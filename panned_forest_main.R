@@ -1,481 +1,438 @@
-TimeMittel<-Sys.time()
-
-Y=Y_start
-
-# Baum=Anzahl der B?ume f?r random Forests, K=Anzahl der potentiell maximierbaren Koordinaten
-
-Schleife=function(durchlauf){
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL)
+{
   
-  K_active=0
+  library(parallel)
+  # Baum= Anzahl der B?um-famililien im "Forest"
+  # splits= Anzahl der Iterationsschritte.
+  # m= number of possible split points
+  TimeMittel<-Sys.time()
   
-  # Berechnen des bootstap sample
+  p <- ncol(X)
+  Blattgroesse <- rep(1,p)  ### minimal leaf size
+  a <- apply(X,2,min)     ## lower bounds
+  b <- apply(X,2,max)     ### upper bounds
   
-  subsample=sample(dim(X)[2],dim(X)[2],replace=TRUE)
-  X_alt=X
-  Y_alt=Y
-  for(i in dim(X)[2]){
-    X[,i]=X_alt[,subsample[i]]
-    Y[i]=Y_alt[subsample[i]]
+  x=t(X[1:m,])
+  for(i in 1:p){
+    h=1:m
+    x[i,]=a[i]+(b[i]-a[i])*h/m
   }
   
-  # x=X
-  
-  # Definition der verschiedenen Bl?cke
-  
-  F=list()
-  
-  # F[[1]][[i]][[k]]= is list of matrices describing intervals  for tree i, leaf k  (which tree tree i given in F3)
-  
-  F[[1]]=list()
-  
-  for(i in 1:length(K)){
-    F[[1]][[i]]=list()
-    F[[1]][[i]][[1]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-    for(j in 1:(dim(X)[1])){
-      F[[1]][[i]][[1]][,j]=c(a[j],b[j])
+  Schleife <- function(run){
+    
+    #???K_active=0
+    # Berechnen des bootstap sample
+    
+    subsample <- sample(nrow(X),nrow(X),replace=TRUE)
+    
+    X_alt <- X
+    Y_alt <- Y
+    
+    for(i in nrow(X)){
+      X[i,]=X_alt[subsample[i],]
+      Y[i]=Y_alt[subsample[i]]
     }
-  }
-  
-  # Funktionswerte ben?tigt f?r das arithmetische Mittel
-  
-  # F[[2]][[i]] is a vector of predictions for each leaf in tree i
-  
-  F[[2]]=list()
-  
-  for(i in 1:length(K)){
-    F[[2]][[i]]=0
-  }
-  
-  # Koordinatengruppenindizees des i-ten Eintrags
-  # F[[3]][[i]] is a vector of variables  in tree i
-  
-  F[[3]]=K
-  
-  
-  # Definition der Partitionen
-  # F[[4]][[i]][[k]] is a vector of individuals in leaf k of tree i
-  
-  F[[4]]=list()
-  
-  for(i in 1:length(K)){
-    F[[4]][[i]]=list(1:(dim(X)[2]))
-  }
- 
- #  F5=? F6=? 
-  
-  
-  F[[5]]=0
-  
-  F[[6]]=0
-  
-  # Residuen f?r das arithmetische Mittel
-  
-  ResiAverage <- function(X,Y,x,I,k){
     
-    # X=Daten, Y=Aktuelles Y, x=Splitpunkt, I=Aktuelle Teilmenge der Indizes, k=Aktuelle Koordinate
     
-    y_1=mean(Y[I][X[k,I]>=x])  ### mean Y of those in I with  X[k,I]>=x
-    y_2=mean(Y[I][X[k,I]<x])   ### mean Y of those in I with  X[k,I]<x
+    # Definition der verschiedenen Bl?cke
     
-    # y_1,y_2=Sch?tzer nach dem Split.
+    K=list()
+    for(i in 1:p){
+      K[[i]]=i
+    }
+    # intervals[[i]][[k]]= is list of matrices describing intervals  for tree i, leaf k  
     
-    Y[I][X[k,I]>=x]=Y[I][X[k,I]>=x]-y_1
-    Y[I][X[k,I]<x]=Y[I][X[k,I]<x]-y_2
+    intervals=list()
     
-    return(sum(Y^2))
-  }
-  
-  # Gegeben der aktuellen Koordinatenmenge K, wo ist der beste Split. 
-  # Es wird das minimale Residuum sowie die Stelle des zugeh?rigen Splits zur?ckgegeben.
-  
-  # Bemerkung: Dies wird f?r endlich viele m?gliche Splitpunkte durchgef?hrt.
-  
-  SplitTest <- function(X,Y,x,I,K){
+    for(i in 1:p){
+      intervals[[i]] <- list()
+      intervals[[i]][[1]] <- matrix(nrow=2, ncol=p)
+      for(j in 1:p){
+        intervals[[i]][[1]][,j]=c(a[j],b[j])
+      }
+    }
     
-    # X=Daten, Y=aktuelles Y, x=Matrix der m?glichen Splitpunkte, I=Aktuelle Teilmenge der Indizes, 
-    # K=Aktuelle Koordinaten.
+    # Funktionswerte ben?tigt f?r das arithmetische Mittel
     
-    R=rep(max(Y^2)*length(Y)+1,dim(x)[2]*dim(x)[1])
-    dim(R)=c(dim(x)[1],dim(x)[2])
+    # values[[i]] is a vector of predictions for each leaf in tree i
     
-    # R=Matrix der Residuen bzgl. der verschiedenen Splits.
-    # Bemerkung: Die Residuen werden nur f?r die relevanten Stellen berechnet. Auf die anderen wird in return auch nicht zugegriffen.
+    values=list()
     
-    for(k in 1:dim(x)[1]){
-      if(k %in% K){
-        for(i in 1:(dim(x)[2])){
-          if(min(c(sum(X[k,I]>=x[k,i]),sum(X[k,I]<x[k,i])))>=Blattgroesse[k]){
+    for(i in 1:p){
+      values[[i]]=0
+    }
+    
+    # Koordinatengruppenindizees des i-ten Eintrags
+    # variables[[i]] is a vector of variables  in tree i
+    
+    variables=K
+    
+    
+    # Definition der Partitionen
+    # individuals[[i]][[k]] is a vector of individuals in leaf k of tree i
+    
+    individuals=list()
+    
+    for(i in 1:p){
+      individuals[[i]]=list(1:nrow(X))
+    }
+    
+    #  F5=? F6=? 
+    
+    F<-list()
+    F[[5]]=0
+    
+    F[[6]]=0
+    
+    # Residuen f?r das arithmetische Mittel
+    
+    ResiAverage <- function(X,Y,x,I,k){
+      
+      # X=Daten, Y=Aktuelles Y, x=Splitpunkt, I=Aktuelle Teilmenge der Indizes, k=Aktuelle Koordinate
+      
+      y_1 <- mean(Y[I][X[I,k]>=x])  ### mean Y of those in I with  X[I,k]>=x
+      y_2 <- mean(Y[I][X[I,k]<x])   ### mean Y of those in I with  X[I,k]<x
+      
+      # y_1,y_2=Sch?tzer nach dem Split.
+      
+      Y[I][X[I,k]>=x] <- Y[I][X[I,k]>=x]-y_1
+      Y[I][X[I,k]<x] <- Y[I][X[I,k]<x]-y_2
+      
+      return(sum(Y^2))
+    }
+    
+    # Gegeben der aktuellen Koordinatenmenge K, wo ist der beste Split. 
+    # Es wird das minimale Residuum sowie die Stelle des zugeh?rigen splits zur?ckgegeben.
+    
+    # Bemerkung: Dies wird f?r endlich viele m?gliche Splitpunkte durchgef?hrt.
+    
+    SplitTest <- function(X,Y,x,I,K){
+      
+      # X=Daten, Y=aktuelles Y, x=Matrix der m?glichen Splitpunkte, I=Aktuelle Teilmenge der Indizes, 
+      # K=Aktuelle Koordinaten.
+      
+      R <- matrix(max(Y^2)*length(Y)+1, nrow=nrow(x), ncol=ncol(x))
+      
+      # R=Matrix der Residuen bzgl. der verschiedenen splits.
+      # Bemerkung: Die Residuen werden nur f?r die relevanten Stellen berechnet. Auf die anderen wird in return auch nicht zugegriffen.
+      
+      for(k in K){
+        for(i in 1:ncol(x)){
+          if(min(c(sum(X[I,k]>=x[k,i]),sum(X[I,k]<x[k,i])))>=Blattgroesse[k]){
             R[k,i]=ResiAverage(X,Y,x[k,i],I,k)  ### residual sum of squares for split at x[k,i]
           }
         }
       }
-    }
-    
-    # Kurzer Test, ob ein Fehler vorherrscht
-    
-    if(sum(R>max(Y^2)*length(Y)+1)>0){
-      print("Residuen drehen durch in SplitTest")
-    }
-    
-    return(c(min(R),which(R == min(R), arr.ind = TRUE)[1,]))
-  }
-  
-  # Iteration
-  
-  while(Splits>0){
-    
-    Splits=Splits-1
-    
-    K_use=sample(dim(X)[1],K_anzahl)
-    
-    # Hilfsvariablen
-    
-    R=1:length(F[[3]])
-    Ikx=1:(3*length(F[[3]]))
-    dim(Ikx)=c(3,length(F[[3]]))
-    
-    # R=Matrix der Residuen bzgl. des besten Splits f?r verschiedenen Koordinatengruppen K[[i]],
-    # Ikx=Indizes der besten zu splitenden Menge, der zu splitenden Koordinate und des zugeh?rigen Splitpunkts f?r verschiedene Koordinatengruppen K.
-    
-    for(i_1 in 1:length(F[[3]])){
-     
-       #i_1 is index of current tree
       
-      # Nur Teilsample verwenden
       
-      K_neu=K_use
+      # Kurzer Test, ob ein Fehler vorherrscht
       
-      if(length(F[[4]][[i_1]])==1 | length(F[[3]][[i_1]])==Komplex ){
-        
-        K_neu=intersect(K_use,F[[3]][[i_1]])
-        
+      if(sum(R>max(Y^2)*length(Y)+1)>0){
+        print("Residuen drehen durch in SplitTest")
       }
       
+      return(c(min(R),which(R == min(R), arr.ind = TRUE)[1,]))
+    }
+    
+    # Iteration
+    
+    while(splits>0){
       
-      # Residuumsberechnung
+      splits=splits-1
       
-      R_1=rep(sum(Y^2),length(F[[4]][[i_1]]))  # R_1=Matrix der Residuen des besten Splits f?r versch. Teilmengen der Datenmenge, 
+      k_use=sample(1:p,m_try)
+      tree_use <- sample(1:length(values),t_try)
+      #tree_use <- 1:length(values)
       
-     ## kx_1=1:(2*length(F[[4]][[i_1]]))   # kx_1=Index der zu splitenden Koordinate und der Splitpunkt. 
-     
-     #??????  dim(kx_1)=c(2,length(F[[4]][[i_1]]))
       
-      kx_1<-matrix(nrow=2, ncol=length(F[[4]][[i_1]]))
       
-      if(length(K_neu)>0){
+      
+      
+      
+      
+      # Hilfsvariablen
+      
+      R <- rep(Inf,length(variables))
+      Ikx <- matrix(nrow=3,ncol=length(variables))
+      
+      # R=Matrix der Residuen bzgl. des besten splits f?r verschiedenen Koordinatengruppen K[[i]],
+      # Ikx=Indizes der besten zu splitenden Menge, der zu splitenden Koordinate und des zugeh?rigen Splitpunkts f?r verschiedene Koordinatengruppen K.
+      
+      
+      for(i_1 in tree_use){
         
-       
-        for(i_2 in 1:length(F[[4]][[i_1]])){
+        #i_1 is index of current tree
+        
+        # Nur Teilsample verwenden
+        
+        k_neu <- k_use
+        
+        if(length(individuals[[i_1]])==1 | length(variables[[i_1]])==max_interaction ){
+          ### if tree has only one leaf or already max number of interactions
+          k_neu <- intersect(k_use,variables[[i_1]])
+        }
+        
+        
+        # Residuumsberechnung
+        R_1 <- rep(sum(Y^2),length(individuals[[i_1]]))  # R_1=Matrix der Residuen des besten splits f?r versch. Blaetter
+        kx_1<-matrix(nrow=2, ncol=length(individuals[[i_1]])) # kx_1=Index der zu splitenden Koordinate und der Splitpunkt.
+        
+        
+        
+        if(length(k_neu)>0){
           
-          #i_2 is index of current leaf
-          
-          # Berechnung der Splitpunkte.
-          
-          if(IterSplit == 1){
-            for(i_3 in 1:(dim(X)[1])){
-              if(i_3 %in% F[[3]][[i_1]]){
-                h=1:m
-                x[i_3,]=quantile(X[i_3,F[[4]][[i_1]][[i_2]]], h/m)
+          for(i_2 in 1:length(individuals[[i_1]])){
+            
+            #i_2 is index of current leaf
+            # Berechnung der Splitpunkte.
+            #i_3 is variable (in leaf i_2 in tree i_1)
+            
+            if(Itersplit == 1){
+              for(i_3 in  variables[[i_1]]){
+                h <- 1:m
+                x[i_3,] <- quantile(X[individuals[[i_1]][[i_2]], i_3], h/m)
               }
             }
+            
+            h <- SplitTest(X,Y,x,individuals[[i_1]][[i_2]],k_neu)
+            if(h[1]<sum(Y^2)){
+              R_1[i_2] <- h[1]
+              kx_1[,i_2] <- c(h[2],x[h[2],h[3]])
+            }
           }
+          R[i_1] <- min(R_1)
+          Ikx[,i_1] <- c(which.min(R_1),kx_1[,which.min(R_1)])  # Ikx: each column for different tree. first row=which leaf to split; second row=which which variable to split, third row= where(=value) to split the variable
           
-          h=SplitTest(X,Y,x,F[[4]][[i_1]][[i_2]],K_neu)
-          if(h[1]<sum(Y^2)){
-            R_1[i_2]=h[1]
-            kx_1[,i_2]=c(h[2],x[h[2],h[3]])
-          }
+        } 
+        
+        # Speicherung des Wertes des optimalen Residuums sowie dessen Index, die zu splitende Koordinate und den Splitpunkt
+        if (i_1==tail(tree_use,1)){
+          if ( sum(R==Inf)==length(R) ) splits <- splits+1
         }
         
       }
       
-      # Speicherung des Wertes des optimalen Residuums sowie dessen Index, die zu splitende Koordinate und den Splitpunkt
-      
-      R[i_1]=min(R_1)
-      Ikx[,i_1]=c(which.min(R_1),kx_1[,which.min(R_1)])
-    }
-    
-    # Mindestabbruchbedingung
-    
-    if(min(R) < sum(Y^2)){
       
       # Definition der optimalen Werte
       
-      i_opt=which.min(R)
-      Ikx_opt=Ikx[,i_opt]
+      R_opt   <- min(R)
+      Ikx_opt <- c(which.min(R), Ikx[,which.min(R)]) # best tree, leaf, variable, split-valaue
       
-      F[[6]]=c(F[[6]],c(i_opt,Ikx_opt[2]))
       
-      # Updaten der Terme
+      # Mindestabbruchbedingung
       
-      if(Ikx_opt[2] %in% F[[3]][[i_opt]]){
+      if(min(R) < sum(Y^2)){
         
-        F[[4]][[i_opt]][[length(F[[4]][[i_opt]])+1]]=intersect(which(X[Ikx_opt[2],]<Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
+        F[[6]] <- c(F[[6]], c(Ikx_opt[1], Ikx_opt[3]) ) 
         
-        # Updaten der mehrdimensionalen Intervalle
+        # Updaten der Terme
+        I_12 <-  which(X[,Ikx_opt[3]]<Ikx_opt[4])   #### individuals who fulfil split criteria 2
+        I_11 <-  which(X[,Ikx_opt[3]]>=Ikx_opt[4])   #### individuals who fulfil split criteria 1
+        I_1 <-   individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]  ### individuals in split-leaf 
         
-        F[[1]][[i_opt]][[length(F[[4]][[i_opt]])]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-        for(j in 1:(dim(X)[1])){
-          F[[1]][[i_opt]][[length(F[[4]][[i_opt]])]][,j]=F[[1]][[i_opt]][[Ikx_opt[1]]][,j]
-        }
-        F[[1]][[i_opt]][[length(F[[4]][[i_opt]])]][,Ikx_opt[2]]=c(F[[1]][[i_opt]][[Ikx_opt[1]]][1,Ikx_opt[2]],Ikx_opt[3])
-        
-        # Berechnung des Differenzterms
-        
-        y_2=mean(Y[F[[4]][[i_opt]][[length(F[[4]][[i_opt]])]]])
-        
-        # Updaten der Y
-        
-        Y[F[[4]][[i_opt]][[length(F[[4]][[i_opt]])]]]=Y[F[[4]][[i_opt]][[length(F[[4]][[i_opt]])]]]-y_2
-        
-        # Updaten des zugeh?rigen Funktionswerts
-        
-        F[[2]][[i_opt]][length(F[[4]][[i_opt]])]=F[[2]][[i_opt]][Ikx_opt[1]]+y_2
-        
-        # Updaten der mehrdimensionalen Intervalle
-        # Bemerkung: Das updaten der mehrdimensionalen Intervalle geschieht nur, falls auch wirklich das Datenset geteilt wird.
-        
-        F[[1]][[i_opt]][[Ikx_opt[1]]][1,Ikx_opt[2]]=Ikx_opt[3]
-        
-        # Updaten der I    
-        
-        F[[4]][[i_opt]][[Ikx_opt[1]]]=intersect(which(X[Ikx_opt[2],]>=Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
-        
-        # Berechnung des Differenzterms
-        
-        y_1=mean(Y[F[[4]][[i_opt]][[Ikx_opt[1]]]])
-        
-        # Updaten der Y
-        
-        Y[F[[4]][[i_opt]][[Ikx_opt[1]]]]=Y[F[[4]][[i_opt]][[Ikx_opt[1]]]]-y_1
-        
-        # Updaten des zugeh?rigen Funktionswerts
-        
-        F[[2]][[i_opt]][Ikx_opt[1]]=F[[2]][[i_opt]][Ikx_opt[1]]+y_1
-        
-      } else {
-        
-        TreeExists=0
-        
-        for(i in 1:length(F[[3]])){
+        if(Ikx_opt[3] %in% variables[[Ikx_opt[1]]]){  ### if split variable is already in tree to be split
           
-          if(length(F[[3]][[i]])==length(F[[3]][[i_opt]])+1){
+          
+          individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])+1]] <- intersect(I_12, I_1 )      #### individuals for  new leaf 
+          individuals[[Ikx_opt[1]]][[Ikx_opt[2]]] <- intersect( I_11 , I_1)                         #### new split-leaf = remaining individuals
+          
+          # Updaten der mehrdimensionalen Intervalle
+          intervals[[Ikx_opt[1]]][[length(intervals[[Ikx_opt[1]]])+1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]] #add one leaf to intervals
+          
+          intervals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]][2,Ikx_opt[3]] <- Ikx_opt[4]  ### new leaf has new interval at split variable: (split value= upper bopund, lower bound remains)
+          intervals[[Ikx_opt[1]]][[Ikx_opt[2]]][1,Ikx_opt[3]] <- Ikx_opt[4] ### split leaf has new interval at split variable: (split value= lower bound, upper bound remains)
+          
+          # Berechnung des Differenzterms
+          y_2 <- mean(Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]])
+          y_1 <- mean(Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]])
+          
+          
+          # Updaten der Y
+          Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]] <- Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]]-y_2
+          Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]] <- Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]]-y_1
+          
+          # Updaten des zugeh?rigen Funktionswerts
+          values[[Ikx_opt[1]]][length(individuals[[Ikx_opt[1]]])] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_2
+          values[[Ikx_opt[1]]][Ikx_opt[2]] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_1
+          
+        } else {
+          
+          TreeExists=0
+          
+          for(i in 1:length(variables)){
             
-            if(prod(F[[3]][[i]]==sort(c(F[[3]][[i_opt]],Ikx_opt[2])))){
-              
-              TreeExists=1
-              
-              F[[4]][[i]][[length(F[[4]][[i]])+1]]=intersect(which(X[Ikx_opt[2],]<Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
-              
-              # Updaten der mehrdimensionalen Intervalle
-              
-              F[[1]][[i]][[length(F[[4]][[i]])]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-              for(j in 1:(dim(X)[1])){
-                F[[1]][[i]][[length(F[[4]][[i]])]][,j]=F[[1]][[i_opt]][[Ikx_opt[1]]][,j]
+            if(length(variables[[i]])==length(variables[[Ikx_opt[1]]])+1){ ###if number of variables in tree i is same as num of var in new split tree
+              if(prod(variables[[i]]==sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3])))){ ### if variables in tree i are same as  var in new split tree
+                
+                TreeExists=1  ###  tree i is the same as new split tree
+                
+                individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_12, I_1)
+                individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_11, I_1)
+                
+                # Updaten der mehrdimensionalen Intervalle
+                
+                intervals[[i]][[length(individuals[[i]])]] <- intervals[[i]][[length(individuals[[i]])-1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
+                
+                intervals[[i]][[length(individuals[[i]])-1]][2,Ikx_opt[3]] <- Ikx_opt[4]
+                intervals[[i]][[length(individuals[[i]])]][1,Ikx_opt[3]] <- Ikx_opt[4]
+                
+                # Berechnung des Differenzterms
+                
+                y_2 <- mean(Y[individuals[[i]][[length(individuals[[i]])-1]]])
+                y_1 <- mean(Y[individuals[[i]][[length(individuals[[i]])]]])
+                
+                # Updaten der Y
+                
+                Y[individuals[[i]][[length(individuals[[i]])-1]]] <- Y[individuals[[i]][[length(individuals[[i]])-1]]]-y_2
+                Y[individuals[[i]][[length(individuals[[i]])]]] <- Y[individuals[[i]][[length(individuals[[i]])]]]-y_1
+                
+                # Updaten des zugeh?rigen Funktionswerts
+                
+                values[[i]][length(individuals[[i]])-1]=y_2
+                values[[i]][length(individuals[[i]])]=y_1
+                
+                
               }
-              F[[1]][[i]][[length(F[[4]][[i]])]][,Ikx_opt[2]]=c(F[[1]][[i_opt]][[Ikx_opt[1]]][1,Ikx_opt[2]],Ikx_opt[3])
-              
-              # Berechnung des Differenzterms
-              
-              y_2=mean(Y[F[[4]][[i]][[length(F[[4]][[i]])]]])
-              
-              # Updaten der Y
-              
-              Y[F[[4]][[i]][[length(F[[4]][[i]])]]]=Y[F[[4]][[i]][[length(F[[4]][[i]])]]]-y_2
-              
-              # Updaten des zugeh?rigen Funktionswerts
-              
-              F[[2]][[i]][length(F[[4]][[i]])]=y_2
-              
-              # Updaten der mehrdimensionalen Intervalle
-              # Bemerkung: Das updaten der mehrdimensionalen Intervalle geschieht nur, falls auch wirklich das Datenset geteilt wird.
-              
-              F[[4]][[i]][[length(F[[4]][[i]])+1]]=intersect(which(X[Ikx_opt[2],]>=Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
-              
-              # Updaten der mehrdimensionalen Intervalle
-              
-              F[[1]][[i]][[length(F[[4]][[i]])]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-              for(j in 1:(dim(X)[1])){
-                F[[1]][[i]][[length(F[[4]][[i]])]][,j]=F[[1]][[i_opt]][[Ikx_opt[1]]][,j]
-              }
-              F[[1]][[i]][[length(F[[4]][[i]])]][,Ikx_opt[2]]=c(Ikx_opt[3],F[[1]][[i_opt]][[Ikx_opt[1]]][2,Ikx_opt[2]])
-              
-              # Berechnung des Differenzterms
-              
-              y_1=mean(Y[F[[4]][[i]][[length(F[[4]][[i]])]]])
-              
-              # Updaten der Y
-              
-              Y[F[[4]][[i]][[length(F[[4]][[i]])]]]=Y[F[[4]][[i]][[length(F[[4]][[i]])]]]-y_1
-              
-              # Updaten des zugeh?rigen Funktionswerts
-              
-              F[[2]][[i]][length(F[[4]][[i]])]=y_1
-              
             }
           }
-        }
-        
-        if(TreeExists==0){
           
-          F[[3]][[length(F[[3]])+1]]=sort(c(F[[3]][[i_opt]],Ikx_opt[2]))
-          F[[4]][[length(F[[3]])]]=list()
-          F[[4]][[length(F[[3]])]][[1]]=intersect(which(X[Ikx_opt[2],]<Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
-          
-          # Updaten der mehrdimensionalen Intervalle
-          
-          F[[1]][[length(F[[3]])]]=list()
-          F[[1]][[length(F[[3]])]][[1]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-          for(j in 1:(dim(X)[1])){
-            F[[1]][[length(F[[3]])]][[1]][,j]=F[[1]][[i_opt]][[Ikx_opt[1]]][,j]
+          if(TreeExists==0){
+            
+            variables[[length(variables)+1]] <- sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3]))
+            individuals[[length(individuals)+1]] <- list()
+            individuals[[length(individuals)]][[1]] <- intersect(which(X[,Ikx_opt[3]]<Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
+            individuals[[length(individuals)]][[2]] <- intersect(which(X[,Ikx_opt[3]]>=Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
+            
+            # Updaten der mehrdimensionalen Intervalle
+            
+            intervals[[length(intervals)+1]] <- list()
+            intervals[[length(intervals)]][[1]] <- intervals[[length(intervals)]][[2]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
+            
+            intervals[[length(intervals)]][[1]][2,Ikx_opt[3]] <- Ikx_opt[4]
+            intervals[[length(intervals)]][[2]][1,Ikx_opt[3]] <- Ikx_opt[4]
+            
+            # Berechnung des Differenzterms
+            
+            y_2 <- mean(Y[individuals[[length(variables)]][[1]]])
+            y_1 <- mean(Y[individuals[[length(variables)]][[2]]])
+            
+            # Updaten der Y
+            
+            Y[individuals[[length(variables)]][[1]]] <- Y[individuals[[length(variables)]][[1]]]-y_2
+            Y[individuals[[length(variables)]][[2]]] <- Y[individuals[[length(variables)]][[2]]]-y_1
+            
+            values[[length(variables)]] <- y_2
+            values[[length(variables)]][2] <- y_1
+            
           }
-          F[[1]][[length(F[[3]])]][[1]][,Ikx_opt[2]]=c(F[[1]][[i_opt]][[Ikx_opt[1]]][1,Ikx_opt[2]],Ikx_opt[3])
-          
-          # Berechnung des Differenzterms
-          
-          y_2=mean(Y[F[[4]][[length(F[[3]])]][[1]]])
-          
-          # Updaten der Y
-          
-          Y[F[[4]][[length(F[[3]])]][[1]]]=Y[F[[4]][[length(F[[3]])]][[1]]]-y_2
-          
-          # Updaten des zugeh?rigen Funktionswerts
-          
-          F[[2]][[length(F[[3]])]]=y_2
-          
-          # Updaten der mehrdimensionalen Intervalle
-          # Bemerkung: Das updaten der mehrdimensionalen Intervalle geschieht nur, falls auch wirklich das Datenset geteilt wird.
-          
-          F[[4]][[length(F[[3]])]][[2]]=intersect(which(X[Ikx_opt[2],]>=Ikx_opt[3]), F[[4]][[i_opt]][[Ikx_opt[1]]])
-          
-          # Updaten der mehrdimensionalen Intervalle
-          
-          F[[1]][[length(F[[3]])]][[2]]=matrix(1:(dim(X)[1]*2), nrow=2, ncol=dim(X)[1])
-          for(j in 1:(dim(X)[1])){
-            F[[1]][[length(F[[3]])]][[2]][,j]=F[[1]][[i_opt]][[Ikx_opt[1]]][,j]
-          }
-          F[[1]][[length(F[[3]])]][[2]][,Ikx_opt[2]]=c(Ikx_opt[3],F[[1]][[i_opt]][[Ikx_opt[1]]][2,Ikx_opt[2]])
-          
-          # Berechnung des Differenzterms
-          
-          y_1=mean(Y[F[[4]][[length(F[[3]])]][[2]]])
-          
-          # Updaten der Y
-          
-          Y[F[[4]][[length(F[[3]])]][[2]]]=Y[F[[4]][[length(F[[3]])]][[2]]]-y_1
-          
-          # Updaten des zugeh?rigen Funktionswerts
-          
-          F[[2]][[length(F[[3]])]][2]=y_1
           
         }
         
       }
-      
     }
-  }
-  
-  # Normieren der Komponenten
-  
-  F[[5]]=0
-  
-  # Purity Algorithmus
-  
-  for(l in Komplex:1){
     
-    for(i_0 in 1:length(F[[3]])){
+    # Normieren der Komponenten
+    
+    F[[5]]=0
+    
+    # Purity Algorithmus
+    
+    for(l in max_interaction:1){
       
-      if(length(F[[3]][[i_0]])==l){
+      for(i_0 in 1:length(variables)){
         
-        if(l==1){
+        if(length(variables[[i_0]])==l){
           
-          i_1=F[[3]][[i_0]]
-          
-          F[[1]][[i_0]][[length(F[[1]][[i_0]])+1]]=F[[1]][[i_0]][[1]]
-          
-          F[[1]][[i_0]][[length(F[[1]][[i_0]])]][,i_1]=c(a[i_1],b[i_1])
-          
-          F[[2]][[i_0]][[length(F[[1]][[i_0]])]]=0
-        
-          for(i_3 in 1:(length(F[[1]][[i_0]])-1)){
+          if(l==1){
             
-            F[[2]][[i_0]][[length(F[[1]][[i_0]])]]=F[[2]][[i_0]][[length(F[[1]][[i_0]])]]-F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+            i_1=variables[[i_0]]
             
-            F[[5]]=F[[5]]+F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+            intervals[[i_0]][[length(intervals[[i_0]])+1]]=intervals[[i_0]][[1]]
             
-          }
-          
-        } else {
-        
-          for(i_1 in 1:dim(X)[1]){
+            intervals[[i_0]][[length(intervals[[i_0]])]][,i_1]=c(a[i_1],b[i_1])
             
-            if(i_1 %in% F[[3]][[i_0]]){
+            values[[i_0]][[length(intervals[[i_0]])]]=0
+            
+            for(i_3 in 1:(length(intervals[[i_0]])-1)){
               
-              exists=0
+              values[[i_0]][[length(intervals[[i_0]])]]=values[[i_0]][[length(intervals[[i_0]])]]-values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
               
-              for(i_2 in 1:length(F[[3]])){
+              F[[5]]=F[[5]]+values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+              
+            }
+            
+          } else {
+            
+            for(i_1 in 1:dim(X)[1]){
+              
+              if(i_1 %in% variables[[i_0]]){
                 
-                if(length(F[[3]][[i_2]])==l-1){
+                exists=0
+                
+                for(i_2 in 1:length(variables)){
                   
-                  if(all(F[[3]][[i_2]]==F[[3]][[i_0]][F[[3]][[i_0]]!=i_1])){
+                  if(length(variables[[i_2]])==l-1){
                     
-                    exists=1
-                    
-                    for(i_3 in 1:length(F[[1]][[i_0]])){
+                    if(all(variables[[i_2]]==variables[[i_0]][variables[[i_0]]!=i_1])){
                       
-                      exists_2=0
+                      exists=1
                       
-                      F[[1]][[i_0]][[length(F[[1]][[i_0]])+1]]=F[[1]][[i_0]][[i_3]]
-                      
-                      F[[1]][[i_0]][[length(F[[1]][[i_0]])]][,i_1]=c(a[i_1],b[i_1])
-                      
-                      F[[2]][[i_0]][[length(F[[1]][[i_0]])]]=-F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
-                      
-                      for(i_4 in 1:length(F[[1]][[i_2]])){
+                      for(i_3 in 1:length(intervals[[i_0]])){
                         
-                        Cube=F[[1]][[i_0]][[i_3]]
+                        exists_2=0
                         
-                        Cube[,i_1]=c(a[i_1],b[i_1])
+                        intervals[[i_0]][[length(intervals[[i_0]])+1]]=intervals[[i_0]][[i_3]]
                         
-                        if(all(F[[1]][[i_2]][[i_4]]==Cube) & exists_2==0){
+                        intervals[[i_0]][[length(intervals[[i_0]])]][,i_1]=c(a[i_1],b[i_1])
+                        
+                        values[[i_0]][[length(intervals[[i_0]])]]=-values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                        
+                        for(i_4 in 1:length(intervals[[i_2]])){
                           
-                          exists_2=1
+                          Cube=intervals[[i_0]][[i_3]]
                           
-                          F[[2]][[i_2]][[i_4]]=F[[2]][[i_2]][[i_4]]+F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
-                        } 
-                      }
-                      
-                      if(exists_2==0){
+                          Cube[,i_1]=c(a[i_1],b[i_1])
+                          
+                          if(all(intervals[[i_2]][[i_4]]==Cube) & exists_2==0){
+                            
+                            exists_2=1
+                            
+                            values[[i_2]][[i_4]]=values[[i_2]][[i_4]]+values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                          } 
+                        }
                         
-                        F[[1]][[i_2]][[length(F[[1]][[i_2]])+1]]=F[[1]][[i_0]][[length(F[[1]][[i_0]])]]
-                        
-                        F[[2]][[i_2]][[length(F[[1]][[i_2]])]]=F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                        if(exists_2==0){
+                          
+                          intervals[[i_2]][[length(intervals[[i_2]])+1]]=intervals[[i_0]][[length(intervals[[i_0]])]]
+                          
+                          values[[i_2]][[length(intervals[[i_2]])]]=values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                        }
                       }
                     }
                   }
                 }
-              }
-              
-              if(exists==0){
                 
-                F[[3]][[length(F[[3]])+1]]=F[[3]][[i_0]][F[[3]][[i_0]]!=i_1]
-                
-                F[[1]][[length(F[[3]])]]=list()
-                
-                F[[2]][[length(F[[3]])]]=vector()
-                
-                for(i_3 in 1:length(F[[1]][[i_0]])){
+                if(exists==0){
                   
-                  F[[1]][[i_0]][[length(F[[1]][[i_0]])+1]]=F[[1]][[i_0]][[i_3]]
+                  variables[[length(variables)+1]]=variables[[i_0]][variables[[i_0]]!=i_1]
                   
-                  F[[1]][[i_0]][[length(F[[1]][[i_0]])]][,i_1]=c(a[i_1],b[i_1])
+                  intervals[[length(variables)]]=list()
                   
-                  F[[2]][[i_0]][[length(F[[1]][[i_0]])]]=-F[[2]][[i_0]][[i_3]]*(F[[1]][[i_0]][[i_3]][2,i_1]-F[[1]][[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                  values[[length(variables)]]=vector()
                   
-                  F[[1]][[length(F[[3]])]][[length(F[[1]][[length(F[[3]])]])+1]]=F[[1]][[i_0]][[length(F[[1]][[i_0]])]]
-                  
-                  F[[2]][[length(F[[3]])]][[length(F[[1]][[length(F[[3]])]])]]=-F[[2]][[i_0]][[length(F[[1]][[i_0]])]]
-                  
+                  for(i_3 in 1:length(intervals[[i_0]])){
+                    
+                    intervals[[i_0]][[length(intervals[[i_0]])+1]]=intervals[[i_0]][[i_3]]
+                    
+                    intervals[[i_0]][[length(intervals[[i_0]])]][,i_1]=c(a[i_1],b[i_1])
+                    
+                    values[[i_0]][[length(intervals[[i_0]])]]=-values[[i_0]][[i_3]]*(intervals[[i_0]][[i_3]][2,i_1]-intervals[[i_0]][[i_3]][1,i_1])/(b[i_1]-a[i_1])
+                    
+                    intervals[[length(variables)]][[length(intervals[[length(variables)]])+1]]=intervals[[i_0]][[length(intervals[[i_0]])]]
+                    
+                    values[[length(variables)]][[length(intervals[[length(variables)]])]]=-values[[i_0]][[length(intervals[[i_0]])]]
+                    
+                  }
                 }
               }
             }
@@ -483,112 +440,108 @@ Schleife=function(durchlauf){
         }
       }
     }
+    
+    return(list(intervals=intervals, values=values, K=K,  individuals=individuals,  F5=F[[5]], F6=F[[6]]))
   }
   
-  return(F)
-}
-
-# Parallelisieren
-
-# Erstelle ein Cluster
-
-cl=makeCluster(Kerne)
-
-clusterExport(cl,c("X","Y","K","a","b","IterSplit","x","m","K_anzahl","Blattgroesse","Komplex","Splits"))
-
-# Berechne die n?tigen Informationen f?r den Sch?tzer
-
-F=parSapply(cl, 1:Baum, Schleife)
-
-# Cluster wieder entfernen
-
-stopCluster(cl)
-
-# Definition der resultierenden Funktionen 
-
-# Definition der Funktion eines Baumes s
-
-F_tree_Mittel=function(x,s=1,i=0,F){
+  # Parallelisieren
+  # Erstelle ein Cluster
+  if(is.null(n.cores)) Kerne <- detectCores() else Kerne <- n.cores
+  cl <- makeCluster(Kerne)
   
-  # x=Eingabevektor, s=Index des Baumes, i=Index des Summaden, den man berechnen m?chte. Bei i=0 wird die gesammte Funktion berechnet 
   
-  f=0
+  clusterExport(cl,c("Y","X","max_interaction", "m_try", "t_try", "Baum", "splits", "m", "Itersplit","a","b","p","x","Blattgroesse"), envir=environment())
+  
+  forest_res <- parSapply(cl, 1:Baum, Schleife) # Berechne die n?tigen Informationen f?r den Sch?tzer
+  
+  
+  stopCluster(cl) # Cluster wieder entfernen
+  
+  # Definition der resultierenden Funktionen 
+  # Definition der Funktion eines Baumes s
+  F_tree_Mittel=function(x,s=1,i=0,forest_res){
     
-  #Fall 1: Man berechnet f(x).
-  
-  if(length(i)==1){
+    # x=Eingabevektor, s=Index des Baumes, i=Index des Summaden, den man berechnen m?chte. Bei i=0 wird die gesammte   Funktion berechnet 
     
-    if(i==0){
+    f=0
+    
+    #Fall 1: Man berechnet f(x).
+    
+    if(length(i)==1){
       
-      if(length(x) != dim(X)[1]){
+      if(i==0){
         
-        print("The vector x has the wrong dimension in order to calculate f(x)")  
-      }
-      
-      for(i in 1:length(F[[3,s]])){
-        
-        for(j in 1:length(F[[1,s]][[i]])){
+        if(length(x) != p){
           
-          if(prod(F[[1,s]][[i]][[j]][1,F[[3,s]][[i]]]<= x[F[[3,s]][[i]]] & (F[[1,s]][[i]][[j]][2,F[[3,s]][[i]]]>x[F[[3,s]][[i]]]|F[[1,s]][[i]][[j]][2,F[[3,s]][[i]]]==b[F[[3,s]][[i]]]))){
-            
-            f=f+F[[2,s]][[i]][j]
-          }   
+          print("The vector x has the wrong dimension in order to calculate f(x)")  
         }
+        
+        for(i in 1:length(forest_res[[3,s]])){
+          
+          for(j in 1:length(forest_res[[1,s]][[i]])){
+            
+            if(prod(forest_res[[1,s]][[i]][[j]][1,forest_res[[3,s]][[i]]]<= x[forest_res[[3,s]][[i]]] & (forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]]]>x[forest_res[[3,s]][[i]]]|forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]]]==b[forest_res[[3,s]][[i]]]))){
+              
+              f=f+forest_res[[2,s]][[i]][j]
+            }   
+          }
+        }
+        
+        return(f+forest_res[[5,s]])   
       }
-      
-      return(f+F[[5,s]])   
     }
-  }
-
-  # Fall 1: Man berechnet den Wert des i-ten Summanden f_i(x).
-  
-  for(i_0 in 1:length(F[[3,s]])){
     
-    if(length(F[[3,s]][[i_0]])==length(i)){
+    # Fall 1: Man berechnet den Wert des i-ten Summanden f_i(x).
+    
+    for(i_0 in 1:length(forest_res[[3,s]])){
       
-      if(prod(F[[3,s]][[i_0]]==sort(i))){
+      if(length(forest_res[[3,s]][[i_0]])==length(i)){
         
-        if(length(x) != length(F[[3,s]][[i_0]])){
-    
-          print("The vector x has the wrong dimension in order to calculate f_i(x)")  
-        }
-        
-        for(j in 1:length(F[[1,s]][[i_0]])){
+        if(prod(forest_res[[3,s]][[i_0]]==sort(i))){
           
-          if(prod(F[[1,s]][[i_0]][[j]][1,F[[3,s]][[i_0]]]<= x & (F[[1,s]][[i_0]][[j]][2,F[[3,s]][[i_0]]]>x|F[[1,s]][[i_0]][[j]][2,F[[3,s]][[i_0]]]==b[F[[3,s]][[i_0]]]))){
+          if(length(x) != length(forest_res[[3,s]][[i_0]])){
             
-            f=f+F[[2,s]][[i_0]][j]
-          }   
+            print("The vector x has the wrong dimension in order to calculate f_i(x)")  
+          }
+          
+          for(j in 1:length(forest_res[[1,s]][[i_0]])){
+            
+            if(prod(forest_res[[1,s]][[i_0]][[j]][1,forest_res[[3,s]][[i_0]]]<= x & (forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]]]>x|forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]]]==b[forest_res[[3,s]][[i_0]]]))){
+              
+              f=f+forest_res[[2,s]][[i_0]][j]
+            }   
+          }
         }
       }
     }
+    
+    return(f)
   }
   
-  return(f)
-}
-
-# Definition der Funktion des Waldes 
-
-F_Mittel1=F
-
-Baum_mittel=Baum
-
-F_average=function(x,i=0){
+  # Definition der Funktion des Waldes 
   
-  y=0
-  for(s in 1:Baum_mittel){
-    y=y+F_tree_Mittel(x,s,i,F_Mittel1)
+  F_Mittel1 <- forest_res
+  
+  Baum_mittel <- Baum
+  
+  F_average=function(x,i=0){
+    
+    y=0
+    for(s in 1:Baum_mittel){
+      y=y+F_tree_Mittel(x,s,i,F_Mittel1)
+    }
+    return(y/Baum_mittel)
   }
-  return(y/Baum_mittel)
+  # Berechnung des MSEs als Indikator f?r die Performance
+  
+  Y_fitted=0
+  for(j in 1:nrow(X)){
+    Y_fitted[j]=F_average(X[j,])
+  }
+  
+  #MSE_average=1/n*sum((Y_true-S)^2)
+  
+  TimeMittel=Sys.time()-TimeMittel
+  return(list(Y_fitted=Y_fitted,forest_res=forest_res))
 }
 
-# Berechnung des MSEs als Indikator f?r die Performance
-
-S=0
-for(j in 1:(dim(X)[2])){
-  S[j]=F_average(X[,j])
-}
-
-MSE_average=1/n*sum((Y_true-S)^2)
-
-TimeMittel=Sys.time()-TimeMittel
