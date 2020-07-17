@@ -1,4 +1,4 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL)
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE)
 {
   
   library(parallel)
@@ -36,10 +36,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     
     # Definition der verschiedenen Bl?cke
     
-    K=list()
-    for(i in 1:p){
-      K[[i]]=i
-    }
+
     # intervals[[i]][[k]]= is list of matrices describing intervals  for tree i, leaf k  
     
     intervals=list()
@@ -65,7 +62,11 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     # Koordinatengruppenindizees des i-ten Eintrags
     # variables[[i]] is a vector of variables  in tree i
     
-    variables=K
+    variables=list()
+    for(i in 1:p){
+      variables[[i]]=i
+    }
+  
     
     
     # Definition der Partitionen
@@ -141,8 +142,10 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       splits=splits-1
       
       k_use=sample(1:p,m_try)
-      tree_use <- sample(1:length(values),t_try)
-      #tree_use <- 1:length(values)
+      if (m_try==0) k_use <- 1:p 
+      
+      tree_use <- sample(1:length(values), max(t_try,length(values)))
+      if (t_try ==0) tree_use <- 1:length(values)
       
       
       
@@ -164,8 +167,9 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
         #i_1 is index of current tree
         
         # Nur Teilsample verwenden
-        if(length(variables[[i_1]])==1) k_neu <- union(k_use,variables[[i_1]]) else  k_neu <- k_use
-       
+        
+        if(single_tree_ignore_m_try==TRUE & length(variables[[i_1]])==1) k_neu <- union(k_use,variables[[i_1]]) else  k_neu <- k_use
+        
         if(length(individuals[[i_1]])==1 | length(variables[[i_1]])==max_interaction ){
           ### if tree has only one leaf or already max number of interactions
           k_neu <- intersect(k_neu,variables[[i_1]])
@@ -440,7 +444,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       }
     }
     
-    return(list(intervals=intervals, values=values, K=K,  individuals=individuals,  F5=F[[5]], F6=F[[6]]))
+    return(list(intervals=intervals, values=values, variables=variables,  individuals=individuals,  F5=F[[5]], F6=F[[6]]))
   }
   
   # Parallelisieren
