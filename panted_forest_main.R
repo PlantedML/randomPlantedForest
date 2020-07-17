@@ -164,12 +164,11 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
         #i_1 is index of current tree
         
         # Nur Teilsample verwenden
-        
-        k_neu <- k_use
-        
+        if(length(variables[[i_1]])==1) k_neu <- union(k_use,variables[[i_1]]) else  k_neu <- k_use
+       
         if(length(individuals[[i_1]])==1 | length(variables[[i_1]])==max_interaction ){
           ### if tree has only one leaf or already max number of interactions
-          k_neu <- intersect(k_use,variables[[i_1]])
+          k_neu <- intersect(k_neu,variables[[i_1]])
         }
         
         
