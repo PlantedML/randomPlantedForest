@@ -1,4 +1,4 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE)
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL)
 {
   
   library(parallel)
@@ -36,12 +36,19 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     
     # Definition der verschiedenen Bl?cke
     
-
+    # Koordinatengruppenindizees des i-ten Eintrags
+    # variables[[i]] is a vector of variables  in tree i
+    if (is.null(variables)){
+    variables=list()
+    for(i in 1:p){
+      variables[[i]]=i
+    }
+    }
     # intervals[[i]][[k]]= is list of matrices describing intervals  for tree i, leaf k  
     
     intervals=list()
     
-    for(i in 1:p){
+    for(i in 1:length(variables)){
       intervals[[i]] <- list()
       intervals[[i]][[1]] <- matrix(nrow=2, ncol=p)
       for(j in 1:p){
@@ -55,17 +62,11 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     
     values=list()
     
-    for(i in 1:p){
+    for(i in 1:length(variables)){
       values[[i]]=0
     }
     
-    # Koordinatengruppenindizees des i-ten Eintrags
-    # variables[[i]] is a vector of variables  in tree i
-    
-    variables=list()
-    for(i in 1:p){
-      variables[[i]]=i
-    }
+  
   
     
     
@@ -74,7 +75,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     
     individuals=list()
     
-    for(i in 1:p){
+    for(i in 1:length(variables)){
       individuals[[i]]=list(1:nrow(X))
     }
     
@@ -141,12 +142,19 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       
       splits=splits-1
       
+     
       k_use=sample(1:p,m_try)
       if (m_try==0) k_use <- 1:p 
       
-      tree_use <- sample(1:length(values), max(t_try,length(values)))
+      if(tree_from_m_try==FALSE){
+      tree_use <- sample(1:length(values), min(t_try,length(values)))
       if (t_try ==0) tree_use <- 1:length(values)
-      
+      } else{
+         tree_candidates <- sapply(1:length(variables), function(i) {sum(k_use %in% variables[[i]])>=1}) 
+         #if (m_try==4) write(tree_candidates, file="bla.txt",append=TRUE)
+        tree_use <- sample(which(tree_candidates==TRUE), min(t_try,sum(tree_candidates)))
+        if (t_try ==0) tree_use <- 1:length(values)
+      }
       
       
       
