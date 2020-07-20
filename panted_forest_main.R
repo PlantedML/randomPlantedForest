@@ -1,14 +1,17 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE)
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
-  
+
+  fsajldjk=323
+    
   library(parallel)
   # Baum= Anzahl der B?um-famililien im "Forest"
   # splits= Anzahl der Iterationsschritte.
   # m= number of possible split points
+  # Blattgroesse= minimal leaf size
   TimeMittel<-Sys.time()
   
   p <- ncol(X)
-  Blattgroesse <- rep(1,p)  ### minimal leaf size
+    
   a <- apply(X,2,min)     ## lower bounds
   b <- apply(X,2,max)     ### upper bounds
   
