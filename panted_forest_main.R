@@ -1,7 +1,5 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1,n.cores=NULL, single_tree_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=TRUE, start_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
-
-  jfdljsfd=343
   
   library(parallel)
   # Baum= Anzahl der B?um-famililien im "Forest"
@@ -18,7 +16,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
   x=t(X[1:m,])
   for(i in 1:p){
     h=1:m
-    x[i,]=a[i]+(b[i]-a[i])*h/m
+    x[i,]=quantile(X[, i], h/m)
   }
   
   Schleife <- function(run){
@@ -149,6 +147,8 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       k_use=sample(1:p,m_try)
       if (m_try==0) k_use <- 1:p 
       
+      if(Itert_try!=0){ t_try=ceiling(Itert_try*length(variables))}
+      
       if(tree_from_m_try==FALSE){
       tree_use <- sample(1:length(values), min(t_try,length(values)))
       if (t_try ==0) tree_use <- 1:length(values)
@@ -186,6 +186,10 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
           k_neu <- intersect(k_neu,variables[[i_1]])
         }
         
+        if(length(individuals[[i_1]])==1 & start_ignore_m_try==TRUE){
+          
+          k_neu <- variables[[i_1]]
+        }
         
         # Residuumsberechnung
         R_1 <- rep(sum(Y^2),length(individuals[[i_1]]))  # R_1=Matrix der Residuen des besten splits f?r versch. Blaetter
@@ -464,7 +468,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
   cl <- makeCluster(Kerne)
   
   
-  clusterExport(cl,c("Y","X","max_interaction", "m_try", "t_try", "Baum", "splits", "m", "Itersplit","a","b","p","x","Blattgroesse"), envir=environment())
+  clusterExport(cl,c("Y","X","max_interaction", "m_try", "t_try", "Baum", "splits", "m", "Itersplit", "Itert_try", "a","b","p","x","Blattgroesse"), envir=environment())
   
   forest_res <- parSapply(cl, 1:Baum, Schleife) # Berechne die n?tigen Informationen f?r den Sch?tzer
   
