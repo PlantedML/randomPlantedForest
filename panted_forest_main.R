@@ -1,4 +1,4 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, splits=30, m=10, Itersplit=1, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=TRUE, start_ignore_m_try=TRUE, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, splits=30, m=10, Itersplit=1, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=FALSE, start_ignore_m_try=TRUE, m_try_after_t_try=FALSE, only_splitable_tree=FALSE, split_try=0, Itersplit_try=0, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
   
   library(parallel)
@@ -9,7 +9,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
   TimeMittel<-Sys.time()
   
   p <- ncol(X)
-    
+  
   a <- apply(X,2,min)     ## lower bounds
   b <- apply(X,2,max)     ### upper bounds
   
@@ -40,10 +40,10 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     # Koordinatengruppenindizees des i-ten Eintrags
     # variables[[i]] is a vector of variables  in tree i
     if (is.null(variables)){
-    variables=list()
-    for(i in 1:p){
-      variables[[i]]=i
-    }
+      variables=list()
+      for(i in 1:p){
+        variables[[i]]=i
+      }
     }
     # intervals[[i]][[k]]= is list of matrices describing intervals  for tree i, leaf k  
     
@@ -67,10 +67,6 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       values[[i]]=0
     }
     
-  
-  
-    
-    
     # Definition der Partitionen
     # individuals[[i]][[k]] is a vector of individuals in leaf k of tree i
     
@@ -86,6 +82,15 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
     F[[5]]=0
     
     F[[6]]=0
+    
+    if(split_try!=0 | Itersplit_try!=0){
+      Possible_Splits=list()
+      for(i_1 in 1:length(variables)){
+        for(i_2 in variables[[i_1]]){
+          Possible_Splits[[i_1]]=list(i_2,variables[[i_1]])
+        }
+      }
+    }
     
     # Residuen f?r das arithmetische Mittel
     
@@ -127,7 +132,6 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
         }
       }
       
-      
       # Kurzer Test, ob ein Fehler vorherrscht
       
       if(sum(R>max(Y^2)*length(Y)+1)>0){
@@ -143,26 +147,40 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
       
       splits=splits-1
       
-     
       k_use=sample(1:p,m_try)
       if (m_try==0) k_use <- 1:p 
       
       if(Itert_try!=0){ t_try=ceiling(Itert_try*length(variables))}
       
       if(tree_from_m_try==FALSE){
-      tree_use <- sample(1:length(values), min(t_try,length(values)))
-      if (t_try ==0) tree_use <- 1:length(values)
+        tree_use <- sample(1:length(values), min(t_try,length(values)))
+        if (t_try ==0) tree_use <- 1:length(values)
       } else{
-         tree_candidates <- sapply(1:length(variables), function(i) {sum(k_use %in% variables[[i]])>=1}) 
-         #if (m_try==4) write(tree_candidates, file="bla.txt",append=TRUE)
+        tree_candidates <- sapply(1:length(variables), function(i) {sum(k_use %in% variables[[i]])>=1}) 
+        #if (m_try==4) write(tree_candidates, file="bla.txt",append=TRUE)
         tree_use <- sample(which(tree_candidates==TRUE), min(t_try,sum(tree_candidates)))
         if (t_try ==0) tree_use <- 1:length(values)
       }
       
+      if(only_splitable_tree==TRUE){
+        Splitable_tree=function(i){
+          if(length(variables[[i]])==max_interaction | length(individuals[[i]])==1){
+            return(length(intersect(variables[[i]],k_use))!= 0)
+          } 
+          return(TRUE)
+        }
+        tree_candidates <- sapply(1:length(variables), Splitable_tree)
+        tree_use <- sample(which(tree_candidates==TRUE), min(t_try,length(tree_candidates[tree_candidates==TRUE])))
+      }
       
+      if(Itersplit_try!=0){
+        split_try=ceiling(Itersplit_try*length(Possible_Splits))
+      }
       
-      
-      
+      if(split_try!=0){
+        split_candidates <- sample(Possible_Splits, min(split_try, length(Possible_Splits)))
+        tree_use=1:length(variables)
+      }
       
       # Hilfsvariablen
       
@@ -187,15 +205,47 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
         }
         
         if(length(individuals[[i_1]])==1 & start_ignore_m_try==TRUE){
-          
           k_neu <- variables[[i_1]]
+        }
+        
+        if(m_try_after_t_try==TRUE){
+          k_neu <- sample(1:p, m_try)
+          
+          if(length(variables[[i_1]])==max_interaction){
+            k_neu <- sample(variables[[i_1]], min(m_try,max_interaction))
+          }
+          
+          if(length(individuals[[i_1]])==1){
+            k_neu <- variables[[i_1]]
+          }
+        }
+        
+        
+        if(split_try!=0){
+          
+          k_neu=vector()
+          
+          for(i_2 in 1:length(split_candidates)){
+            
+            if(length(split_candidates[[i_2]][[2]])==length(variables[[i_1]])){
+              
+              if(all(split_candidates[[i_2]][[2]] %in% variables[[i_1]])){
+                
+                k_neu=union(k_neu,split_candidates[[i_2]][[1]])  
+              }
+            } else if(length(split_candidates[[i_2]][[2]])==length(variables[[i_1]])+1) {
+              
+              if(all(variables[[i_1]] %in% split_candidates[[i_2]][[2]]) & !(split_candidates[[i_2]][[1]] %in% variables[[i_1]])){
+                
+                k_neu=union(k_neu,split_candidates[[i_2]][[1]])
+              }
+            }
+          }
         }
         
         # Residuumsberechnung
         R_1 <- rep(sum(Y^2),length(individuals[[i_1]]))  # R_1=Matrix der Residuen des besten splits f?r versch. Blaetter
         kx_1<-matrix(nrow=2, ncol=length(individuals[[i_1]])) # kx_1=Index der zu splitenden Koordinate und der Splitpunkt.
-        
-        
         
         if(length(k_neu)>0){
           
@@ -222,130 +272,174 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
           Ikx[,i_1] <- c(which.min(R_1),kx_1[,which.min(R_1)])  # Ikx: each column for different tree. first row=which leaf to split; second row=which which variable to split, third row= where(=value) to split the variable
           
         } 
-        
-        # Speicherung des Wertes des optimalen Residuums sowie dessen Index, die zu splitende Koordinate und den Splitpunkt
-        if (i_1==tail(tree_use,1)){
-          if ( sum(R==Inf)==length(R) ) splits <- splits+1
-        }
-        
       }
       
-      
-      # Definition der optimalen Werte
-      
-      R_opt   <- min(R)
-      Ikx_opt <- c(which.min(R), Ikx[,which.min(R)]) # best tree, leaf, variable, split-valaue
-      
-      
-      # Mindestabbruchbedingung
-      
-      if(min(R) < sum(Y^2)){
+      if ( sum(R==Inf)==length(R) ){ splits <- splits+1 } else {
         
-        F[[6]] <- c(F[[6]], c(Ikx_opt[1], Ikx_opt[3]) ) 
+        # Definition der optimalen Werte
         
-        # Updaten der Terme
-        I_12 <-  which(X[,Ikx_opt[3]]<Ikx_opt[4])   #### individuals who fulfil split criteria 2
-        I_11 <-  which(X[,Ikx_opt[3]]>=Ikx_opt[4])   #### individuals who fulfil split criteria 1
-        I_1 <-   individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]  ### individuals in split-leaf 
+        R_opt   <- min(R)
+        Ikx_opt <- c(which.min(R), Ikx[,which.min(R)]) # best tree, leaf, variable, split-valaue
         
-        if(Ikx_opt[3] %in% variables[[Ikx_opt[1]]]){  ### if split variable is already in tree to be split
+        
+        if(split_try!=0 & max_interaction>1){
           
-          
-          individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])+1]] <- intersect(I_12, I_1 )      #### individuals for  new leaf 
-          individuals[[Ikx_opt[1]]][[Ikx_opt[2]]] <- intersect( I_11 , I_1)                         #### new split-leaf = remaining individuals
-          
-          # Updaten der mehrdimensionalen Intervalle
-          intervals[[Ikx_opt[1]]][[length(intervals[[Ikx_opt[1]]])+1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]] #add one leaf to intervals
-          
-          intervals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]][2,Ikx_opt[3]] <- Ikx_opt[4]  ### new leaf has new interval at split variable: (split value= upper bopund, lower bound remains)
-          intervals[[Ikx_opt[1]]][[Ikx_opt[2]]][1,Ikx_opt[3]] <- Ikx_opt[4] ### split leaf has new interval at split variable: (split value= lower bound, upper bound remains)
-          
-          # Berechnung des Differenzterms
-          y_2 <- mean(Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]])
-          y_1 <- mean(Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]])
-          
-          
-          # Updaten der Y
-          Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]] <- Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]]-y_2
-          Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]] <- Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]]-y_1
-          
-          # Updaten des zugeh?rigen Funktionswerts
-          values[[Ikx_opt[1]]][length(individuals[[Ikx_opt[1]]])] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_2
-          values[[Ikx_opt[1]]][Ikx_opt[2]] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_1
-          
-        } else {
-          
-          TreeExists=0
-          
-          for(i in 1:length(variables)){
-            
-            if(length(variables[[i]])==length(variables[[Ikx_opt[1]]])+1){ ###if number of variables in tree i is same as num of var in new split tree
-              if(prod(variables[[i]]==sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3])))){ ### if variables in tree i are same as  var in new split tree
-                
-                TreeExists=1  ###  tree i is the same as new split tree
-                
-                individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_12, I_1)
-                individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_11, I_1)
-                
-                # Updaten der mehrdimensionalen Intervalle
-                
-                intervals[[i]][[length(individuals[[i]])]] <- intervals[[i]][[length(individuals[[i]])-1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
-                
-                intervals[[i]][[length(individuals[[i]])-1]][2,Ikx_opt[3]] <- Ikx_opt[4]
-                intervals[[i]][[length(individuals[[i]])]][1,Ikx_opt[3]] <- Ikx_opt[4]
-                
-                # Berechnung des Differenzterms
-                
-                y_2 <- mean(Y[individuals[[i]][[length(individuals[[i]])-1]]])
-                y_1 <- mean(Y[individuals[[i]][[length(individuals[[i]])]]])
-                
-                # Updaten der Y
-                
-                Y[individuals[[i]][[length(individuals[[i]])-1]]] <- Y[individuals[[i]][[length(individuals[[i]])-1]]]-y_2
-                Y[individuals[[i]][[length(individuals[[i]])]]] <- Y[individuals[[i]][[length(individuals[[i]])]]]-y_1
-                
-                # Updaten des zugeh?rigen Funktionswerts
-                
-                values[[i]][length(individuals[[i]])-1]=y_2
-                values[[i]][length(individuals[[i]])]=y_1
-                
-                
+          if(length(individuals[[Ikx_opt[1]]])==1){
+            for(i_1 in ((1:p)[-variables[[Ikx_opt[1]]]]) ){
+              Possible_exists=0
+              for(i_2 in 1:length(Possible_Splits)){
+                if(Possible_Splits[[i_2]][[1]]==i_1 & length(Possible_Splits[[i_2]][[2]])==length(variables[[Ikx_opt[1]]])+1){
+                  if(all(union(i_1,variables[[Ikx_opt[1]]]) %in% Possible_Splits[[i_2]][[2]])){
+                    Possible_exists=1
+                  }
+                } 
+              }
+              if(Possible_exists==0){  
+                Possible_Splits[[length(Possible_Splits)+1]]=list(i_1,sort(c(i_1,variables[[Ikx_opt[1]]])))
               }
             }
           }
-          
-          if(TreeExists==0){
-            
-            variables[[length(variables)+1]] <- sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3]))
-            individuals[[length(individuals)+1]] <- list()
-            individuals[[length(individuals)]][[1]] <- intersect(which(X[,Ikx_opt[3]]<Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
-            individuals[[length(individuals)]][[2]] <- intersect(which(X[,Ikx_opt[3]]>=Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
-            
-            # Updaten der mehrdimensionalen Intervalle
-            
-            intervals[[length(intervals)+1]] <- list()
-            intervals[[length(intervals)]][[1]] <- intervals[[length(intervals)]][[2]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
-            
-            intervals[[length(intervals)]][[1]][2,Ikx_opt[3]] <- Ikx_opt[4]
-            intervals[[length(intervals)]][[2]][1,Ikx_opt[3]] <- Ikx_opt[4]
-            
-            # Berechnung des Differenzterms
-            
-            y_2 <- mean(Y[individuals[[length(variables)]][[1]]])
-            y_1 <- mean(Y[individuals[[length(variables)]][[2]]])
-            
-            # Updaten der Y
-            
-            Y[individuals[[length(variables)]][[1]]] <- Y[individuals[[length(variables)]][[1]]]-y_2
-            Y[individuals[[length(variables)]][[2]]] <- Y[individuals[[length(variables)]][[2]]]-y_1
-            
-            values[[length(variables)]] <- y_2
-            values[[length(variables)]][2] <- y_1
-            
-          }
-          
         }
         
+        # Mindestabbruchbedingung
+        
+        if(min(R) < sum(Y^2)){
+          
+          F[[6]] <- c(F[[6]], c(Ikx_opt[1], Ikx_opt[3]) ) 
+          
+          # Updaten der Terme
+          I_12 <-  which(X[,Ikx_opt[3]]<Ikx_opt[4])   #### individuals who fulfil split criteria 2
+          I_11 <-  which(X[,Ikx_opt[3]]>=Ikx_opt[4])   #### individuals who fulfil split criteria 1
+          I_1 <-   individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]  ### individuals in split-leaf 
+          
+          if(Ikx_opt[3] %in% variables[[Ikx_opt[1]]]){  ### if split variable is already in tree to be split
+            
+            
+            individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])+1]] <- intersect(I_12, I_1 )      #### individuals for  new leaf 
+            individuals[[Ikx_opt[1]]][[Ikx_opt[2]]] <- intersect( I_11 , I_1)                         #### new split-leaf = remaining individuals
+            
+            # Updaten der mehrdimensionalen Intervalle
+            intervals[[Ikx_opt[1]]][[length(intervals[[Ikx_opt[1]]])+1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]] #add one leaf to intervals
+            
+            intervals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]][2,Ikx_opt[3]] <- Ikx_opt[4]  ### new leaf has new interval at split variable: (split value= upper bopund, lower bound remains)
+            intervals[[Ikx_opt[1]]][[Ikx_opt[2]]][1,Ikx_opt[3]] <- Ikx_opt[4] ### split leaf has new interval at split variable: (split value= lower bound, upper bound remains)
+            
+            # Berechnung des Differenzterms
+            y_2 <- mean(Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]])
+            y_1 <- mean(Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]])
+            
+            
+            # Updaten der Y
+            Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]] <- Y[individuals[[Ikx_opt[1]]][[length(individuals[[Ikx_opt[1]]])]]]-y_2
+            Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]] <- Y[individuals[[Ikx_opt[1]]][[Ikx_opt[2]]]]-y_1
+            
+            # Updaten des zugeh?rigen Funktionswerts
+            values[[Ikx_opt[1]]][length(individuals[[Ikx_opt[1]]])] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_2
+            values[[Ikx_opt[1]]][Ikx_opt[2]] <- values[[Ikx_opt[1]]][Ikx_opt[2]]+y_1
+            
+          } else {
+            
+            TreeExists=0
+            
+            for(i in 1:length(variables)){
+              
+              if(length(variables[[i]])==length(variables[[Ikx_opt[1]]])+1){ ###if number of variables in tree i is same as num of var in new split tree
+                if(prod(variables[[i]]==sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3])))){ ### if variables in tree i are same as  var in new split tree
+                  
+                  TreeExists=1  ###  tree i is the same as new split tree
+                  
+                  individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_12, I_1)
+                  individuals[[i]][[length(individuals[[i]])+1]] <- intersect(I_11, I_1)
+                  
+                  # Updaten der mehrdimensionalen Intervalle
+                  
+                  intervals[[i]][[length(individuals[[i]])]] <- intervals[[i]][[length(individuals[[i]])-1]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
+                  
+                  intervals[[i]][[length(individuals[[i]])-1]][2,Ikx_opt[3]] <- Ikx_opt[4]
+                  intervals[[i]][[length(individuals[[i]])]][1,Ikx_opt[3]] <- Ikx_opt[4]
+                  
+                  # Berechnung des Differenzterms
+                  
+                  y_2 <- mean(Y[individuals[[i]][[length(individuals[[i]])-1]]])
+                  y_1 <- mean(Y[individuals[[i]][[length(individuals[[i]])]]])
+                  
+                  # Updaten der Y
+                  
+                  Y[individuals[[i]][[length(individuals[[i]])-1]]] <- Y[individuals[[i]][[length(individuals[[i]])-1]]]-y_2
+                  Y[individuals[[i]][[length(individuals[[i]])]]] <- Y[individuals[[i]][[length(individuals[[i]])]]]-y_1
+                  
+                  # Updaten des zugeh?rigen Funktionswerts
+                  
+                  values[[i]][length(individuals[[i]])-1]=y_2
+                  values[[i]][length(individuals[[i]])]=y_1
+                }
+              }
+            }
+            
+            if(TreeExists==0){
+              
+              variables[[length(variables)+1]] <- sort(c(variables[[Ikx_opt[1]]],Ikx_opt[3]))
+              individuals[[length(individuals)+1]] <- list()
+              individuals[[length(individuals)]][[1]] <- intersect(which(X[,Ikx_opt[3]]<Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
+              individuals[[length(individuals)]][[2]] <- intersect(which(X[,Ikx_opt[3]]>=Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
+              
+              if(split_try!=0){ 
+                if(variables[[length(variables)]]<max_interaction){
+                  
+                  for(i_1 in ((1:p)[-variables[[length(variables)]]]) ){
+                    Possible_exists=0
+                    for(i_2 in 1:length(Possible_Splits)){
+                      if(Possible_Splits[[i_2]][[1]]==i_1 & length(Possible_Splits[[i_2]][[2]])==length(variables[[length(variables)]])+1){
+                        if(all(union(i_1,variables[[length(variables)]]) %in% Possible_Splits[[i_2]][[2]])){
+                          Possible_exists=1
+                        }
+                      } 
+                    }
+                    if(Possible_exists==0){  
+                      Possible_Splits[[length(Possible_Splits)+1]]=list(i_1,sort(c(i_1,variables[[length(variables)]])))
+                    }
+                  }
+                }
+                
+                for(i_1 in variables[[length(variables)]]){
+                  Possible_exists=0
+                  for(i_2 in 1:length(Possible_Splits)){
+                    if(Possible_Splits[[i_2]][[1]]==i_1 & length(Possible_Splits[[i_2]][[2]])==length(variables[[length(variables)]])){
+                      if(all(variables[[length(variables)]] %in% Possible_Splits[[i_2]][[2]])){
+                        Possible_exists=1
+                      }
+                    } 
+                  }
+                  if(Possible_exists==0){  
+                    Possible_Splits[[length(Possible_Splits)+1]]=list(i_1,variables[[length(variables)]])
+                  }
+                }
+              }
+              
+              # Updaten der mehrdimensionalen Intervalle
+              
+              intervals[[length(intervals)+1]] <- list()
+              intervals[[length(intervals)]][[1]] <- intervals[[length(intervals)]][[2]] <- intervals[[Ikx_opt[1]]][[Ikx_opt[2]]]
+              
+              intervals[[length(intervals)]][[1]][2,Ikx_opt[3]] <- Ikx_opt[4]
+              intervals[[length(intervals)]][[2]][1,Ikx_opt[3]] <- Ikx_opt[4]
+              
+              # Berechnung des Differenzterms
+              
+              y_2 <- mean(Y[individuals[[length(variables)]][[1]]])
+              y_1 <- mean(Y[individuals[[length(variables)]][[2]]])
+              
+              # Updaten der Y
+              
+              Y[individuals[[length(variables)]][[1]]] <- Y[individuals[[length(variables)]][[1]]]-y_2
+              Y[individuals[[length(variables)]][[2]]] <- Y[individuals[[length(variables)]][[2]]]-y_1
+              
+              values[[length(variables)]] <- y_2
+              values[[length(variables)]][2] <- y_1
+              
+            }
+          }
+        }
       }
     }
     
@@ -562,4 +656,3 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try, Baum=50, spli
   TimeMittel=Sys.time()-TimeMittel
   return(list(Y_fitted=Y_fitted,forest_res=forest_res))
 }
-
