@@ -1,6 +1,8 @@
 planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, splits=30, m=10, Itersplit=1, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=FALSE, start_ignore_m_try=TRUE, m_try_after_t_try=FALSE, only_splitable_tree=FALSE, split_try=0, Itersplit_try=0, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
   
+  jkljk=3
+  
   library(parallel)
   # Baum= Anzahl der B?um-famililien im "Forest"
   # splits= Anzahl der Iterationsschritte.
