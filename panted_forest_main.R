@@ -1,4 +1,4 @@
-planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, splits=30, m=10, Itersplit=1, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=FALSE, start_ignore_m_try=TRUE, m_try_after_t_try=FALSE, only_splitable_tree=FALSE, split_try=0, Itersplit_try=0, tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
+planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, splits=30, m=10, Itersplit=1, RandomIterSplit=0, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=FALSE, start_ignore_m_try=TRUE, m_try_after_t_try=FALSE, only_splitable_tree=FALSE, split_try=0, Itersplit_try=0,  tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
   
   library(parallel)
@@ -257,8 +257,11 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
             
             if(Itersplit == 1){
               for(i_3 in  variables[[i_1]]){
-                h <- 1:m
-                x[i_3,] <- quantile(X[individuals[[i_1]][[i_2]], i_3], h/m)
+                h <- 1:m/m
+                if(RandomIterSplit == 1){
+                  h=runif(max=1, min=0, n=m)
+                }
+                x[i_3,] <- quantile(X[individuals[[i_1]][[i_2]], i_3], h)
               }
             }
             
@@ -559,6 +562,8 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
   # Parallelisieren
   # Erstelle ein Cluster
   if(is.null(n.cores)) Kerne <- detectCores() else Kerne <- n.cores
+  
+  if (Kerne!=1){
   cl <- makeCluster(Kerne)
   
   
@@ -568,6 +573,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
   
   
   stopCluster(cl) # Cluster wieder entfernen
+  } else forest_res <- sapply(1:Baum, Schleife) 
   
   # Definition der resultierenden Funktionen 
   # Definition der Funktion eines Baumes s
