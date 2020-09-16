@@ -1,6 +1,8 @@
 planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, splits=30, m=10, Itersplit=1, RandomIterSplit=0, Itert_try=0, n.cores=NULL, single_tree_ignore_m_try=FALSE, start_ignore_m_try=TRUE, m_try_after_t_try=FALSE, only_splitable_tree=FALSE, split_try=0, Itersplit_try=0,  tree_from_m_try=FALSE, variables=NULL, new_trees=TRUE, Blattgroesse=rep(1,p))
 {
   
+  force(RandomIterSplit)
+  
   library(parallel)
   # Baum= Anzahl der B?um-famililien im "Forest"
   # splits= Anzahl der Iterationsschritte.
@@ -567,7 +569,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
   cl <- makeCluster(Kerne)
   
   
-  clusterExport(cl,c("Y","X","max_interaction", "m_try", "t_try", "Baum", "splits", "m", "Itersplit", "Itert_try", "a","b","p","x","Blattgroesse"), envir=environment())
+  clusterExport(cl,c("Y","X","max_interaction", "m_try", "t_try", "Baum", "splits","m", "Itersplit", "Itert_try", "a","b","p","x","Blattgroesse"), envir=environment())
   
   forest_res <- parSapply(cl, 1:Baum, Schleife) # Berechne die n?tigen Informationen f?r den Sch?tzer
   
