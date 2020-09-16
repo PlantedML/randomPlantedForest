@@ -2,6 +2,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
 {
   
   force(RandomIterSplit)
+  force(Itersplit_try)
   
   library(parallel)
   # Baum= Anzahl der B?um-famililien im "Forest"
