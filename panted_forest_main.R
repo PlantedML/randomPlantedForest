@@ -390,7 +390,7 @@ planted_forest<- function(Y, X, max_interaction=2, m_try=3, t_try=3, Baum=50, sp
               individuals[[length(individuals)]][[2]] <- intersect(which(X[,Ikx_opt[3]]>=Ikx_opt[4]), individuals[[Ikx_opt[1]]][[Ikx_opt[2]]])
               
               if(split_try!=0){ 
-                if(variables[[length(variables)]]<max_interaction){
+                if(length(variables[[length(variables)]])<max_interaction){
                   
                   for(i_1 in ((1:p)[-variables[[length(variables)]]]) ){
                     Possible_exists=0
