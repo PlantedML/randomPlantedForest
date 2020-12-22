@@ -51,7 +51,7 @@ f_single_fam=function(x,s=1,i=0,forest_res){
 # Input:  x = Input vector, forest_res = random planted forest model, i = Coordinates of the component to be estimated
 # Output: Estimated function f(x) if i=0, otherwise estimated component f_i(x)
 
-planted_forest_f=function(x, forest_res,f_single_fam, i=0){
+f_rpf=function(x, forest_res,f_single_fam, i=0){
   
   ntrees=dim(forest_res)[2]
   
