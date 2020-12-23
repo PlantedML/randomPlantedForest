@@ -6,7 +6,7 @@ The following functions are provided:
 
 rpf: The main function. A random planted forest is calculated. Note: Output should be purified if interpretation is desired.
 
-purify_rpf: A purified random planted forest is calculated from a rpf output.
+purify_rpf: A purified random planted forest is calculated from an rpf output.
 
 predict_rpf: Given x values and rpf output, y values are fitted.
 
