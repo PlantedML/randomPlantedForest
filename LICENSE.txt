@@ -1,4 +1,4 @@
-Copyright (c) 2020  Munir Hiabu, Joseph Meyer
+Copyright (c) 2020  Munir Hiabu, Joseph Theo Meyer
 
 Apache License
                          Version 2.0, January 2004
