@@ -76,13 +76,13 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericMatrix X, int split_tr
         double leaf_size2 = as<NumericVector>(leaf_size(k))[0];
 
 
-        if(samplepoints_1.size()<2*leaf_size2(k)) continue;
+        if(samplepoints_1.size()<2*leaf_size2) continue;
 
-        NumericVector samplepoints=NumericVector(samplepoints_1.size()+1-2*leaf_size2(k));
+        NumericVector samplepoints=NumericVector(samplepoints_1.size()+1-2*leaf_size2);
 
-        for(int i_5=0; i_5<samplepoints_1.size()+1-2*leaf_size2(k); ++i_5){
+        for(int i_5=0; i_5<samplepoints_1.size()+1-2*leaf_size2; ++i_5){
 
-          samplepoints(i_5)=samplepoints_1(i_5+leaf_size2(k));
+          samplepoints(i_5)=samplepoints_1(i_5+leaf_size2);
         }
 
         for(int i_4=0; i_4<split_try; ++i_4){
