@@ -5,8 +5,9 @@
 #        leaf_size = minimum number of nodes in each leaf, alternative = alternative updating       
 # Output: list of families of trees: [i][1] Final leaves of the trees, [i][2] = estimated values corresponding to the leaves, [i][3] = coordinates of the trees 
 #                                     (for the i-th family, i=1,...,ntrees)
+library(Rcpp)
 
-rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, leaf_size=rep(1,p), alternative=F){
+rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, leaf_size=rep(1,p), alternative=F, loss="L2"){
   
   force(t_try)
   
@@ -75,7 +76,7 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
       
       split_candidates <- sample(Possible_Splits, m_try)
       
-      R=Calc_Optimal_split2(Y, X, split_try, variables, individuals, leaf_size, split_candidates)
+      R=Calc_Optimal_split2(Y, X, split_try, variables, individuals, leaf_size, split_candidates, loss)
       
       R_opt <- R[1]
       
