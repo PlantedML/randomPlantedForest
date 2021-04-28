@@ -10,17 +10,20 @@ F_single_fam=function(x,s=1,i=0,forest_res){
     
     if(i==0){
       
-      for(i in 1:length(forest_res[[3,s]])){
+      for(i in 1:length(forest_res[[3,s]])){  ###  tree 3=variables  --> i= trees
         
-        for(j in 1:length(forest_res[[1,s]][[i]])){
+        for(j in 1:length(forest_res[[1,s]][[i]])){ ## 1= intervals --> j is leaf of tree i
           
-          if(prod(forest_res[[1,s]][[i]][[j]][1,forest_res[[3,s]][[i]]]<= x[forest_res[[3,s]][[i]]] & (forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]]]>x[forest_res[[3,s]][[i]]]|forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]]]==forest_res[[4,s]][forest_res[[3,s]][[i]]]))){
-            
+          categorical = is.element(forest_res[[3,s]][[i]],forest_res[[6,s]])
+          
+          
+          if(prod(forest_res[[1,s]][[i]][[j]][1,forest_res[[3,s]][[i]][!categorical]]<= x[forest_res[[3,s]][[i]][!categorical]] & (forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]][!categorical]]>x[forest_res[[3,s]][[i]][!categorical]]|forest_res[[1,s]][[i]][[j]][2,forest_res[[3,s]][[i]][!categorical]]==forest_res[[4,s]][forest_res[[3,s]][[i]][!categorical]]))& min(1,as.numeric(sapply( forest_res[[6,s]], function(k)   is.element(x[k] , forest_res[[1,s]][[i]][[j]][,k]))))
+             ){
             f=f+forest_res[[2,s]][[i]][j]
           }   
         }
       }
-      
+     # f<-mean(f[-1])
       if(is.null(forest_res[,s]$constant)){ return(f) }
       
       return(f+forest_res[["constant",s]])
@@ -31,11 +34,13 @@ F_single_fam=function(x,s=1,i=0,forest_res){
     
     if(length(forest_res[[3,s]][[i_0]])==length(i)){
       
-      if(prod(forest_res[[3,s]][[i_0]]==sort(i))){
+      if(prod(forest_res[[3,s]][[i_0]]==sort(i))){  ## variables in tree i_0  match i
         
-        for(j in 1:length(forest_res[[1,s]][[i_0]])){
+        for(j in 1:length(forest_res[[1,s]][[i_0]])){  ### j is leaf in tree i_0
           
-          if(prod(forest_res[[1,s]][[i_0]][[j]][1,forest_res[[3,s]][[i_0]]]<= x & (forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]]]>x|forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]]]==forest_res[[4,s]][forest_res[[3,s]][[i_0]]]))){
+          categorical = is.element(i,forest_res[[6,s]])
+          
+          if(all(forest_res[[1,s]][[i_0]][[j]][1,forest_res[[3,s]][[i_0]][!categorical]]<= x[!categorical] & (forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]][!categorical]]>x[!categorical]|forest_res[[1,s]][[i_0]][[j]][2,forest_res[[3,s]][[i_0]][!categorical]]==forest_res[[4,s]][forest_res[[3,s]][[i_0]][!categorical]]))& min(1,as.numeric(sapply( i[categorical] , function (k) is.element(x[which(i==k)],  forest_res[[1,s]][[i]][[j]][,k]   ))))){
             
             f=f+forest_res[[2,s]][[i_0]][j]
           }   
@@ -57,7 +62,7 @@ F_average=function(x, forest_res, i=0){
   
   y=0
   
-  for(s in 1:ntrees){ y=y+F_single_fam(x, s, i, forest_res) }
+  for(s in 1:ntrees){ y=y + F_single_fam(x, s, i, forest_res) }
   
   return(y/ntrees)
 }
