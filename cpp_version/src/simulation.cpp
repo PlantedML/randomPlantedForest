@@ -1,4 +1,4 @@
-#include <random_planted_forest.h>
+#include <randomPlantedForest.h>
 #include <iostream>
 #include <math.h>
 #include <functional>

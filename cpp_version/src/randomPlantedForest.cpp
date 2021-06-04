@@ -1,4 +1,4 @@
-#include <random_planted_forest.h>
+#include <randomPlantedForest.h>
 #include <iostream>
 
 RandomPlantedForest::RandomPlantedForest(const std::vector<double> &Y, const std::vector<std::vector<double>> &X, 

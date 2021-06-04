@@ -1,7 +1,7 @@
 #ifndef RANDOM_PLANTED_FOREST_H
 #define RANDOM_PLANTED_FOREST_H
 
-#include <decision_tree.h>
+#include <decisionTree.h>
 #include <optional>
 #include <exception>
 #include <stdexcept>
