@@ -5,24 +5,25 @@
 #include <utility>
 #include <set>
 
-struct Split {
-	double min_sum;			//
-	int tree_index;			//
-	int interval_index;		//
-	int split_coordinate;	//
-	double split_point;		//
+typedef std::pair<double, double> Interval;
+
+struct Leaf{
+    std::set<int> individuals;          // considered samples for each leaf
+    double value;                       // residual
+    std::vector<Interval> intervals;    // min/max for each feature of the interval
 };
 
 class DecisionTree {
-	
-	public:
-		
-	private:
-		std::set<int> split_dims; 			// dimensions of the performed splits
-		std::vector<double> values;			// residuals of the leaves
-		std::vector<std::pair<double, double>> intervals;	// min/max of interval for each leaf
-		Split calcOptimalSplit();			// determine optimal split
-		
+
+    friend class RandomPlantedForest;
+
+    public:
+
+
+    private:
+        std::set<int> split_dims;           // dimensions of the performed splits
+        std::vector<Leaf> leaves;           // leaves of tree containing intervals and approximating value
+        // idea: save intervals as interval-tree with nodes and corresponding values
 };
 
 
