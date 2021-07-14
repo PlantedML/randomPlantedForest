@@ -18,11 +18,14 @@ class DecisionTree {
     friend class RandomPlantedForest;
 
     public:
-
+        DecisionTree() {};
+        DecisionTree(std::set<int> dims, std::vector<Leaf> first_leaves):
+            split_dims(dims), leaves(first_leaves) {};
+        std::set<int> get_split_dims() const;
 
     private:
-        std::set<int> split_dims;           // dimensions of the performed splits
-        std::vector<Leaf> leaves;           // leaves of tree containing intervals and approximating value
+        std::set<int> split_dims;       // dimensions of the performed splits
+        std::vector<Leaf> leaves;       // leaves of tree containing intervals and approximating value
         // idea: save intervals as interval-tree with nodes and corresponding values
 };
 
