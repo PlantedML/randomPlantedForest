@@ -1,5 +1,3 @@
-
-#include <cpp_version/src/decisionTree.h>
 #include <iostream>
 #include <iterator>
 #include <algorithm>
@@ -10,9 +8,41 @@
 #include <limits>
 #include <cmath>
 #include <memory>
+#include <vector>
+#include <utility>
 #include <Rcpp.h>
 
 using namespace Rcpp;
+
+
+typedef std::pair<double, double> Interval;
+
+struct Leaf{
+    std::set<int> individuals;          // considered samples for each leaf
+    double value;                       // residual
+    std::vector<Interval> intervals;    // min/max for each feature of the interval
+};
+
+class DecisionTree {
+
+    friend class RandomPlantedForest;
+
+    public:
+        DecisionTree() {};
+        DecisionTree(std::set<int> dims, std::vector<Leaf> first_leaves):
+            split_dims(dims), leaves(first_leaves) {};
+        std::set<int> get_split_dims() const;
+
+    private:
+        std::set<int> split_dims;       // dimensions of the performed splits
+        std::vector<Leaf> leaves;       // leaves of tree containing intervals and approximating value
+        // idea: save intervals as interval-tree with nodes and corresponding values
+};
+
+std::set<int> DecisionTree::get_split_dims() const{
+    return split_dims;
+}
+
 
 Rcpp::IntegerVector from_std_vec(std::vector<int> v) {
     return Rcpp::IntegerVector(v.begin(), v.end());
