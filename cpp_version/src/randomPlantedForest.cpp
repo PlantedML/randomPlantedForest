@@ -256,29 +256,6 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
     }
     std::vector<Leaf> initial_leaves{initial_leaf}; // vector with initial leaf
 
-    // initial trees according to variables
-    DecisionTree initial_tree;
-    TreeFamily initial_family;
-    for(size_t i=0; i<variables.size(); ++i){
-        initial_tree.split_dims = std::set<int> (variables[i].begin(),variables[i].end());
-        initial_tree.leaves = initial_leaves;
-        initial_family.push_back(std::make_shared<DecisionTree>(initial_tree)); // save tree with one leaf in the beginning
-    }
-
-    if(true){
-        std::cout << "Initial TreeFamily: (" << initial_family.size() << ") ";
-        for(auto tree: initial_family){
-            std::cout << "Dims = ";
-            for(auto dim: tree->split_dims) std::cout << dim << ", ";
-            std::cout << "; " << "Number of Leafs = " << tree->leaves.size();
-            std::cout << " / ";
-        }
-        std::cout << std::endl;
-    }
-
-    // initilize tree families
-    this->tree_families = std::vector<TreeFamily>(1, initial_family); // todo: change to (n_trees, initial_family);
-
     // store possible splits in map with splitting variable as key and pointer to resulting tree
     std::multimap<int, std::shared_ptr<DecisionTree>> possible_splits;
 
@@ -287,8 +264,31 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
     std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
     std::vector<double> samples_Y = std::vector<double>(sample_size);
 
+    // initilize tree families
+    //n_trees = 2;
+    this->tree_families = std::vector<TreeFamily>(n_trees); //(1, initial_family); // todo: change to n_trees;
+
     // iterate over families of trees and modify
-    for(auto& curr_family: tree_families){
+    for(size_t n=0; n<n_trees; ++n){
+
+        DecisionTree initial_tree;
+        TreeFamily curr_family;
+        for(size_t i=0; i<variables.size(); ++i){
+            initial_tree.split_dims = std::set<int> (variables[i].begin(),variables[i].end());
+            initial_tree.leaves = initial_leaves;
+            curr_family.push_back(std::make_shared<DecisionTree>(initial_tree)); // save tree with one leaf in the beginning
+        }
+
+        if(true){
+            std::cout << "Initial TreeFamily: (" << curr_family.size() << ") ";
+            for(auto tree: curr_family){
+                std::cout << "Dims = ";
+                for(auto dim: tree->split_dims) std::cout << dim << ", ";
+                std::cout << "; " << "Number of Leafs = " << tree->leaves.size();
+                std::cout << " / ";
+            }
+            std::cout << std::endl;
+        }
 
         // reset possible splits
         possible_splits.clear();
@@ -433,6 +433,8 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
         }else{
             purified = false;
         }
+
+        tree_families[n] = curr_family;
     }
 }
 
