@@ -255,8 +255,8 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, const 
                     }
                     
                     // get mean
-                    Y_s_mean = Y_s_sum / Y_s.size();
-                    Y_b_mean = Y_b_sum / Y_b.size();
+                    if(Y_s.size() != 0) Y_s_mean = Y_s_sum / Y_s.size();
+                    if(Y_b.size() != 0) Y_b_mean = Y_b_sum / Y_b.size();
                     
                     // accumulate squared mean
                     curr_sum = 0;
@@ -543,7 +543,7 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
     }
 }
 
-// predict single feature vector
+// predict single family
 double RandomPlantedForest::predict_single(const std::vector<double> &X){
     int component_index = 0;
     double total_res = 0;
@@ -553,9 +553,9 @@ double RandomPlantedForest::predict_single(const std::vector<double> &X){
             for(auto& leaf: tree->leaves){
                 for(auto& dim: tree->split_dims){
                     if(leaf.intervals[dim-1].first <= X[dim-1]
-                           && (leaf.intervals[dim-1].second > X[dim-1]
-                                   || leaf.intervals[dim-1].second == upper_bounds[dim-1])){
-                                   total_res += leaf.value;
+                        && (leaf.intervals[dim-1].second > X[dim-1]
+                        || leaf.intervals[dim-1].second == upper_bounds[dim-1])){
+                               total_res += leaf.value;
                     }
                 }
             }

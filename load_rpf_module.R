@@ -14,7 +14,7 @@ data <- generate_data()
 
 # create new class object
 rpf_cpp <- new(RandomPlantedForest, data$Y_true, data$X, 2, 50, 30, 0.4)
-rpf_R <- rpf(data$Y_true, data$X, ntrees = 1)
+rpf_R <- rpf(data$Y_true, data$X)
 
 # extract samples
 samples_x = data$X[1:10, ]
