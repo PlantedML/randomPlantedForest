@@ -85,9 +85,10 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericMatrix X, int split_tr
           samplepoints(i_5)=samplepoints_1(i_5+leaf_size2);
         }
         
-        for(int i_4=0; i_4<split_try; ++i_4){
+        for(int i_4=0; i_4<samplepoints.size(); ++i_4){ // #deterministic // split_try; ++i_4){
           
           NumericVector splitpoint=sample(samplepoints,1);
+	  splitpoint = samplepoints[i_4]; // #deterministic
           
           LogicalVector b_1 = Xk_1>=splitpoint(0);
           

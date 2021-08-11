@@ -30,8 +30,10 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
     
     subsample <- sample(n,n,replace=TRUE)
     
-    X <- X[subsample,]
-    Y <- Y[subsample]
+    # deterministic
+    # X <- X[subsample,]
+    # Y <- Y[subsample]
+    t_try <- 1;
     
      W <- rep(1,n)
     if (loss=="logit") W <- rep(0,n)
@@ -98,6 +100,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
       
       split_candidates <- sample(Possible_Splits, m_try)
       
+      # deterministic
+      split_candidates <- Possible_Splits
   
       if(!is.null(categorical_variables)){ 
       R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, categorical_variables, max_categorical)

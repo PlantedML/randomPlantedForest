@@ -194,7 +194,7 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, const 
     int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
     std::vector<int> split_candidates(possible_splits.size());
     std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
-    std::shuffle(split_candidates.begin(), split_candidates.end(), gen); // shuffle for random order
+    // #deterministic // std::shuffle(split_candidates.begin(), split_candidates.end(), gen); // shuffle for random order
     
     if(true){
         std::cout << "Current candidates: (" << n_candidates << ") ";
@@ -242,12 +242,12 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, const 
                 if(unique_samples.size() < 2*leaf_size) continue;
                 
                 // consider split_try-number of random samples
-                for(int t=0; t<split_try; ++t){
+                for(int t=0; t<unique_samples.size(); ++t){ // # deterministic // split_try; ++t){
                     
                     // get samplepoint
                     auto sample_pos = unique_samples.begin();
-                    std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size + 1);
-                    std::advance(sample_pos, distrib(gen)); // consider only sample points with offset
+                    // # deterministic // std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size + 1);
+                    std::advance(sample_pos, t); // # deterministic // distrib(gen)); // consider only sample points with offset
                     sample_point = sample_pos->first;
                     
                     std::set<int> I_s, I_b; // individuals smaller/bigger than the samplepoint
@@ -437,6 +437,11 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
             samples_Y[i] = Y[sample_index];
             samples_X[i] = X[sample_index];
         }
+        
+        // deterministic
+        samples_X = X;
+        samples_Y = Y;
+        this->t_try = 1;
         
         // modify existing or add new trees through splitting
         for(size_t split_count=0; split_count<n_splits; ++split_count){

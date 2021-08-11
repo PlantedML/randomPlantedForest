@@ -19,8 +19,8 @@ samples_y <- data$Y_true[1:10]
 
 # create new class object
 cat("\014")
-rpf_cpp <- new(RandomPlantedForest, data$Y_true, data$X, 1, 1, 50, 0.4)
-rpf_R <- rpf(data$Y_true, data$X, max_interaction = 1, ntrees = 1)
+rpf_cpp <- new(RandomPlantedForest, data$Y_true, data$X, 1, 1, 5, 0.4)
+rpf_R <- rpf(data$Y_true, data$X, max_interaction = 1, ntrees = 1, t_try = 1, splits = 5)
 #rpf_purify(rpf_R)
 #rpf_cpp$purify()
 rpf_cpp$print()
