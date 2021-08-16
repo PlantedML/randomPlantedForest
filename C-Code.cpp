@@ -41,7 +41,7 @@ bool TreeWrong(NumericVector indices, NumericVector k, NumericVector x){
 
 // [[Rcpp::export]]
 
-NumericVector Calc_Optimal_split2(NumericVector Y, NumericMatrix X, int split_try, List variables, List individuals, List leaf_size, List split_candidates, StringVector loss) {
+NumericVector Calc_Optimal_split2(NumericVector Y, NumericMatrix X, int split_try, List variables, List individuals, List leaf_size, List split_candidates, StringVector loss, bool deterministic) {
   
   NumericVector R_opt=NumericVector::create(R_PosInf,0,0,0,0);
   
@@ -84,11 +84,21 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericMatrix X, int split_tr
           
           samplepoints(i_5)=samplepoints_1(i_5+leaf_size2);
         }
+
+	int start = 0;
+        int end = split_try;
+        if(deterministic){
+          start = 1;
+          end = samplepoints_1.size()-1;
+        }
         
-        for(int i_4=0; i_4<samplepoints.size(); ++i_4){ // #deterministic // split_try; ++i_4){
+        for(int i_4=start; i_4<end; ++i_4){
           
+
           NumericVector splitpoint=sample(samplepoints,1);
-	  splitpoint = samplepoints[i_4]; // #deterministic
+	  if(deterministic){
+            splitpoint = samplepoints_1[i_4];
+          }
           
           LogicalVector b_1 = Xk_1>=splitpoint(0);
           

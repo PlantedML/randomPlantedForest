@@ -8,7 +8,7 @@
 library(Rcpp)
 sourceCpp("C-Code.cpp")
 
-rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=rep(1,p), alternative=F, loss="L2", epsilon=0.001, categorical_variables=NULL){
+rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=rep(1,p), alternative=F, loss="L2", epsilon=0.001, categorical_variables=NULL, deterministic=FALSE){
   
   force(t_try)
   
@@ -29,11 +29,13 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
   tree_fam <- function(run){
     
     subsample <- sample(n,n,replace=TRUE)
-    
-    # deterministic
-    # X <- X[subsample,]
-    # Y <- Y[subsample]
-    t_try <- 1;
+
+    if(!deterministic){
+      X <- X[subsample,]
+      Y <- Y[subsample]
+    }else{
+      t_try <- 1
+    }
     
      W <- rep(1,n)
     if (loss=="logit") W <- rep(0,n)
@@ -104,8 +106,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
       split_candidates <- Possible_Splits
   
       if(!is.null(categorical_variables)){ 
-      R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, categorical_variables, max_categorical)
-      } else       R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, p+1, 0)
+      R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, categorical_variables, max_categorical, deterministic)
+      } else       R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, p+1, 0, deterministic)
         
       R_opt <- R[1]
       
