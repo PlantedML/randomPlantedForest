@@ -14,7 +14,7 @@ rpf_purify=function(forest_res){
   
   print(matrix(c(a,b), nrow=2, byrow=T))
   
-  forest_res=rbind(forest_res, rep(0,50))
+  forest_res=rbind(forest_res, rep(0, dim(forest_res)[2]))
   
   dimnames(forest_res)[[1]][5]="constant"
   
