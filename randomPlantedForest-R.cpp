@@ -25,6 +25,14 @@ Rcpp::NumericVector from_std_vec(std::vector<double> v) {
     return Rcpp::NumericVector(v.begin(), v.end());
 }
 
+Rcpp::NumericMatrix from_std_vec(std::vector<std::vector<double>> v) {
+  NumericMatrix m;
+  for(int row=0; row<v.size(); ++row){
+      m(row, _ ) = from_std_vec(v[row]);
+  }
+  return m;
+}
+
 std::vector<int> to_std_vec(Rcpp::IntegerVector rv) {
     return std::vector<int>(rv.begin(), rv.end());
 }
@@ -40,6 +48,10 @@ std::vector<std::vector<double>> to_std_vec(Rcpp::NumericMatrix rv) {
 }
 
 std::set<int> to_std_set(Rcpp::NumericVector rv) {
+    return std::set<int>(rv.begin(), rv.end());
+}
+
+std::set<int> to_std_set(Rcpp::IntegerVector rv) {
     return std::set<int>(rv.begin(), rv.end());
 }
 
@@ -142,25 +154,6 @@ bool leafExists(std::vector<Interval>& intervals, const std::shared_ptr<Decision
     return exists;
 }
 
-std::vector<std::vector<double>> transpose(std::vector<std::vector<double>> vec){
-    if(vec.size() == 0) return vec;
-    std::vector<std::vector<double>> transposed(vec[0].size(),std::vector<double>());
-    
-    for(int i=0; i<vec.size(); ++i){
-        for(int j=0; j<vec[i].size(); ++j){
-            transposed[j].push_back(vec[i][j]);
-        }
-    }
-    
-    for(auto col: transposed){
-        for(auto el: col){
-            std::cout << el << ", ";
-        }
-        std::cout << std::endl;
-    }
-    
-    return transposed;
-}
 
 // ----------------- main rpf class -----------------
 
@@ -169,14 +162,18 @@ class RandomPlantedForest {
     public:
         RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
                             int max_interaction=2, int n_trees=50, int n_splits=30, double t_try=0.4);
-        void fit(const std::vector<double> &Y, const std::vector<std::vector<double>> &X);
+        void set_data(const NumericVector &samples_Y, const NumericMatrix &samples_X);
         Rcpp::NumericVector predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
         Rcpp::NumericVector predict_vector(const NumericVector &X, const NumericVector components = {0});
         void purify();
-        // todo: getter/setter
         void print();
-
+        void cross_validation(int n_sets, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
+        double MSE(const NumericVector &Y_predicted, const NumericVector &Y_true); 
+        void set_deterministic(bool deterministic);
+        
     private:
+        std::vector<double> Y;
+        std::vector<std::vector<double>> X;
         int max_interaction;                        //
         int n_trees;                                //
         int n_splits;                               // number of performed splits for each tree family
@@ -192,6 +189,7 @@ class RandomPlantedForest {
         std::vector<double> upper_bounds;           //
         std::vector<double> lower_bounds;           //
         std::vector<TreeFamily> tree_families;      // random planted forest conatining result
+        void fit();
         double predict_single(const std::vector<double> &X, std::set<int> component_index);
         Split calcOptimalSplit(const std::vector<double> &Y, const std::vector<std::vector<double>> &X,
                                const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
@@ -201,15 +199,6 @@ class RandomPlantedForest {
 RandomPlantedForest::RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
                                          int max_interaction, int n_trees, int n_splits, double t_try){
 
-    std::vector<double> Y = to_std_vec(samples_Y);
-    std::vector<std::vector<double>> X = to_std_vec(samples_X);
-
-    // Check if all vector in x are same length
-    for(const auto &vec:X){
-        this->feature_size = vec.size();
-        if(vec.size() != feature_size) std::cout << "Dimensions of X mismatch." << std::endl;
-    }
-
     // initialize class members
     this->max_interaction = max_interaction;
     this->n_trees = n_trees;
@@ -217,12 +206,9 @@ RandomPlantedForest::RandomPlantedForest(const NumericVector &samples_Y, const N
     this->split_try = 10;
     this->t_try = t_try;
     this->purify_forest = false;
-    this->n_leaves = std::vector<int>(feature_size, 1);
-    this->variables = std::vector<std::vector<int>>(feature_size);
-    for(int i = 0; i<feature_size; ++i) this->variables[i] = std::vector<int> {i+1};
 
-    // construct tree families
-    this->fit(Y, X);
+    // set data and data related members
+    this->set_data(samples_Y, samples_X);
 }
 
 // determine optimal split
@@ -244,18 +230,6 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, const 
     
     if(!deterministic){
         std::shuffle(split_candidates.begin(), split_candidates.end(), gen); // shuffle for random order
-    }
-    
-    if(true){
-        std::cout << "Current candidates: (" << n_candidates << ") ";
-        for(size_t n=0; n<n_candidates; ++n){
-            auto candidate = possible_splits.begin();
-            std::advance(candidate, split_candidates[n]);
-            std::cout << candidate->first << "- ";
-            for(auto dim: candidate->second->split_dims) std::cout << dim << ",";
-            std::cout << "; ";
-        }
-        std::cout << std::endl;
     }
 
     // go through all trees in current family
@@ -365,20 +339,21 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, const 
     return curr_split;
 }
 
-// fit forest to new data
-void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<std::vector<double>> &X){
+void RandomPlantedForest::set_data(const NumericVector &samples_Y, const NumericMatrix &samples_X){
     
-    // Check for correct input dimensions
+    this->Y = to_std_vec(samples_Y);
+    this->X = to_std_vec(samples_X);
+    
+    // Check if all vector in x are same length
     for(const auto &vec:X){
         this->feature_size = vec.size();
-        if(vec.size() != feature_size){
-            std::cout << "Dimensions of X mismatch." << std::endl;
-        }
+        if(vec.size() != feature_size) std::cout << "Dimensions of X mismatch." << std::endl;
     }
     if(Y.size() != X.size()){
         std::cout << "Dimensions of X and Y mismatch." << std::endl;
     }
     
+    this->n_leaves = std::vector<int>(feature_size, 1);
     this->sample_size = X.size();
     this->upper_bounds = std::vector<double>(feature_size);
     this->lower_bounds = std::vector<double>(feature_size);
@@ -396,14 +371,15 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
         this->lower_bounds[i] = minVal;
     }
     
-    if(false){
-        std::cout << "Upper bounds: ";
-        for(auto val: upper_bounds) std::cout << val << ", ";
-        std::cout << "Lower bounds: ";
-        for(auto val: lower_bounds) std::cout << val << ", ";
-        std::cout << std::endl;
-    }
+    this->variables = std::vector<std::vector<int>>(feature_size);
+    for(int i = 0; i<feature_size; ++i) this->variables[i] = std::vector<int> {i+1};
     
+    this->fit();
+}
+
+// fit forest to new data
+void RandomPlantedForest::fit(){
+
     std::set<int> feature_dims;
     auto pos = feature_dims.begin();
     for(int i = 1; i <= feature_size; ++i) pos = feature_dims.insert(pos, i);
@@ -413,21 +389,9 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
     pos = initial_individuals.begin();
     for(int i = 0; i < sample_size; ++i) pos = initial_individuals.insert(pos, i);
     
-    if(false){
-        std::cout << "Initial individuals: (" << sample_size << ") ";
-        for(auto val: initial_individuals) std::cout << val << ", ";
-        std::cout << std::endl;
-    }
-    
     // initialize intervals with lower and upper bounds
     std::vector<Interval> initial_intervals(feature_size);
     for(size_t i = 0; i<feature_size; ++i) initial_intervals[i] = Interval{lower_bounds[i], upper_bounds[i]};
-    
-    if(false){
-        std::cout << "Initial intervals: ";
-        for(auto interval: initial_intervals) std::cout << interval.first << ", " << interval.second << "; ";
-        std::cout << std::endl;
-    }
     
     // set properties of first leaf
     Leaf initial_leaf;
@@ -458,17 +422,6 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
             initial_tree.split_dims = std::set<int> (variables[i].begin(),variables[i].end());
             initial_tree.leaves = initial_leaves;
             curr_family.trees.push_back(std::make_shared<DecisionTree>(initial_tree)); // save tree with one leaf in the beginning
-        }
-        
-        if(true){
-            std::cout << "Initial TreeFamily: (" << curr_family.trees.size() << ") ";
-            for(auto tree: curr_family.trees){
-                std::cout << "Dims = ";
-                for(auto dim: tree->split_dims) std::cout << dim << ", ";
-                std::cout << "; " << "Number of Leafs = " << tree->leaves.size();
-                std::cout << " / ";
-            }
-            std::cout << std::endl;
         }
         
         // reset possible splits
@@ -515,7 +468,7 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
             // continue only if we get a significant result
             if(!std::isinf(curr_split.min_sum)){
                 
-                if(true){
+                if(false){
                     std::cout << "Current Optimal Split: " << curr_split.min_sum << "; " << curr_split.split_coordinate << "- ";
                     for(auto dim: curr_split.tree_index->split_dims) std::cout << dim << ", ";
                     std::cout << "; " << curr_split.I_s.size() << "/" << curr_split.I_b.size() << "=" << curr_split.I_s.size()+curr_split.I_b.size() << "; " <<
@@ -549,7 +502,7 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
                             possible_splits.insert(std::pair<int, std::shared_ptr<DecisionTree>>(feature_dim, curr_family.trees.back()));
                         }
                         
-                        if(true){
+                        if(false){
                             std::cout << "Updated Possible Splits: " << std::endl;
                             for(auto split: possible_splits){
                                 std::cout << split.first << "-";
@@ -621,7 +574,7 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
                     found_tree->leaves.push_back(leaf_b);
                 }
                 
-                if(true){
+                if(false){
                     std::cout << "Current TreeFamily: (" << curr_family.trees.size() << ") ";
                     for(auto tree: curr_family.trees){
                         std::cout << "Dims = ";
@@ -649,6 +602,80 @@ void RandomPlantedForest::fit(const std::vector<double> &Y, const std::vector<st
         
         tree_families[n] = curr_family;
     }
+}
+
+void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries){
+    std::set<int> splits_vec = to_std_set(splits);
+    std::vector<int> split_tries_vec = to_std_vec(split_tries);
+    std::vector<double> t_tries_vec = to_std_vec(t_tries);
+    
+    if(splits_vec.size()!=2) {std::cout << "Min and max needed for number of splits." << std::endl; return;}
+    
+    // remember optimal parameter set and MSE
+    double  MSE_sum = 0, curr_MSE = 0, MSE_min = INF, optimal_split = INF, optimal_t_try = INF, optimal_split_try = INF;
+    
+    std::vector<int> order(sample_size);
+    std::iota(order.begin(), order.end(), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(order.begin(), order.end(), g);
+    int set_size = sample_size/n_sets;
+    NumericVector Y_train, Y_test_true, Y_test_predicted;
+    NumericMatrix X_train, X_test;
+    
+    // remember original data samples
+    NumericMatrix X_original = from_std_vec(X);
+    NumericVector Y_original = from_std_vec(Y);
+    
+    // go through all parameter combinations
+    for(int splits=*splits_vec.begin(); splits<=*--splits_vec.end(); splits=ceil(splits*1.2)){
+    		for(auto t: t_tries){
+      			for(auto s: split_tries){	
+      			  
+      			    // set parameter
+      			    this->n_splits = splits;
+      			    this->t_try = t;
+      			    this->split_try = s;
+
+      			    // k-fold cross-validation: go over all possible combinations as test set
+      			    MSE_sum = 0;
+      			    for(int n_set=0; n_set<n_sets; ++n_set){
+      			      
+    	              // split data into training and test sets
+    	              Y_train = Y_original;
+    	              X_train = X_original;
+    	              Y_train.erase(n_set*set_size, (n_set+1)*set_size);
+    	              X_train.erase(n_set*set_size, (n_set+1)*set_size);
+    	              X_test = X_original(Rcpp::Range(n_set*set_size, (n_set+1)*set_size), _ );
+	                  Y_test_true = Y_original[Rcpp::Range(n_set*set_size, (n_set+1)*set_size)];
+    	             
+    	              // fit to training data
+    	              this->set_data(Y_train, X_train);
+    	              
+    	              // predict with test set and determine mse
+      			        Y_test_predicted = this->predict_matrix(X_test); 
+      			        MSE_sum += this->MSE(Y_test_predicted, Y_test_true);
+      			    }
+      			    
+  			        // average
+  			        curr_MSE = MSE_sum / n_sets;
+      			    
+      			    // update optimal
+  			        if(curr_MSE < MSE_min){
+  			          MSE_min = curr_MSE;
+		              optimal_split = splits;
+			            optimal_t_try = t;
+			            optimal_split_try = s;
+  			        }
+      			}
+    		}	
+    }
+    
+    // reset X&Y to original, fit with optimal pars
+    this->n_splits = optimal_split;
+    this->t_try = optimal_t_try;
+    this->split_try = optimal_split_try;
+    this->set_data(Y_original, X_original);
 }
 
 // predict single feature vector
@@ -763,6 +790,13 @@ Rcpp::NumericVector RandomPlantedForest::predict_vector(const NumericVector &X, 
     return res;
 }
 
+double RandomPlantedForest::MSE(const NumericVector &Y_predicted, const NumericVector &Y_true){
+    
+    
+    
+    return 0;
+}
+
 void RandomPlantedForest::purify(){
     
     // go through all n_trees families 
@@ -775,10 +809,6 @@ void RandomPlantedForest::purify(){
         }
 
         while(curr_max >= 1){
-            
-            if(false){
-                std::cout << curr_max << ", "; 
-            }
             
             int numb_of_trees = curr_family.trees.size();
             // go through split dimensions of all trees
@@ -891,6 +921,11 @@ void RandomPlantedForest::print(){
     }
 }
 
+void RandomPlantedForest::set_deterministic(bool deterministic){
+  this->deterministic = deterministic;
+  this->fit();
+}
+
 
 // ----------------- Rcpp include  -----------------
 
@@ -898,10 +933,14 @@ RCPP_MODULE(mod_rpf) {
 
     class_<RandomPlantedForest>("RandomPlantedForest")
     .constructor<const NumericVector, const NumericMatrix, int, int, int, double>()
+    .method("set_data", &RandomPlantedForest::set_data)
+    .method("cross_validation", &RandomPlantedForest::cross_validation)
     .method("predict_matrix", &RandomPlantedForest::predict_matrix)
     .method("predict_vector", &RandomPlantedForest::predict_vector)
+    .method("MSE", &RandomPlantedForest::MSE)
     .method("purify", &RandomPlantedForest::purify)
     .method("print", &RandomPlantedForest::print)
+    .method("set_deterministic", &RandomPlantedForest::set_deterministic)
     ;
 
 }

@@ -8,7 +8,7 @@
 library(Rcpp)
 sourceCpp("C-Code.cpp")
 
-rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=rep(1,p), alternative=F, loss="L2", epsilon=0.001, categorical_variables=NULL, deterministic=FALSE){
+rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=1, alternative=F, loss="L2", epsilon=0.1, categorical_variables=NULL, delta=0, cores=1, deterministic=FALSE){
   
   force(t_try)
   
@@ -18,6 +18,7 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
   a <- apply(X,2,min)     ## lower bounds
   b <- apply(X,2,max)     ### upper bounds
   
+  min_leaf_size<-rep(min_leaf_size,p)
   
   if(!is.null(categorical_variables)){
     max_categorical <-  max(sapply( 1:length(categorical_variables), function(j) (length(unique(as.matrix(X[,categorical_variables[j]]))))))
@@ -29,7 +30,7 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
   tree_fam <- function(run){
     
     subsample <- sample(n,n,replace=TRUE)
-
+    
     if(!deterministic){
       X <- X[subsample,]
       Y <- Y[subsample]
@@ -102,12 +103,10 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
       
       split_candidates <- sample(Possible_Splits, m_try)
       
-      # deterministic
-      split_candidates <- Possible_Splits
   
       if(!is.null(categorical_variables)){ 
-      R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, categorical_variables, max_categorical, deterministic)
-      } else       R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, p+1, 0, deterministic)
+      R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, categorical_variables, max_categorical,delta, deterministic=deterministic)
+      } else       R=Calc_Optimal_split2(Y,W, as.matrix(X), split_try, variables, individuals, min_leaf_size, split_candidates, loss, p+1, 0,delta, deterministic=deterministic)
         
       R_opt <- R[1]
       
@@ -182,7 +181,7 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
           R21 = sum(((Y[I_1]+1)/2) *W[I_1])/sum(W[I_1])
           R31 = sum(((Y[I_2]+1)/2) *W[I_2])/sum(W[I_2])
           R21 = min(1-epsilon,max(epsilon,R21))
-          R31 = min(1-epsilon,max(epsilon,R21))
+          R31 = min(1-epsilon,max(epsilon,R31))
           
           if (sum(W[I_1])==0){
             y_1 <- 0
@@ -349,10 +348,11 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
     }
     }
  
-    return(list(intervals=intervals, values=values, variables=variables, b=b, subsample=subsample, categorical_variables=categorical_variables))
+    return(list(intervals=intervals, values=values, variables=variables, b=b, subsample=subsample, categorical_variables=categorical_variables, individuals=individuals))
   }
   
-  forest_res <- sapply(1:ntrees, tree_fam) 
+  if (cores ==1) forest_res <- sapply(1:ntrees, tree_fam) 
+  else forest_res <- mcmapply( tree_fam, 1:ntrees, mc.cores=cores) 
   # 
   # Y_hat=rep(0,n)
   # for(s in 1:ntrees){ Y_hat <- Y_hat + forest_res[[s]]$Y_hat }
