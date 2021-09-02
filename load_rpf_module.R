@@ -4,7 +4,7 @@ library(Rcpp)
 
 # enable compiler optimization
 myPlugin <- getPlugin("Rcpp")
-myPlugin$PKG_CXXFLAGS <- c(myPlugin$PKG_CXXFLAGS, "-O3 -funroll-loops -fvectorize")
+myPlugin$PKG_CXXFLAGS <- c(myPlugin$PKG_CXXFLAGS, "-O3 -funroll-loops")
 
 
 # set path to code
@@ -22,7 +22,7 @@ sourceCpp(paste(rpf_path, '/randomPlantedForest-R.cpp', sep=''))
 
 
 # generate test data
-data <- generate_data(Model=1)
+data <- generate_data(Model=1, p=3)
 samples_x <- data$X # extract samples
 samples_y <- data$Y_true
 
@@ -39,7 +39,7 @@ rpf_R <- rpf(data$Y_start, data$X, max_interaction = max_inter, t_try=t_try, ntr
 
 
 # cross-validation
-rpf_cpp$cross_validation(2, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
+rpf_cpp$cross_validation(5, c(5, 50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
 
 
 # purify
@@ -71,7 +71,7 @@ predictions_R <- predict_rpf(samples_x, rpf_R, c(0))
 
 # accuracy
 variation <- mean(data$Y_true^2)
-MSE_cpp <- sum((samples_y - predictions_cpp)^2) / length(samples_y)
+MSE_cpp <- rpf_cpp$MSE(predictions_cpp, samples_y) 
 MSE_R <- sum((samples_y - predictions_R)^2) / length(samples_y)
 MSE_cpp
 MSE_R
@@ -81,13 +81,23 @@ MSE_R
 library(rbenchmark)
 benchmark( "rpf_cpp" = {
                 rpf_cpp <- new(RandomPlantedForest, data$Y_start, data$X, max_inter, n_trees, n_splits, t_try)
-                predictions_cpp <- rpf_cpp$predict_matrix(samples_x, c(0))
+           },
+           "rpf_cpp_predict" = {
+             predictions_cpp <- rpf_cpp$predict_matrix(samples_x, c(0))
            },
            "rpf_R" = {
                 rpf_R <- rpf(data$Y_start, data$X, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
+           },
+           "rpf_R_predict" = {
                 predictions_R <- predict_rpf(samples_x, rpf_R, c(0))
            },
            replications=1
+)
+
+benchmark( "rpf_cpp_cv" = {
+  rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
+  },
+  replications=1
 )
 
 

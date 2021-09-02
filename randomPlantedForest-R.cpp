@@ -26,9 +26,10 @@ Rcpp::NumericVector from_std_vec(std::vector<double> v) {
 }
 
 Rcpp::NumericMatrix from_std_vec(std::vector<std::vector<double>> v) {
-  NumericMatrix m;
+  if(v.empty()) return NumericMatrix();
+  NumericMatrix m(v.size(), v[0].size());
   for(int row=0; row<v.size(); ++row){
-      m(row, _ ) = from_std_vec(v[row]);
+      m(row, _ ) = NumericMatrix(1, v[row].size(), from_std_vec(v[row]).begin());
   }
   return m;
 }
@@ -433,7 +434,7 @@ void RandomPlantedForest::fit(){
             }
         }
         
-        if(true){
+        if(false){
             std::cout << "Initial Possible Splits: ";
             for(auto split: possible_splits){
                 std::cout << split.first << "-";
@@ -605,6 +606,12 @@ void RandomPlantedForest::fit(){
 }
 
 void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries){
+    
+    if(deterministic) {
+      std::cout << "Note: Set model to non-deterministic. " << std::endl;
+      deterministic = false; 
+    }
+    
     std::set<int> splits_vec = to_std_set(splits);
     std::vector<int> split_tries_vec = to_std_vec(split_tries);
     std::vector<double> t_tries_vec = to_std_vec(t_tries);
@@ -619,9 +626,8 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(order.begin(), order.end(), g);
-    int set_size = sample_size/n_sets;
-    NumericVector Y_train, Y_test_true, Y_test_predicted;
-    NumericMatrix X_train, X_test;
+    double tmp = double(sample_size)/double(n_sets);
+    int set_size = round(tmp);
     
     // remember original data samples
     NumericMatrix X_original = from_std_vec(X);
@@ -642,13 +648,29 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
       			    for(int n_set=0; n_set<n_sets; ++n_set){
       			      
     	              // split data into training and test sets
-    	              Y_train = Y_original;
-    	              X_train = X_original;
-    	              Y_train.erase(n_set*set_size, (n_set+1)*set_size);
-    	              X_train.erase(n_set*set_size, (n_set+1)*set_size);
-    	              X_test = X_original(Rcpp::Range(n_set*set_size, (n_set+1)*set_size), _ );
-	                  Y_test_true = Y_original[Rcpp::Range(n_set*set_size, (n_set+1)*set_size)];
-    	             
+      			        int test_size = set_size;
+      			        if(n_set == n_sets-1) test_size = order.size() - (n_sets-1)*set_size;
+      			        int train_size = order.size() - test_size, i = 0, j = 0;
+    	              NumericVector Y_train(train_size), Y_test_true(test_size), Y_test_predicted;
+      			        NumericMatrix X_train(train_size, feature_size), X_test(test_size, feature_size);
+      			        //std::cout << train_size << "/" << test_size << std::endl; // << " - "; // 
+    	              for(int index=0; index<order.size(); ++index){
+    	                  if( (index >= (n_set * set_size)) && (index < ((n_set + 1) * set_size))){
+    	                      //if(i == 0) std::cout << std::endl;
+    	                      Y_test_true[i] = Y_original[order[index]];
+    	                      X_test(i, _ ) = X_original(order[index], _ );
+    	                      //std::cout << i << ",";
+    	                      //if(i == test_size-1) std::cout << std::endl;
+    	                      ++i;
+    	                  }else{
+    	                      Y_train[j] = Y_original[order[index]];
+    	                      X_train(j, _ ) = X_original(order[index], _ );
+    	                      //std::cout << j << ",";
+    	                      ++j;
+    	                  }
+    	              }
+    	              std::cout << train_size << "/" << test_size << std::endl;
+
     	              // fit to training data
     	              this->set_data(Y_train, X_train);
     	              
@@ -659,6 +681,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
       			    
   			        // average
   			        curr_MSE = MSE_sum / n_sets;
+      			    std::cout << splits << ", " << t << ", " << s << ": MSE=" << curr_MSE << std::endl;
       			    
       			    // update optimal
   			        if(curr_MSE < MSE_min){
@@ -671,11 +694,13 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     		}	
     }
     
-    // reset X&Y to original, fit with optimal pars
+    // reset X&Y to original and fit with optimal pars
     this->n_splits = optimal_split;
     this->t_try = optimal_t_try;
     this->split_try = optimal_split_try;
     this->set_data(Y_original, X_original);
+    
+    std::cout << "Optimal parameters: " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
 }
 
 // predict single feature vector
@@ -791,10 +816,7 @@ Rcpp::NumericVector RandomPlantedForest::predict_vector(const NumericVector &X, 
 }
 
 double RandomPlantedForest::MSE(const NumericVector &Y_predicted, const NumericVector &Y_true){
-    
-    
-    
-    return 0;
+    return sum(Rcpp::pow(Y_true - Y_predicted, 2)) / Y_true.size();
 }
 
 void RandomPlantedForest::purify(){
