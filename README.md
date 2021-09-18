@@ -1,6 +1,6 @@
 # Planted_Forest
 
-23/12/2020 Very first version released. We will work on usability after the holidays.
+23/12/2020 Very first version released. 
 
 The following functions are provided:
 
