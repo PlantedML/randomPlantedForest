@@ -171,6 +171,7 @@ class RandomPlantedForest {
         void cross_validation(int n_sets, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
         double MSE(const NumericVector &Y_predicted, const NumericVector &Y_true); 
         void set_deterministic(bool deterministic);
+        void get_parameters();
         
     private:
         std::vector<double> Y;
@@ -185,7 +186,7 @@ class RandomPlantedForest {
         int sample_size;                            // number of samples of X
         bool purify_forest;                         // whether the forest should be purified
         bool purified = false;                      // track if forest is currently purified
-        bool deterministic = true;                  // choose whether approach deterministic or random
+        bool deterministic = false;                 // choose whether approach deterministic or random
         std::vector<std::vector<int>> variables;    // split dimensions for initial trees
         std::vector<double> upper_bounds;           //
         std::vector<double> lower_bounds;           //
@@ -649,27 +650,21 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
       			      
     	              // split data into training and test sets
       			        int test_size = set_size;
-      			        if(n_set == n_sets-1) test_size = order.size() - (n_sets-1)*set_size;
+      			        if(n_set == n_sets-1) test_size = order.size() - (n_sets-1) * set_size;
       			        int train_size = order.size() - test_size, i = 0, j = 0;
     	              NumericVector Y_train(train_size), Y_test_true(test_size), Y_test_predicted;
       			        NumericMatrix X_train(train_size, feature_size), X_test(test_size, feature_size);
-      			        //std::cout << train_size << "/" << test_size << std::endl; // << " - "; // 
     	              for(int index=0; index<order.size(); ++index){
     	                  if( (index >= (n_set * set_size)) && (index < ((n_set + 1) * set_size))){
-    	                      //if(i == 0) std::cout << std::endl;
     	                      Y_test_true[i] = Y_original[order[index]];
     	                      X_test(i, _ ) = X_original(order[index], _ );
-    	                      //std::cout << i << ",";
-    	                      //if(i == test_size-1) std::cout << std::endl;
     	                      ++i;
     	                  }else{
     	                      Y_train[j] = Y_original[order[index]];
     	                      X_train(j, _ ) = X_original(order[index], _ );
-    	                      //std::cout << j << ",";
     	                      ++j;
     	                  }
     	              }
-    	              std::cout << train_size << "/" << test_size << std::endl;
 
     	              // fit to training data
     	              this->set_data(Y_train, X_train);
@@ -741,8 +736,7 @@ double RandomPlantedForest::predict_single(const std::vector<double> &X, std::se
                     for(int i = 0; i<dims.size(); ++i){
 
                         int dim = dims[i];
-                        std::cout << X[i] << ", " << leaf.intervals[dim-1].first << std::endl;
-                        
+                      
                         if(!(leaf.intervals[dim-1].first <= X[i]
                             && (leaf.intervals[dim-1].second > X[i]
                             || leaf.intervals[dim-1].second == upper_bounds[dim-1]))){
@@ -943,6 +937,12 @@ void RandomPlantedForest::print(){
     }
 }
 
+void RandomPlantedForest::get_parameters(){
+  std::cout << "Parameters: n_trees=" <<  n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try 
+            << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", feature_size=" << feature_size 
+            << ", sample_size=" << sample_size << std::endl;
+}
+
 void RandomPlantedForest::set_deterministic(bool deterministic){
   this->deterministic = deterministic;
   this->fit();
@@ -962,6 +962,7 @@ RCPP_MODULE(mod_rpf) {
     .method("MSE", &RandomPlantedForest::MSE)
     .method("purify", &RandomPlantedForest::purify)
     .method("print", &RandomPlantedForest::print)
+    .method("get_parameters", &RandomPlantedForest::get_parameters)
     .method("set_deterministic", &RandomPlantedForest::set_deterministic)
     ;
 
