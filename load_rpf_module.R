@@ -1,5 +1,6 @@
 library(inline)
 library(Rcpp)
+library(RcppParallel)
 
 
 # enable compiler optimization ------------------------
@@ -23,26 +24,28 @@ sourceCpp(paste(rpf_path, '/randomPlantedForest-R.cpp', sep=''))
 
 # generate test data ------------------------
 sample_size = 500
-data <- generate_data(Model=1, p=3, n=sample_size)
-test_size = floor(length(data$Y_true)/5)
+data <- generate_data(Model=1, p=4, n=sample_size)
+test_size = floor(length(data$Y_true) / 5)
 x_test <- data$X[1:test_size, ] # extract samples
 y_test <- data$Y_true[1:test_size]
 x_train <- data$X[(test_size+1):sample_size, ] # extract samples
-y_train <- data$Y_true[(test_size+1):sample_size]
+y_train <- data$Y_start[(test_size+1):sample_size]
 
 
 # set parameters ------------------------
 n_splits <- 15
-max_inter <- 2
-n_trees <- 1
+max_inter <- 1
+n_trees <- 50
 t_try <- 0.5
 d <- FALSE
 
 
 # train models ------------------------
 rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, t_try)
-rpf_cpp$set_deterministic(d)
-rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=d)
+#rpf_cpp$set_deterministic(d)
+rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=d)
+#rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=0.9, ntrees = n_trees, splits = 18, split_try=5, deterministic=d)
+#rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=0.7, ntrees = n_trees, splits = 18,  split_try=5, deterministic=d)
 
 
 # cross-validation ------------------------
@@ -90,16 +93,16 @@ variation
 # benchmark ------------------------
 library(rbenchmark)
 benchmark( "rpf_cpp" = {
-                rpf_cpp <- new(RandomPlantedForest, data$Y_start, data$X, max_inter, n_trees, n_splits, t_try)
+                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, t_try)
            },
            "rpf_cpp_predict" = {
-             predictions_cpp <- rpf_cpp$predict_matrix(samples_x, c(0))
+             predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
            },
            "rpf_R" = {
-                rpf_R <- rpf(data$Y_start, data$X, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
+                rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
            },
            "rpf_R_predict" = {
-                predictions_R <- predict_rpf(samples_x, rpf_R, c(0))
+                predictions_R <- predict_rpf(x_test, rpf_R, c(0))
            },
            replications=1
 )
@@ -108,6 +111,17 @@ benchmark( "rpf_cpp_cv" = {
   rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
   },
   replications=1
+)
+
+benchmark(  "rpf_cpp_sequential" = {
+                rpf_cpp$set_parallel(FALSE);
+                rpf_cpp$set_data(y_train, x_train)
+            },
+            "rpf_cpp_parallel" = {
+                rpf_cpp$set_parallel(TRUE);
+                rpf_cpp$set_data(y_train, x_train)
+            },
+            replications=1
 )
 
 
