@@ -67,7 +67,7 @@ std::set<int> to_std_set(Rcpp::IntegerVector rv) {
 typedef std::pair<double, double> Interval;
 
 struct Leaf{
-    std::set<int> individuals;          // considered samples for each leaf
+    std::vector<int> individuals;          // considered samples for each leaf
     double value;                       // residual
     std::vector<Interval> intervals;    // min/max for each feature of the interval
 };
@@ -113,8 +113,8 @@ namespace rpf{
       Leaf* leaf_index;               // pointer to leaf containing interval
       int split_coordinate;           // coordinate for splitting
       double split_point;             // splitpoint
-      std::set<int> I_s;              // individuals smaller than splitpoint
-      std::set<int> I_b;              // individuals bigger than splitpoint
+      std::vector<int> I_s;              // individuals smaller than splitpoint
+      std::vector<int> I_b;              // individuals bigger than splitpoint
       double I_s_mean;                // mean of individuals smaller than splitpoin
       double I_b_mean;                // mean of individuals bigger than splitpoint
       Split(): min_sum(INF), tree_index(nullptr), leaf_index(nullptr), split_coordinate(1), split_point(0), I_s_mean(0.0), I_b_mean(0.0) {};
@@ -275,7 +275,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
             
             // go through all leaves of current tree
             for(auto& leaf: curr_tree->leaves){
-                std::set<int> curr_individuals = leaf.individuals; // consider individuals of current leaf
+                std::vector<int> curr_individuals = leaf.individuals; // consider individuals of current leaf
                 
                 // extract sample points according to individuals from X and Y
                 std::map<double, double> unique_samples;
@@ -306,7 +306,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
                     }
                     sample_point = sample_pos->first;
                     
-                    std::set<int> I_s, I_b; // individuals smaller/bigger than the samplepoint
+                    std::vector<int> I_s, I_b; // individuals smaller/bigger than the samplepoint
                     std::vector<double> Y_s, Y_b; // values of individuals smaller/bigger than the samplepoint
                     
                     // sum of respective samples
@@ -317,14 +317,20 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
                     for(int individual: curr_individuals){
                         if(X[individual][k] < sample_point){
                             Y_s.push_back(Y[individual]);
-                            I_s.insert(individual);
+                            I_s.push_back(individual);
                             Y_s_sum += Y[individual];
                         }else{
                             Y_b.push_back(Y[individual]);
-                            I_b.insert(individual);
+                            I_b.push_back(individual);
                             Y_b_sum += Y[individual];
                         }
                     }
+                    
+                    // ensure individuals are sorted and unique
+                    std::sort(I_s.begin(), I_s.end());
+                    std::sort(I_b.begin(), I_b.end());
+                    I_s.erase(std::unique(I_s.begin(), I_s.end()), I_s.end());
+                    I_b.erase(std::unique(I_b.begin(), I_b.end()), I_b.end());
                     
                     // get mean
                     if(Y_s.size() != 0) Y_s_mean = Y_s_sum / Y_s.size();
@@ -400,14 +406,6 @@ void RandomPlantedForest::set_data(const NumericVector &samples_Y, const Numeric
 
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n){
   
-  // store possible splits in map with splitting variable as key and pointer to resulting tree
-  std::multimap<int, std::shared_ptr<DecisionTree>> possible_splits;
-  
-  // construct some helper objects
-  rpf::Split curr_split;
-  std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
-  std::vector<double> samples_Y = std::vector<double>(sample_size);
-  
   DecisionTree initial_tree;
   TreeFamily curr_family;
   for(size_t i=0; i<variables.size(); ++i){
@@ -416,8 +414,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     curr_family.trees.push_back(std::make_shared<DecisionTree>(initial_tree)); // save tree with one leaf in the beginning
   }
   
-  // reset possible splits
-  possible_splits.clear();
+  // store possible splits in map with splitting variable as key and pointer to resulting tree
+  std::multimap<int, std::shared_ptr<DecisionTree>> possible_splits;
   for(int i=0; i<variables.size(); ++i){
     for(int j=0; j<variables[i].size(); ++j){
       // add pointer to resulting tree with split dimension as key
@@ -437,6 +435,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   
   // sample data points with replacement
   int sample_index;
+  std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
+  std::vector<double> samples_Y = std::vector<double>(sample_size);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
     sample_index = std::rand() % sample_size;
@@ -452,6 +452,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   }
   
   // modify existing or add new trees through splitting
+  rpf::Split curr_split;
   for(size_t split_count=0; split_count<n_splits; ++split_count){
     
     // find optimal split
@@ -605,9 +606,8 @@ void RandomPlantedForest::CreateTreeFamilies::operator()(std::size_t begin, std:
 void RandomPlantedForest::fit(){
 
     // setup initial set of individuals
-    std::set<int> initial_individuals;
-    auto pos = initial_individuals.begin();
-    for(int i = 0; i < sample_size; ++i) pos = initial_individuals.insert(pos, i);
+    std::vector<int> initial_individuals(sample_size);
+    std::iota(initial_individuals.begin(), initial_individuals.end(), 0);
     
     // initialize intervals with lower and upper bounds
     std::vector<Interval> initial_intervals(feature_size);

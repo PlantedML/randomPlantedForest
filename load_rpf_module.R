@@ -108,9 +108,9 @@ benchmark( "rpf_cpp" = {
 )
 
 benchmark( "rpf_cpp_cv" = {
-  rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
-  },
-  replications=1
+              rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
+            },
+            replications=1
 )
 
 benchmark(  "rpf_cpp_sequential" = {
@@ -120,6 +120,9 @@ benchmark(  "rpf_cpp_sequential" = {
             "rpf_cpp_parallel" = {
                 rpf_cpp$set_parallel(TRUE);
                 rpf_cpp$set_data(y_train, x_train)
+            },
+            "rpf_R" = {
+                rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
             },
             replications=1
 )
