@@ -171,7 +171,7 @@ class RandomPlantedForest {
 
     public:
         RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
-                            int max_interaction=2, int n_trees=50, int n_splits=30, double t_try=0.4);
+                            int max_interaction=2, int n_trees=50, int n_splits=30, , NumericVector parameters={10,0.4,0,0,0});
         void set_data(const NumericVector &samples_Y, const NumericMatrix &samples_X);
         Rcpp::NumericVector predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
         Rcpp::NumericVector predict_vector(const NumericVector &X, const NumericVector components = {0});
@@ -216,17 +216,29 @@ class RandomPlantedForest {
                                const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
 };
 
-// constructor
+// constructor with parameters split_try, t_try, purify_forest, deterministic, parallelize
 RandomPlantedForest::RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
-                                         int max_interaction, int n_trees, int n_splits, double t_try){
-
-    // initialize class members
+                                         int max_interaction, int n_trees, int n_splits, NumericVector parameters){
+   
+    // initialize class members 
+    std::vector<double> pars = to_std_vec(parameters);
     this->max_interaction = max_interaction;
     this->n_trees = n_trees;
     this->n_splits = n_splits;
-    this->split_try = 10;
-    this->t_try = t_try;
-    this->purify_forest = false;
+    if(pars.size() != 5){
+        std::cout << "Wrong number of parameters - set to default." << std::endl;
+        this->split_try = 10;
+        this->t_try = 0.4;
+        this->purify_forest = 0;
+        this->deterministic = 0;
+        this->parallelize = 0;
+    }else{
+        this->split_try = pars[0];
+        this->t_try = pars[1];
+        this->purify_forest = pars[2];
+        this->deterministic = pars[3];
+        this->parallelize = pars[4];
+    }
 
     // set data and data related members
     this->set_data(samples_Y, samples_X);
@@ -1001,7 +1013,7 @@ void RandomPlantedForest::set_parallel(bool parallelize){
 RCPP_MODULE(mod_rpf) {
 
     class_<RandomPlantedForest>("RandomPlantedForest")
-    .constructor<const NumericVector, const NumericMatrix, int, int, int, double>()
+    .constructor<const NumericVector, const NumericMatrix, int, int, int, NumericVector>()
     .method("set_data", &RandomPlantedForest::set_data)
     .method("cross_validation", &RandomPlantedForest::cross_validation)
     .method("predict_matrix", &RandomPlantedForest::predict_matrix)
