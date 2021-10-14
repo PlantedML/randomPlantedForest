@@ -171,7 +171,7 @@ class RandomPlantedForest {
 
     public:
         RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
-                            int max_interaction=2, int n_trees=50, int n_splits=30, , NumericVector parameters={10,0.4,0,0,0});
+                            int max_interaction=2, int n_trees=50, int n_splits=30, NumericVector parameters={10,0.4,0,0,0});
         void set_data(const NumericVector &samples_Y, const NumericMatrix &samples_X);
         Rcpp::NumericVector predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
         Rcpp::NumericVector predict_vector(const NumericVector &X, const NumericVector components = {0});
