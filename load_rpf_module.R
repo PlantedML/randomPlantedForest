@@ -36,16 +36,17 @@ y_train <- data$Y_start[(test_size+1):sample_size]
 n_splits <- 15
 max_inter <- 1
 n_trees <- 50
+split_try <- 10
 t_try <- 0.5
-d <- FALSE
+deterministic_forest <- FALSE
+parallel <- FALSE
+purify_forest <- FALSE
 
 
 # train models ------------------------
-rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, t_try)
+rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, purify_forest, deterministic_forest, parallel))
 #rpf_cpp$set_deterministic(d)
-rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=d)
-#rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=0.9, ntrees = n_trees, splits = 18, split_try=5, deterministic=d)
-#rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=0.7, ntrees = n_trees, splits = 18,  split_try=5, deterministic=d)
+rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest)
 
 
 # cross-validation ------------------------
