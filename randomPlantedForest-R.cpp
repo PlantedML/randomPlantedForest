@@ -67,7 +67,7 @@ std::set<int> to_std_set(Rcpp::IntegerVector rv) {
 typedef std::pair<double, double> Interval;
 
 struct Leaf{
-    std::vector<int> individuals;          // considered samples for each leaf
+    std::vector<int> individuals;       // considered samples for each leaf
     double value;                       // residual
     std::vector<Interval> intervals;    // min/max for each feature of the interval
 };
@@ -98,10 +98,7 @@ std::vector<Leaf> DecisionTree::get_leaves() const{
     return leaves;
 }
 
-struct TreeFamily {
-    std::vector<std::shared_ptr<DecisionTree>> trees;
-    double constant = 0;
-};
+typedef std::map<std::set<int>, std::shared_ptr<DecisionTree>> TreeFamily;
 
 const double INF = std::numeric_limits<double>::infinity();
 
@@ -113,8 +110,8 @@ namespace rpf{
       Leaf* leaf_index;               // pointer to leaf containing interval
       int split_coordinate;           // coordinate for splitting
       double split_point;             // splitpoint
-      std::vector<int> I_s;              // individuals smaller than splitpoint
-      std::vector<int> I_b;              // individuals bigger than splitpoint
+      std::vector<int> I_s;           // individuals smaller than splitpoint
+      std::vector<int> I_b;           // individuals bigger than splitpoint
       double I_s_mean;                // mean of individuals smaller than splitpoin
       double I_b_mean;                // mean of individuals bigger than splitpoint
       Split(): min_sum(INF), tree_index(nullptr), leaf_index(nullptr), split_coordinate(1), split_point(0), I_s_mean(0.0), I_b_mean(0.0) {};
@@ -127,9 +124,9 @@ namespace rpf{
 
 // helper function to check whether a tree with specified split_dims already exists in tree_family
 std::shared_ptr<DecisionTree> treeExists(const std::set<int> split_dims, TreeFamily &tree_family){
-    for(auto& tree: tree_family.trees){
-        if(tree->get_split_dims() == split_dims){
-            return tree; // if found, return pointer to tree, otherwise nullptr
+    for(auto& tree: tree_family){
+        if(tree.second->get_split_dims() == split_dims){
+            return tree.second; // if found, return pointer to tree, otherwise nullptr
         }
     }
     return nullptr;
@@ -162,6 +159,15 @@ bool leafExists(std::vector<Interval>& intervals, const std::shared_ptr<Decision
         }
     }
     return exists;
+}
+
+template <typename KT, typename VT>
+std::vector<KT> get_keys(std::map<KT, VT> m){
+  std::vector<KT> keys;
+  for(const auto& entry: m){
+    keys.push_back(entry.first);
+  }
+  return keys;
 }
 
 
@@ -197,10 +203,10 @@ class RandomPlantedForest {
         bool purified = false;                      // track if forest is currently purified
         bool deterministic = false;                 // choose whether approach deterministic or random
         bool parallelize = true;                    // 
-        std::vector<std::vector<int>> variables;    // split dimensions for initial trees
+        std::vector<std::set<int>> variables;       // split dimensions for initial trees
         std::vector<double> upper_bounds;           //
         std::vector<double> lower_bounds;           //
-        std::vector<TreeFamily> tree_families;      // random planted forest conatining result
+        std::vector<TreeFamily> tree_families;      // random planted forest containing result
         void fit();
         void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
         struct CreateTreeFamilies : public Worker {
@@ -265,10 +271,10 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
     }
 
     // go through all trees in current family
-    for(auto& curr_tree:curr_family.trees){
+    for(auto& curr_tree:curr_family){
         
         // skip if tree has no leaves
-        if(curr_tree->leaves.size() == 0){ continue; }
+        if(curr_tree.second->leaves.size() == 0){ continue; }
 
         // consider a fraction of possible splits
         for(size_t n=0; n<n_candidates; ++n){
@@ -280,12 +286,12 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
             leaf_size = n_leaves[k];
             
             // Test if splitting in the current tree w.r.t. the coordinate "k" is an element of candidate tree
-            tree_dims = curr_tree->split_dims;
+            tree_dims = curr_tree.second->split_dims;
             tree_dims.insert(k+1);
             if(tree_dims != candidate->second->split_dims) continue; // if split dimensions do not match consider next candidate
             
             // go through all leaves of current tree
-            for(auto& leaf: curr_tree->leaves){
+            for(auto& leaf: curr_tree.second->leaves){
                 std::vector<int> curr_individuals = leaf.individuals; // consider individuals of current leaf
                 
                 // extract sample points according to individuals from X and Y
@@ -360,7 +366,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
                     // update split if squared sum is smaller
                     if(curr_sum < curr_split.min_sum){
                         curr_split.min_sum = curr_sum;
-                        curr_split.tree_index = curr_tree;
+                        curr_split.tree_index = curr_tree.second;
                         curr_split.leaf_index =  &leaf;
                         curr_split.split_coordinate = k+1;
                         curr_split.split_point = sample_point;
@@ -409,8 +415,8 @@ void RandomPlantedForest::set_data(const NumericVector &samples_Y, const Numeric
         this->lower_bounds[i] = minVal;
     }
     
-    this->variables = std::vector<std::vector<int>>(feature_size);
-    for(int i = 0; i<feature_size; ++i) this->variables[i] = std::vector<int> {i+1};
+    this->variables = std::vector<std::set<int>>(feature_size);
+    for(int i = 0; i<feature_size; ++i) this->variables.push_back(std::set<int> {i+1});
     
     this->fit();
 }
@@ -420,17 +426,17 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   DecisionTree initial_tree;
   TreeFamily curr_family;
   for(size_t i=0; i<variables.size(); ++i){
-    initial_tree.split_dims = std::set<int> (variables[i].begin(),variables[i].end());
+    initial_tree.split_dims = variables[i];
     initial_tree.leaves = initial_leaves;
-    curr_family.trees.push_back(std::make_shared<DecisionTree>(initial_tree)); // save tree with one leaf in the beginning
+    curr_family.insert(std::make_pair(initial_tree.split_dims, std::make_shared<DecisionTree>(initial_tree))); // save tree with one leaf in the beginning
   }
   
   // store possible splits in map with splitting variable as key and pointer to resulting tree
   std::multimap<int, std::shared_ptr<DecisionTree>> possible_splits;
   for(int i=0; i<variables.size(); ++i){
-    for(int j=0; j<variables[i].size(); ++j){
+    for(auto const& var: variables[i]){
       // add pointer to resulting tree with split dimension as key
-      possible_splits.insert(std::pair<int, std::shared_ptr<DecisionTree>>(variables[i][j], curr_family.trees[i]));
+      possible_splits.insert(std::make_pair(var, curr_family[variables[i]]));
     }
   }
   
@@ -493,17 +499,17 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
           curr_dims.insert(curr_split.split_coordinate);
           curr_dims.insert(feature_dim);
           
-          if(curr_dims.size()>max_interaction) continue; 
+          if(curr_dims.size() > max_interaction) continue; 
           
           // check if resulting tree already exists in family
           std::shared_ptr<DecisionTree> found_tree = treeExists(curr_dims, curr_family);
           
           // update possible_splits if not already existing
           if(found_tree){ // if yes add pointer
-            possible_splits.insert(std::pair<int, std::shared_ptr<DecisionTree>>(feature_dim, found_tree));
+            possible_splits.insert(std::make_pair(feature_dim, found_tree));
           }else{ // if not create new tree
-            curr_family.trees.push_back(std::make_shared<DecisionTree>(DecisionTree(curr_dims)));
-            possible_splits.insert(std::pair<int, std::shared_ptr<DecisionTree>>(feature_dim, curr_family.trees.back()));
+            curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
+            possible_splits.insert(std::make_pair(feature_dim, curr_family[curr_dims]));
           }
           
           if(false){
@@ -579,11 +585,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
       
       if(false){
-        std::cout << "Current TreeFamily: (" << curr_family.trees.size() << ") ";
-        for(auto tree: curr_family.trees){
+        std::cout << "Current TreeFamily: (" << curr_family.size() << ") ";
+        for(auto tree: curr_family){
           std::cout << "Dims = ";
-          for(auto dim: tree->split_dims) std::cout << dim << ", ";
-          std::cout << "; " << "Number of Leafs = " << tree->leaves.size();
+          for(auto dim: tree.first) std::cout << dim << ", ";
+          std::cout << "; " << "Number of Leafs = " << tree.second->leaves.size();
           std::cout << " / ";
         }
         std::cout << std::endl << std::endl;
@@ -591,17 +597,16 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
   
-  // remove empty trees
-  curr_family.trees.erase(std::remove_if(curr_family.trees.begin(), curr_family.trees.end(), 
-                                         [](std::shared_ptr<DecisionTree> tree) { return tree->leaves.size() == 0;}), curr_family.trees.end() );
-  
-  // todo: clear individuals of each tree
-  
-  // optional: purify tree
-  if(purify_forest){
-    this->purify();
-  }else{
-    purified = false;
+  // remove empty trees & clear individuals of each tree
+  auto keys = get_keys(curr_family);
+  for(auto& key: keys){
+    if(curr_family[key]->leaves.size() == 0){
+      curr_family.erase(key);
+      continue;
+    } 
+    for(auto leaf: curr_family[key]->leaves){
+      leaf.individuals.clear();
+    }
   }
   
   tree_families[n] = curr_family;
@@ -638,13 +643,19 @@ void RandomPlantedForest::fit(){
 
     // iterate over families of trees and modify
     if(parallelize){
-      std::cout << "Note: Using parallelized version." << std::endl;
       CreateTreeFamilies create_tree_families(initial_leaves, this);
       parallelFor(0, n_trees, create_tree_families);
     }else{
       for(size_t n=0; n<n_trees; ++n){
         create_tree_family(initial_leaves, n);
       }
+    }
+    
+    // optionally purify tree
+    if(purify_forest){
+      this->purify();
+    }else{
+      purified = false;
     }
 }
 
@@ -759,10 +770,10 @@ double RandomPlantedForest::predict_single(const std::vector<double> &X, std::se
     // consider all components
     if(component_index == std::set<int>{0}) {
         for(auto& tree_family: this->tree_families){
-            for(auto& tree: tree_family.trees){
-                for(auto& leaf: tree->leaves){
+            for(auto& tree: tree_family){
+                for(auto& leaf: tree.second->leaves){
                     bool valid = true;
-                    for(auto& dim: tree->split_dims){
+                    for(auto& dim: tree.first){
                         if(!(leaf.intervals[dim-1].first <= X[dim-1]
                             && (leaf.intervals[dim-1].second > X[dim-1]
                             || leaf.intervals[dim-1].second == upper_bounds[dim-1]))){
@@ -772,19 +783,20 @@ double RandomPlantedForest::predict_single(const std::vector<double> &X, std::se
                     if(valid) total_res += leaf.value;
                 }
             }
-            total_res += tree_family.constant;
+            // todo: check if constant not needed with null tree
+            // total_res += tree_family.constant;
         }
     }else{ // choose components for prediction
         for(auto& tree_family: this->tree_families){
-            for(auto& tree: tree_family.trees){
+            for(auto& tree: tree_family){
                 
                 // only consider trees with same dimensions as component_index
-                if(tree->split_dims != component_index) continue;
+                if(tree.first != component_index) continue;
                 
                 std::vector<int> dims;
-                for(auto dim: tree->split_dims) {dims.push_back(dim);}
+                for(auto dim: tree.first) {dims.push_back(dim);}
                 
-                for(auto& leaf: tree->leaves){
+                for(auto& leaf: tree.second->leaves){
                     bool valid = true;
                     for(int i = 0; i<dims.size(); ++i){
 
@@ -873,16 +885,17 @@ void RandomPlantedForest::purify(){
         
         // recap maximum number of dimensions of current family
         unsigned int curr_max = 0;
-        for(auto& tree: curr_family.trees){
-            if(tree->split_dims.size() > curr_max) curr_max = tree->split_dims.size();
+        for(auto& tree: curr_family){
+            if(tree.first.size() > curr_max) curr_max = tree.first.size();
         }
 
         while(curr_max >= 1){
             
-            int numb_of_trees = curr_family.trees.size();
+            int numb_of_trees = curr_family.size();
+            auto keys = get_keys(curr_family);
             // go through split dimensions of all trees
-            for(int n=0; n<numb_of_trees; ++n){
-                auto& curr_tree = curr_family.trees[n];
+            for(const auto& key: keys){
+                auto& curr_tree = curr_family[key];
                 
                 std::set<int> curr_dims = curr_tree->split_dims;
                 
@@ -909,8 +922,8 @@ void RandomPlantedForest::purify(){
                             // update value of new leaf
                             new_leaf.value -= leaf.value * multiplier;
                             
-                            // update constant of family
-                            curr_family.constant += leaf.value * multiplier;
+                            // update constant of family todo: check if constant needed
+                            // curr_family.constant += leaf.value * multiplier;
                         }
                         
                         // append new leaf
@@ -930,7 +943,7 @@ void RandomPlantedForest::purify(){
                                 
                                 // check if tree with dimensions exists, if not create
                                 std::shared_ptr<DecisionTree> tree = treeExists(tree_dims, curr_family);
-                                if(!tree) curr_family.trees.push_back(std::make_shared<DecisionTree>(DecisionTree(tree_dims)));
+                                if(!tree) curr_family.insert(std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims))));
                                 
                                 // go through leafs of current tree
                                 int n_leafs = curr_tree->leaves.size();
@@ -970,9 +983,11 @@ void RandomPlantedForest::purify(){
 void RandomPlantedForest::print(){
     for(int n=0; n<n_trees; ++n){
         TreeFamily family = tree_families[n];
-        std::cout << n+1 << " TreeFamily: constant=" << family.constant << std::endl << std::endl;
-        for(int m=0; m<family.trees.size(); ++m){
-            DecisionTree tree = *(family.trees[m]);
+        // todo: check if constant needed
+        // std::cout << n+1 << " TreeFamily: constant=" << family.constant << std::endl << std::endl;
+        auto keys = get_keys(family);
+        for(int m=0; m<keys.size(); ++m){
+            DecisionTree tree = *(family[keys[m]]);
             std::cout << m+1 << " Tree: ";
             std::cout << "Dims=";
             for(auto& dim: tree.split_dims) std::cout << dim << ",";
