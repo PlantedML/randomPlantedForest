@@ -179,9 +179,8 @@ class RandomPlantedForest {
         void print();
         void cross_validation(int n_sets, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
         double MSE(const NumericVector &Y_predicted, const NumericVector &Y_true); 
-        void set_deterministic(bool deterministic);
-        void set_parallel(bool parallelize);
         void get_parameters();
+        void set_parameters(StringVector keys, NumericVector values);
         
     private:
         std::vector<double> Y;
@@ -752,7 +751,6 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     std::cout << "Optimal parameters: " << optimal_inter << ", " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
 }
 
-
 // predict single feature vector
 double RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index){
 
@@ -994,18 +992,43 @@ void RandomPlantedForest::print(){
 
 void RandomPlantedForest::get_parameters(){
   std::cout << "Parameters: n_trees=" <<  n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try 
-            << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", feature_size=" << feature_size 
-            << ", sample_size=" << sample_size << std::endl;
+            << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", parallel=" << parallelize
+            << ", feature_size=" << feature_size << ", sample_size=" << sample_size << std::endl;
 }
 
-void RandomPlantedForest::set_deterministic(bool deterministic){
-  this->deterministic = deterministic;
+/*  retrospectively change parameters of existing class object, 
+    updates the model, so far only single valued parameters supported,
+    for replacing training data use 'set_data' */
+void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values){
+  if(keys.size() != values.size()) {
+    std::cout << "Size of input vectors is not the same. " << std::endl;
+    return;
+  }
+  
+  for(int i=0; i<keys.size(); ++i){
+    if(keys[i] == "deterministic"){
+      this->deterministic = values[i];
+    }else if(keys[i] == "parallel"){
+      this->parallelize = values[i];
+    }else if(keys[i] == "purify"){
+      this->purify_forest = values[i];
+    }else if(keys[i] == "n_trees"){
+      this->n_trees = values[i];
+    }else if(keys[i] == "n_splits"){
+      this->n_splits= values[i];
+    }else if(keys[i] == "t_try"){
+      this->t_try = values[i];
+    }else if(keys[i] == "split_try"){
+      this->split_try = values[i];
+    }else if(keys[i] == "max_interaction"){
+      this->max_interaction = values[i];
+    }else{
+      std::cout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
+    }
+  }
   this->fit();
 }
 
-void RandomPlantedForest::set_parallel(bool parallelize){
-  this->parallelize = parallelize;
-}
 
 
 // ----------------- Rcpp include  -----------------
@@ -1022,8 +1045,7 @@ RCPP_MODULE(mod_rpf) {
     .method("purify", &RandomPlantedForest::purify)
     .method("print", &RandomPlantedForest::print)
     .method("get_parameters", &RandomPlantedForest::get_parameters)
-    .method("set_deterministic", &RandomPlantedForest::set_deterministic)
-    .method("set_parallel", &RandomPlantedForest::set_parallel)
+    .method("set_parameters", &RandomPlantedForest::set_parameters)
     ;
 
 }

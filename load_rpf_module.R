@@ -1,11 +1,7 @@
+# load external libraries ------------------------
 library(inline)
 library(Rcpp)
 library(RcppParallel)
-
-
-# enable compiler optimization ------------------------
-myPlugin <- getPlugin("Rcpp")
-myPlugin$PKG_CXXFLAGS <- c(myPlugin$PKG_CXXFLAGS, "-O3 -funroll-loops")
 
 
 # set path to code ------------------------
@@ -39,13 +35,14 @@ n_trees <- 50
 split_try <- 10
 t_try <- 0.5
 deterministic_forest <- FALSE
-parallel <- FALSE
+parallel <- TRUE
 purify_forest <- FALSE
 
 
 # train models ------------------------
 rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, purify_forest, deterministic_forest, parallel))
-#rpf_cpp$set_deterministic(d)
+rpf_cpp$set_parameters("parallel", 0)
+rpf_cpp$set_parameters(c("t_try", "split_try"), c(0.4, 5))
 rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest)
 
 
@@ -93,8 +90,9 @@ variation
 
 # benchmark ------------------------
 library(rbenchmark)
+
 benchmark( "rpf_cpp" = {
-                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, t_try)
+  rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, purify_forest, deterministic_forest, parallel))
            },
            "rpf_cpp_predict" = {
              predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
