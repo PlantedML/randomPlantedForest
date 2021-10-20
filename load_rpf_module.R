@@ -16,6 +16,7 @@ source(paste(rpf_path, '/predict_rpf.R', sep=''))
 source(paste(rpf_path, '/purify_rpf.R', sep=''))
 source(paste(rpf_path, '/rpf.R', sep=''))
 sourceCpp(paste(rpf_path, '/C-Code.cpp', sep=''))
+source(paste(rpf_path, '/randomPlantedForest-R.R', sep=''))
 sourceCpp(paste(rpf_path, '/randomPlantedForest-R.cpp', sep=''))
 
 
@@ -41,7 +42,7 @@ purify_forest <- FALSE
 
 
 # train models ------------------------
-rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, purify_forest, deterministic_forest, parallel))
+rpf_cpp <- new_rpf(y_train, x_train)
 rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest)
 
 
