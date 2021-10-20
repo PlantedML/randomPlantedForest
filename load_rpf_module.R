@@ -34,7 +34,7 @@ max_inter <- 1
 n_trees <- 50
 split_try <- 10
 t_try <- 0.5
-deterministic_forest <- FALSE
+deterministic_forest <- TRUE
 parallel <- TRUE
 purify_forest <- FALSE
 
@@ -116,12 +116,10 @@ benchmark( "rpf_cpp_cv" = {
 )
 
 benchmark(  "rpf_cpp_sequential" = {
-                rpf_cpp$set_parallel(FALSE);
-                rpf_cpp$set_data(y_train, x_train)
+                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, FALSE))
             },
             "rpf_cpp_parallel" = {
-                rpf_cpp$set_parallel(TRUE);
-                rpf_cpp$set_data(y_train, x_train)
+                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, TRUE))
             },
             "rpf_R" = {
                 rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
