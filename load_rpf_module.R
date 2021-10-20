@@ -2,6 +2,7 @@
 library(inline)
 library(Rcpp)
 library(RcppParallel)
+library(rbenchmark)
 
 
 # set path to code ------------------------
@@ -30,7 +31,7 @@ y_train <- data$Y_start[(test_size+1):sample_size]
 
 # set parameters ------------------------
 n_splits <- 15
-max_inter <- 1
+max_inter <- 2
 n_trees <- 50
 split_try <- 10
 t_try <- 0.5
@@ -92,13 +93,18 @@ variation
 
 
 # benchmark ------------------------
-library(rbenchmark)
 
-benchmark( "rpf_cpp" = {
-  rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, purify_forest, deterministic_forest, parallel))
-           },
+benchmark( "rpf_cpp_sequential" = {
+                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, FALSE))
+            },
+            "rpf_cpp_parallel" = {
+                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, TRUE))
+            },
            "rpf_cpp_predict" = {
-             predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
+                predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
+           },
+           "rpf_cpp_cv" = {
+                rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
            },
            "rpf_R" = {
                 rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
@@ -109,22 +115,5 @@ benchmark( "rpf_cpp" = {
            replications=1
 )
 
-benchmark( "rpf_cpp_cv" = {
-              rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
-            },
-            replications=1
-)
-
-benchmark(  "rpf_cpp_sequential" = {
-                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, FALSE))
-            },
-            "rpf_cpp_parallel" = {
-                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, TRUE))
-            },
-            "rpf_R" = {
-                rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
-            },
-            replications=1
-)
 
 
