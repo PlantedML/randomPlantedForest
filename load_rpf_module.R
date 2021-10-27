@@ -1,9 +1,3 @@
-# load external libraries ------------------------
-library(inline)
-library(Rcpp)
-library(RcppParallel)
-library(rbenchmark)
-
 
 # set path to code ------------------------
 rpf_path <- '/home/maike/Dokumente/HiWi/Planted_Forest'
@@ -11,13 +5,12 @@ setwd(rpf_path)
 
 
 # source code ------------------------
+source(paste(rpf_path, '/randomPlantedForest-R.R', sep=''))
 source(paste(rpf_path, '/ARCHIVE_Codes_used_in_paper/generate_data.R', sep=''))
 source(paste(rpf_path, '/predict_rpf.R', sep=''))
 source(paste(rpf_path, '/purify_rpf.R', sep=''))
 source(paste(rpf_path, '/rpf.R', sep=''))
 sourceCpp(paste(rpf_path, '/C-Code.cpp', sep=''))
-source(paste(rpf_path, '/randomPlantedForest-R.R', sep=''))
-sourceCpp(paste(rpf_path, '/randomPlantedForest-R.cpp', sep=''))
 
 
 # generate test data ------------------------
@@ -42,29 +35,25 @@ purify_forest <- FALSE
 
 
 # train models ------------------------
-rpf_cpp <- new_rpf(y_train, x_train)
+rpf_cpp <- new_rpf(y_train, x_train,  max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest, parallel = TRUE)
 rpf_R <- rpf(y_train, x_train, max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest)
-
 
 # change parameters ------------------------
 rpf_cpp$set_parameters("deterministic", 1)
 rpf_cpp$set_parameters(c("t_try", "split_try"), c(0.4, 5))
-
 
 # cross-validation ------------------------
 rpf_cpp$cross_validation(5, c(5, 20), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
 
 
 # purify ------------------------
-rpf_R_purified <- rpf_purify(rpf_R)
 rpf_cpp$purify()
-
+rpf_R_purified <- rpf_purify(rpf_R)
 
 # view result ------------------------
 rpf_cpp$print()
 rpf_cpp$get_parameters()
 rpf_R 
-
 
 # predict ------------------------
 
@@ -83,7 +72,6 @@ predictions_R <- predict_rpf(x_test, rpf_R, c(0))
 predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
 predictions_R <- predict_rpf(x_test, rpf_R, c(0))
 
-
 # accuracy ------------------------
 variation <- mean(y_test^2)
 MSE_cpp <- rpf_cpp$MSE(predictions_cpp, y_test) 
@@ -92,8 +80,8 @@ MSE_cpp
 MSE_R
 variation
 
-
 # benchmark ------------------------
+library(rbenchmark)
 
 benchmark( "rpf_cpp_sequential" = {
                 rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, FALSE))
