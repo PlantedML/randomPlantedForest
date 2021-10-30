@@ -5,29 +5,36 @@
 #        min_leaf_size = minimum number of nodes in each leaf, alternative = alternative updating       
 # Output: list of families of trees: [i][1] Final leaves of the trees, [i][2] = estimated values corresponding to the leaves, [i][3] = coordinates of the trees 
 #                                     (for the i-th family, i=1,...,ntrees)
-library(Rcpp)
-sourceCpp("C-Code.cpp")
 
 rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=1, alternative=F, loss="L2", epsilon=0.1, categorical_variables=NULL, delta=0, cores=1){
-  
-  force(t_try)
-  
-  p <- ncol(X)
-  n <- length(Y)
-  
-  a <- apply(X,2,min)     ## lower bounds
-  b <- apply(X,2,max)     ### upper bounds
-  
-  min_leaf_size<-rep(min_leaf_size,p)
-  
-  if(!is.null(categorical_variables)){
-    max_categorical <-  max(sapply( 1:length(categorical_variables), function(j) (length(unique(as.matrix(X[,categorical_variables[j]]))))))
-  } else {
-    max_categorical <- 2
-  }
-  
+  l
   
   tree_fam <- function(run){
+    library(devtools)
+    find_rtools()
+    print(find_rtools())
+    
+    library(Rcpp)
+   
+    
+    sourceCpp("C-Code.cpp")
+    
+    force(t_try)
+    
+    p <- ncol(X)
+    n <- length(Y)
+    
+    a <- apply(X,2,min)     ## lower bounds
+    b <- apply(X,2,max)     ### upper bounds
+    
+    min_leaf_size<-rep(min_leaf_size,p)
+    
+    if(!is.null(categorical_variables)){
+      max_categorical <-  max(sapply( 1:length(categorical_variables), function(j) (length(unique(as.matrix(X[,categorical_variables[j]]))))))
+    } else {
+      max_categorical <- 2
+    }
+    
     
     subsample <- sample(n,n,replace=TRUE)
     
@@ -192,7 +199,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
             y_2 <- log( R31/(1-R31))
           }
           W[I_2] <- W[I_2]*exp(-0.5*Y[I_2]*y_2)
-          
+       
+             
           
           W[I_1][is.infinite(y_1)]<-0
           W[I_2][is.infinite(y_2)]<-0
@@ -348,7 +356,18 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
   }
   
   if (cores ==1) forest_res <- sapply(1:ntrees, tree_fam) 
-  else forest_res <- mcmapply( tree_fam, 1:ntrees, mc.cores=cores) 
+  
+  
+  
+  else{cl <- makeCluster(cores)
+    
+    clusterExport(cl, varlist = ls(), envir = environment())
+    forest_res <- parSapply(cl,1:ntrees, tree_fam)
+    stopCluster(cl)
+    
+  } 
+  
+  
   # 
   # Y_hat=rep(0,n)
   # for(s in 1:ntrees){ Y_hat <- Y_hat + forest_res[[s]]$Y_hat }
