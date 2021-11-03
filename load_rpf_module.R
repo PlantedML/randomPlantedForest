@@ -84,16 +84,13 @@ variation
 library(rbenchmark)
 
 benchmark( "rpf_cpp_sequential" = {
-                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, FALSE))
+                rpf_cpp <- new_rpf(y_train, x_train,  max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest, parallel = FALSE)
             },
             "rpf_cpp_parallel" = {
-                rpf_cpp <- new(RandomPlantedForest, y_train, x_train, max_inter, n_trees, n_splits, c(split_try, t_try, FALSE, TRUE, TRUE))
+                rpf_cpp <- new_rpf(y_train, x_train,  max_interaction=max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, split_try = split_try, deterministic=deterministic_forest, parallel = TRUE)
             },
            "rpf_cpp_predict" = {
                 predictions_cpp <- rpf_cpp$predict_matrix(x_test, c(0))
-           },
-           "rpf_cpp_cv" = {
-                rpf_cpp$cross_validation(3, c(5,50), c(0.2,0.5,0.7,0.9), c(1,2,5,10))
            },
            "rpf_R" = {
                 rpf_R <- rpf(y_train, x_train, max_interaction = max_inter, t_try=t_try, ntrees = n_trees, splits = n_splits, deterministic=FALSE)
