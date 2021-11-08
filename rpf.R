@@ -5,8 +5,7 @@
 #        min_leaf_size = minimum number of nodes in each leaf, alternative = alternative updating       
 # Output: list of families of trees: [i][1] Final leaves of the trees, [i][2] = estimated values corresponding to the leaves, [i][3] = coordinates of the trees 
 #                                     (for the i-th family, i=1,...,ntrees)
-library(Rcpp)
-sourceCpp("C-Code.cpp")
+
 
 rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_try=0.4, variables=NULL, min_leaf_size=1, alternative=F, loss="L2", epsilon=0.1, categorical_variables=NULL, delta=0, cores=1){
   
@@ -30,7 +29,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
   
   
   tree_fam <- function(run){
-    
+    library(Rcpp)
+    sourceCpp("C-Code.cpp")
     subsample <- sample(n,n,replace=TRUE)
     
  

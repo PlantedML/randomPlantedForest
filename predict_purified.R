@@ -61,7 +61,7 @@ if (interpret){
   
   var_names <- sapply(1:length(my_components), function(k){
     paste(
-      paste(colnames(X)[as.numeric(my_components[[k]])], collapse = ","),"(",
+      paste(colnames(x)[as.numeric(my_components[[k]])], collapse = ","),"(",
       paste(as.numeric(my_components[[k]]), collapse = ","),")",sep = "")
   }
   )
