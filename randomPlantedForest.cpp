@@ -23,6 +23,16 @@ using namespace RcppParallel;
 //  ----------------- functions for converting R and Cpp types ----------------- 
 
 /**
+ * \brief Convert the std container set of type int into an IntegerVector 
+ * from rcpp.
+ * 
+ * \param v the vector that is converted.
+ */
+Rcpp::IntegerVector from_std_set(std::set<int> v) {
+  return Rcpp::IntegerVector(v.begin(), v.end());
+}
+
+/**
  * \brief Convert the std container vector of type int into an IntegerVector 
  * from rcpp.
  * 
@@ -253,6 +263,7 @@ class RandomPlantedForest {
         double MSE(const NumericVector &Y_predicted, const NumericVector &Y_true); 
         void get_parameters();
         void set_parameters(StringVector keys, NumericVector values);
+        List get_model();
         
     protected:
         std::vector<double> Y;
@@ -1098,6 +1109,32 @@ void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values
   this->fit();
 }
 
+List RandomPlantedForest::get_model(){
+  List model;
+  for(const auto family: tree_families){
+    List variables, family_values, family_intervals;
+    for(const auto tree: family){
+      NumericVector tree_values;
+      List tree_intervals;
+      variables.push_back(from_std_set(tree.first));
+      for(const auto leaf: tree.second->leaves){
+        tree_values.push_back(leaf.value);
+        NumericVector intervals;
+        for(const auto interval: leaf.intervals){
+          intervals.push_back(interval.first);
+          intervals.push_back(interval.second);
+        }
+        NumericMatrix leaf_intervals(2, feature_size, intervals.begin());
+        tree_intervals.push_back(leaf_intervals);
+      }
+      family_intervals.push_back(tree_intervals);
+      family_values.push_back(tree_values);
+    }
+    model.push_back(List::create(Named("variables") = variables, _["values"] = family_values, _["intervals"] = family_intervals));
+  }
+  return(model);
+}
+
 
 // ----------------- rpf subclass for classification -----------------
 
@@ -1706,6 +1743,7 @@ RCPP_MODULE(mod_rpf) {
       .method("print", &RandomPlantedForest::print)
       .method("get_parameters", &RandomPlantedForest::get_parameters)
       .method("set_parameters", &RandomPlantedForest::set_parameters)
+      .method("get_model", &RandomPlantedForest::get_model)
     ;
   
     class_<ClassificationRPF>("ClassificationRPF")
