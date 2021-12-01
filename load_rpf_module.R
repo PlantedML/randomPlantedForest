@@ -119,8 +119,8 @@ MSE_R
 variation
 
 variation_class <- mean(y_test_class^2)
-MSE_cpp_class <- rpf_cpp_class$MSE(predictions_cpp_class, y_test_class) 
-MSE_R_class <- sum((y_test_class - predictions_R_class)^2) / length(y_test_class)
+MSE_cpp_class <- rpf_cpp_class$MSE(sigma(predictions_cpp_class), y_test_class) 
+MSE_R_class <- sum((y_test_class - sigma(predictions_R_class))^2) / length(y_test_class)
 MSE_cpp_class
 MSE_R_class
 variation_class

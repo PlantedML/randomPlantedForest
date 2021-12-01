@@ -1182,20 +1182,25 @@ void ClassificationRPF::median_loss(rpf::Split &split){
 
 void ClassificationRPF::logit_loss(rpf::Split &split){
   split.min_sum = 0;
-  split.M_s = calcMean(split.Y_s);
+  split.M_s = calcMean(split.Y_s);  
   split.M_b = calcMean(split.Y_b); 
   double M_s = std::min(1 - delta, std::max(delta, split.M_s)); // ~ R3
   double M_b = std::min(1 - delta, std::max(delta, split.M_b)); // ~ R2
+  double W_s_mean = calcMean(split.W_s), W_b_mean = calcMean(split.W_b);
   
-  std::vector<double> W = weights, W_s = split.W_s, W_b = split.W_b;
-  for(auto &w: W_s) w = 1 / (1 + exp( -(w + log(M_s / (1 - M_s)) - split.M_s))); // W_3 -> P_3
-  for(auto &w: W_b) w = 1 / (1 + exp( -(w + log(M_b / (1 - M_b)) - split.M_b))); // W_2 -> P_2
+  std::vector<double> W_s = split.W_s, W_b = split.W_b;
+  for(auto &w: W_s) w = 1 / (1 + exp( -(w + log(M_s / (1 - M_s)) - W_s_mean))); // W_3 -> P_3
+  for(auto &w: W_b) w = 1 / (1 + exp( -(w + log(M_b / (1 - M_b)) - W_b_mean))); // W_2 -> P_2
   
-  for(auto& w: W) w = 1/ (1 + exp(-w)); // ~ P_1
-  for(int i=0; i<W.size(); ++i) split.min_sum += Y[i] * log(W[i]) + (1 - Y[i]) * log(1 - W[i]); // ~ R_old
+  for(int i=0; i<split.W_s.size(); ++i) split.min_sum += split.Y_s[i] * log(1/ (1 + exp(-split.W_s[i]))) + (1 - split.Y_s[i]) * log(1 - (1/ (1 + exp(-split.W_s[i])))) ; // ~ R_old
+  for(int i=0; i<split.W_b.size(); ++i) split.min_sum += split.Y_b[i] * log(1/ (1 + exp(-split.W_b[i]))) + (1 - split.Y_b[i]) * log(1 - (1/ (1 + exp(-split.W_b[i])))) ; // ~ R_old
   
   for(int i=0; i<split.Y_s.size(); ++i) split.min_sum -= split.Y_s[i] * log(W_s[i]) + (1 - split.Y_s[i]) * log(1 - W_s[i]); // Y_3
   for(int i=0; i<split.Y_b.size(); ++i) split.min_sum -= split.Y_b[i] * log(W_b[i]) + (1 - split.Y_b[i]) * log(1 - W_b[i]); // Y_2
+  
+  if(std::isnan(split.min_sum)){
+    split.min_sum = INF;
+  }
 }
 
 void ClassificationRPF::exponential_loss(rpf::Split &split){
@@ -1216,6 +1221,10 @@ void ClassificationRPF::exponential_loss(rpf::Split &split){
   for(int i=0; i<split.Y_b.size(); ++i) split.min_sum += split.W_b[i] * exp(-0.5 * split.Y_b[i] * log(sum_b / (1 - sum_b)));
   
   split.min_sum -= W_s_sum + W_b_sum;
+  
+  if(W_b_sum == 0 || std::isnan(split.min_sum)){
+    split.min_sum = INF;
+  }
 }
 
 // constructor with parameters split_try, t_try, purify_forest, deterministic, parallelize
@@ -1527,15 +1536,18 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           std::cout << std::endl;
         }
       }
-      
+          
       // update values of individuals of split interval
+      double update_s = 0, update_b = 0;  
       switch(this->loss){
         case LossType::L1: case LossType::L2: case LossType::median: {
+          update_s = curr_split.M_s;
+          update_b = curr_split.M_b;
           for(int individual: curr_split.leaf_index->individuals){
             if(samples_X[individual][curr_split.split_coordinate-1] < curr_split.split_point){
-              samples_Y[individual] -= curr_split.M_s;
+              samples_Y[individual] -= update_s;
             }else{
-              samples_Y[individual] -= curr_split.M_b;
+              samples_Y[individual] -= update_b;
             }
           }
           break;
@@ -1543,13 +1555,13 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         case LossType::logit: {
           double v_s = std::min(1 - epsilon, std::max(epsilon, curr_split.M_s));
           double v_b = std::min(1 - epsilon, std::max(epsilon, curr_split.M_b));
-          v_s = log(v_s / (1 - v_s)) - calcMean(curr_split.W_s);
-          v_b = log(v_b / (1 - v_b)) - calcMean(curr_split.W_b);
+          update_s = log(v_s / (1 - v_s)) - calcMean(curr_split.W_s);
+          update_b = log(v_b / (1 - v_b)) - calcMean(curr_split.W_b);
           for(int individual: curr_split.leaf_index->individuals){
             if(samples_X[individual][curr_split.split_coordinate-1] < curr_split.split_point){
-              weights[individual] += v_s;
+              weights[individual] += update_s;
             }else{
-              weights[individual] += v_b;
+              weights[individual] += update_b;
             }
           }
           break;
@@ -1557,13 +1569,21 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         case LossType::exponential: {
           double sum_s = std::min(1 - epsilon, std::max(epsilon, curr_split.M_s));
           double sum_b = std::min(1 - epsilon, std::max(epsilon, curr_split.M_b));
-          sum_s = log(sum_s / (1 - sum_s));
-          sum_b = log(sum_b / (1 - sum_b));
+          if(curr_split.M_s != 0) update_s = log(sum_s / (1 - sum_s));
+          if(curr_split.M_b != 0) update_b = log(sum_b / (1 - sum_b));
           for(int individual: curr_split.leaf_index->individuals){
             if(samples_X[individual][curr_split.split_coordinate-1] < curr_split.split_point){
-              weights[individual] *= exp(-0.5 * samples_Y[individual] * sum_s);
+              if(std::isinf(update_s)){
+                weights[individual] = 0;
+              }else{
+                weights[individual] *= exp(-0.5 * samples_Y[individual] * update_s);
+              }
             }else{
-              weights[individual] *= exp(-0.5 * samples_Y[individual] * sum_b);
+              if(std::isinf(update_b)){
+                weights[individual] = 0;
+              }else{
+                weights[individual] *= exp(-0.5 * samples_Y[individual] * update_b);
+              }
             }
           }
           break;
@@ -1575,8 +1595,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       {
         leaf_s.individuals = curr_split.I_s;
         leaf_b.individuals = curr_split.I_b;
-        leaf_s.value = curr_split.M_s;
-        leaf_b.value = curr_split.M_b;
+        leaf_s.value = update_s;
+        leaf_b.value = update_b;
         
         // initialize interval with split interval
         leaf_s.intervals = curr_split.leaf_index->intervals;
@@ -1600,8 +1620,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       if(curr_split.tree_index->split_dims.count(curr_split.split_coordinate) ){ // if split variable is already in tree to be split
         // change values
         {
-          leaf_s.value += curr_split.leaf_index->value;
-          leaf_b.value += curr_split.leaf_index->value;
+          leaf_s.value += curr_split.leaf_index->value + update_s;
+          leaf_b.value += curr_split.leaf_index->value + update_b;
         }
         *curr_split.leaf_index = leaf_b; // replace old interval
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf

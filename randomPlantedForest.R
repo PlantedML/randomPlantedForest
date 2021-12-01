@@ -22,6 +22,10 @@ new_rpf <- function(Y, X, max_interaction=1, ntrees=50, splits=30, split_try=10,
                                           purify, deterministic, parallel, cv)))
 }
 
+sigma <- function(x){
+  1 / (1 + exp(-x))
+}
+
 benchmark_rpf <- function(start=1, end=100){
   problem_size <- seq(start, end, floor((end-start)/10)) # todo: exponential increase
   timings_c_seq <- c()
