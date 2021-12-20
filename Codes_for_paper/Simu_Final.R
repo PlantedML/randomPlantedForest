@@ -163,7 +163,7 @@ addAlgorithm(name = "sbf", fun = run_sbf)
 
 run_bart <- function(data, job, instance, ...) {
   
-  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, power=bart_pow, a=bart_a, ntree=bart_ntree, ndpost = bart_ndpost, sparse = T)
+  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, sparse = T)
   pred <- predict(fit, instance$test$X)
   
   Y_rep <- matrix(rep(instance$test$Y_true,dim(pred)[1]), ncol=500, byrow= T)
@@ -175,7 +175,7 @@ addAlgorithm(name = "bart", fun = run_bart)
 
 run_mars <- function(data, job, instance, ...) {
   
-  fit <- mars(x=instance$train$X, y=instance$train$Y_start, degree=mars_degree, penalty = mars_penalty)
+  fit <- mars(x=instance$train$X, y=instance$train$Y_start)
   pred <- predict(fit, instance$test$X)
   mse <- mean((pred-instance$test$Y_true)^2)
   mse
@@ -275,8 +275,8 @@ algo_design <- list(
   ranger = best_params[algorithm == "ranger", .(num.trees, mtry, max.depth, replace)],
   gam = data.frame(),
   sbf = best_params[algorithm == "sbf", .(bandwidth)],
-  bart = best_params[algorithm == "bart", .(bart_pow, bart_a, bart_ntree, bart_ndpost=bart_ndpost)],
-  mars = best_params[algorithm == "mars", .(mars_degree, mars_penalty)],
+  bart = best_params[algorithm == "bart", .(power, a, ntree, ndpost)],
+  mars = best_params[algorithm == "mars", .(degree, penalty)],
   rpf_CV = data.frame(),
   xgboost_CV = data.frame(),
   bart_CV = data.frame(),
@@ -317,13 +317,13 @@ res[, Method := factor(paste(algorithm, max.depth, max_interaction),
                        labels = c("RF", "xgboost additive", "xgboost interaction 2", "xgboost interaction 3",  "xgboost interaction 4", "RPF additive", "RPF interaction 2", "RPF interaction 3", "RPF interaction 4", "ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger", "gam", "bart", "sbf", "mars", "rpf_CV", "xgboost_CV", "bart_CV", "average", "nearestneighbor"))]
 
 # Average over repls
-res_mean <- res[, mean(mse), by = .(problem, algorithm, Model, Method, n, p, ntree, mtry, maxnodes, eta, nrounds, max.depth, ntrees, splits, split_try, t_try, max_interaction, num.trees, replace, bandwidth, bart_pow, bart_a, bart_ntree, bart_ndpost, mars_degree, mars_penalty)]
+res_mean <- res[, mean(mse), by = .(problem, algorithm, Model, sparse, Method, n, p, ntree, mtry, maxnodes, eta, nrounds, max.depth, ntrees, splits, split_try, t_try, max_interaction, num.trees, replace, bandwidth, power, a, ntree, ndpost, degree, penalty)]
 res_mean[, mse := V1]
 res_mean
 res_mean[Model == 2 & p == 4, .(Method, round(V1,3))]
 
 # Plot results -------------------------------------------------------------
-res_plot <- res[!(Method %in% c("ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger")), ]
+#res_plot <- res[!(Method %in% c("ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger")), ]
 ggplot(res_plot, aes(x = Method, y = mse)) +
   geom_boxplot() + 
   coord_flip() + 
