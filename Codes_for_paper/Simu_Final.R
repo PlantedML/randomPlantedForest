@@ -8,7 +8,7 @@ library(ggplot2)
 
 set.seed(1042)
 
-repls <- 100
+repls <- 10#100 # Bug in batchtools adds repls^2 jobs 10 -> 100 (https://github.com/mllg/batchtools/issues/226)
 
 # Registry ----------------------------------------------------------------
 reg_name <- "rpf_sim_all"
@@ -231,7 +231,7 @@ addAlgorithm(name = "xgboost_CV", fun = run_xgboost_CV)
 
 run_bart_CV <- function(data, job, instance, ...){
   
-  parameters <- BART_CV(Y=Data$Y_start, X=Data$X)
+  parameters <- BART_CV(Y=instance$train$Y_start, X=instance$train$X)
   
   fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, power=parameters$n_pow, a=parameters$n_spars, ntree=parameters$n_tree, ndpost = 1600, sparse = T)
   pred <- predict(fit, instance$test$X)
@@ -286,14 +286,14 @@ algo_design <- list(
 addExperiments(prob_design, algo_design, repls = repls, combine = "bind")
 summarizeExperiments()
 
-
 # Test jobs -----------------------------------------------------------
 #testJob(id = 1)
 #testJob(id = 500)
+#testJob(id=2281)
 
 # Submit -----------------------------------------------------------
 if (grepl("node\\d{2}|bipscluster", system("hostname", intern = TRUE))) {
-  ids <- findNotStarted()
+  ids <- findExpired()
   ids[, chunk := chunk(job.id, chunk.size = 50)]
   submitJobs(ids = ids, # walltime in seconds, 10 days max, memory in MB
              resources = list(name = reg_name, chunks.as.arrayjobs = TRUE, 
@@ -313,23 +313,29 @@ saveRDS(res, "sim_result_all.Rds")
 
 # Rename
 res[, Method := factor(paste(algorithm, max.depth, max_interaction), 
-                       levels = c("rf NA NA",  "xgboost 1 NA", "xgboost 2 NA", "xgboost 3 NA", "xgboost 4 NA", "rpf NA 1", "rpf NA 2", "rpf NA 3", "rpf NA 4", "ranger 1 NA", "ranger 2 NA", "ranger 3 NA", "ranger 4 NA", "ranger 0 NA", "gam NA NA", "bart NA NA", "sbf NA NA", "mars NA NA", "rpf_CV NA NA", "xgboost_CV NA NA", "bart_CV NA NA","average NA NA", "nearestneighbor NA NA"), 
-                       labels = c("RF", "xgboost additive", "xgboost interaction 2", "xgboost interaction 3",  "xgboost interaction 4", "RPF additive", "RPF interaction 2", "RPF interaction 3", "RPF interaction 4", "ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger", "gam", "bart", "sbf", "mars", "rpf_CV", "xgboost_CV", "bart_CV", "average", "nearestneighbor"))]
+                       levels = c("rf NA NA",  "xgboost 1 NA", "xgboost 2 NA", "xgboost 3 NA", "xgboost 4 NA", "rpf NA 1", "rpf NA 2", "rpf NA 3", "rpf NA 4", "rpf NA 30", "ranger 1 NA", "ranger 2 NA", "ranger 3 NA", "ranger 4 NA", "ranger 0 NA", "gam NA NA", "bart NA NA", "sbf NA NA", "mars NA NA", "rpf_CV NA NA", "xgboost_CV NA NA", "bart_CV NA NA","average NA NA", "nearestneighbor NA NA"), 
+                       labels = c("RF", "xgboost additive", "xgboost interaction 2", "xgboost interaction 3",  "xgboost interaction 4", "RPF additive", "RPF interaction 2", "RPF interaction 3", "RPF interaction 4", "RPF interaction 30", "ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger", "gam", "bart", "sbf", "mars", "rpf_CV", "xgboost_CV", "bart_CV", "average", "nearestneighbor"))]
 
 # Average over repls
 res_mean <- res[, mean(mse), by = .(problem, algorithm, Model, sparse, Method, n, p, ntree, mtry, maxnodes, eta, nrounds, max.depth, ntrees, splits, split_try, t_try, max_interaction, num.trees, replace, bandwidth, power, a, ntree, ndpost, degree, penalty)]
 res_mean[, mse := V1]
 res_mean
-res_mean[Model == 2 & p == 4, .(Method, round(V1,3))]
+res_mean[Model == 2 & p == 4 & sparse, .(Method, round(V1,3))]
 
 # Plot results -------------------------------------------------------------
-#res_plot <- res[!(Method %in% c("ranger additive", "ranger interaction 2", "ranger interaction 3", "ranger interaction 4", "ranger")), ]
-ggplot(res_plot, aes(x = Method, y = mse)) +
+ggplot(res[sparse == TRUE, ], aes(x = Method, y = mse)) +
   geom_boxplot() + 
   coord_flip() + 
   facet_grid(p ~ Model, scales = "free") + 
   ylab("MSE")
-ggsave("sim_all.pdf", width = 15, height = 10)
+ggsave("sim_sparse.pdf", width = 15, height = 10)
+
+ggplot(res[sparse == FALSE, ], aes(x = Method, y = mse)) +
+  geom_boxplot() + 
+  coord_flip() + 
+  facet_grid(p ~ Model, scales = "free") + 
+  ylab("MSE")
+ggsave("sim_nosparse.pdf", width = 15, height = 10)
 
 # Export results -------------------------------------------------------------
 res_export <- copy(res)
