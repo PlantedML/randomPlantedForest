@@ -22,6 +22,11 @@ new_rpf <- function(Y, X, max_interaction=1, ntrees=50, splits=30, split_try=10,
                                           purify, deterministic, parallel, cv)))
 }
 
+predict <- function(rpf, X, components){
+  if(is.matrix(X)) return(rpf$predict_matrix(X, components)) 
+  if(is.vector(X)) return(rpf$predict_vector(X, components)) 
+}
+
 sigma <- function(x){
   1 / (1 + exp(-x))
 }
