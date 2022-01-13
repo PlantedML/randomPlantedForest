@@ -163,7 +163,7 @@ addAlgorithm(name = "sbf", fun = run_sbf)
 
 run_bart <- function(data, job, instance, ...) {
   
-  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, sparse = T)
+  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, sparse = T, ...)
   pred <- predict(fit, instance$test$X)
   
   Y_rep <- matrix(rep(instance$test$Y_true,dim(pred)[1]), ncol=500, byrow= T)
@@ -175,7 +175,7 @@ addAlgorithm(name = "bart", fun = run_bart)
 
 run_mars <- function(data, job, instance, ...) {
   
-  fit <- mars(x=instance$train$X, y=instance$train$Y_start)
+  fit <- mars(x=instance$train$X, y=instance$train$Y_start, ...)
   pred <- predict(fit, instance$test$X)
   mse <- mean((pred-instance$test$Y_true)^2)
   mse
