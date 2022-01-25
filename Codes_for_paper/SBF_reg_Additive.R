@@ -2,6 +2,7 @@
 SBF.reg.LL<-function(formula,data,bandwidth,weight='sw',x.grid=NULL,n.grid.additional=0, x.min=NULL, x.max=NULL, integral.approx='right',it=100,kern=function(u){return(0.75*(1-u^2                         )*(abs(u)<1))},initial=NULL,kcorr=kcorr,LC,wrong,classic.backfit)
 {  
   
+p = ncol(data) - 1  
 bandwidth=rep(bandwidth,p)
 "div" <- function(x,y) ifelse(y==0&x==0,0,base:::"/"(x,y))
 

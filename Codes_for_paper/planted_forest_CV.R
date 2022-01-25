@@ -210,9 +210,7 @@ rpf_CV<- function(Y, X,
   }
 
   for(t_try in t_try_test){
-    
-    TestList3[[t_try]] <- TestList2
-    
+    TestList3[[as.character(t_try)]] <- TestList2
   }
 
   for(max_interaction in max_interaction_test){
@@ -299,11 +297,11 @@ rpf_CV<- function(Y, X,
               }
             }
               
-            Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]] = list(X=X, Y=Y, Y_fitted=rep(0,nrow(X_orig)), Possible_Splits=Possible_Splits, variables=variables, individuals=individuals, individuals_orig=individuals_orig)
+            Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]] = list(X=X, Y=Y, Y_fitted=rep(0,nrow(X_orig)), Possible_Splits=Possible_Splits, variables=variables, individuals=individuals, individuals_orig=individuals_orig)
           
-            Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]] = tree_fam(Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]], splits = split_min)
+            Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]] = tree_fam(Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]], splits = split_min)
             
-            Y_new = Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]]$Y_fitted
+            Y_new = Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]]$Y_fitted
             
             Y_fitted = Y_fitted+Y_new
           }
@@ -353,9 +351,9 @@ rpf_CV<- function(Y, X,
                 
               for(t in 1:ntrees){ 
                 
-                Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]]=tree_fam(Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]], splits = splits_test[splits+1]-splits_test[splits])
+                Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]]=tree_fam(Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]], splits = splits_test[splits+1]-splits_test[splits])
                 
-                Y_new=Current_Forests[[t]][[max_interaction]][[t_try]][[split_try]][[fold]]$Y_fitted
+                Y_new=Current_Forests[[t]][[max_interaction]][[as.character(t_try)]][[split_try]][[fold]]$Y_fitted
                 
                 Y_fitted=Y_fitted+Y_new
               }

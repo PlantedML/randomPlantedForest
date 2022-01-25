@@ -201,7 +201,7 @@ addAlgorithm(name = "sbf", fun = run_sbf)
 
 run_bart <- function(data, job, instance, ...) {
   
-  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, power=bart_pow, a=bart_a, ntree=bart_ntree, ndpost = bart_ndpost, sparse = T)
+  fit <- wbart(x.train=instance$train$X, y.train=instance$train$Y_start, sparse = T, ...)
   pred <- predict(fit, instance$test$X)
   
   Y_rep <- matrix(rep(instance$test$Y_true,dim(pred)[1]), ncol=500, byrow= T)
@@ -213,7 +213,7 @@ addAlgorithm(name = "bart", fun = run_bart)
 
 run_mars <- function(data, job, instance, ...) {
   
-  fit <- mars(x=instance$train$X, y=instance$train$Y_start, degree=mars_degree, penalty = mars_penalty)
+  fit <- mars(x=instance$train$X, y=instance$train$Y_start, ...)
   pred <- predict(fit, instance$test$X)
   mse <- mean((pred-instance$test$Y_true)^2)
   mse
@@ -238,12 +238,12 @@ addAlgorithm(name = "nearestneighbor", fun = run_nearestneighbor)
 
 # Experiments -----------------------------------------------------------
 prob_design <- list(myprob = rbind(expand.grid(n = n, 
-                                               p = no_sparse_p, 
+                                               p = p, 
                                                Model = Model,
                                                sparse = T,
                                                stringsAsFactors = FALSE),
                                    expand.grid(n = n, 
-                                               p = p, 
+                                               p = no_sparse_p, 
                                                Model = Model,
                                                sparse = F,
                                                stringsAsFactors = FALSE)))
@@ -268,12 +268,12 @@ algo_design <- list(rf = expand.grid(ntree = ntree,
                                          stringsAsFactors = FALSE),
                     gam = data.frame(),
                     sbf = data.frame(bandwidth = bandwidth),
-                    bart = expand.grid(bart_pow=bart_pow,
-                                      bart_a=bart_a,
-                                      bart_ntree=bart_ntree,
-                                      bart_ndpost=bart_ndpost),
-                    mars = expand.grid(mars_degree=mars_degree,
-                                      mars_penalty=mars_penalty),
+                    bart = expand.grid(power=bart_pow,
+                                       a=bart_a,
+                                       ntree=bart_ntree,
+                                       ndpost=bart_ndpost),
+                    mars = expand.grid(degree=mars_degree,
+                                       penalty=mars_penalty),
                     average = data.frame(),
                     nearestneighbor = data.frame())
 addExperiments(prob_design, algo_design, repls = repls)
@@ -285,12 +285,12 @@ summarizeExperiments()
 
 # Submit -----------------------------------------------------------
 if (grepl("node\\d{2}|bipscluster", system("hostname", intern = TRUE))) {
-  ids <- findNotStarted()
+  ids <- findNotDone()
   ids[, chunk := chunk(job.id, chunk.size = 50)]
   submitJobs(ids = ids, # walltime in seconds, 10 days max, memory in MB
              resources = list(name = reg_name, chunks.as.arrayjobs = TRUE, 
                               ncpus = 1, memory = 6000, walltime = 10*24*3600, 
-                              max.concurrent.jobs = 400))
+                              max.concurrent.jobs = 200))
 } else {
   submitJobs()
 }
@@ -304,11 +304,11 @@ res[, mse := result.1]
 saveRDS(res, "tune_result_all.Rds")
 
 # Average over repls
-res_mean <- res[, mean(mse), by = .(problem, algorithm, n, p, Model, sparse, ntree, mtry, maxnodes, eta, nrounds, max.depth, ntrees, splits, split_try, t_try, max_interaction, num.trees, replace, bandwidth, bart_pow, bart_a, bart_ntree, bart_ndpost, mars_degree, mars_penalty)]
+res_mean <- res[, mean(mse), by = .(problem, algorithm, n, p, Model, sparse, ntree, mtry, maxnodes, eta, nrounds, max.depth, ntrees, splits, split_try, t_try, max_interaction, num.trees, replace, bandwidth, power, a, ndpost, degree, penalty)]
 res_mean[, mse := V1]
 
 # Get best parameters per method
-best_params <- res_mean[ , .SD[which.min(mse)], by = .(algorithm, n, p, Model, max_interaction, max.depth)]
+best_params <- res_mean[ , .SD[which.min(mse)], by = .(algorithm, n, p, Model, sparse, max_interaction, max.depth)]
 saveRDS(best_params, "best_params.Rds")
 
 # Results
