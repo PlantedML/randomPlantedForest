@@ -200,29 +200,30 @@ namespace rpf{
     T& operator[](std::vector<int> indices){
       assert(indices.size() == dims.size());
       int index = 0;
-      for(int i=0; i<indices.size(); ++i){
+      for(int i=indices.size()-1; i>0; --i){
         int a = indices[i];
         for(int d=0; d<dims.size(); ++d){
-          if(d>i){
+          if(d<i){
             a *= dims[d];
-          } 
+          }
         }
         index += a;
       }
+      index += indices[0];
       assert(index<n_entries);
       return entries[index];
     }
     std::vector<int> dims;
     int n_entries = 1;
     
-  private:
-    std::vector<T> entries;
+    private:
+      std::vector<T> entries;
   };
 
 }
 
 namespace NDGrid{
-  
+
   typedef std::vector<int> Dimension;
   typedef std::vector< Dimension > Space;
   typedef std::vector< typename Dimension::iterator > Point;
@@ -242,7 +243,7 @@ namespace NDGrid{
       // fill space with dimensions
       for(const auto& dim: dims){
         Dimension d;
-        for(int i=1; i<=dim; ++i){
+        for(int i=0; i<dim; ++i){
           d.push_back(i);
         }
         space.push_back(d);
@@ -369,15 +370,39 @@ std::vector<KT> getKeys(std::map<KT, VT, setComp> m){
   return keys;
 }
 
-void testSetComp(){
-  TreeFamily m;
-  m.insert({{1,2,3},nullptr});
-  m.insert({{1,3},nullptr});
-  m.insert({{1,3},nullptr});
-  m.insert({{1,2,3,4},nullptr});
-  m.insert({{2,3,4},nullptr});
-  m.insert({{1,2},nullptr});
-  getKeys(m);
+int mirrorIndex(){
+  return 0;
+}
+
+void testRPF(){
+  
+  if(false){
+    // fill space with dimensions
+    std::vector<int> dimensions{3,3,3};
+    
+    // setup grid for indices
+    auto grid =  NDGrid::NDGrid(dimensions);
+    
+    rpf::Matrix<int> m(dimensions);
+    
+    // loop over grid points
+    while(!grid.nextPoint()){
+      std::vector<int> gridPoint = grid.getPoint();
+      std::cout << m[gridPoint] << ", ";
+    }
+  }
+  
+  if(false){
+    TreeFamily m;
+    m.insert({{1,2,3},nullptr});
+    m.insert({{1,3},nullptr});
+    m.insert({{1,3},nullptr});
+    m.insert({{1,2,3,4},nullptr});
+    m.insert({{2,3,4},nullptr});
+    m.insert({{1,2},nullptr});
+    getKeys(m);
+  }
+  
 }
 
 /**
@@ -1271,18 +1296,16 @@ void RandomPlantedForest::new_purify(){
     
     // setup finer grid with individuals and values
     int tree_index = 0; // ignore null tree?
-    for(const auto& curr_tree: curr_family)
-    {
-      std::cout << tree_index << ": " << std::endl;
+    for(const auto& curr_tree: curr_family){
+      
+      std::cout << tree_index << ": "; // << std::endl;
       
       if(curr_tree.first == std::set<int>{0}) continue; // ignore null tree?
       
       // fill space with dimensions
       std::vector<int> dimensions;
-      
-      // get variables and individuals of tree
-      for(const auto& var: curr_tree.first){ // go through dimensions of tree
-        dimensions.push_back(lim_list[var - 1].size() - 1); // size - 1 ?
+      for(const auto& dim: curr_tree.first){
+        dimensions.push_back(lim_list[dim - 1].size() - 1); // size - 1 ?
       }
       
       // setup grid for leaf indices
@@ -1293,42 +1316,52 @@ void RandomPlantedForest::new_purify(){
       individuals[tree_index] = rpf::Matrix<int>(dimensions);
       values[tree_index] = rpf::Matrix<double>(dimensions);
       
-      // loop over grid points
+      // fill grid points with individuals and values
       while(!grid.nextPoint()){
+        
         std::vector<int> gridPoint = grid.getPoint();
-      
-        // go through leaves of tree
+        bool in_leaf = true;
+  
+        // go through sample points to sum up individuals
+        for(const auto& feature_vec: X){
+          int dim_index = 0;
+          in_leaf = true;
+          for(const auto& dim: curr_tree.first){
+            double val = feature_vec[dim - 1];
+            if( !( (val >= lim_list[dim - 1][gridPoint[dim_index]]) 
+                && (val < lim_list[dim - 1][gridPoint[dim_index] + 1]) ) ) in_leaf = false;
+            ++dim_index;
+          }
+          
+          // consider individuals only if all in
+          if(in_leaf) individuals[tree_index][gridPoint] += 1;
+        }
+        
+        // go through leaves of tree to sum up values
         for(const auto& leaf: curr_tree.second->get_leaves()){
-          bool in_leaf_val = false, in_leaf_ind = false;
+          
+          in_leaf = true;
           int dim_index = 0;
           for(const auto& dim: curr_tree.first){
             
-            // consider values only if any in
-            if( (leaf.intervals[dim - 1].first <= lim_list[dim - 1][gridPoint[dim_index]]) 
-                 && (leaf.intervals[dim - 1].second >= lim_list[dim - 1][gridPoint[dim_index] + 1]) ) in_leaf_val = true;
-            
-            // consider individuals only if all in
-            bool all_true = true;
-            for(const auto& x: X[dim]){
-              if( !( (x >= lim_list[dim - 1][gridPoint[dim_index]]) 
-                  && (x >= lim_list[dim - 1][gridPoint[dim_index] + 1]) ) ) all_true = false;
-            }
-            if(all_true) in_leaf_ind = true;
+            // consider values only if all in
+            if( !( (leaf.intervals[dim - 1].first <= lim_list[dim - 1][gridPoint[dim_index]]) 
+                && (leaf.intervals[dim - 1].second >= lim_list[dim - 1][gridPoint[dim_index] + 1]) ) ) in_leaf = false;
             
             ++dim_index;
           }
           
-          // sum up individuals and values
-          //if(in_leaf_val) values[tree_index][gridPoint] += double(leaf.value); 
-          if(in_leaf_ind) individuals[tree_index][gridPoint] += 1; 
+          // sum up values
+          //if(in_leaf) values[tree_index][gridPoint] += double(leaf.value); 
         }
       }
       
-      
-      while(!grid.nextPoint()){
+      if(true){
+        while(!grid.nextPoint()){
         std::cout << individuals[tree_index][grid.getPoint()] << ", ";
       }
-      std::cout << std::endl;
+        std::cout << std::endl;
+      }
       
       ++tree_index;
     }
@@ -1341,11 +1374,11 @@ void RandomPlantedForest::new_purify(){
     
     // create new trees
     std::vector<std::set<int>> new_trees;
-    while(curr_max >= 1){
+    while(curr_max > 1){ // ignore one dimensional trees ?
       
       // go through split dimensions of all trees
-      auto keys = getKeys(curr_family);
       int tree_index = 0;
+      auto keys = getKeys(curr_family);
       std::vector<std::set<int>>::reverse_iterator key = keys.rbegin();
       while(key != keys.rend()){
         
@@ -1379,17 +1412,22 @@ void RandomPlantedForest::new_purify(){
                 if(!tree){
                   if(false){
                     std::cout << "   New tree: ";
-                  for(const auto& dim: tree_dims) std::cout << dim << ", "; 
-                  std::cout << std::endl;
+                    for(const auto& dim: tree_dims) std::cout << dim << ", "; 
+                    std::cout << std::endl;
                   }
                   curr_family.insert(std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims))));
                   new_trees.push_back(tree_dims);
                   std::vector<int> matrix_dimensions = values[tree_index].dims;
-                  matrix_dimensions.erase(matrix_dimensions.begin() + dim_index);
+                  //matrix_dimensions.erase(matrix_dimensions.begin() + dim_index);
+                  //std::cout << matrix_dimensions.size() << std::endl;
+                  
+                  // initialize data for new tree
+                  auto grid =  NDGrid::NDGrid(matrix_dimensions);
+                  grids.push_back(grid);
                   values.push_back(rpf::Matrix<double>(matrix_dimensions));
-                  // todo: add individuals to new trees
-                  tree = curr_family[tree_dims];
-                  std::cout << std::endl;
+                  individuals.push_back(rpf::Matrix<int>(matrix_dimensions));
+                  
+                  // todo: fill individuals of new trees
                 }
               }
               dim_index++;
@@ -2146,5 +2184,5 @@ RCPP_MODULE(mod_rpf) {
       .method("set_parameters", &ClassificationRPF::set_parameters)
     ;
 
-    function("testSetComp", &testSetComp);
+    function("testRPF", &testRPF);
 }

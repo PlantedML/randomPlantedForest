@@ -31,6 +31,8 @@ epsilon <- 0
 
 # train models ------------------------
 
+#testRPF()
+
 start_time <- Sys.time()
 rpf_cpp <- new_rpf(y_train, x_train,  max_interaction=max_inter, t_try=t_try, ntrees=n_trees, splits=n_splits, split_try = split_try, deterministic=deterministic_forest, parallel=parallel)
 end_time <- Sys.time()
