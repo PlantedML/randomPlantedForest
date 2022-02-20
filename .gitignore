@@ -5,3 +5,4 @@ latex/
 # ignore R history
 .Rhistory
 
+.Rproj.user
