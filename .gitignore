@@ -1,0 +1,7 @@
+# ignore doxygen generated data
+html/
+latex/
+
+# ignore R history
+.Rhistory
+

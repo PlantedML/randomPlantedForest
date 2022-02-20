@@ -41,7 +41,11 @@ bool TreeWrong(NumericVector indices, NumericVector k, NumericVector x){
 
 // [[Rcpp::export]]
 
+<<<<<<< HEAD
 NumericVector Calc_Optimal_split2(NumericVector Y, NumericVector W, NumericMatrix X, int split_try, List variables, List individuals, List leaf_size, List split_candidates, StringVector loss, std::vector<int>  categorical_columns, int max_categorical, double delta) {
+=======
+NumericVector Calc_Optimal_split2(NumericVector Y, NumericVector W, NumericMatrix X, int split_try, List variables, List individuals, List leaf_size, List split_candidates, StringVector loss, std::vector<int>  categorical_columns, int max_categorical, double delta, bool deterministic=false) {
+>>>>>>> cppVersion
 
   String loss2(loss[0]);
 
@@ -87,11 +91,22 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericVector W, NumericMatri
 
         if(samplepoints_1.size()<2*leaf_size2) continue;
 
+<<<<<<< HEAD
 
 
 
 
         for(int i_4=0; i_4<split_try; ++i_4){
+=======
+        int start = 0;
+        int end = split_try;
+        if(deterministic){
+          start = 1;
+          end = samplepoints_1.size()-1;
+        }
+
+        for(int i_4=start; i_4<end; ++i_4){
+>>>>>>> cppVersion
 
           LogicalVector b_1 (Xk_1.size());
           LogicalVector b_2 (Xk_1.size());
@@ -104,8 +119,11 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericVector W, NumericMatri
             double group_size = Rcpp::sample(group_sizes,1)(0);
             NumericVector group1 = Rcpp::sample(samplepoints_1, group_size);
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> cppVersion
             for(int i_x=0; i_x < Xk_1.size(); ++i_x){
               b_1(i_x)  = std::find(std::begin(group1), std::end(group1), Xk_1(i_x)) != std::end(group1);
             };
@@ -120,6 +138,12 @@ NumericVector Calc_Optimal_split2(NumericVector Y, NumericVector W, NumericMatri
             };
 
           splitpoint=sample(samplepoints,1);
+<<<<<<< HEAD
+=======
+          if(deterministic){
+            splitpoint = samplepoints_1[i_4];
+          }
+>>>>>>> cppVersion
 
           b_1 = Xk_1>=splitpoint(0);
 
