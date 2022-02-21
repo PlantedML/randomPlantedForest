@@ -1,1 +1,25 @@
+# randomPlantedForest
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+The goal of randomPlantedForest is to ...
+
+## Installation
+
+You can install the development version of randomPlantedForest from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("PlantedML/randomPlantedForest")
+```
+
+## Example
+
+This is a basic example which shows you how to solve a common problem:
+
+``` r
+library(randomPlantedForest)
+## basic example code
+```
 

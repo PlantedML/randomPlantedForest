@@ -4,6 +4,6 @@ latex/
 
 # ignore R history
 .Rhistory
-
+.RData
 .Rproj.user
 randomPlantedForest.Rproj

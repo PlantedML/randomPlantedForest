@@ -1,0 +1,23 @@
+Package: randomPlantedForest
+Title: What the Package Does (One Line, Title Case)
+Version: 0.0.0.9000
+Authors@R: c(
+    person("Lukas", "Burk", , "github@quantenbrot.de", role = c("cre", "ctb"),
+           comment = c(ORCID = "0000-0001-7528-3795")),
+    person("Munir", "Hiabu", role = "aut"),
+    person(c("Joseph", "Theo"), "Meyer", role = "aut"),
+    person("Maike", role = "aut")
+  )
+Description: What the package does (one paragraph).
+License: Apache License (>= 2)
+Imports: 
+    Rcpp,
+    RcppParallel
+LinkingTo: 
+    Rcpp,
+    RcppParallel
+Config/testthat/edition: 3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+SystemRequirements: C++11
