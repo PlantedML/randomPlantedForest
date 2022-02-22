@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{A fit object as returned by \code{\link[=rpf]{rpf()}}.}
 
-\item{new_data}{Matrix or vector input for new observatoins.}
+\item{new_data}{Matrix or vector input for new observations.}
 
 \item{components}{TODO}
 
@@ -23,6 +23,8 @@ Random Planted Forest Predictions
 }
 \examples{
 \dontrun{
-# TODO
+# This doesn't work just yet
+ rpfit <- rpf(mtcars$mpg, as.matrix(mtcars[, c("cyl", "wt")]))
+ predict(rpfit, mtcars[1:5, c("cyl", "wt")], components = 1)
 }
 }

@@ -52,13 +52,14 @@ number of split dimensions for a tree}
 \item{epsilon}{TODO}
 }
 \value{
-Object
+C++ object of class \code{"Rcpp_RandomPlantedForest"}.
 }
 \description{
 Random Planted Forest
 }
 \examples{
 \dontrun{
-# TODO (see tests)
+# Requires X to be a numeric matrix
+rpfit <- rpf(mtcars$mpg, as.matrix(mtcars[, c("cyl", "wt")]))
 }
 }
