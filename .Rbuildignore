@@ -2,3 +2,5 @@
 ^\.Rproj\.user$
 ^test.*R$
 ^LICENSE\.md$
+^randomPlantedForest\.R$
+^\.github$

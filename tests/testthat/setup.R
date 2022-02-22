@@ -7,18 +7,18 @@ generate_data <-function(n=500,p=4,rho=0.3,sparsity=2,sigma=1, Model=1, covariat
 
   if(covariates=='normal'){
 
-    z_1 <- rnorm(p*n,0,(1-rho)^(1/2))
-    z_0 <- rnorm(n,0,rho^(1/2))
+    z_1 <- stats::rnorm(p*n,0,(1-rho)^(1/2))
+    z_0 <- stats::rnorm(n,0,rho^(1/2))
     X <- 2.5*atan(z_1+z_0)/pi
     dim(X) <- c(n,p)
   }
 
   if(covariates=='uniform'){
 
-    X <- matrix( runif(p*n,-1,1), nrow=n, ncol=p)
+    X <- matrix(stats::runif(p*n,-1,1), nrow=n, ncol=p)
   }
 
-  epsilon <- rnorm(nrow(X),0,sigma)
+  epsilon <- stats::rnorm(nrow(X),0,sigma)
 
   ### Model1 = additive
 
@@ -164,3 +164,14 @@ generate_data <-function(n=500,p=4,rho=0.3,sparsity=2,sigma=1, Model=1, covariat
   return(list(Y_start=Y_start,Y_true=Y_true,X=X))
 
 }
+
+
+# Generate some example data for tests
+
+sample_size <- 500
+data <- generate_data(Model = 1, p = 4, n = sample_size)
+test_size <- floor(length(data$Y_true) / 5)
+x_test <- data$X[1:test_size, ] # extract samples
+y_test <- data$Y_true[1:test_size]
+x_train <- data$X[(test_size + 1):sample_size, ] # extract samples
+y_train <- data$Y_start[(test_size + 1):sample_size]

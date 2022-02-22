@@ -2,15 +2,16 @@ citHeader("To cite randomPlantedForest in publications use:")
 
 citEntry(
   entry    = "Article",
-  title    = ,
-  author   = ,
-  journal  = ,
-  year     = ,
-  volume   = ,
-  number   = ,
-  pages    = ,
-  url      = ,
+  title    = "This is a placeholder",
+  author   = "Lukas",
+  journal  = "Journal of Lorem Ipsum",
+  year     = "2099",
+  volume   = "2",
+  number   = "1",
+  pages    = "123",
+  url      = "example.net/hello",
   textVersion = paste(
-
+    "Example et. al. (2099).",
+    "Foo: Bar."
   )
 )

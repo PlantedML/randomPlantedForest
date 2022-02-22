@@ -9,7 +9,14 @@
 What the package does (one paragraph).
 }
 \author{
-\strong{Maintainer}: Lukas Burk \email{github@quantenbrot.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
+\strong{Maintainer}: Lukas Burk \email{github@quantenbrot.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID}) [contributor]
+
+Authors:
+\itemize{
+  \item Munir Hiabu
+  \item Joseph Theo Meyer
+  \item Maike
+}
 
 }
 \keyword{internal}

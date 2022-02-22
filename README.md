@@ -1,6 +1,7 @@
 # randomPlantedForest
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/workflows/R-CMD-check/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions)
 <!-- badges: end -->
 
 The goal of randomPlantedForest is to ...
