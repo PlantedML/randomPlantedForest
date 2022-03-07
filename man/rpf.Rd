@@ -11,6 +11,7 @@
 \usage{
 rpf(
   x,
+  ...,
   max_interaction = 1,
   ntrees = 50,
   splits = 30,
@@ -22,8 +23,7 @@ rpf(
   cv = FALSE,
   loss = "L2",
   delta = 0,
-  epsilon = 0.1,
-  ...
+  epsilon = 0.1
 )
 
 \method{rpf}{default}(x, ...)
