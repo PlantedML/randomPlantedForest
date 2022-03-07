@@ -31,7 +31,7 @@ predict.rpf <- function(object, new_data, type = "numeric",
 }
 
 
-#' Bridge: Passes new data to corresponding predict function
+# Bridge: Passes new data to corresponding predict function
 predict_rpf_bridge <- function(type, object, predictors, ...) {
 
   type <- match.arg(type, choices = c("numeric", "class", "prob"))
@@ -46,7 +46,7 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
   )
 }
 
-#' Predict function for numeric outcome / regression
+# Predict function for numeric outcome / regression
 predict_rpf_numeric <- function(object, new_data, components, ...){
   pred <- object$fit$predict_matrix(new_data, components)
   out <- hardhat::spruce_numeric(pred)
@@ -57,7 +57,7 @@ predict_rpf_numeric <- function(object, new_data, components, ...){
 
 # Classification ----------------------------------------------------------
 
-#' Predict function for classification: Class prediction
+# Predict function for classification: Class prediction
 predict_rpf_class <- function(object, new_data, components, ...){
   pred <- object$fit$predict_matrix(new_data, components)
   out <- hardhat::spruce_class(pred)
@@ -65,7 +65,7 @@ predict_rpf_class <- function(object, new_data, components, ...){
   out
 }
 
-#' Predict function for classification: Probability prediction
+# Predict function for classification: Probability prediction
 predict_rpf_prob <- function(object, new_data, components, ...){
   pred <- object$fit$predict_matrix(new_data, components)
   out <- hardhat::spruce_prob(pred)
