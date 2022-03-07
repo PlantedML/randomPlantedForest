@@ -11,7 +11,10 @@
 
 \item{new_data}{Input for new observations.}
 
-\item{components}{}
+\item{type}{\verb{["numeric"]}: One of \code{"numeric"} for regression outcomes,
+\code{"class"} for class predictions or \code{"prob"} for probability predictions.}
+
+\item{components}{\verb{[0]} TODO.}
 
 \item{...}{Unused.}
 }

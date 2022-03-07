@@ -37,7 +37,9 @@ rpf(
 \method{rpf}{recipe}(x, data, ...)
 }
 \arguments{
-\item{x}{Feature matrix or \code{formula}.}
+\item{x}{Feature matrix or \code{data.frame}.}
+
+\item{...}{(Ignored)}
 
 \item{max_interaction}{Maximum level of interaction determining maximum
 number of split dimensions for a tree}
@@ -64,10 +66,14 @@ number of split dimensions for a tree}
 
 \item{epsilon}{TODO}
 
-\item{(Ignored)}{}
+\item{y}{Target vector for use with \code{x}.}
+
+\item{formula}{Formula specification, e.g. y ~ x1 + x2.}
+
+\item{data}{A \code{data.frame} for use with \code{formula}.}
 }
 \value{
-C++ object of class \code{"Rcpp_RandomPlantedForest"}.
+Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 }
 \description{
 Random Planted Forest

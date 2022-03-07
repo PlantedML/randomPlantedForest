@@ -2,7 +2,9 @@
 #'
 #' @param object A fit object as returned by [`rpf()`].
 #' @param new_data Input for new observations.
-#' @param components [`0`]: TODO
+#' @param type `["numeric"]`: One of `"numeric"` for regression outcomes,
+#' `"class"` for class predictions or `"prob"` for probability predictions.
+#' @param components `[0]` TODO.
 #' @param ... Unused.
 #'
 #' @return For regression: A data.frame with column `.pred` with the same

@@ -1,8 +1,10 @@
 #' Random Planted Forest
 #'
 # FIXME: Parameters need describing
-# @param Y Vector of target features
-#' @param x Feature matrix or `formula`.
+#' @param x Feature matrix or `data.frame`.
+#' @param y Target vector for use with `x`.
+#' @param formula Formula specification, e.g. y ~ x1 + x2.
+#' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction Maximum level of interaction determining maximum
 #'   number of split dimensions for a tree
 #' @param ntrees Number of trees generated per family
@@ -16,9 +18,9 @@
 #' @param loss "L2" or "logit" / TODO
 #' @param delta TODO
 #' @param epsilon TODO
-#' @param (Ignored)
+#' @param ... (Ignored)
 #'
-#' @return C++ object of class `"Rcpp_RandomPlantedForest"`.
+#' @return Object of class `"rpf"` with model object contained in `$fit`.
 #' @export
 #' @importFrom methods new
 #' @importFrom hardhat mold
