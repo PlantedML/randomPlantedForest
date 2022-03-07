@@ -21,6 +21,7 @@ This is a basic example which shows you how to solve a common problem:
 
 ``` r
 library(randomPlantedForest)
-## basic example code
+
+rp_fit <- rpf(mpg ~ cyl + wt, data = mtcars)
 ```
 
