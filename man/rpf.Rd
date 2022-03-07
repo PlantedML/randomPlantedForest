@@ -2,11 +2,15 @@
 % Please edit documentation in R/rpf.R
 \name{rpf}
 \alias{rpf}
+\alias{rpf.default}
+\alias{rpf.data.frame}
+\alias{rpf.matrix}
+\alias{rpf.formula}
+\alias{rpf.recipe}
 \title{Random Planted Forest}
 \usage{
 rpf(
-  Y,
-  X,
+  x,
   max_interaction = 1,
   ntrees = 50,
   splits = 30,
@@ -18,13 +22,22 @@ rpf(
   cv = FALSE,
   loss = "L2",
   delta = 0,
-  epsilon = 0.1
+  epsilon = 0.1,
+  ...
 )
+
+\method{rpf}{default}(x, ...)
+
+\method{rpf}{data.frame}(x, y, ...)
+
+\method{rpf}{matrix}(x, y, ...)
+
+\method{rpf}{formula}(formula, data, ...)
+
+\method{rpf}{recipe}(x, data, ...)
 }
 \arguments{
-\item{Y}{Vector of target features}
-
-\item{X}{Feature matrix}
+\item{x}{Feature matrix or \code{formula}.}
 
 \item{max_interaction}{Maximum level of interaction determining maximum
 number of split dimensions for a tree}
@@ -50,6 +63,8 @@ number of split dimensions for a tree}
 \item{delta}{TODO}
 
 \item{epsilon}{TODO}
+
+\item{(Ignored)}{}
 }
 \value{
 C++ object of class \code{"Rcpp_RandomPlantedForest"}.
@@ -59,7 +74,10 @@ Random Planted Forest
 }
 \examples{
 \dontrun{
-# Requires X to be a numeric matrix
-rpfit <- rpf(mtcars$mpg, as.matrix(mtcars[, c("cyl", "wt")]))
+# Regression with x and y
+rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
+
+# Regression with formula
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
 }
 }
