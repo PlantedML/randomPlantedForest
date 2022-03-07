@@ -99,7 +99,7 @@ std::set<int> to_std_set(Rcpp::IntegerVector rv) {
 // ----------------- custom data types ----------------- 
 
 struct setComp{
-  bool operator()(const std::set<int> &a, const std::set<int> &b){
+  bool operator()(const std::set<int> &a, const std::set<int> &b) const {
     if(a == b) return false; // what if same?
     if(a.size() == b.size()){
       std::set<int>::iterator it2 = b.begin();
