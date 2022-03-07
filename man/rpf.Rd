@@ -2,11 +2,16 @@
 % Please edit documentation in R/rpf.R
 \name{rpf}
 \alias{rpf}
+\alias{rpf.default}
+\alias{rpf.data.frame}
+\alias{rpf.matrix}
+\alias{rpf.formula}
+\alias{rpf.recipe}
 \title{Random Planted Forest}
 \usage{
 rpf(
-  Y,
-  X,
+  x,
+  ...,
   max_interaction = 1,
   ntrees = 50,
   splits = 30,
@@ -20,11 +25,21 @@ rpf(
   delta = 0,
   epsilon = 0.1
 )
+
+\method{rpf}{default}(x, ...)
+
+\method{rpf}{data.frame}(x, y, ...)
+
+\method{rpf}{matrix}(x, y, ...)
+
+\method{rpf}{formula}(formula, data, ...)
+
+\method{rpf}{recipe}(x, data, ...)
 }
 \arguments{
-\item{Y}{Vector of target features}
+\item{x}{Feature matrix or \code{data.frame}.}
 
-\item{X}{Feature matrix}
+\item{...}{(Ignored)}
 
 \item{max_interaction}{Maximum level of interaction determining maximum
 number of split dimensions for a tree}
@@ -50,16 +65,25 @@ number of split dimensions for a tree}
 \item{delta}{TODO}
 
 \item{epsilon}{TODO}
+
+\item{y}{Target vector for use with \code{x}.}
+
+\item{formula}{Formula specification, e.g. y ~ x1 + x2.}
+
+\item{data}{A \code{data.frame} for use with \code{formula}.}
 }
 \value{
-C++ object of class \code{"Rcpp_RandomPlantedForest"}.
+Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 }
 \description{
 Random Planted Forest
 }
 \examples{
 \dontrun{
-# Requires X to be a numeric matrix
-rpfit <- rpf(mtcars$mpg, as.matrix(mtcars[, c("cyl", "wt")]))
+# Regression with x and y
+rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
+
+# Regression with formula
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
 }
 }

@@ -11,6 +11,7 @@ Authors@R: c(
 Description: What the package does (one paragraph).
 License: Apache License (>= 2)
 Imports: 
+    hardhat,
     methods,
     Rcpp,
     RcppParallel
