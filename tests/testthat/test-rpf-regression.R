@@ -20,7 +20,7 @@ test_that("Prediction: All numeric", {
   pred_1 <- predict(rpf_fit, mtcars[, c(2, 6)], type = "numeric", components = c(0, 1))
 })
 
-test_that("Fit + predict: Numeric and factor features", {
+test_that("Fit + predict: Categorical features", {
 
   mtcars_cat <- mtcars
   mtcars_cat$cyl <- factor(mtcars$cyl)
@@ -32,8 +32,6 @@ test_that("Fit + predict: Numeric and factor features", {
   expect_s3_class(pred, "tbl_df")
 
   # Not coercible to integer
-  mean(mtcars_cat$wt)
-
   mtcars_cat$wt_cat <- ifelse(mtcars$wt > 3.2, "heavy", "light")
   rpf_fit <- rpf(mpg ~ wt_cat, data = mtcars_cat)
 
