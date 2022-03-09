@@ -29,6 +29,27 @@ test_that("Binary: All numeric, probability predictions", {
   bin_pred_prob <- predict(bin_fit, mtcars[c("hp", "disp")], type = "prob")
 })
 
+test_that("Binary: Detection works", {
+  xdat <- data.frame(
+    y01 = sample(c(0, 1), 100, replace = TRUE),
+    yfact = factor(sample(c("pos", "neg"), 100, replace = TRUE)),
+    ylogi = sample(c(TRUE, FALSE), 100, replace = TRUE),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+
+  # y in 0, 1
+  y_01 <- rpf(y01 ~ x1 + x2, xdat)
+  expect_s4_class(y_01$fit, "Rcpp_ClassificationRPF")
+
+  # y two-level factor
+  y_fact <- rpf(yfact ~ x1 + x2, xdat)
+  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+
+  # y logical: should warn but work, user should supply numerical/factor
+  y_logi <- expect_warning(rpf(ylogi ~ x1 + x2, xdat))
+  expect_s4_class(y_logi$fit, "Rcpp_ClassificationRPF")
+})
 
 # Multiclass classification -----------------------------------------------
 # Using iris is suboptimal but it's easy and comes with 3-class y
@@ -50,4 +71,21 @@ test_that("Multiclass: All numeric, probability predictions", {
   classif_fit <- rpf(Species ~ ., data = iris)
 
   classif_pred_prob <- predict(classif_fit, iris[, -5], type = "prob")
+})
+
+test_that("Multiclass: Detection works", {
+  xdat <- data.frame(
+    yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
+    yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+
+  # y is integer: should _not_ be treated as classif task
+  y_int <- rpf(yint ~ x1 + x2, xdat)
+  expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
+
+  # y 3-level factor
+  y_fact <- rpf(yfact ~ x1 + x2, xdat)
+  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
 })
