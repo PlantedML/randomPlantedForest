@@ -33,6 +33,7 @@ test_that("Binary: Detection works", {
   xdat <- data.frame(
     y01 = sample(c(0, 1), 100, replace = TRUE),
     yfact = factor(sample(c("pos", "neg"), 100, replace = TRUE)),
+    ychar = sample(c("pos", "neg"), 100, replace = TRUE),
     ylogi = sample(c(TRUE, FALSE), 100, replace = TRUE),
     x1 = rnorm(100),
     x2 = rnorm(100)
@@ -45,6 +46,10 @@ test_that("Binary: Detection works", {
   # y two-level factor
   y_fact <- rpf(yfact ~ x1 + x2, xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+
+  # y two-level character
+  y_char <- rpf(ychar ~ x1 + x2, xdat)
+  expect_s4_class(y_char$fit, "Rcpp_ClassificationRPF")
 
   # y logical: should warn but work, user should supply numerical/factor
   y_logi <- expect_warning(rpf(ylogi ~ x1 + x2, xdat))
@@ -77,6 +82,7 @@ test_that("Multiclass: Detection works", {
   xdat <- data.frame(
     yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
     yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
+    ychar = sample(c("hi", "mid", "lo"), 100, replace = TRUE),
     x1 = rnorm(100),
     x2 = rnorm(100)
   )
@@ -88,4 +94,8 @@ test_that("Multiclass: Detection works", {
   # y 3-level factor
   y_fact <- rpf(yfact ~ x1 + x2, xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+
+  # y 3-level character
+  y_char <- rpf(ychar ~ x1 + x2, xdat)
+  expect_s4_class(y_char$fit, "Rcpp_ClassificationRPF")
 })
