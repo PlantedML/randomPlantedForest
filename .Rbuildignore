@@ -4,3 +4,6 @@
 ^LICENSE\.md$
 ^randomPlantedForest\.R$
 ^\.github$
+^randomPlantedForest\.Rcheck$
+^randomPlantedForest.*\.tar\.gz$
+^randomPlantedForest.*\.tgz$
