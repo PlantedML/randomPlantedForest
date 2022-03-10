@@ -17,17 +17,6 @@ test_that("Binary: All numeric, logit loss", {
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
 })
 
-test_that("Binary: All numeric, class predictions", {
-  bin_fit <- rpf(am ~ hp + disp, data = mtcars)
-
-  bin_pred_class <- predict(bin_fit, mtcars[c("hp", "disp")], type = "class")
-})
-
-test_that("Binary: All numeric, probability predictions", {
-  bin_fit <- rpf(am ~ hp + disp, data = mtcars)
-
-  bin_pred_prob <- predict(bin_fit, mtcars[c("hp", "disp")], type = "prob")
-})
 
 test_that("Binary: Detection works", {
   xdat <- data.frame(
