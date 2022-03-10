@@ -32,13 +32,14 @@ test_that("Binary: Detection works", {
   y_01 <- rpf(y01 ~ x1 + x2, xdat)
   expect_s4_class(y_01$fit, "Rcpp_ClassificationRPF")
 
-  # y two-level factor
+  # FIXME: decide factor order assumption?
+  # y two-level factor: should work assuming which level is positive?
   y_fact <- rpf(yfact ~ x1 + x2, xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
 
-  # y two-level character
-  y_char <- rpf(ychar ~ x1 + x2, xdat)
-  expect_s4_class(y_char$fit, "Rcpp_ClassificationRPF")
+  # y two-level character: should fail because ambiguous
+  # similar problem as factor but w/o levels no order can be assumed
+  expect_error(rpf(ychar ~ x1 + x2, xdat))
 
   # y logical: should warn but work, user should supply numerical/factor
   y_logi <- expect_warning(rpf(ylogi ~ x1 + x2, xdat))
