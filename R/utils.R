@@ -56,8 +56,8 @@ pca_order <- function(x, y) {
   
   # PCA of weighted covariance matrix of class probabilites
   P <- N/rowSums(N)
-  S <- cov.wt(P, wt = rowSums(N))$cov
-  pc1 <- prcomp(S, rank. = 1)$rotation
+  S <- stats::cov.wt(P, wt = rowSums(N))$cov
+  pc1 <- stats::prcomp(S, rank. = 1)$rotation
   score <- P %*% pc1
   
   # Return ordered factor levels
