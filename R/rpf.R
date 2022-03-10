@@ -83,7 +83,7 @@ rpf.formula <- function(formula, data, ...) {
 #' @export
 #' @rdname rpf
 rpf.recipe <- function(x, data, ...) {
-  blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE, indicators = "none")
+  blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
   rpf_bridge(processed, ...)
 }
