@@ -56,7 +56,7 @@ rpf.default <- function(x, ...) {
 #' @export
 #' @rdname rpf
 rpf.data.frame <- function(x, y, ...) {
-  blueprint <- hardhat::default_xy_blueprint(intercept = FALSE, indicators = "none")
+  blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(processed, ...)
 }
@@ -65,7 +65,7 @@ rpf.data.frame <- function(x, y, ...) {
 #' @export
 #' @rdname rpf
 rpf.matrix <- function(x, y, ...) {
-  blueprint <- hardhat::default_xy_blueprint(intercept = FALSE, indicators = "none")
+  blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(processed, ...)
 }
