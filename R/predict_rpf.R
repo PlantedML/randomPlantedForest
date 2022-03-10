@@ -48,8 +48,7 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
   # Re-order factor levels according to saved order 
   factor_cols <- names(object$factor_levels)
   if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(.SD, factor, levels = object$factor_levels[[names(.SD)]], 
-                                                         ordered = TRUE, exclude = NULL), .SDcols = factor_cols]
+    predictors[, (factor_cols) := Map(factor, .SD, object$factor_levels, ordered = TRUE), .SDcols = factor_cols]
   }
   
   # Convert factors to integer and data to matrix

@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{order_factor_by_response}
 \alias{order_factor_by_response}
-\title{Order factor column by response}
+\title{Order factor levels by response}
 \usage{
 order_factor_by_response(x, y)
 }
@@ -18,8 +18,7 @@ Re-ordered (ordered) factor
 Regression: Order by mean(y)
 Binary classification: Order by mean(y==1)
 Multiclass: Order by first principal component of the weighted covariance matrix of the contingency table
-Survival: Order by median survival if available or largest quantile available in all strata if median not available
 }
 \details{
-See https://doi.org/10.7717/peerj.6339 for details
+See https://doi.org/10.7717/peerj.6339 for details.
 }
