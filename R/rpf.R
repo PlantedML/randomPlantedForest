@@ -74,7 +74,7 @@ rpf.matrix <- function(x, y, ...) {
 #' @export
 #' @rdname rpf
 rpf.formula <- function(formula, data, ...) {
-  blueprint <- hardhat::default_formula_blueprint(intercept = FALSE)
+  blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
   rpf_bridge(processed, ...)
 }
@@ -90,30 +90,51 @@ rpf.recipe <- function(x, data, ...) {
 
 # Bridge: Calls rpf_impl() with processed input
 #' @importFrom hardhat validate_outcomes_are_univariate
+#' @importFrom data.table .SD ':=' as.data.table
 rpf_bridge <- function(processed, ...) {
 
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
-
-  # FIXME: Categorical features need consideration
-  # Can't coerce to numeric matrix if categoricals aren't encoded
-  predictors <- as.matrix(processed$predictors)
   outcomes <- processed$outcomes[[1]]
-
-  fit <- rpf_impl(Y = outcomes, X = predictors, ...)
+  predictors <- as.data.table(processed$predictors)
+  
+  # Convert characters to factors
+  char_cols <- names(which(sapply(predictors, is.character)))
+  if (length(char_cols) > 0) {
+    predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
+  }
+  
+  # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
+  factor_cols <- names(which(sapply(predictors, is.factor)))
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := lapply(.SD, order_factor_by_response, y = outcomes), .SDcols = factor_cols]
+  }
+  
+  # Save re-ordered factor levels
+  factor_levels <- hardhat::get_levels(predictors)
+  
+  # Convert factors to integer and data to matrix
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
+  }
+  predictors_matrix <- as.matrix(predictors)
+  
+  fit <- rpf_impl(Y = outcomes, X = predictors_matrix, ...)
 
   new_rpf(
     fit = fit,
-    blueprint = processed$blueprint
+    blueprint = processed$blueprint, 
+    factor_levels = factor_levels
   )
 }
 
 # Intermediate to hold model object with blueprint used for prediction
-new_rpf <- function(fit, blueprint) {
+new_rpf <- function(fit, blueprint, ...) {
 
   hardhat::new_model(
     fit = fit,
     blueprint = blueprint,
-    class = "rpf"
+    class = "rpf", 
+    ...
   )
 }
 
