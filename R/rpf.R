@@ -143,19 +143,54 @@ rpf_impl <- function(Y, X, max_interaction = 1, ntrees = 50, splits = 30, split_
                 deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
                 loss = "L2", delta = 0, epsilon = 0.1) {
 
-  # FIXME: Proper classif/regression detection and switching
+  # Input validation
+  checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
+  checkmate::assert_integerish(ntrees, lower = 1, len = 1)
+  checkmate::assert_integerish(splits, lower = 1, len = 1)
+  checkmate::assert_integerish(split_try, lower = 1, len = 1)
+  
+  checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
+  # FIXME: What is delta/epsilone and what can it look like?
+  checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
+  checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
+  
+  checkmate::assert_choice(
+    loss, choices = c("L1", "L2", "median", "logit", "exponential"), 
+    null.ok = FALSE
+  )
+  
+  checkmate::assert_logical(deterministic, len = 1)
+  checkmate::assert_logical(parallel, len = 1)
+  checkmate::assert_logical(purify, len = 1)
+  checkmate::assert_logical(cv, len = 1)
 
+  # Task type detection: Could be more concise
+  is_binary <- length(sort(unique(Y))) == 2
+  is_integerish <- checkmate::test_integerish(Y, any.missing = FALSE)
+  is_factor <- checkmate::test_factor(Y, any.missing = FALSE)
+  is_numeric <- checkmate::test_numeric(Y, any.missing = FALSE)
+  
+  if (is_binary & is_integerish) {
+    warning("y is binary integer, assuming classification task")
+  }
+  
   # Assume binary Y for classif
-  if (length(unique(Y)) == 2) {
+  if (is_factor | (is_binary & is_integerish)) {
+    
+    # Coerce to integer sequence 1 to nleveles(x)
+    if (is_factor) Y <- as.integer(Y)
+    
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv, delta, epsilon
     ))
-  } else {
+  } else if (is_numeric) {
     fit <- new(RandomPlantedForest, Y, X, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv
     ))
+  } else {
+    stop("y should be either numeric (regression) or factor (classification)")
   }
 
   fit
