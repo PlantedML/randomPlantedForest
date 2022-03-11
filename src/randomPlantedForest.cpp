@@ -2039,7 +2039,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         found_tree->leaves.push_back(leaf_b);
       }
     } else{
-      std::cout << "test" << std::endl;
+      //FIXME: Why is this here?
+      //std::cout << "test" << std::endl;
     }
   }
   
