@@ -388,7 +388,7 @@ void testRPF(){
     // loop over grid points
     while(!grid.nextPoint()){
       std::vector<int> gridPoint = grid.getPoint();
-      std::cout << m[gridPoint] << ", ";
+      Rcpp::Rcout  << m[gridPoint] << ", ";
     }
   }
   
@@ -514,7 +514,7 @@ RandomPlantedForest::RandomPlantedForest(const NumericVector &samples_Y, const N
     // initialize class members 
     std::vector<double> pars = to_std_vec(parameters);
     if(pars.size() != 9){
-        std::cout << "Wrong number of parameters - set to default." << std::endl;
+        Rcpp::Rcout  << "Wrong number of parameters - set to default." << std::endl;
         this->max_interaction = 1;
         this->n_trees = 50;
         this->n_splits = 30;
@@ -694,10 +694,10 @@ void RandomPlantedForest::set_data(const NumericVector &samples_Y, const Numeric
     // Check if all vector in x are same length
     for(const auto &vec:X){
         this->feature_size = vec.size();
-        if(vec.size() != feature_size) std::cout << "Dimensions of X mismatch." << std::endl;
+        if(vec.size() != feature_size) Rcpp::Rcout  << "Dimensions of X mismatch." << std::endl;
     }
     if(Y.size() != X.size()){
-        std::cout << "Dimensions of X and Y mismatch." << std::endl;
+        Rcpp::Rcout  << "Dimensions of X and Y mismatch." << std::endl;
     }
     
     this->n_leaves = std::vector<int>(feature_size, 1);
@@ -739,22 +739,27 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   }
   
   if(false){
-    std::cout << "Initial Possible Splits: ";
+    Rcpp::Rcout  << "Initial Possible Splits: ";
     for(auto split: possible_splits){
-      std::cout << split.first << "-";
-      for(auto dim: split.second->split_dims) std::cout << dim << ",";
-      std::cout << "; ";
+      Rcpp::Rcout  << split.first << "-";
+      for(auto dim: split.second->split_dims) Rcpp::Rcout  << dim << ",";
+      Rcpp::Rcout  << "; ";
     }
-    std::cout << std::endl;
+    Rcpp::Rcout  << std::endl;
   }
+  
+  // setup random device
+  std::random_device rd;
+  std::mt19937 gen(rd());
   
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
+  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = std::rand() % sample_size;
+    sample_index = unif_dist(gen);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
@@ -777,9 +782,9 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     if(!std::isinf(curr_split.min_sum)){
       
       if(false){
-        std::cout << "Current Optimal Split: " << curr_split.min_sum << "; " << curr_split.split_coordinate << "- ";
-        for(auto dim: curr_split.tree_index->split_dims) std::cout << dim << ", ";
-        std::cout << "; " << curr_split.I_s.size() << "/" << curr_split.I_b.size() << "=" << curr_split.I_s.size()+curr_split.I_b.size() << "; " <<
+        Rcpp::Rcout  << "Current Optimal Split: " << curr_split.min_sum << "; " << curr_split.split_coordinate << "- ";
+        for(auto dim: curr_split.tree_index->split_dims) Rcpp::Rcout  << dim << ", ";
+        Rcpp::Rcout  << "; " << curr_split.I_s.size() << "/" << curr_split.I_b.size() << "=" << curr_split.I_s.size()+curr_split.I_b.size() << "; " <<
           curr_split.M_s << "/" << curr_split.M_b <<  std::endl;
       }
 
@@ -813,13 +818,13 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         }
         
         if(false){
-          std::cout << "Updated Possible Splits: " << std::endl;
+          Rcpp::Rcout  << "Updated Possible Splits: " << std::endl;
           for(auto split: possible_splits){
-            std::cout << split.first << "-";
-            for(auto dim: split.second->split_dims) std::cout << dim << ",";
-            std::cout << "; ";
+            Rcpp::Rcout  << split.first << "-";
+            for(auto dim: split.second->split_dims) Rcpp::Rcout  << dim << ",";
+            Rcpp::Rcout  << "; ";
           }
-          std::cout << std::endl;
+          Rcpp::Rcout  << std::endl;
         }
       }
       
@@ -851,15 +856,15 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
       
       if(false){
-        std::cout << "First leaf: intervals=" << std::endl;
-        for(auto interval: leaf_s.intervals) std::cout << interval.first << "," << interval.second << ";";
-        std::cout << "individuals=";
-        for(auto i: leaf_s.individuals) std::cout << i << ",";
-        std::cout << std::endl << "Second leaf: intervals=" << std::endl;
-        for(auto interval: leaf_b.intervals) std::cout << interval.first << "," << interval.second << ";";
-        std::cout << "individuals=";
-        for(auto i: leaf_b.individuals) std::cout << i << ",";
-        std::cout << std::endl;
+        Rcpp::Rcout  << "First leaf: intervals=" << std::endl;
+        for(auto interval: leaf_s.intervals) Rcpp::Rcout  << interval.first << "," << interval.second << ";";
+        Rcpp::Rcout  << "individuals=";
+        for(auto i: leaf_s.individuals) Rcpp::Rcout  << i << ",";
+        Rcpp::Rcout  << std::endl << "Second leaf: intervals=" << std::endl;
+        for(auto interval: leaf_b.intervals) Rcpp::Rcout  << interval.first << "," << interval.second << ";";
+        Rcpp::Rcout  << "individuals=";
+        for(auto i: leaf_b.individuals) Rcpp::Rcout  << i << ",";
+        Rcpp::Rcout  << std::endl;
       }
       
       // construct split_dims of resulting tree when splitting in split_coordinate
@@ -885,14 +890,14 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
       
       if(false){
-        std::cout << "Current TreeFamily: (" << curr_family.size() << ") ";
+        Rcpp::Rcout  << "Current TreeFamily: (" << curr_family.size() << ") ";
         for(auto tree: curr_family){
-          std::cout << "Dims = ";
-          for(auto dim: tree.first) std::cout << dim << ", ";
-          std::cout << "; " << "Number of Leaves = " << tree.second->leaves.size();
-          std::cout << " / ";
+          Rcpp::Rcout  << "Dims = ";
+          for(auto dim: tree.first) Rcpp::Rcout  << dim << ", ";
+          Rcpp::Rcout  << "; " << "Number of Leaves = " << tree.second->leaves.size();
+          Rcpp::Rcout  << " / ";
         }
-        std::cout << std::endl << std::endl;
+        Rcpp::Rcout  << std::endl << std::endl;
       }
     }
   }
@@ -968,7 +973,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     this->cross_validate = false;
   
     if(deterministic) {
-      std::cout << "Note: Set model to non-deterministic. " << std::endl;
+      Rcpp::Rcout  << "Note: Set model to non-deterministic. " << std::endl;
       deterministic = false; 
     }
     
@@ -976,7 +981,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     std::vector<int> split_tries_vec = to_std_vec(split_tries);
     std::vector<double> t_tries_vec = to_std_vec(t_tries);
     
-    if(splits_vec.size()!=2) {std::cout << "Min and max needed for number of splits." << std::endl; return;}
+    if(splits_vec.size()!=2) {Rcpp::Rcout  << "Min and max needed for number of splits." << std::endl; return;}
     
     // remember optimal parameter set and MSE
     double  MSE_sum = 0, curr_MSE = 0, MSE_min = INF, optimal_split = INF, optimal_t_try = INF, optimal_split_try = INF;
@@ -1043,7 +1048,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
           			    
       			        // average
       			        curr_MSE = MSE_sum / n_sets;
-          			    std::cout << inter << ", " << splits << ", " << t << ", " << s << ": MSE=" << curr_MSE << std::endl;
+          			    Rcpp::Rcout  << inter << ", " << splits << ", " << t << ", " << s << ": MSE=" << curr_MSE << std::endl;
           			    
           			    // update optimal
       			        if(curr_MSE < MSE_min){
@@ -1066,7 +1071,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     this->set_data(Y_original, X_original);
     this->cross_validate = cv_tmp;
     
-    std::cout << "Optimal parameters: " << optimal_inter << ", " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
+    Rcpp::Rcout  << "Optimal parameters: " << optimal_inter << ", " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
 }
 
 // predict single feature vector
@@ -1135,13 +1140,13 @@ Rcpp::NumericVector RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
     
     // todo: sanity check for X
 
-    if(feature_vec.empty()) { std::cout << "Feature vector is empty." << std::endl; return res; }
+    if(feature_vec.empty()) { Rcpp::Rcout  << "Feature vector is empty." << std::endl; return res; }
     
     if(component_index == std::set<int>{0} && feature_vec[0].size() != this->feature_size){ 
-        std::cout << "Feature vector has wrong dimension." << std::endl; return res;
+        Rcpp::Rcout  << "Feature vector has wrong dimension." << std::endl; return res;
     }
     if(component_index != std::set<int>{0} && component_index.size() != feature_vec[0].size()){
-        std::cout << "The input X has the wrong dimension in order to calculate f_i(x)" << std::endl; return res;
+        Rcpp::Rcout  << "The input X has the wrong dimension in order to calculate f_i(x)" << std::endl; return res;
     }  
     
     for(auto& vec: feature_vec){
@@ -1160,10 +1165,10 @@ Rcpp::NumericVector RandomPlantedForest::predict_vector(const NumericVector &X, 
     
     // todo: sanity check for X
     
-    if(feature_vec.empty()) { std::cout << "Feature vector is empty." << std::endl; return res; }
+    if(feature_vec.empty()) { Rcpp::Rcout  << "Feature vector is empty." << std::endl; return res; }
     
     if(component_index == std::set<int>{0} && feature_vec.size() != this->feature_size){ 
-        std::cout << "Feature vector has wrong dimension." << std::endl; return res;
+        Rcpp::Rcout  << "Feature vector has wrong dimension." << std::endl; return res;
     }
     
     if(component_index == std::set<int>{0}) {
@@ -1298,7 +1303,7 @@ void RandomPlantedForest::new_purify(){
     int tree_index = 0; // ignore null tree?
     for(const auto& curr_tree: curr_family){
       
-      std::cout << tree_index << ": "; // << std::endl;
+      Rcpp::Rcout  << tree_index << ": "; // << std::endl;
       
       if(curr_tree.first == std::set<int>{0}) continue; // ignore null tree?
       
@@ -1358,9 +1363,9 @@ void RandomPlantedForest::new_purify(){
       
       if(true){
         while(!grid.nextPoint()){
-        std::cout << individuals[tree_index][grid.getPoint()] << ", ";
+        Rcpp::Rcout  << individuals[tree_index][grid.getPoint()] << ", ";
       }
-        std::cout << std::endl;
+        Rcpp::Rcout  << std::endl;
       }
       
       ++tree_index;
@@ -1386,9 +1391,9 @@ void RandomPlantedForest::new_purify(){
         std::set<int> curr_dims = curr_tree->split_dims;
         
         if(false){
-          std::cout << "Old tree: ";
-          for(const auto& dim: curr_dims) std::cout << dim << ", "; 
-          std::cout << std::endl;
+          Rcpp::Rcout  << "Old tree: ";
+          for(const auto& dim: curr_dims) Rcpp::Rcout  << dim << ", "; 
+          Rcpp::Rcout  << std::endl;
         }
         
         // check if number of dims same as current max_interaction
@@ -1411,15 +1416,15 @@ void RandomPlantedForest::new_purify(){
               }else{
                 if(!tree){
                   if(false){
-                    std::cout << "   New tree: ";
-                    for(const auto& dim: tree_dims) std::cout << dim << ", "; 
-                    std::cout << std::endl;
+                    Rcpp::Rcout  << "   New tree: ";
+                    for(const auto& dim: tree_dims) Rcpp::Rcout  << dim << ", "; 
+                    Rcpp::Rcout  << std::endl;
                   }
                   curr_family.insert(std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims))));
                   new_trees.push_back(tree_dims);
                   std::vector<int> matrix_dimensions = values[tree_index].dims;
                   //matrix_dimensions.erase(matrix_dimensions.begin() + dim_index);
-                  //std::cout << matrix_dimensions.size() << std::endl;
+                  //Rcpp::Rcout  << matrix_dimensions.size() << std::endl;
                   
                   // initialize data for new tree
                   auto grid =  NDGrid::NDGrid(matrix_dimensions);
@@ -1451,30 +1456,30 @@ void RandomPlantedForest::print(){
     for(int n=0; n<n_trees; ++n){
         TreeFamily family = tree_families[n];
         // todo: check if constant needed
-        // std::cout << n+1 << " TreeFamily: constant=" << family.constant << std::endl << std::endl;
+        // Rcpp::Rcout  << n+1 << " TreeFamily: constant=" << family.constant << std::endl << std::endl;
         auto keys = getKeys(family);
         for(int m=0; m<keys.size(); ++m){
             DecisionTree tree = *(family[keys[m]]);
-            std::cout << m+1 << " Tree: ";
-            std::cout << "Dims=";
-            for(const auto& dim: tree.split_dims) std::cout << dim << ",";
-            std::cout << std::endl << "Leaves: (" << tree.leaves.size() << ")" << std::endl;
+            Rcpp::Rcout  << m+1 << " Tree: ";
+            Rcpp::Rcout  << "Dims=";
+            for(const auto& dim: tree.split_dims) Rcpp::Rcout  << dim << ",";
+            Rcpp::Rcout  << std::endl << "Leaves: (" << tree.leaves.size() << ")" << std::endl;
             for(const auto& leaf: tree.leaves){
-                std::cout << "Intervals=";
+                Rcpp::Rcout  << "Intervals=";
                 for(const auto& interval: leaf.intervals){
-                    std::cout << interval.first << "," << interval.second << "/";
+                    Rcpp::Rcout  << interval.first << "," << interval.second << "/";
                 }
-                std::cout << " Value=" << leaf.value << std::endl;
+                Rcpp::Rcout  << " Value=" << leaf.value << std::endl;
             }  
-            std::cout << std::endl;
+            Rcpp::Rcout  << std::endl;
         }
-        std::cout << std::endl << std::endl;
+        Rcpp::Rcout  << std::endl << std::endl;
     }
 }
 
 // print parameters of the model to the console
 void RandomPlantedForest::get_parameters(){
-  std::cout << "Parameters: n_trees=" <<  n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try 
+  Rcpp::Rcout  << "Parameters: n_trees=" <<  n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try 
             << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", parallel=" << parallelize
             << ", feature_size=" << feature_size << ", sample_size=" << sample_size << std::endl;
 }
@@ -1485,7 +1490,7 @@ void RandomPlantedForest::get_parameters(){
     note that changing cv does not trigger cross validation */
 void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values){
   if(keys.size() != values.size()) {
-    std::cout << "Size of input vectors is not the same. " << std::endl;
+    Rcpp::Rcout  << "Size of input vectors is not the same. " << std::endl;
     return;
   }
   
@@ -1509,7 +1514,7 @@ void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values
     }else if(keys[i] == "cv"){
       this->cross_validate = values[i];
     }else{
-      std::cout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
+      Rcpp::Rcout  << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
     }
   }
   this->fit();
@@ -1659,10 +1664,10 @@ ClassificationRPF::ClassificationRPF(const NumericVector &samples_Y, const Numer
     this->loss = LossType::exponential;
     this->calcLoss = &ClassificationRPF::exponential_loss;
   }else{
-    std::cout << "Unkown loss function." << std::endl;
+    Rcpp::Rcout  << "Unkown loss function." << std::endl;
   }
   if(pars.size() != 11){
-    std::cout << "Wrong number of parameters - set to default." << std::endl;
+    Rcpp::Rcout  << "Wrong number of parameters - set to default." << std::endl;
     this->max_interaction = 1;
     this->n_trees = 50;
     this->n_splits = 30;
@@ -1857,22 +1862,27 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   }
   
   if(false){
-    std::cout << "Initial Possible Splits: ";
+    Rcpp::Rcout  << "Initial Possible Splits: ";
     for(auto split: possible_splits){
-      std::cout << split.first << "-";
-      for(auto dim: split.second->split_dims) std::cout << dim << ",";
-      std::cout << "; ";
+      Rcpp::Rcout  << split.first << "-";
+      for(auto dim: split.second->split_dims) Rcpp::Rcout  << dim << ",";
+      Rcpp::Rcout  << "; ";
     }
-    std::cout << std::endl;
+    Rcpp::Rcout  << std::endl;
   }
+  
+  // setup random device
+  std::random_device rd;
+  std::mt19937 gen(rd());
   
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
+  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = std::rand() % sample_size;
+    sample_index = unif_dist(gen);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
@@ -1936,13 +1946,13 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         }
         
         if(false){
-          std::cout << "Updated Possible Splits: " << std::endl;
+          Rcpp::Rcout  << "Updated Possible Splits: " << std::endl;
           for(auto split: possible_splits){
-            std::cout << split.first << "-";
-            for(auto dim: split.second->split_dims) std::cout << dim << ",";
-            std::cout << "; ";
+            Rcpp::Rcout  << split.first << "-";
+            for(auto dim: split.second->split_dims) Rcpp::Rcout  << dim << ",";
+            Rcpp::Rcout  << "; ";
           }
-          std::cout << std::endl;
+          Rcpp::Rcout  << std::endl;
         }
       }
           
@@ -2040,7 +2050,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
     } else{
       //FIXME: Why is this here?
-      //std::cout << "test" << std::endl;
+      //Rcpp::Rcout  << "test" << std::endl;
     }
   }
   
@@ -2106,7 +2116,7 @@ void ClassificationRPF::fit(){
  note that changing cv does not trigger cross validation */
 void ClassificationRPF::set_parameters(StringVector keys, NumericVector values){
   if(keys.size() != values.size()) {
-    std::cout << "Size of input vectors is not the same. " << std::endl;
+    Rcpp::Rcout  << "Size of input vectors is not the same. " << std::endl;
     return;
   }
   
@@ -2146,14 +2156,14 @@ void ClassificationRPF::set_parameters(StringVector keys, NumericVector values){
         this->loss = LossType::exponential;
         this->calcLoss = &ClassificationRPF::exponential_loss;
       }else{
-        std::cout << "Unkown loss function." << std::endl;
+        Rcpp::Rcout  << "Unkown loss function." << std::endl;
       }
     }else if(keys[i] == "delta"){
       this->delta = values[i];
     }else if(keys[i] == "epsilon"){
       this->epsilon = values[i];
     }else{
-      std::cout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
+      Rcpp::Rcout  << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
     }
   }
   this->fit();
