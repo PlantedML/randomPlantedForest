@@ -1,4 +1,6 @@
 # Binary classification ----------------------------------------------------------
+mtcars$am <- factor(mtcars$am)
+
 test_that("Binary: All numeric", {
   bin_fit <- rpf(am ~ hp + disp, data = mtcars)
 
@@ -7,8 +9,6 @@ test_that("Binary: All numeric", {
 })
 
 test_that("Binary: All numeric, logit loss", {
-  expect_silent(rpf(am ~ hp + disp, data = mtcars, loss = "logit"))
-
   bin_fit <- rpf(am ~ hp + disp, data = mtcars, loss = "logit")
 
   expect_s3_class(bin_fit, "rpf")
@@ -26,8 +26,10 @@ test_that("Binary: Detection works", {
     x2 = rnorm(100)
   )
 
-  # y in 0, 1
-  y_01 <- rpf(y01 ~ x1 + x2, xdat)
+  # y in 0, 1: Ambiguous, expect warning, but should classify
+  expect_warning(rpf(y01 ~ x1 + x2, xdat), regexp = "^y is.*assuming")
+  
+  y_01 <- suppressWarnings(rpf(y01 ~ x1 + x2, xdat))
   expect_s4_class(y_01$fit, "Rcpp_ClassificationRPF")
 
   # FIXME: decide factor order assumption?
@@ -37,11 +39,10 @@ test_that("Binary: Detection works", {
 
   # y two-level character: should fail because ambiguous
   # similar problem as factor but w/o levels no order can be assumed
-  expect_error(rpf(ychar ~ x1 + x2, xdat))
+  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
 
-  # y logical: should warn but work, user should supply numerical/factor
-  y_logi <- expect_warning(rpf(ylogi ~ x1 + x2, xdat))
-  expect_s4_class(y_logi$fit, "Rcpp_ClassificationRPF")
+  # y logical: should error and note what it expects
+  expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "^y should be")
 })
 
 # Multiclass classification -----------------------------------------------
@@ -84,6 +85,5 @@ test_that("Multiclass: Detection works", {
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
 
   # y 3-level character
-  y_char <- rpf(ychar ~ x1 + x2, xdat)
-  expect_s4_class(y_char$fit, "Rcpp_ClassificationRPF")
+  expect_error(rpf(ychar ~ x1 + x2, xdat))
 })

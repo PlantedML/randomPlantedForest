@@ -2,6 +2,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
+#' @import checkmate
 #' @import RcppParallel
 #' @importFrom Rcpp loadModule
 #' @importFrom Rcpp sourceCpp
