@@ -22,6 +22,10 @@ using namespace Rcpp;
 using namespace RcppParallel;
 
 
+// wrapper around R's RNG such that we get a uniform distribution over
+// [0,n) as required by the STL algorithm
+inline int randWrapper(const int n) { return floor(R::runif(0,1)*n); }
+
 //  ----------------- functions for converting R and Cpp types ----------------- 
 
 /**
@@ -551,17 +555,13 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
   size_t n = 0;
   double leaf_size, sample_point;
   
-  // setup random device
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  
   // sample possible splits
   int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
   std::vector<int> split_candidates(possible_splits.size());
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
   
   if(!deterministic){
-    std::shuffle(split_candidates.begin(), split_candidates.end(), gen); // shuffle for random order
+    std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
   }
   
   // consider a fraction of possible splits
@@ -621,11 +621,11 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<double> &Y, c
           
           // get samplepoint
           auto sample_pos = unique_samples.begin();
-          std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size + 1);
           if(deterministic){
             std::advance(sample_pos, t);
           }else{
-            std::advance(sample_pos, distrib(gen)); // consider only sample points with offset
+            int offset = R::runif(leaf_size, unique_samples.size() - leaf_size + 1);
+            std::advance(sample_pos, offset); // consider only sample points with offset
           }
           sample_point = sample_pos->first;
           
@@ -748,18 +748,13 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     Rcpp::Rcout  << std::endl;
   }
   
-  // setup random device
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
-  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = unif_dist(gen);
+    sample_index = R::runif(0, sample_size - 1);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
@@ -989,9 +984,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
     
     std::vector<int> order(sample_size);
     std::iota(order.begin(), order.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(order.begin(), order.end(), g);
+    std::random_shuffle(order.begin(), order.end(), randWrapper);
     double tmp = double(sample_size)/double(n_sets);
     int set_size = round(tmp);
     
@@ -1708,17 +1701,13 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<double> &Y, con
   size_t n = 0;
   double leaf_size, sample_point;
   
-  // setup random device
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  
   // sample possible splits
   int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
   std::vector<int> split_candidates(possible_splits.size());
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
   
   if(!deterministic){
-    std::shuffle(split_candidates.begin(), split_candidates.end(), gen); // shuffle for random order
+    std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
   }
   
   // consider a fraction of possible splits
@@ -1777,11 +1766,11 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<double> &Y, con
           
           // get samplepoint
           auto sample_pos = unique_samples.begin();
-          std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size + 1);
           if(deterministic){
             std::advance(sample_pos, t);
           }else{
-            std::advance(sample_pos, distrib(gen)); // consider only sample points with offset
+            int offset = R::runif(leaf_size, unique_samples.size() - leaf_size + 1);
+            std::advance(sample_pos, offset); // consider only sample points with offset
           }
           sample_point = sample_pos->first;
           
@@ -1870,19 +1859,14 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     }
     Rcpp::Rcout  << std::endl;
   }
-  
-  // setup random device
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  
+
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
-  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = unif_dist(gen);
+    sample_index = R::runif(0, sample_size - 1);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
