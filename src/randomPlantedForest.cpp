@@ -748,13 +748,18 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     Rcpp::Rcout  << std::endl;
   }
   
+  // setup random device
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
+  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = std::rand() % sample_size;
+    sample_index = unif_dist(gen);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
@@ -1866,13 +1871,18 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     Rcpp::Rcout  << std::endl;
   }
   
+  // setup random device
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X = std::vector<std::vector<double>>(sample_size);
   std::vector<double> samples_Y = std::vector<double>(sample_size);
+  std::uniform_int_distribution<int> unif_dist(0, sample_size - 1);
   for(size_t i=0; i<sample_size; ++i){
     // todo: switch to 'std::uniform_int_distribution' for equally-likely numbers
-    sample_index = std::rand() % sample_size;
+    sample_index = unif_dist(gen);
     samples_Y[i] = Y[sample_index];
     samples_X[i] = X[sample_index];
   }
