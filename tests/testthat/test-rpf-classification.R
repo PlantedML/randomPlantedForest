@@ -7,8 +7,6 @@ test_that("Binary: All numeric", {
 })
 
 test_that("Binary: All numeric, logit loss", {
-  # Currently prints "test" (3x) in console, not sure how to capture
-  # Hopefully capturable with switch to Rcout?
   expect_silent(rpf(am ~ hp + disp, data = mtcars, loss = "logit"))
 
   bin_fit <- rpf(am ~ hp + disp, data = mtcars, loss = "logit")
