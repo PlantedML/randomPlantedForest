@@ -139,23 +139,33 @@ new_rpf <- function(fit, blueprint, ...) {
 }
 
 # Main fitting function and interface to C++ implementation
-rpf_impl <- function(Y, X, max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
-                deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
-                loss = "L2", delta = 0, epsilon = 0.1) {
+rpf_impl <- function(
+    Y, X, 
+    max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
+    deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
+    loss = "L2", delta = 0, epsilon = 0.1
+  ) {
 
   # Input validation
+  checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
   checkmate::assert_integerish(ntrees, lower = 1, len = 1)
   checkmate::assert_integerish(splits, lower = 1, len = 1)
   checkmate::assert_integerish(split_try, lower = 1, len = 1)
   
   checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
-  # FIXME: What is delta/epsilone and what can it look like?
+  # FIXME: What is delta/epsilon and what can it look like?
   checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
   checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
   
   checkmate::assert_choice(
-    loss, choices = c("L1", "L2", "median", "logit", "exponential"), 
+    loss, choices = c(
+      "L1", 
+      "L2",
+      # "median", # Discarded but present in C++ impl
+      "logit", 
+      "exponential"
+    ), 
     null.ok = FALSE
   )
   
@@ -165,20 +175,42 @@ rpf_impl <- function(Y, X, max_interaction = 1, ntrees = 50, splits = 30, split_
   checkmate::assert_logical(cv, len = 1)
 
   # Task type detection: Could be more concise
-  is_binary <- length(sort(unique(Y))) == 2
+  is_binary <- length(unique(Y)) == 2
   is_integerish <- checkmate::test_integerish(Y, any.missing = FALSE)
   is_factor <- checkmate::test_factor(Y, any.missing = FALSE)
   is_numeric <- checkmate::test_numeric(Y, any.missing = FALSE)
   
   if (is_binary & is_integerish) {
     warning("y is binary integer, assuming classification task")
+    Y <- as.integer(Y)
   }
-  
+
   # Assume binary Y for classif
   if (is_factor | (is_binary & is_integerish)) {
     
-    # Coerce to integer sequence 1 to nleveles(x)
-    if (is_factor) Y <- as.integer(Y)
+    # Coerce to integer sequence 1 to nlevels(x)
+    if (is_factor) {
+      Y <- as.integer(Y)
+      
+      # Binary factor will result in 1,2, recode to 0,1
+      if (is_binary) {
+        Y <- Y - 1L
+      }
+    }
+    
+    # Recode to 0,1 in case e.g -1,1 is supplied
+    if (is_binary & !identical(range(Y), c(0L, 1L))) {
+      warning("y is binary integer but not 0,1 - transforming to 0,1")
+      Y[Y == min(Y)] <- 0L
+      Y[Y == max(Y)] <- 1L
+    }
+    
+    # FIXME: Final assertion just in case should be superfluous
+    if (is_binary) {
+      checkmate::assert_integer(Y, lower = 0, upper = 1)
+    } else {
+      checkmate::assert_integer(Y, lower = 1)
+    }
     
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
