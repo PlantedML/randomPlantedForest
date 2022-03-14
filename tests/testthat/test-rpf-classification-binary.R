@@ -61,25 +61,3 @@ test_that("Binary detection: Fail for character, logical", {
   # y logical: should error and note what it expects
   expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "^y should be")
 })
-
-# Prediction --------------------------------------------------------------
-
-test_that("Probability prediction: y = factor / L2 loss", {
-  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
-  
-  bin_pred <- predict(bin_fit_L2, new_data = xdat, type = "prob")
-})
-
-test_that("Class prediction: y = factor / L2 loss", {
-  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
-  
-  bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-  
-})
-
-test_that("Class prediction: y = 0,1 / L2 loss", {
-  bin_fit <- suppressWarnings(rpf(y01 ~ x1 + x2, data = xdat, loss = "L2"))
-  
-  bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-  
-})
