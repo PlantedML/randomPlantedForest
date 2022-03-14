@@ -39,3 +39,13 @@ test_that("Fit + predict: Categorical features", {
 
   expect_s3_class(pred, "tbl_df")
 })
+
+test_that("Setting L1 or L2 loss", {
+  fit_l1 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L1")
+  fit_l2 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L2")
+  fit_default <- rpf(mpg ~ wt + cyl, data = mtcars)
+  
+  expect_identical(fit_l1$loss, "L1")
+  expect_identical(fit_l2$loss, "L2")
+  expect_identical(fit_default$loss, "L2")
+})
