@@ -90,40 +90,53 @@ rpf.recipe <- function(x, data, ...) {
 
 # Bridge: Calls rpf_impl() with processed input
 #' @importFrom hardhat validate_outcomes_are_univariate
-#' @importFrom data.table .SD ':=' as.data.table
-rpf_bridge <- function(processed, ...) {
-
+rpf_bridge <- function(
+    processed, max_interaction = 1, ntrees = 50, splits = 30,
+    split_try = 10, t_try = 0.4, deterministic = FALSE,
+    parallel = FALSE, purify = FALSE, cv = FALSE,
+    loss = "L2", delta = 0, epsilon = 0.1
+  ) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   outcomes <- processed$outcomes[[1]]
-  predictors <- as.data.table(processed$predictors)
+  predictors <- preprocess_predictors_fit(processed)
   
-  # Convert characters to factors
-  char_cols <- names(which(sapply(predictors, is.character)))
-  if (length(char_cols) > 0) {
-    predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
-  }
+  # Check arguments
+  checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
+  checkmate::assert_integerish(ntrees, lower = 1, len = 1)
+  checkmate::assert_integerish(splits, lower = 1, len = 1)
+  checkmate::assert_integerish(split_try, lower = 1, len = 1)
   
-  # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
-  factor_cols <- names(which(sapply(predictors, is.factor)))
-  if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(.SD, order_factor_by_response, y = outcomes), .SDcols = factor_cols]
-  }
+  checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
+  # FIXME: What is delta/epsilon and what can it look like?
+  checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
+  checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
   
-  # Save re-ordered factor levels
-  factor_levels <- hardhat::get_levels(predictors)
+  checkmate::assert_choice(
+    loss, choices = c(
+      "L1", "L2",
+      # "median", # Discarded but present in C++ impl
+      "logit", "exponential"
+    ), null.ok = FALSE
+  )
   
-  # Convert factors to integer and data to matrix
-  if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
-  }
-  predictors_matrix <- as.matrix(predictors)
+  checkmate::assert_logical(deterministic, len = 1)
+  checkmate::assert_logical(parallel, len = 1)
+  checkmate::assert_logical(purify, len = 1)
+  checkmate::assert_logical(cv, len = 1)
   
-  fit <- rpf_impl(Y = outcomes, X = predictors_matrix, ...)
+  fit <- rpf_impl(
+    Y = outcomes, X = predictors$predictors_matrix, 
+    max_interaction = max_interaction, ntrees = ntrees, splits = splits,
+    split_try = split_try, t_try = t_try, deterministic = deterministic,
+    parallel = parallel, purify = purify, cv = cv,
+    loss = loss, delta = delta, epsilon = epsilon
+  )
   
   new_rpf(
     fit = fit,
     blueprint = processed$blueprint, 
-    factor_levels = factor_levels
+    factor_levels = predictors$factor_levels,
+    loss = loss
   )
 }
 
@@ -140,7 +153,7 @@ new_rpf <- function(fit, blueprint, ...) {
 
 # Main fitting function and interface to C++ implementation
 rpf_impl <- function(
-    Y, X, 
+    Y, X,
     max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
     deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
     loss = "L2", delta = 0, epsilon = 0.1
@@ -148,31 +161,6 @@ rpf_impl <- function(
 
   # Input validation
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
-  checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
-  checkmate::assert_integerish(ntrees, lower = 1, len = 1)
-  checkmate::assert_integerish(splits, lower = 1, len = 1)
-  checkmate::assert_integerish(split_try, lower = 1, len = 1)
-  
-  checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
-  # FIXME: What is delta/epsilon and what can it look like?
-  checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
-  checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
-  
-  checkmate::assert_choice(
-    loss, choices = c(
-      "L1", 
-      "L2",
-      # "median", # Discarded but present in C++ impl
-      "logit", 
-      "exponential"
-    ), 
-    null.ok = FALSE
-  )
-  
-  checkmate::assert_logical(deterministic, len = 1)
-  checkmate::assert_logical(parallel, len = 1)
-  checkmate::assert_logical(purify, len = 1)
-  checkmate::assert_logical(cv, len = 1)
 
   # Task type detection: Could be more concise
   is_binary <- length(unique(Y)) == 2

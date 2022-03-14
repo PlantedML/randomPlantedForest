@@ -104,11 +104,10 @@ predict_rpf_prob <- function(object, new_data, components, ...){
   
   pred_raw <- object$fit$predict_matrix(new_data, components)
   
-  #FIXME: Where to get loss?
-  if (loss %in% c("logit", "exp")) {
+  if (object$loss %in% c("logit", "exponential")) {
     # logit^-1 transformation for logit/exp loss
     pred_prob <- 1/(1 + exp(-pred_raw))
-  } else if (loss %in% c("L1", "L2")) {
+  } else if (object$loss %in% c("L1", "L2")) {
     # Truncate probabilities at [0,1] for L1/L2 loss
     pred_prob <- pmax(0, pmin(1, pred_raw))
   }

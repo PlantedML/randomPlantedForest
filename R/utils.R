@@ -1,5 +1,3 @@
-
-
 #' Order factor levels by response
 #' 
 #' Regression: Order by mean(y)
@@ -62,4 +60,36 @@ pca_order <- function(x, y) {
   
   # Return ordered factor levels
   order(score)
+}
+
+# Sort factor predictors by outcome and re-encode as integer
+# save original factor levels for prediction step
+#' @importFrom data.table .SD ':=' as.data.table
+preprocess_predictors_fit <- function(processed) {
+  predictors <- as.data.table(processed$predictors)
+  
+  # Convert characters to factors
+  char_cols <- names(which(sapply(predictors, is.character)))
+  if (length(char_cols) > 0) {
+    predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
+  }
+  
+  # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
+  factor_cols <- names(which(sapply(predictors, is.factor)))
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := lapply(.SD, order_factor_by_response, y = outcomes), .SDcols = factor_cols]
+  }
+  
+  # Save re-ordered factor levels
+  factor_levels <- hardhat::get_levels(predictors)
+  
+  # Convert factors to integer and data to matrix
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
+  }
+  
+  list(
+    factor_levels = factor_levels,
+    predictors_matrix = as.matrix(predictors)
+  )
 }
