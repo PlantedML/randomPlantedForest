@@ -84,7 +84,6 @@ predict_rpf_class <- function(object, new_data, components, ...){
     outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
   }
   
-  
   # Predict probability
   pred_prob <- predict_rpf_prob(object, new_data, components, ...)
   
@@ -103,11 +102,18 @@ predict_rpf_prob <- function(object, new_data, components, ...){
     outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
   }
   
-  #FIXME: Works only for L2 loss
   pred_raw <- object$fit$predict_matrix(new_data, components)
   
-  # Truncate probabilities at [0,1]
-  pred_prob <- pmax(0, pmin(1, pred_raw))
+  #FIXME: Where to get loss?
+  if (loss %in% c("logit", "exp")) {
+    # logit^-1 transformation for logit/exp loss
+    pred_prob <- 1/(1 + exp(-pred_raw))
+  } else if (loss %in% c("L1", "L2")) {
+    # Truncate probabilities at [0,1] for L1/L2 loss
+    pred_prob <- pmax(0, pmin(1, pred_raw))
+  }
+  
+  #FIXME: Multiclass
   pred <- cbind(1 - pred_prob, pred_prob)
   out <- hardhat::spruce_prob(outcome_levels, pred)
 

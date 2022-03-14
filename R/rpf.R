@@ -119,7 +119,7 @@ rpf_bridge <- function(processed, ...) {
   predictors_matrix <- as.matrix(predictors)
   
   fit <- rpf_impl(Y = outcomes, X = predictors_matrix, ...)
-
+  
   new_rpf(
     fit = fit,
     blueprint = processed$blueprint, 
@@ -217,6 +217,7 @@ rpf_impl <- function(
       purify, deterministic, parallel, cv, delta, epsilon
     ))
   } else if (is_numeric) {
+    #FIXME: Loss missing here?
     fit <- new(RandomPlantedForest, Y, X, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv
