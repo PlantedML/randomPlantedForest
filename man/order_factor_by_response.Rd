@@ -17,7 +17,8 @@ Re-ordered (ordered) factor
 \description{
 Regression: Order by mean(y)
 Binary classification: Order by mean(y==1)
-Multiclass: Order by first principal component of the weighted covariance matrix of the contingency table
+Multiclass: Order by first principal component of the weighted covariance
+matrix of the contingency table
 }
 \details{
 See https://doi.org/10.7717/peerj.6339 for details.

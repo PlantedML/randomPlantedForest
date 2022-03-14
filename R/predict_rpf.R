@@ -37,31 +37,13 @@ predict.rpf <- function(object, new_data, type = "numeric",
 predict_rpf_bridge <- function(type, object, predictors, ...) {
 
   type <- match.arg(type, choices = c("numeric", "class", "prob"))
-  predictors <- as.data.table(predictors)
-  
-  # Convert characters to factors
-  char_cols <- names(which(sapply(predictors, is.character)))
-  if (length(char_cols) > 0) {
-    predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
-  }
-  
-  # Re-order factor levels according to saved order 
-  factor_cols <- names(object$factor_levels)
-  if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := Map(factor, .SD, object$factor_levels, ordered = TRUE), .SDcols = factor_cols]
-  }
-  
-  # Convert factors to integer and data to matrix
-  if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
-  }
-  predictors_matrix <- as.matrix(predictors)
+  predictors <- preprocess_predictors_predict(object, predictors)
 
   switch(
     type,
-    numeric = predict_rpf_numeric(object, predictors_matrix, ...),
-    class = predict_rpf_class(object, predictors_matrix, ...),
-    prob = predict_rpf_prob(object, predictors_matrix, ...)
+    numeric = predict_rpf_numeric(object, predictors, ...),
+    class = predict_rpf_class(object, predictors, ...),
+    prob = predict_rpf_prob(object, predictors, ...)
   )
 }
 

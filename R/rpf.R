@@ -96,9 +96,10 @@ rpf_bridge <- function(
     parallel = FALSE, purify = FALSE, cv = FALSE,
     loss = "L2", delta = 0, epsilon = 0.1
   ) {
+
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
-  outcomes <- processed$outcomes[[1]]
   predictors <- preprocess_predictors_fit(processed)
+  outcomes <- processed$outcomes[[1]]
   
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
@@ -206,6 +207,9 @@ rpf_impl <- function(
     ))
   } else if (is_numeric) {
     #FIXME: Loss missing here?
+    # Passing loss as arg gives error
+    # "no valid constructor available for the argument list"
+    # N.B. Neither delta nor epsilon are passed as well
     fit <- new(RandomPlantedForest, Y, X, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv

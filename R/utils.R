@@ -2,7 +2,8 @@
 #' 
 #' Regression: Order by mean(y)
 #' Binary classification: Order by mean(y==1)
-#' Multiclass: Order by first principal component of the weighted covariance matrix of the contingency table
+#' Multiclass: Order by first principal component of the weighted covariance 
+#' matrix of the contingency table
 #'
 #' See https://doi.org/10.7717/peerj.6339 for details.
 #' 
@@ -23,27 +24,33 @@ order_factor_by_response <- function(x, y) {
         mean((as.numeric(y) - 1)[x == lev])
       })
     } else {
-      # Multiclass: Order by first principal component of the weighted covariance matrix of the contingency table
+      # Multiclass: Order by first principal component of the weighted 
+      # covariance matrix of the contingency table
       means <- pca_order(x, y)
     }
   } else {
-    stop("Ordering of factor columns only implemented for regression and classification outcomes.")
+    stop(paste("Ordering of factor columns only implemented for regression",
+               "and classification outcomes."))
   }
   
   levels_ordered <- as.character(levels(x)[order(means)])
   factor(x, levels = levels_ordered, ordered = TRUE, exclude = NULL)
 }
 
-# 
-# 
-#' Order factor levels by first principal component of the weighted covariance matrix of the contingency table
+#' PCA-ordering of factors
 #' 
-#' Reference: Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999) Partitioning Nominal Attributes in Decision Trees. Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
+#' Order factor levels by first principal component of the weighted covariance 
+#' matrix of the contingency table
 #'
 #' @param x Factor variable to order
 #' @param y Response
 #'
 #' @return Order of factor levels
+#' 
+#' @references 
+#' Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999) 
+#' Partitioning Nominal Attributes in Decision Trees. 
+#' Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
 pca_order <- function(x, y) {
   if (nlevels(x) < 2) {
     return(seq(1, nlevels(x)))
@@ -64,6 +71,7 @@ pca_order <- function(x, y) {
 
 # Sort factor predictors by outcome and re-encode as integer
 # save original factor levels for prediction step
+# Used in rpf_bridge()
 #' @importFrom data.table .SD ':=' as.data.table
 preprocess_predictors_fit <- function(processed) {
   predictors <- as.data.table(processed$predictors)
@@ -77,7 +85,9 @@ preprocess_predictors_fit <- function(processed) {
   # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
   factor_cols <- names(which(sapply(predictors, is.factor)))
   if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(.SD, order_factor_by_response, y = outcomes), .SDcols = factor_cols]
+    predictors[, (factor_cols) := lapply(
+      .SD, order_factor_by_response, y = processed$outcomes[[1]]
+    ), .SDcols = factor_cols]
   }
   
   # Save re-ordered factor levels
@@ -92,4 +102,31 @@ preprocess_predictors_fit <- function(processed) {
     factor_levels = factor_levels,
     predictors_matrix = as.matrix(predictors)
   )
+}
+
+# Sort factor predictors using stored level information
+# Used in predict_rpf_bridge()
+preprocess_predictors_predict <- function(object, predictors) {
+  predictors <- as.data.table(predictors)
+  
+  # Convert characters to factors
+  char_cols <- names(which(sapply(predictors, is.character)))
+  if (length(char_cols) > 0) {
+    predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
+  }
+  
+  # Re-order factor levels according to saved order 
+  factor_cols <- names(object$factor_levels)
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := Map(
+      factor, .SD, object$factor_levels, ordered = TRUE
+    ), .SDcols = factor_cols]
+  }
+  
+  # Convert factors to integer and data to matrix
+  if (length(factor_cols) > 0) {
+    predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
+  }
+  
+  as.matrix(predictors)
 }
