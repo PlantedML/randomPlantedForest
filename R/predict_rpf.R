@@ -78,20 +78,29 @@ predict_rpf_numeric <- function(object, new_data, components, ...){
 
 # Predict function for classification: Class prediction
 predict_rpf_class <- function(object, new_data, components, ...){
-  lvls <- levels(object$blueprint$ptypes$outcomes[[1]])
-  pred <- object$fit$predict_matrix(new_data, components)
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
   
-  out <- hardhat::spruce_class(pred)
+  # Predict probability
+  pred_prob <- predict_rpf_prob(object, new_data, components, ...)
+  
+  # For each instance, class with higher probability
+  pred_class <- factor(outcome_levels[max.col(pred_prob)], levels = outcome_levels)
+  out <- hardhat::spruce_class(pred_class)
 
   out
 }
 
 # Predict function for classification: Probability prediction
 predict_rpf_prob <- function(object, new_data, components, ...){
-  lvls <- levels(object$blueprint$ptypes$outcomes[[1]])
-  pred <- object$fit$predict_matrix(new_data, components)
-
-  out <- hardhat::spruce_prob(prob_matrix = pred, pred_levels = lvls)
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  
+  #FIXME: Works only for L2 loss
+  pred_raw <- object$fit$predict_matrix(new_data, components)
+  
+  # Truncate probabilities at [0,1]
+  pred_prob <- pmax(0, pmin(1, pred_raw))
+  pred <- cbind(1 - pred_prob, pred_prob)
+  out <- hardhat::spruce_prob(outcome_levels, pred)
 
   out
 }
