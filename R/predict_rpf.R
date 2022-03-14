@@ -78,7 +78,9 @@ predict_rpf_numeric <- function(object, new_data, components, ...){
 
 # Predict function for classification: Class prediction
 predict_rpf_class <- function(object, new_data, components, ...){
+  lvls <- levels(object$blueprint$ptypes$outcomes[[1]])
   pred <- object$fit$predict_matrix(new_data, components)
+  
   out <- hardhat::spruce_class(pred)
 
   out
@@ -86,8 +88,10 @@ predict_rpf_class <- function(object, new_data, components, ...){
 
 # Predict function for classification: Probability prediction
 predict_rpf_prob <- function(object, new_data, components, ...){
+  lvls <- levels(object$blueprint$ptypes$outcomes[[1]])
   pred <- object$fit$predict_matrix(new_data, components)
-  out <- hardhat::spruce_prob(pred)
+
+  out <- hardhat::spruce_prob(prob_matrix = pred, pred_levels = lvls)
 
   out
 }
