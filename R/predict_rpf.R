@@ -78,7 +78,12 @@ predict_rpf_numeric <- function(object, new_data, components, ...){
 
 # Predict function for classification: Class prediction
 predict_rpf_class <- function(object, new_data, components, ...){
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (is.integer(object$blueprint$ptypes$outcomes[[1]])) {
+    outcome_levels <- c("0", "1")
+  } else {
+    outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  }
+  
   
   # Predict probability
   pred_prob <- predict_rpf_prob(object, new_data, components, ...)
@@ -92,7 +97,11 @@ predict_rpf_class <- function(object, new_data, components, ...){
 
 # Predict function for classification: Probability prediction
 predict_rpf_prob <- function(object, new_data, components, ...){
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (is.integer(object$blueprint$ptypes$outcomes[[1]])) {
+    outcome_levels <- c("0", "1")
+  } else {
+    outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  }
   
   #FIXME: Works only for L2 loss
   pred_raw <- object$fit$predict_matrix(new_data, components)
