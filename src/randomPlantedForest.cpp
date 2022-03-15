@@ -495,6 +495,7 @@ class RandomPlantedForest {
         std::vector<double> upper_bounds;           
         std::vector<double> lower_bounds;           
         std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
+        Rcpp::RNGScope scope; // Ensure correct Rcpp RNG state
         double predict_single(const std::vector<double> &X, std::set<int> component_index);
         void L2_loss(rpf::Split &split);
         virtual void fit();
