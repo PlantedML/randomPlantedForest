@@ -38,6 +38,16 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
 
   type <- match.arg(type, choices = c("numeric", "class", "prob"))
   predictors <- preprocess_predictors_predict(object, predictors)
+  
+  if (object$mode == "regression") {
+    if (type != "numeric") {
+      warning(
+        paste0("Only predict type 'numeric' supported for regression, ",
+               "but type is set to '" , type, "'. Setting type to 'numeric'.")
+      )
+    }
+    type <- "numeric"
+  }
 
   switch(
     type,
