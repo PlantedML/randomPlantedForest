@@ -99,7 +99,7 @@ rpf_bridge <- function(
 
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
-  outcomes <- processed$outcomes[[1]]
+  outcomes <- preprocess_outcome(processed)
   
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
@@ -126,7 +126,8 @@ rpf_bridge <- function(
   checkmate::assert_logical(cv, len = 1)
   
   fit <- rpf_impl(
-    Y = outcomes, X = predictors$predictors_matrix, 
+    Y = outcomes$outcomes, X = predictors$predictors_matrix, 
+    mode = outcomes$mode,
     max_interaction = max_interaction, ntrees = ntrees, splits = splits,
     split_try = split_try, t_try = t_try, deterministic = deterministic,
     parallel = parallel, purify = purify, cv = cv,
@@ -136,6 +137,7 @@ rpf_bridge <- function(
   new_rpf(
     fit = fit,
     blueprint = processed$blueprint, 
+    mode = outcomes$mode,
     factor_levels = predictors$factor_levels,
     loss = loss
   )
@@ -154,58 +156,23 @@ new_rpf <- function(fit, blueprint, ...) {
 
 # Main fitting function and interface to C++ implementation
 rpf_impl <- function(
-    Y, X,
+    Y, X, mode = c("regression", "classification"),
     max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
     deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
     loss = "L2", delta = 0, epsilon = 0.1
   ) {
 
-  # Input validation
+  # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
-
-  # Task type detection: Could be more concise
-  is_binary <- length(unique(Y)) == 2
-  is_integerish <- checkmate::test_integerish(Y, any.missing = FALSE)
-  is_factor <- checkmate::test_factor(Y, any.missing = FALSE)
-  is_numeric <- checkmate::test_numeric(Y, any.missing = FALSE)
-  
-  if (is_binary & is_integerish) {
-    warning("y is binary integer, assuming classification task")
-    Y <- as.integer(Y)
-  }
-
-  # Assume binary Y for classif
-  if (is_factor | (is_binary & is_integerish)) {
     
-    # Coerce to integer sequence 1 to nlevels(x)
-    if (is_factor) {
-      Y <- as.integer(Y)
-      
-      # Binary factor will result in 1,2, recode to 0,1
-      if (is_binary) {
-        Y <- Y - 1L
-      }
-    }
-    
-    # Recode to 0,1 in case e.g -1,1 is supplied
-    if (is_binary & !identical(range(Y), c(0L, 1L))) {
-      warning("y is binary integer but not 0,1 - transforming to 0,1")
-      Y[Y == min(Y)] <- 0L
-      Y[Y == max(Y)] <- 1L
-    }
-    
-    # FIXME: Final assertion just in case should be superfluous
-    if (is_binary) {
-      checkmate::assert_integer(Y, lower = 0, upper = 1)
-    } else {
-      checkmate::assert_integer(Y, lower = 1)
-    }
+  if (mode == "classification") {
+    checkmate::assert_integer(Y, lower = 0, upper = 1)
     
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv, delta, epsilon
     ))
-  } else if (is_numeric) {
+  } else if (mode == "regression") {
     #FIXME: Loss missing here?
     # Passing loss as arg gives error
     # "no valid constructor available for the argument list"

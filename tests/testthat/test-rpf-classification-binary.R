@@ -34,13 +34,8 @@ test_that("Binary detection: 0,1", {
 test_that("Binary detection: 1,2", {
   # y in 1, 2: See 0,1 but should transform to 0,1 internally
   # Unfortunately clunky way to capture multiple expected warnings
-  expect_warning(
-    expect_warning(
-      rpf(y12 ~ x1 + x2, xdat),
-      regexp = "^y is.*assuming"
-    ),
-    regexp = "y is binary integer but not 0,1"
-  )
+
+  expect_warning(rpf(y12 ~ x1 + x2, xdat), regexp = "^y is.*assuming")
   y_12 <- suppressWarnings(rpf(y12 ~ x1 + x2, xdat))
   expect_s4_class(y_12$fit, "Rcpp_ClassificationRPF")
 })
@@ -50,7 +45,6 @@ test_that("Binary detection: factor", {
   # y two-level factor: should work assuming which level is positive?
   y_fact <- rpf(yfact ~ x1 + x2, xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
-  
 })
 
 test_that("Binary detection: Fail for character, logical", {

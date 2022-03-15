@@ -130,3 +130,35 @@ preprocess_predictors_predict <- function(object, predictors) {
   
   as.matrix(predictors)
 }
+
+# Check outcome to detect mode (classif/regr), return suitable outcome
+# Used in rpf_impl()
+preprocess_outcome <- function(processed) {
+  outcomes <- processed$outcomes[[1]]
+  
+  # Task type detection: Could be more concise
+  is_binary <- length(unique(outcomes)) == 2
+  is_integerish <- checkmate::test_integerish(outcomes, any.missing = FALSE)
+  
+  if (is_binary & is_integerish) {
+    warning("y is binary integer, assuming classification task")
+    outcomes <- factor(outcomes)
+  }
+  
+  is_factor <- checkmate::test_factor(outcomes, any.missing = FALSE)
+  is_numeric <- checkmate::test_numeric(outcomes, any.missing = FALSE)
+  
+  if (is_factor) {
+    mode <- "classification"
+    outcomes <- as.integer(outcomes) - 1L
+  } else if (is_numeric) {
+    mode <- "regression"
+  } else {
+    mode <- "unsupported"
+  }
+  
+  list(
+    outcomes = outcomes,
+    mode = mode
+  )
+}
