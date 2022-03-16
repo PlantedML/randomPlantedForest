@@ -39,33 +39,33 @@ rpf(
 \arguments{
 \item{x}{Feature matrix or \code{data.frame}.}
 
-\item{...}{(Ignored)}
+\item{...}{(Ignored).}
 
-\item{max_interaction}{Maximum level of interaction determining maximum
-number of split dimensions for a tree}
+\item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
+number of split dimensions for a tree.}
 
-\item{ntrees}{Number of trees generated per family}
+\item{ntrees}{\verb{[50]}: Number of trees generated per family.}
 
-\item{splits}{Number of performed splits for each tree family}
+\item{splits}{\verb{[30]}: Number of performed splits for each tree family.}
 
-\item{split_try}{TODO}
+\item{split_try}{\verb{[10]}: TODO.}
 
-\item{t_try}{TODO}
+\item{t_try}{\verb{[0.4]}: TODO.}
 
-\item{deterministic}{Choose whether approach deterministic or random}
+\item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
-\item{parallel}{Perform algorithm in parallel or serialized}
+\item{parallel}{\verb{[FALSE]}: Perform algorithm in parallel or serialized.}
 
-\item{purify}{Whether the forest should be purified}
+\item{purify}{\verb{[FALSE]}: Whether the forest should be purified.}
 
-\item{cv}{Determines if cross validation is performed}
+\item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}
 
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
 classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.}
 
-\item{delta}{TODO}
+\item{delta}{\verb{[0]}: TODO.}
 
-\item{epsilon}{TODO}
+\item{epsilon}{\verb{[0.1]}: TODO.}
 
 \item{y}{Target vector for use with \code{x}.
 The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression

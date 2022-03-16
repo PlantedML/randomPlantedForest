@@ -7,21 +7,21 @@
 #'   or classification will be performed.
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
 #' @param data A `data.frame` for use with `formula`.
-#' @param max_interaction Maximum level of interaction determining maximum
-#'   number of split dimensions for a tree
-#' @param ntrees Number of trees generated per family
-#' @param splits Number of performed splits for each tree family
-#' @param split_try TODO
-#' @param t_try TODO
-#' @param deterministic Choose whether approach deterministic or random
-#' @param parallel Perform algorithm in parallel or serialized
-#' @param purify Whether the forest should be purified
-#' @param cv Determines if cross validation is performed
+#' @param max_interaction `[1]`: Maximum level of interaction determining maximum
+#'   number of split dimensions for a tree.
+#' @param ntrees `[50]`: Number of trees generated per family.
+#' @param splits `[30]`: Number of performed splits for each tree family.
+#' @param split_try `[10]`: TODO.
+#' @param t_try `[0.4]`: TODO.
+#' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
+#' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
+#' @param purify `[FALSE]`: Whether the forest should be purified.
+#' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
 #'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
-#' @param delta TODO
-#' @param epsilon TODO
-#' @param ... (Ignored)
+#' @param delta `[0]`: TODO.
+#' @param epsilon `[0.1]`: TODO.
+#' @param ... (Ignored).
 #'
 #' @return Object of class `"rpf"` with model object contained in `$fit`.
 #' @export
