@@ -39,3 +39,19 @@ test_that("Setting seed in R works", {
   expect_equal(pred1, pred2)
   expect_failure(expect_equal(pred1, pred3))
 })
+
+test_that("Rcpp RNG/R RNG interference", {
+  set.seed(1)
+  r11 <- runif(1)
+  r12 <- runif(1)
+  
+  set.seed(1)
+  r21 <- runif(1)
+  rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
+  r22 <- runif(1)
+  
+  # If this fails R is broken
+  expect_equal(r11, r21)
+  # If this fails Rcpp does not properly reset R's RNG
+  expect_equal(r12, r22) 
+})
