@@ -39,3 +39,33 @@ test_that("Fit + predict: Categorical features", {
 
   expect_s3_class(pred, "tbl_df")
 })
+
+# FIXME: Since L1 loss not supported in regression, this test is somewhat weird
+test_that("Setting L1 or L2 loss is saved in rpf object", {
+  fit_l1 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L1")
+  fit_l2 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L2")
+  fit_default <- rpf(mpg ~ wt + cyl, data = mtcars)
+  
+  expect_identical(fit_l1$loss, "L1")
+  expect_identical(fit_l2$loss, "L2")
+  expect_identical(fit_default$loss, "L2")
+})
+
+test_that("Warn for y = 0,1", {
+  xdat <- data.frame(
+    y01 = sample(c(0L, 1L), 100, replace = TRUE),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+  bin_fit <- suppressWarnings(rpf(y01 ~ x1 + x2, data = xdat, loss = "L2"))
+  
+  expect_warning(
+    predict(bin_fit, new_data = xdat, type = "class"),
+    regexp = "^Only predict type 'numeric' supported for regression"
+  )
+  
+  expect_warning(
+    predict(bin_fit, new_data = xdat, type = "link"),
+    regexp = "^Only predict type 'numeric' supported for regression"
+  )
+})

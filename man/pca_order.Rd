@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{pca_order}
 \alias{pca_order}
-\title{Order factor levels by first principal component of the weighted covariance matrix of the contingency table}
+\title{PCA-ordering of factors}
 \usage{
 pca_order(x, y)
 }
@@ -15,5 +15,11 @@ pca_order(x, y)
 Order of factor levels
 }
 \description{
-Reference: Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999) Partitioning Nominal Attributes in Decision Trees. Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
+Order factor levels by first principal component of the weighted covariance
+matrix of the contingency table
+}
+\references{
+Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999)
+Partitioning Nominal Attributes in Decision Trees.
+Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
 }
