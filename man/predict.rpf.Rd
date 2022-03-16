@@ -4,31 +4,48 @@
 \alias{predict.rpf}
 \title{Random Planted Forest Predictions}
 \usage{
-\method{predict}{rpf}(object, new_data, type = "numeric", components = 0, ...)
+\method{predict}{rpf}(
+  object,
+  new_data,
+  type = ifelse(object$mode == "regression", "numeric", "prob"),
+  components = 0,
+  ...
+)
 }
 \arguments{
-\item{object}{A fit object as returned by \code{\link[=rpf]{rpf()}}.}
+\item{object}{A fit object of class \code{\link{rpf}}.}
 
-\item{new_data}{Input for new observations.}
+\item{new_data}{Data for new observations to predict.}
 
-\item{type}{\verb{["numeric"]}: One of \code{"numeric"} for regression outcomes,
-\code{"class"} for class predictions or \code{"prob"} for probability predictions.}
+\item{type}{\code{"numeric"} for regression outcomes,
+\code{"class"} for class predictions or \code{"prob"} for probability predictions.
+
+For classification and \code{loss = "L1"} or \code{"L2"}, \code{"numeric"} yields raw
+predictions which are not guaranteed to be valid probabilities in \verb{[0, 1]}.
+For \code{type = "prob"}, these are truncated to ensure this property.
+
+If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} is an alias
+for \code{type = "numeric"}, as in this case the raw predictions have the
+additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
 
 \item{components}{\verb{[0]} TODO.}
 
 \item{...}{Unused.}
 }
 \value{
-For regression: A data.frame with column \code{.pred} with the same
-number of rows as \code{new_data}.
-For Classification: TBI
+For regression: A \code{\link[tibble:tibble]{tbl}} with column \code{.pred} with
+the same number of rows as \code{new_data}.
+
+For classification: A \code{\link[tibble:tibble]{tbl}} with one column for each
+level in \code{y} containing class probabilities if \code{type = "prob"}.
+For \code{type = "class"}, one column \code{.pred} with class predictions is returned.
+For \code{type = "numeric"} or \code{"link"}, one column \code{.pred} with raw predictions.
 }
 \description{
 Random Planted Forest Predictions
 }
 \examples{
-\dontrun{
-rpfit <- rpf(y = mtcars$mpg, x = as.matrix(mtcars[, c("cyl", "wt")]))
+# Regression with L2 loss
+rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
 predict(rpfit, mtcars[, c("cyl", "wt")], components = 0)
-}
 }

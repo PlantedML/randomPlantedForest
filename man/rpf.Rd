@@ -60,13 +60,16 @@ number of split dimensions for a tree}
 
 \item{cv}{Determines if cross validation is performed}
 
-\item{loss}{"L2" or "logit" / TODO}
+\item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
+classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.}
 
 \item{delta}{TODO}
 
 \item{epsilon}{TODO}
 
-\item{y}{Target vector for use with \code{x}.}
+\item{y}{Target vector for use with \code{x}.
+The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
+or classification will be performed.}
 
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
 
@@ -79,11 +82,9 @@ Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 Random Planted Forest
 }
 \examples{
-\dontrun{
 # Regression with x and y
 rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
 
 # Regression with formula
 rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
-}
 }

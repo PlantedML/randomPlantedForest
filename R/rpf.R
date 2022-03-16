@@ -3,6 +3,8 @@
 # FIXME: Parameters need describing
 #' @param x Feature matrix or `data.frame`.
 #' @param y Target vector for use with `x`.
+#'   The class of `y` (either `numeric` or [`factor`]) determines if regression
+#'   or classification will be performed.
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
 #' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction Maximum level of interaction determining maximum
@@ -15,7 +17,8 @@
 #' @param parallel Perform algorithm in parallel or serialized
 #' @param purify Whether the forest should be purified
 #' @param cv Determines if cross validation is performed
-#' @param loss "L2" or "logit" / TODO
+#' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
+#'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
 #' @param delta TODO
 #' @param epsilon TODO
 #' @param ... (Ignored)
@@ -29,13 +32,11 @@
 #' @importFrom hardhat default_recipe_blueprint
 #'
 #' @examples
-#' \dontrun{
 #' # Regression with x and y
 #' rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
 #'
 #' # Regression with formula
 #' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
-#' }
 rpf <- function(x, ..., max_interaction = 1, ntrees = 50, splits = 30,
                 split_try = 10, t_try = 0.4, deterministic = FALSE,
                 parallel = FALSE, purify = FALSE, cv = FALSE,
