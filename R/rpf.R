@@ -166,7 +166,7 @@ rpf_impl <- function(
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
     
   if (mode == "classification") {
-    checkmate::assert_integer(Y, lower = 0, upper = 1)
+    checkmate::assert_integer(Y, lower = 0)
     
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
