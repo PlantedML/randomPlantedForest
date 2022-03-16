@@ -52,6 +52,6 @@ test_that("Rcpp RNG/R RNG interference", {
   
   # If this fails R is broken
   expect_equal(r11, r21)
-  # If this fails Rcpp does not properly reset R's RNG
-  expect_equal(r12, r22) 
+  # If this fails Rcpp does not properly affect R's RNG
+  expect_failure(expect_equal(r12, r22))
 })
