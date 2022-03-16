@@ -21,7 +21,6 @@ test_that("Prediction: All numeric", {
 })
 
 test_that("Fit + predict: Categorical features", {
-
   mtcars_cat <- mtcars
   mtcars_cat$cyl <- factor(mtcars$cyl)
 
@@ -45,7 +44,7 @@ test_that("Setting L1 or L2 loss is saved in rpf object", {
   fit_l1 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L1")
   fit_l2 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L2")
   fit_default <- rpf(mpg ~ wt + cyl, data = mtcars)
-  
+
   expect_identical(fit_l1$loss, "L1")
   expect_identical(fit_l2$loss, "L2")
   expect_identical(fit_default$loss, "L2")
@@ -58,12 +57,12 @@ test_that("Warn for y = 0,1", {
     x2 = rnorm(100)
   )
   bin_fit <- suppressWarnings(rpf(y01 ~ x1 + x2, data = xdat, loss = "L2"))
-  
+
   expect_warning(
     predict(bin_fit, new_data = xdat, type = "class"),
     regexp = "^Only predict type 'numeric' supported for regression"
   )
-  
+
   expect_warning(
     predict(bin_fit, new_data = xdat, type = "link"),
     regexp = "^Only predict type 'numeric' supported for regression"

@@ -91,50 +91,48 @@ rpf.recipe <- function(x, data, ...) {
 
 # Bridge: Calls rpf_impl() with processed input
 #' @importFrom hardhat validate_outcomes_are_univariate
-rpf_bridge <- function(
-    processed, max_interaction = 1, ntrees = 50, splits = 30,
-    split_try = 10, t_try = 0.4, deterministic = FALSE,
-    parallel = FALSE, purify = FALSE, cv = FALSE,
-    loss = "L2", delta = 0, epsilon = 0.1
-  ) {
-
+rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
+                       split_try = 10, t_try = 0.4, deterministic = FALSE,
+                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       loss = "L2", delta = 0, epsilon = 0.1) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed)
-  
+
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
   checkmate::assert_integerish(ntrees, lower = 1, len = 1)
   checkmate::assert_integerish(splits, lower = 1, len = 1)
   checkmate::assert_integerish(split_try, lower = 1, len = 1)
-  
+
   checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
   # FIXME: What is delta/epsilon and what can it look like?
   checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
   checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
-  
+
   # "median" is implemented but discarded
   checkmate::assert_choice(
-    loss, choices = c("L1", "L2", "logit", "exponential"), null.ok = FALSE
+    loss,
+    choices = c("L1", "L2", "logit", "exponential"), null.ok = FALSE
   )
-  
+
   checkmate::assert_logical(deterministic, len = 1)
   checkmate::assert_logical(parallel, len = 1)
   checkmate::assert_logical(purify, len = 1)
   checkmate::assert_logical(cv, len = 1)
-  
+
   fit <- rpf_impl(
-    Y = outcomes$outcomes, X = predictors$predictors_matrix, 
+    Y = outcomes$outcomes, X = predictors$predictors_matrix,
     mode = outcomes$mode,
     max_interaction = max_interaction, ntrees = ntrees, splits = splits,
     split_try = split_try, t_try = t_try, deterministic = deterministic,
     parallel = parallel, purify = purify, cv = cv,
     loss = loss, delta = delta, epsilon = epsilon
   )
-  
+
   new_rpf(
     fit = fit,
-    blueprint = processed$blueprint, 
+    blueprint = processed$blueprint,
     mode = outcomes$mode,
     factor_levels = predictors$factor_levels,
     loss = loss
@@ -143,35 +141,32 @@ rpf_bridge <- function(
 
 # Intermediate to hold model object with blueprint used for prediction
 new_rpf <- function(fit, blueprint, ...) {
-
   hardhat::new_model(
     fit = fit,
     blueprint = blueprint,
-    class = "rpf", 
+    class = "rpf",
     ...
   )
 }
 
 # Main fitting function and interface to C++ implementation
-rpf_impl <- function(
-    Y, X, mode = c("regression", "classification"),
-    max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
-    deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
-    loss = "L2", delta = 0, epsilon = 0.1
-  ) {
+rpf_impl <- function(Y, X, mode = c("regression", "classification"),
+                     max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
+                     deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
+                     loss = "L2", delta = 0, epsilon = 0.1) {
 
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
-    
+
   if (mode == "classification") {
     checkmate::assert_integer(Y, lower = 0)
-    
+
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv, delta, epsilon
     ))
   } else if (mode == "regression") {
-    #FIXME: Loss missing here?
+    # FIXME: Loss missing here?
     # Passing loss as arg gives error
     # "no valid constructor available for the argument list"
     # N.B. Neither delta nor epsilon are passed as well
