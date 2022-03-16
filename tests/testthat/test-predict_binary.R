@@ -8,6 +8,15 @@ xdat <- data.frame(
   x2 = rnorm(100)
 )
 
+test_that("Default: L2 with 'prob'", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat)
+  bin_pred <- predict(bin_fit, new_data = xdat)
+  
+  expect_identical(bin_fit$loss, "L2")
+  expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
+  expect_gte(min(bin_pred), 0)
+  expect_lte(max(bin_pred), 1)
+})
 
 # L2 loss -----------------------------------------------------------------
 test_that("L2: Probability prediction", {
