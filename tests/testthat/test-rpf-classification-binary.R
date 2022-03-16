@@ -24,27 +24,24 @@ test_that("Binary: All numeric, logit loss", {
 
 # Binary task detection ---------------------------------------------------
 
-test_that("Binary detection: 0,1", {
+test_that("Binary detection: factor", {
+  y_fact <- rpf(yfact ~ x1 + x2, xdat)
+  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+})
+
+# Ambiguous, use regression and warn
+test_that("Binary detection: Regression for 0,1", {
   # y in 0, 1: Ambiguous, expect warning, but should classify
   expect_warning(rpf(y01 ~ x1 + x2, xdat), regexp = "^y is.*assuming")
   y_01 <- suppressWarnings(rpf(y01 ~ x1 + x2, xdat))
-  expect_s4_class(y_01$fit, "Rcpp_ClassificationRPF")
+  expect_s4_class(y_01$fit, "Rcpp_RandomPlantedForest")
 })
 
-test_that("Binary detection: 1,2", {
-  # y in 1, 2: See 0,1 but should transform to 0,1 internally
-  # Unfortunately clunky way to capture multiple expected warnings
-
+test_that("Binary detection: Regression for 1,2", {
+  # y in 1, 2: See 0,1 
   expect_warning(rpf(y12 ~ x1 + x2, xdat), regexp = "^y is.*assuming")
   y_12 <- suppressWarnings(rpf(y12 ~ x1 + x2, xdat))
-  expect_s4_class(y_12$fit, "Rcpp_ClassificationRPF")
-})
-
-test_that("Binary detection: factor", {
-  # FIXME: decide factor order assumption?
-  # y two-level factor: should work assuming which level is positive?
-  y_fact <- rpf(yfact ~ x1 + x2, xdat)
-  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+  expect_s4_class(y_12$fit, "Rcpp_RandomPlantedForest")
 })
 
 test_that("Binary detection: Fail for character, logical", {

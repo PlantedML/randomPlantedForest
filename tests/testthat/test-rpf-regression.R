@@ -50,3 +50,17 @@ test_that("Setting L1 or L2 loss is saved in rpf object", {
   expect_identical(fit_l2$loss, "L2")
   expect_identical(fit_default$loss, "L2")
 })
+
+test_that("Warn for y = 0,1", {
+  xdat <- data.frame(
+    y01 = sample(c(0L, 1L), 100, replace = TRUE),
+    x1 = rnorm(100),
+    x2 = rnorm(100)
+  )
+  bin_fit <- suppressWarnings(rpf(y01 ~ x1 + x2, data = xdat, loss = "L2"))
+  
+  expect_warning(
+    predict(bin_fit, new_data = xdat, type = "class"),
+    regexp = "^Only predict type 'numeric' supported for regression"
+  )
+})
