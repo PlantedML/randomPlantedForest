@@ -4,7 +4,6 @@
 ^test_purify.R$
 ^test_regression.R$
 ^LICENSE\.md$
-^randomPlantedForest\.R$
 ^\.github$
 ^randomPlantedForest\.Rcheck$
 ^randomPlantedForest.*\.tar\.gz$
