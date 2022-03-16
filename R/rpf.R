@@ -112,12 +112,9 @@ rpf_bridge <- function(
   checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
   checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
   
+  # "median" is implemented but discarded
   checkmate::assert_choice(
-    loss, choices = c(
-      "L1", "L2",
-      # "median", # Discarded but present in C++ impl
-      "logit", "exponential"
-    ), null.ok = FALSE
+    loss, choices = c("L1", "L2", "logit", "exponential"), null.ok = FALSE
   )
   
   checkmate::assert_logical(deterministic, len = 1)
