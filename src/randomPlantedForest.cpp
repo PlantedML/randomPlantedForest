@@ -514,6 +514,9 @@ void RandomPlantedForest::L2_loss(rpf::Split &split){
 // constructor
 RandomPlantedForest::RandomPlantedForest(const NumericVector &samples_Y, const NumericMatrix &samples_X,
                                          const NumericVector parameters){
+  
+  // Ensure correct Rcpp RNG state
+    Rcpp::RNGScope scope; 
 
     // initialize class members 
     std::vector<double> pars = to_std_vec(parameters);
@@ -1638,6 +1641,9 @@ void ClassificationRPF::exponential_loss(rpf::Split &split){
 ClassificationRPF::ClassificationRPF(const NumericVector &samples_Y, const NumericMatrix &samples_X,
                                      const String loss, const NumericVector parameters)
    : RandomPlantedForest{}{
+     
+  // Ensure correct Rcpp RNG state
+  Rcpp::RNGScope scope; 
 
   // initialize class members 
   std::vector<double> pars = to_std_vec(parameters);
