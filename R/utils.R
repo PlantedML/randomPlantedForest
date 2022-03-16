@@ -139,14 +139,13 @@ preprocess_outcome <- function(processed) {
   # Task type detection: Could be more concise
   is_binary <- length(unique(outcomes)) == 2
   is_integerish <- checkmate::test_integerish(outcomes, any.missing = FALSE)
-  
-  if (is_binary & is_integerish) {
-    warning("y is binary integer, assuming classification task")
-    outcomes <- factor(outcomes)
-  }
-  
   is_factor <- checkmate::test_factor(outcomes, any.missing = FALSE)
   is_numeric <- checkmate::test_numeric(outcomes, any.missing = FALSE)
+  
+  if (is_binary & is_integerish) {
+    warning(paste("y is binary integer, assuming regression task.",
+                  "Recode y to a factor for classification."))
+  }
   
   if (is_factor) {
     mode <- "classification"
