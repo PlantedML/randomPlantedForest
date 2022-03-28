@@ -1,6 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^test.*R$
+^test_class.R$
+^test_purify.R$
+^test_regression.R$
 ^LICENSE\.md$
-^randomPlantedForest\.R$
 ^\.github$
+^randomPlantedForest\.Rcheck$
+^randomPlantedForest.*\.tar\.gz$
+^randomPlantedForest.*\.tgz$

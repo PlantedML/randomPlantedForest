@@ -1,75 +1,55 @@
-# Fitting -----------------------------------------------------------------
-test_that("Basic fitting", {
-  # set parameters ------------------------
-  n_splits <- 15
-  max_inter <- 2
-  n_trees <- 50
-  split_try <- 10
-  t_try <- 0.5
-  deterministic_forest <- TRUE
-  parallel <- TRUE
-  purify_forest <- FALSE
-  loss <- "logit"
-  delta <- 0.1
-  epsilon <- 0
+test_that("Formula interface", {
+  rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
 
-  # train models ------------------------
-  rpf_fit <- rpf(
-    y_train, x_train,
-    max_interaction = max_inter, t_try = t_try,
-    ntrees = n_trees, splits = n_splits, split_try = split_try,
-    deterministic = deterministic_forest, parallel = parallel
-  )
-
-  expect_s4_class(rpf_fit, "Rcpp_RandomPlantedForest")
-
-  y_train_bin <- as.integer(y_train > 0)
-
-  rpf_fit_binary <- rpf(
-    y_train_bin, x_train,
-    max_interaction = max_inter, t_try = t_try,
-    ntrees = n_trees, splits = n_splits, split_try = split_try,
-    deterministic = deterministic_forest, parallel = parallel
-  )
-
-  expect_s4_class(rpf_fit_binary, "Rcpp_RandomPlantedForest")
+  expect_s3_class(rpf_fit, "rpf")
+  expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
 })
 
+test_that("XY data.frame interface", {
+  pred_df <- mtcars[, c(2, 6)]
+  rpf_fit <- rpf(x = pred_df, y = mtcars$mpg)
 
-# Prediction --------------------------------------------------------------
-test_that("Predicting works", {
-  # set parameters -------------------------
-  n_splits <- 15
-  max_inter <- 2
-  n_trees <- 50
-  split_try <- 10
-  t_try <- 0.5
-  deterministic_forest <- TRUE
-  parallel <- TRUE
-  purify_forest <- FALSE
-  loss <- "logit"
-  delta <- 0.1
-  epsilon <- 0
+  expect_s3_class(rpf_fit, "rpf")
+  expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
+})
 
-  # train models ----------------------------
-  rpf_fit <- rpf(
-    y_train, x_train,
-    max_interaction = max_inter, t_try = t_try,
-    ntrees = n_trees, splits = n_splits, split_try = split_try,
-    deterministic = deterministic_forest, parallel = parallel
-  )
+test_that("XY matrix interface", {
+  pred_mat <- as.matrix(mtcars[, c(2, 6)])
+  rpf_fit <- rpf(x = pred_mat, y = mtcars$mpg)
 
-  # predict ---------------------------------
-  pred <- predict(rpf_fit, x_test[, 1:2], c(1,2))
-  expect_equal(length(pred), nrow(x_test))
+  expect_s3_class(rpf_fit, "rpf")
+  expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
+})
 
-  # Vector input
-  pred <- predict(rpf_fit, x_test[, 1], c(1))
-  expect_equal(length(pred), length(x_test[, 1]))
+test_that("Setting seed in R works", {
+  set.seed(13)
+  rpf_fit1 <- rpf(mpg ~ wt + cyl, data = mtcars)
+  pred1 <- predict(rpf_fit1, mtcars[1:5, ])
 
-  pred <- predict(rpf_fit, x_test[1, ], c(0))
-  expect_length(pred, 1)
+  set.seed(13)
+  rpf_fit2 <- rpf(mpg ~ wt + cyl, data = mtcars)
+  pred2 <- predict(rpf_fit2, mtcars[1:5, ])
 
-  pred <- predict(rpf_fit, x_test, c(0))
-  expect_equal(length(pred), nrow(x_test))
+  # No seed set, so should be different
+  rpf_fit3 <- rpf(mpg ~ wt + cyl, data = mtcars)
+  pred3 <- predict(rpf_fit3, mtcars[1:5, ])
+
+  expect_equal(pred1, pred2)
+  expect_failure(expect_equal(pred1, pred3))
+})
+
+test_that("Rcpp RNG/R RNG interference", {
+  set.seed(1)
+  r11 <- runif(1)
+  r12 <- runif(1)
+
+  set.seed(1)
+  r21 <- runif(1)
+  rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
+  r22 <- runif(1)
+
+  # If this fails R is broken
+  expect_equal(r11, r21)
+  # If this fails Rcpp does not properly affect R's RNG
+  expect_failure(expect_equal(r12, r22))
 })
