@@ -78,6 +78,9 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
 # Predict function for numeric outcome / regression
 predict_rpf_numeric <- function(object, new_data, components, ...) {
   pred <- object$fit$predict_matrix(new_data, components)
+  
+  # Convert n x 1 matrix to numeric vector
+  pred <- as.numeric(pred)
   out <- hardhat::spruce_numeric(pred)
 
   out
@@ -111,12 +114,19 @@ predict_rpf_prob <- function(object, new_data, components, ...) {
     pred_prob <- 1 / (1 + exp(-pred_raw))
   } else if (object$loss %in% c("L1", "L2")) {
     # Truncate probabilities at [0,1] for L1/L2 loss
-    pred_prob <- pmax(0, pmin(1, pred_raw))
+    
+    # pred_prob <- pmax(0, pmin(1, pred_raw)) # did not work for matrix predictions
+    pred_prob <- apply(pred_raw, MARGIN = 2, function(col) pmax(0, pmin(1, col)))
   }
 
-  # FIXME: Multiclass
-  pred <- cbind(1 - pred_prob, pred_prob)
-  out <- hardhat::spruce_prob(outcome_levels, pred)
+  # FIXME: Hacky solution
+  if (ncol(pred_prob) == 1) { # Binary classif yields n x 1 prediction matrix
+    pred <- cbind(1 - pred_prob, pred_prob)
+    out <- hardhat::spruce_prob(outcome_levels, pred)
+  } else { # otherwise one column per level
+    out <- hardhat::spruce_prob(outcome_levels, pred_prob)
+  }
+
 
   out
 }

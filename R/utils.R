@@ -137,6 +137,7 @@ preprocess_predictors_predict <- function(object, predictors) {
 
 # Check outcome to detect mode (classif/regr), return suitable outcome
 # Used in rpf_impl()
+#' @importFrom stats model.matrix
 preprocess_outcome <- function(processed) {
   outcomes <- processed$outcomes[[1]]
 
@@ -155,9 +156,22 @@ preprocess_outcome <- function(processed) {
 
   if (is_factor) {
     mode <- "classification"
-    outcomes <- as.integer(outcomes) - 1L
+    if (is_binary) {
+      # Binary case: Convert to 0, 1 integer
+      outcomes <- as.integer(outcomes) - 1L
+      # rpf_impl expects Y to be a matrix
+      outcomes <- as.matrix(outcomes, ncol = 1)
+    } else { # Multiclass
+      # One-hot encoding
+      outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
+      colnames(outcomes_mat) <- levels(outcomes)
+      
+      outcomes <- outcomes_mat
+    }
   } else if (is_numeric) {
     mode <- "regression"
+    # rpf_impl expects Y to be a matrix
+    outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
     mode <- "unsupported"
   }

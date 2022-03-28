@@ -31,7 +31,7 @@ test_that("Binary detection: factor", {
 
 # Ambiguous, use regression and warn
 test_that("Binary detection: Regression for 0,1", {
-  # y in 0, 1: Ambiguous, expect warning, but should classify
+  # y in 0, 1: Ambiguous, expect warning, but should classifybrows
   expect_warning(rpf(y01 ~ x1 + x2, xdat), regexp = "^y is.*assuming")
   y_01 <- suppressWarnings(rpf(y01 ~ x1 + x2, xdat))
   expect_s4_class(y_01$fit, "Rcpp_RandomPlantedForest")

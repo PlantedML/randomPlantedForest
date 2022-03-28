@@ -10,13 +10,18 @@ test_that("Multiclass: All numeric", {
 test_that("Multiclass: All numeric, class predictions", {
   classif_fit <- rpf(Species ~ ., data = iris)
 
-  classif_pred_class <- predict(classif_fit, iris[, -5], type = "class")
+  classif_pred_class <- predict(classif_fit, iris, type = "class")
+  expect_equal(dim(classif_pred_class), c(nrow(iris), 1))
+  expect_equal(levels(classif_pred_class$.pred_class), levels(iris$Species))
 })
 
 test_that("Multiclass: All numeric, probability predictions", {
   classif_fit <- rpf(Species ~ ., data = iris)
 
-  classif_pred_prob <- predict(classif_fit, iris[, -5], type = "prob")
+  classif_pred_prob <- predict(classif_fit, iris, type = "prob")
+  expect_equal(dim(classif_pred_prob), c(nrow(iris), nlevels(iris$Species)))
+  expect_gte(min(classif_pred_prob), 0)
+  expect_lte(min(classif_pred_prob), 1)
 })
 
 test_that("Multiclass: Detection works", {
