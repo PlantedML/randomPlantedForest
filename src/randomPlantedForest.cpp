@@ -16,11 +16,6 @@
 
 using namespace Rcpp;
 
-
-// wrapper around R's RNG such that we get a uniform distribution over
-// [0,n) as required by the STL algorithm
-inline int randWrapper(const int n) { return floor(R::runif(0,1)*n); }
-
 //  ----------------- functions for converting R and Cpp types ----------------- 
 
 // wrapper around R's RNG such that we get a uniform distribution over
