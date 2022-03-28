@@ -1,3 +1,25 @@
+xdat <- data.frame(
+  yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
+  yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
+  ychar = sample(c("hi", "mid", "lo"), 100, replace = TRUE),
+  x1 = rnorm(100),
+  x2 = rnorm(100)
+)
+
+test_that("Multiclass: Detection works", {
+  # y is integer: should _not_ be treated as classif task
+  y_int <- rpf(yint ~ x1 + x2, xdat)
+  expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
+  
+  # y 3-level factor
+  y_fact <- rpf(yfact ~ x1 + x2, xdat)
+  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
+  
+  # y 3-level character
+  expect_error(rpf(ychar ~ x1 + x2, xdat))
+})
+
+
 # Using iris is suboptimal but it's easy and comes with 3-class y
 # penguins would require package in Suggests and na.omit() preprocessing
 test_that("Multiclass: All numeric", {
@@ -24,23 +46,3 @@ test_that("Multiclass: All numeric, probability predictions", {
   expect_lte(min(classif_pred_prob), 1)
 })
 
-test_that("Multiclass: Detection works", {
-  xdat <- data.frame(
-    yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
-    yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
-    ychar = sample(c("hi", "mid", "lo"), 100, replace = TRUE),
-    x1 = rnorm(100),
-    x2 = rnorm(100)
-  )
-
-  # y is integer: should _not_ be treated as classif task
-  y_int <- rpf(yint ~ x1 + x2, xdat)
-  expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
-
-  # y 3-level factor
-  y_fact <- rpf(yfact ~ x1 + x2, xdat)
-  expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
-
-  # y 3-level character
-  expect_error(rpf(ychar ~ x1 + x2, xdat))
-})

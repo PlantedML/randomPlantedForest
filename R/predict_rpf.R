@@ -108,15 +108,20 @@ predict_rpf_prob <- function(object, new_data, components, ...) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   pred_raw <- object$fit$predict_matrix(new_data, components)
-
-  if (object$loss %in% c("logit", "exponential")) {
-    # logit^-1 transformation for logit/exp loss
-    pred_prob <- 1 / (1 + exp(-pred_raw))
+  if (object$loss %in% c("logit", "logit_2", "exponential", "exponential_2")) {
+    if (ncol(pred_raw) == 1) {
+      # logit^-1 transformation for logit/exp loss
+      pred_prob <- 1 / (1 + exp(-pred_raw))
+    } else {
+      # FIXME:
+      # softmax() defined in utils.R, should be identical to logit^-1 for 
+      # binary case but not properly tested yet
+      pred_prob <- t(apply(pred_raw, 1, softmax))
+    }
   } else if (object$loss %in% c("L1", "L2")) {
     # Truncate probabilities at [0,1] for L1/L2 loss
-    
     # pred_prob <- pmax(0, pmin(1, pred_raw)) # did not work for matrix predictions
-    pred_prob <- apply(pred_raw, MARGIN = 2, function(col) pmax(0, pmin(1, col)))
+    pred_prob <- apply(pred_raw, 2, function(col) pmax(0, pmin(1, col)))
   }
 
   # FIXME: Hacky solution
@@ -126,7 +131,6 @@ predict_rpf_prob <- function(object, new_data, components, ...) {
   } else { # otherwise one column per level
     out <- hardhat::spruce_prob(outcome_levels, pred_prob)
   }
-
 
   out
 }

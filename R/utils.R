@@ -173,11 +173,21 @@ preprocess_outcome <- function(processed) {
     # rpf_impl expects Y to be a matrix
     outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
-    mode <- "unsupported"
+    # mode <- "unsupported"
+    stop("y should be either numeric (regression) or factor (classification)")
   }
 
   list(
     outcomes = outcomes,
     mode = mode
   )
+}
+
+# Softmax for multiclass prediction using logsumexp for numerical stability
+# should be identical to sigmoid for scalar input
+softmax <- function(x) {
+  # logsumexp for numerical stability
+  y <- max(x)
+  logsumexp <- y + log(sum(exp(x - y)))
+  exp(x - logsumexp)
 }

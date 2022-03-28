@@ -99,6 +99,16 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed)
 
+  # FIXME: loss function handling for multiclass is a clunky hack to ensure
+  # the user only sees e.g. "logit" as an option
+  if (ncol(outcomes$outcomes) > 1) {
+    loss <- switch (loss,
+      "logit" = "logit_2",
+      "exponential" = "exponential_2",
+      loss
+    )
+  }
+
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
   checkmate::assert_integerish(ntrees, lower = 1, len = 1)
@@ -113,7 +123,8 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "exponential"), null.ok = FALSE
+    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2"), 
+    null.ok = FALSE
   )
 
   checkmate::assert_logical(deterministic, len = 1)
