@@ -137,8 +137,9 @@ preprocess_predictors_predict <- function(object, predictors) {
 
 # Check outcome to detect mode (classif/regr), return suitable outcome
 # Used in rpf_impl()
+# Loss is need to transform 1/0 to 1/-1 for exponential
 #' @importFrom stats model.matrix
-preprocess_outcome <- function(processed) {
+preprocess_outcome <- function(processed, loss) {
   outcomes <- processed$outcomes[[1]]
 
   # Task type detection: Could be more concise
@@ -156,6 +157,7 @@ preprocess_outcome <- function(processed) {
 
   if (is_factor) {
     mode <- "classification"
+    
     if (is_binary) {
       # Binary case: Convert to 0, 1 integer
       outcomes <- as.integer(outcomes) - 1L
@@ -168,6 +170,14 @@ preprocess_outcome <- function(processed) {
       
       outcomes <- outcomes_mat
     }
+    
+    # Exponential expects outcome in 1/-1
+    # no need to check for exponential_2 here as rewriting exponential to
+    # exponential_2 is handled after this function is called
+    if (loss == "exponential") {
+      outcomes[outcomes == 0] <- -1
+    }
+    
   } else if (is_numeric) {
     mode <- "regression"
     # rpf_impl expects Y to be a matrix

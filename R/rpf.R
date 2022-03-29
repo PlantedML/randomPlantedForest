@@ -97,7 +97,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        loss = "L2", delta = 0, epsilon = 0.1) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
-  outcomes <- preprocess_outcome(processed)
+  outcomes <- preprocess_outcome(processed, loss)
 
   # FIXME: loss function handling for multiclass is a clunky hack to ensure
   # the user only sees e.g. "logit" as an option
