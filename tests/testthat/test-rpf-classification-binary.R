@@ -8,6 +8,7 @@ xdat <- data.frame(
   x2 = rnorm(100)
 )
 
+# Basic model creation ----------------------------------------------------
 test_that("Binary: All numeric", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat)
 
@@ -20,7 +21,17 @@ test_that("Binary: All numeric, logit loss", {
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
+  expect_identical(bin_fit$loss, "logit")
 })
+
+test_that("Binary: All numeric, exponential loss", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
+  
+  expect_s3_class(bin_fit, "rpf")
+  expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
+  expect_identical(bin_fit$loss, "exponential")
+})
+
 
 # Binary task detection ---------------------------------------------------
 
