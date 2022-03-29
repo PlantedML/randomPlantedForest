@@ -137,3 +137,18 @@ test_that("exponential: Numeric/link prediction", {
   expect_identical(classif_pred, classif_pred_lnk)
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
 })
+
+# Classif and prob agree with each other ----------------------------------
+
+test_that("prob and classif yield same result", {
+  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  pred_class <- predict(classif_fit, new_data = xdat, type = "class")
+  pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")
+  
+  pred_prob$pred_prob_class <- apply(pred_prob, 1, which.max) |> 
+    factor(labels = levels(xdat$yfact)) 
+  
+  pred_both <- cbind(pred_prob, pred_class)
+  
+  expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
+})
