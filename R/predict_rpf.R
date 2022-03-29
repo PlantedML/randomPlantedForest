@@ -61,9 +61,8 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
     }
     type <- "numeric"
   } else if (object$mode == "classification") {
-    if (object$loss %in% c("logit", "exponential")) {
+    if (object$loss %in% c("logit", "logit_2", "exponential", "exponential_2")) {
       # numeric yields raw predictions, which is the link in the binary case
-      # FIXME: Likely needs readjustment for multiclass?
       if (type == "link") type <- "numeric"
     }
   }
@@ -78,10 +77,18 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
 # Predict function for numeric outcome / regression
 predict_rpf_numeric <- function(object, new_data, components, ...) {
   pred <- object$fit$predict_matrix(new_data, components)
-  
-  # Convert n x 1 matrix to numeric vector
-  pred <- as.numeric(pred)
-  out <- hardhat::spruce_numeric(pred)
+
+  if (ncol(pred) == 1) {
+    # Regression or binary case: just return predictions as-s, single column
+    # Convert n x 1 matrix to numeric vector
+    pred <- as.numeric(pred)
+    out <- hardhat::spruce_numeric(pred)
+  } else {
+    # multiclass case for 'link' type: get prediction matrix, clean up
+    # via spruce_prob, but no transformation
+    outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+    out <- hardhat::spruce_prob(outcome_levels, pred)
+  }
 
   out
 }
@@ -116,7 +123,7 @@ predict_rpf_prob <- function(object, new_data, components, ...) {
       # FIXME:
       # softmax() defined in utils.R, should be identical to logit^-1 for 
       # binary case but not properly tested yet
-      pred_prob <- t(apply(pred_raw, 1, softmax))
+      pred_prob <- softmax(pred_raw)
     }
   } else if (object$loss %in% c("L1", "L2")) {
     # Truncate probabilities at [0,1] for L1/L2 loss

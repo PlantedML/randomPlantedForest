@@ -183,11 +183,12 @@ preprocess_outcome <- function(processed) {
   )
 }
 
-# Softmax for multiclass prediction using logsumexp for numerical stability
+# Softmax for multiclass prediction using centered logsumexp for numerical stability
 # should be identical to sigmoid for scalar input
+# Works on matrix input where one row is assumed to be one vector of predictions
+# for a single observations
 softmax <- function(x) {
-  # logsumexp for numerical stability
-  y <- max(x)
-  logsumexp <- y + log(sum(exp(x - y)))
-  exp(x - logsumexp)
+  rowmax <- apply(x, 1, max)
+  lse <- rowmax + log(rowSums(exp(x - rowmax)))
+  exp(x - lse)
 }
