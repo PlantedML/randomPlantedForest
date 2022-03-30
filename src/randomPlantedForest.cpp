@@ -16,7 +16,6 @@
 
 using namespace Rcpp;
 
-
 //  ----------------- functions for converting R and Cpp types ----------------- 
 
 // wrapper around R's RNG such that we get a uniform distribution over

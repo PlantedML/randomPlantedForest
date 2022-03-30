@@ -97,7 +97,17 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        loss = "L2", delta = 0, epsilon = 0.1) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
-  outcomes <- preprocess_outcome(processed)
+  outcomes <- preprocess_outcome(processed, loss)
+
+  # FIXME: loss function handling for multiclass is a clunky hack to ensure
+  # the user only sees e.g. "logit" as an option
+  if (ncol(outcomes$outcomes) > 1) {
+    loss <- switch (loss,
+      "logit" = "logit_2",
+      "exponential" = "exponential_2",
+      loss
+    )
+  }
 
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
@@ -113,7 +123,8 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "exponential"), null.ok = FALSE
+    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2"), 
+    null.ok = FALSE
   )
 
   checkmate::assert_logical(deterministic, len = 1)
@@ -154,12 +165,14 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
                      max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
                      deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
                      loss = "L2", delta = 0, epsilon = 0.1) {
-
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
+  # checkmate::assert_matrix(Y, mode = "numeric", any.missing = FALSE)
 
   if (mode == "classification") {
-    checkmate::assert_integer(Y, lower = 0)
+    # FIXME: Handling for classification modes, must allow 1/0 or 1/-1 and 
+    # be a matrix
+    #checkmate::assert_integer(Y, lower = 0)
 
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,

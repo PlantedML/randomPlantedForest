@@ -11,7 +11,7 @@ xdat <- data.frame(
 test_that("Default: L2 with 'prob'", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat)
   bin_pred <- predict(bin_fit, new_data = xdat)
-
+  
   expect_identical(bin_fit$loss, "L2")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
@@ -22,7 +22,7 @@ test_that("Default: L2 with 'prob'", {
 test_that("L2: Probability prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "prob")
-
+  
   expect_identical(bin_fit$loss, "L2")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
@@ -32,7 +32,7 @@ test_that("L2: Probability prediction", {
 test_that("L2: Class prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
   expect_true(all(bin_pred$.pred_class %in% levels(xdat$yfact)))
 })
@@ -40,7 +40,7 @@ test_that("L2: Class prediction", {
 test_that("L2: Numeric prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "numeric")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
   expect_gt(max(bin_pred$.pred), 1)
   expect_lt(min(bin_pred$.pred), 0)
@@ -50,7 +50,7 @@ test_that("L2: Numeric prediction", {
 test_that("L1: Probability prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L1")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "prob")
-
+  
   expect_identical(bin_fit$loss, "L1")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
@@ -60,7 +60,7 @@ test_that("L1: Probability prediction", {
 test_that("L1: Class prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L1")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
   expect_true(all(bin_pred$.pred_class %in% levels(xdat$yfact)))
 })
@@ -68,17 +68,16 @@ test_that("L1: Class prediction", {
 test_that("L1: Numeric prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L1")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "numeric")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
-  expect_gt(max(bin_pred$.pred), 1)
-  expect_lt(min(bin_pred$.pred), 0)
+  # FIXME: Not sure how to test the possibility of <0 | >1 here
 })
 
 # logit loss --------------------------------------------------------------
 test_that("logit: Probability prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "prob")
-
+  
   expect_identical(bin_fit$loss, "logit")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
@@ -88,17 +87,17 @@ test_that("logit: Probability prediction", {
 test_that("logit: Class prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
   expect_true(all(bin_pred$.pred_class %in% levels(xdat$yfact)))
 })
 
 test_that("logit: Numeric/link prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
-
+  
   bin_pred <- predict(bin_fit, new_data = xdat, type = "numeric")
   bin_pred_lnk <- predict(bin_fit, new_data = xdat, type = "link")
-
+  
   expect_identical(bin_pred, bin_pred_lnk)
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
 })
@@ -107,7 +106,7 @@ test_that("logit: Numeric/link prediction", {
 test_that("exponential: Probability prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "prob")
-
+  
   expect_identical(bin_fit$loss, "exponential")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
@@ -117,17 +116,33 @@ test_that("exponential: Probability prediction", {
 test_that("exponential: Class prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
   bin_pred <- predict(bin_fit, new_data = xdat, type = "class")
-
+  
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
   expect_true(all(bin_pred$.pred_class %in% levels(xdat$yfact)))
 })
 
 test_that("exponential: Numeric/link prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
-
+  
   bin_pred <- predict(bin_fit, new_data = xdat, type = "numeric")
   bin_pred_lnk <- predict(bin_fit, new_data = xdat, type = "link")
-
+  
   expect_identical(bin_pred, bin_pred_lnk)
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
+})
+
+
+# Classif and prob agree with each other ----------------------------------
+
+test_that("prob and classif yield same result", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  pred_class <- predict(bin_fit, new_data = xdat, type = "class")
+  pred_prob <- predict(bin_fit, new_data = xdat, type = "prob")
+  
+  pred_prob$pred_prob_class <- apply(pred_prob, 1, which.max) |> 
+    factor(labels = levels(xdat$yfact)) 
+  
+  pred_both <- cbind(pred_prob, pred_class)
+  
+  expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
 })

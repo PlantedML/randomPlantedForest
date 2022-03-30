@@ -137,7 +137,9 @@ preprocess_predictors_predict <- function(object, predictors) {
 
 # Check outcome to detect mode (classif/regr), return suitable outcome
 # Used in rpf_impl()
-preprocess_outcome <- function(processed) {
+# Loss is need to transform 1/0 to 1/-1 for exponential
+#' @importFrom stats model.matrix
+preprocess_outcome <- function(processed, loss) {
   outcomes <- processed$outcomes[[1]]
 
   # Task type detection: Could be more concise
@@ -155,15 +157,48 @@ preprocess_outcome <- function(processed) {
 
   if (is_factor) {
     mode <- "classification"
-    outcomes <- as.integer(outcomes) - 1L
+    
+    if (is_binary) {
+      # Binary case: Convert to 0, 1 integer
+      outcomes <- as.integer(outcomes) - 1L
+      # rpf_impl expects Y to be a matrix
+      outcomes <- as.matrix(outcomes, ncol = 1)
+    } else { # Multiclass
+      # One-hot encoding
+      outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
+      colnames(outcomes_mat) <- levels(outcomes)
+      
+      outcomes <- outcomes_mat
+    }
+    
+    # Exponential expects outcome in 1/-1
+    # no need to check for exponential_2 here as rewriting exponential to
+    # exponential_2 is handled after this function is called
+    if (loss == "exponential") {
+      outcomes[outcomes == 0] <- -1
+    }
+    
   } else if (is_numeric) {
     mode <- "regression"
+    # rpf_impl expects Y to be a matrix
+    outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
-    mode <- "unsupported"
+    # mode <- "unsupported"
+    stop("y should be either numeric (regression) or factor (classification)")
   }
 
   list(
     outcomes = outcomes,
     mode = mode
   )
+}
+
+# Softmax for multiclass prediction using centered logsumexp for numerical stability
+# should be identical to sigmoid for scalar input
+# Works on matrix input where one row is assumed to be one vector of predictions
+# for a single observations
+softmax <- function(x) {
+  rowmax <- apply(x, 1, max)
+  lse <- rowmax + log(rowSums(exp(x - rowmax)))
+  exp(x - lse)
 }
