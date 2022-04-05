@@ -70,8 +70,7 @@ test_that("L1: Numeric prediction", {
   bin_pred <- predict(bin_fit, new_data = xdat, type = "numeric")
   
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
-  expect_gt(max(bin_pred$.pred), 1)
-  expect_lt(min(bin_pred$.pred), 0)
+  # FIXME: Not sure how to test the possibility of <0 | >1 here
 })
 
 # logit loss --------------------------------------------------------------
@@ -130,4 +129,20 @@ test_that("exponential: Numeric/link prediction", {
   
   expect_identical(bin_pred, bin_pred_lnk)
   expect_equal(dim(bin_pred), c(nrow(xdat), 1))
+})
+
+
+# Classif and prob agree with each other ----------------------------------
+
+test_that("prob and classif yield same result", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  pred_class <- predict(bin_fit, new_data = xdat, type = "class")
+  pred_prob <- predict(bin_fit, new_data = xdat, type = "prob")
+  
+  pred_prob$pred_prob_class <- apply(pred_prob, 1, which.max) |> 
+    factor(labels = levels(xdat$yfact)) 
+  
+  pred_both <- cbind(pred_prob, pred_class)
+  
+  expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
 })

@@ -1,12 +1,12 @@
 #' Order factor levels by response
-#' 
+#'
 #' Regression: Order by mean(y)
 #' Binary classification: Order by mean(y==1)
-#' Multiclass: Order by first principal component of the weighted covariance 
+#' Multiclass: Order by first principal component of the weighted covariance
 #' matrix of the contingency table
 #'
 #' See https://doi.org/10.7717/peerj.6339 for details.
-#' 
+#'
 #' @param x Factor variable to order
 #' @param y Response
 #'
@@ -24,47 +24,49 @@ order_factor_by_response <- function(x, y) {
         mean((as.numeric(y) - 1)[x == lev])
       })
     } else {
-      # Multiclass: Order by first principal component of the weighted 
+      # Multiclass: Order by first principal component of the weighted
       # covariance matrix of the contingency table
       means <- pca_order(x, y)
     }
   } else {
-    stop(paste("Ordering of factor columns only implemented for regression",
-               "and classification outcomes."))
+    stop(paste(
+      "Ordering of factor columns only implemented for regression",
+      "and classification outcomes."
+    ))
   }
-  
+
   levels_ordered <- as.character(levels(x)[order(means)])
   factor(x, levels = levels_ordered, ordered = TRUE, exclude = NULL)
 }
 
 #' PCA-ordering of factors
-#' 
-#' Order factor levels by first principal component of the weighted covariance 
+#'
+#' Order factor levels by first principal component of the weighted covariance
 #' matrix of the contingency table
 #'
 #' @param x Factor variable to order
 #' @param y Response
 #'
 #' @return Order of factor levels
-#' 
-#' @references 
-#' Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999) 
-#' Partitioning Nominal Attributes in Decision Trees. 
+#'
+#' @references
+#' Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999)
+#' Partitioning Nominal Attributes in Decision Trees.
 #' Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
 pca_order <- function(x, y) {
   if (nlevels(x) < 2) {
     return(seq(1, nlevels(x)))
   }
-  
+
   # Create contingency table of the nominal outcome with the nominal covariate
   N <- table(x, droplevels(y))
-  
+
   # PCA of weighted covariance matrix of class probabilites
-  P <- N/rowSums(N)
+  P <- N / rowSums(N)
   S <- stats::cov.wt(P, wt = rowSums(N))$cov
   pc1 <- stats::prcomp(S, rank. = 1)$rotation
   score <- P %*% pc1
-  
+
   # Return ordered factor levels
   order(score)
 }
@@ -75,29 +77,30 @@ pca_order <- function(x, y) {
 #' @importFrom data.table .SD ':=' as.data.table
 preprocess_predictors_fit <- function(processed) {
   predictors <- as.data.table(processed$predictors)
-  
+
   # Convert characters to factors
   char_cols <- names(which(sapply(predictors, is.character)))
   if (length(char_cols) > 0) {
     predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
   }
-  
+
   # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
   factor_cols <- names(which(sapply(predictors, is.factor)))
   if (length(factor_cols) > 0) {
     predictors[, (factor_cols) := lapply(
-      .SD, order_factor_by_response, y = processed$outcomes[[1]]
+      .SD, order_factor_by_response,
+      y = processed$outcomes[[1]]
     ), .SDcols = factor_cols]
   }
-  
+
   # Save re-ordered factor levels
   factor_levels <- hardhat::get_levels(predictors)
-  
+
   # Convert factors to integer and data to matrix
   if (length(factor_cols) > 0) {
     predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
   }
-  
+
   list(
     factor_levels = factor_levels,
     predictors_matrix = as.matrix(predictors)
@@ -108,56 +111,94 @@ preprocess_predictors_fit <- function(processed) {
 # Used in predict_rpf_bridge()
 preprocess_predictors_predict <- function(object, predictors) {
   predictors <- as.data.table(predictors)
-  
+
   # Convert characters to factors
   char_cols <- names(which(sapply(predictors, is.character)))
   if (length(char_cols) > 0) {
     predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
   }
-  
-  # Re-order factor levels according to saved order 
+
+  # Re-order factor levels according to saved order
   factor_cols <- names(object$factor_levels)
   if (length(factor_cols) > 0) {
     predictors[, (factor_cols) := Map(
-      factor, .SD, object$factor_levels, ordered = TRUE
+      factor, .SD, object$factor_levels,
+      ordered = TRUE
     ), .SDcols = factor_cols]
   }
-  
+
   # Convert factors to integer and data to matrix
   if (length(factor_cols) > 0) {
     predictors[, (factor_cols) := lapply(.SD, as.integer), .SDcols = factor_cols]
   }
-  
+
   as.matrix(predictors)
 }
 
 # Check outcome to detect mode (classif/regr), return suitable outcome
 # Used in rpf_impl()
-preprocess_outcome <- function(processed) {
+# Loss is need to transform 1/0 to 1/-1 for exponential
+#' @importFrom stats model.matrix
+preprocess_outcome <- function(processed, loss) {
   outcomes <- processed$outcomes[[1]]
-  
+
   # Task type detection: Could be more concise
   is_binary <- length(unique(outcomes)) == 2
   is_integerish <- checkmate::test_integerish(outcomes, any.missing = FALSE)
   is_factor <- checkmate::test_factor(outcomes, any.missing = FALSE)
   is_numeric <- checkmate::test_numeric(outcomes, any.missing = FALSE)
-  
+
   if (is_binary & is_integerish) {
-    warning(paste("y is binary integer, assuming regression task.",
-                  "Recode y to a factor for classification."))
+    warning(paste(
+      "y is binary integer, assuming regression task.",
+      "Recode y to a factor for classification."
+    ))
   }
-  
+
   if (is_factor) {
     mode <- "classification"
-    outcomes <- as.integer(outcomes) - 1L
+    
+    if (is_binary) {
+      # Binary case: Convert to 0, 1 integer
+      outcomes <- as.integer(outcomes) - 1L
+      # rpf_impl expects Y to be a matrix
+      outcomes <- as.matrix(outcomes, ncol = 1)
+    } else { # Multiclass
+      # One-hot encoding
+      outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
+      colnames(outcomes_mat) <- levels(outcomes)
+      
+      outcomes <- outcomes_mat
+    }
+    
+    # Exponential expects outcome in 1/-1
+    # no need to check for exponential_2 here as rewriting exponential to
+    # exponential_2 is handled after this function is called
+    if (loss == "exponential") {
+      outcomes[outcomes == 0] <- -1
+    }
+    
   } else if (is_numeric) {
     mode <- "regression"
+    # rpf_impl expects Y to be a matrix
+    outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
-    mode <- "unsupported"
+    # mode <- "unsupported"
+    stop("y should be either numeric (regression) or factor (classification)")
   }
-  
+
   list(
     outcomes = outcomes,
     mode = mode
   )
+}
+
+# Softmax for multiclass prediction using centered logsumexp for numerical stability
+# should be identical to sigmoid for scalar input
+# Works on matrix input where one row is assumed to be one vector of predictions
+# for a single observations
+softmax <- function(x) {
+  rowmax <- apply(x, 1, max)
+  lse <- rowmax + log(rowSums(exp(x - rowmax)))
+  exp(x - lse)
 }
