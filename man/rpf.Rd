@@ -48,9 +48,9 @@ number of split dimensions for a tree.}
 
 \item{splits}{\verb{[30]}: Number of performed splits for each tree family.}
 
-\item{split_try}{\verb{[10]}: TODO.}
+\item{split_try}{\verb{[10]}: Number of split points to be considered when considering a split candidate.}
 
-\item{t_try}{\verb{[0.4]}: TODO.}
+\item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of split-candidetes viable in each round.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
@@ -63,9 +63,9 @@ number of split dimensions for a tree.}
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
 classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.}
 
-\item{delta}{\verb{[0]}: TODO.}
+\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.}
 
-\item{epsilon}{\verb{[0.1]}: TODO.}
+\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave.}
 
 \item{y}{Target vector for use with \code{x}.
 The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
