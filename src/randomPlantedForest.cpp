@@ -2,7 +2,6 @@
 #include <iterator>
 #include <algorithm>
 #include <random>
-#include <optional>
 #include <set>
 #include <map>
 #include <limits>
