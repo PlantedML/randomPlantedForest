@@ -176,10 +176,6 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   # checkmate::assert_matrix(Y, mode = "numeric", any.missing = FALSE)
-  
-  print(
-    paste0("max_interaction = ", max_interaction)
-  )
 
   if (mode == "classification") {
     # FIXME: Handling for classification modes, must allow 1/0 or 1/-1 and 
