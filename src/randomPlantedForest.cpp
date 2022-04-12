@@ -107,7 +107,7 @@ std::vector<T> operator-(const std::vector<T>& vec_a, S val){
 // enable to subtract scalar from vector entries inplace
 template<typename T, typename S>
 void operator-=( std::vector<T>& vec, S val){
-  vec = vec - val;
+  for(auto& entry: vec) entry -= val;
 }
 
 // enable to add scalar to vector entries
@@ -121,7 +121,7 @@ std::vector<T> operator+(const std::vector<T>& vec_a, S val){
 // enable to add scalar to vector entries inplace
 template<typename T, typename S>
 void operator+=(std::vector<T>& vec, S val){
-  vec = vec + val;
+  for(auto& entry: vec) entry += val;
 }
 
 // enable to multiply vector entries by scalar
@@ -143,13 +143,7 @@ std::vector<T> operator*(S val, const std::vector<T>& vec_a){
 // enable to multiply vector entries by scalar inplace
 template<typename T, typename S>
 void operator*=(std::vector<T>& vec, S val){
-  vec = vec * val;
-}
-
-// enable to multiply vector entries by scalar inplace
-template<typename T, typename S>
-void operator*=(S val, std::vector<T>& vec){
-  for(T& entry: vec) entry *= val;
+  for(auto& entry: vec) entry *= val;
 }
 
 // enable to divide vector entries by scalar
@@ -163,7 +157,7 @@ std::vector<T> operator/(const std::vector<T>& vec_a, S val){
 // enable to divide vector entries by scalar inplace
 template<typename T, typename S>
 void operator/=( std::vector<T>& vec, S val){
-  vec = vec / val;
+  for(auto& entry: vec) entry /= val;
 }
 
 // element-wise exp() of vector
