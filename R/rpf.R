@@ -8,7 +8,9 @@
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
 #' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction `[1]`: Maximum level of interaction determining maximum
-#'   number of split dimensions for a tree.
+#'   number of split dimensions for a tree.  
+#'   If `0`, the number fo columns in `x` is used, i.e. for 10 predictors, 
+#'   this is equivalent to setting `max_interaction = 10`.
 #' @param ntrees `[50]`: Number of trees generated per family.
 #' @param splits `[30]`: Number of performed splits for each tree family.
 #' @param split_try `[10]`: Number of split points to be considered when considering a split candidate.
@@ -110,7 +112,13 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   }
 
   # Check arguments
-  checkmate::assert_integerish(max_interaction, lower = 1, len = 1)
+  checkmate::assert_integerish(max_interaction, lower = 0, len = 1)
+  
+  # rewrite max_interaction so 0 -> "maximum", e.g. ncol(x):
+  if (max_interaction == 0) {
+    max_interaction <- ncol(predictors$predictors_matrix)
+  }
+  
   checkmate::assert_integerish(ntrees, lower = 1, len = 1)
   checkmate::assert_integerish(splits, lower = 1, len = 1)
   checkmate::assert_integerish(split_try, lower = 1, len = 1)
