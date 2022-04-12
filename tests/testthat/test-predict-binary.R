@@ -139,8 +139,8 @@ test_that("prob and classif yield same result", {
   pred_class <- predict(bin_fit, new_data = xdat, type = "class")
   pred_prob <- predict(bin_fit, new_data = xdat, type = "prob")
   
-  pred_prob$pred_prob_class <- apply(pred_prob, 1, which.max) |> 
-    factor(labels = levels(xdat$yfact)) 
+  pred_max <- apply(pred_prob, 1, which.max)
+  pred_prob$pred_prob_class <- factor(pred_max, labels = levels(xdat$yfact)) 
   
   pred_both <- cbind(pred_prob, pred_class)
   

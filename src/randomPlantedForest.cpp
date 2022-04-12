@@ -2,7 +2,6 @@
 #include <iterator>
 #include <algorithm>
 #include <random>
-#include <optional>
 #include <set>
 #include <map>
 #include <limits>
@@ -99,7 +98,7 @@ std::set<int> to_std_set(Rcpp::IntegerVector rv) {
 
 // enable to subtract scalar from vector entries
 template<typename T, typename S>
-std::vector<T> operator-(const std::vector<T> vec_a, S val){
+std::vector<T> operator-(const std::vector<T>& vec_a, S val){
   std::vector<T> res = vec_a;
   for(auto& entry: res) entry -= val;
   return res;
@@ -113,7 +112,7 @@ void operator-=( std::vector<T>& vec, S val){
 
 // enable to add scalar to vector entries
 template<typename T, typename S>
-std::vector<T> operator+(const std::vector<T> vec_a, S val){
+std::vector<T> operator+(const std::vector<T>& vec_a, S val){
   std::vector<T> res = vec_a;
   for(auto& entry: res) entry += val;
   return res;
@@ -127,7 +126,7 @@ void operator+=(std::vector<T>& vec, S val){
 
 // enable to multiply vector entries by scalar
 template<typename T, typename S>
-std::vector<T> operator*(const std::vector<T> vec_a, S val){
+std::vector<T> operator*(const std::vector<T>& vec_a, S val){
   std::vector<T> res = vec_a;
   for(auto& entry: res) entry *= val;
   return res;
@@ -135,7 +134,7 @@ std::vector<T> operator*(const std::vector<T> vec_a, S val){
 
 // enable to multiply vector entries by scalar
 template<typename T, typename S>
-std::vector<T> operator*(S val, const std::vector<T> vec_a){
+std::vector<T> operator*(S val, const std::vector<T>& vec_a){
   std::vector<T> res = vec_a;
   for(auto& entry: res) entry *= val;
   return res;
@@ -155,7 +154,7 @@ void operator*=(S val, std::vector<T>& vec){
 
 // enable to divide vector entries by scalar
 template<typename T, typename S>
-std::vector<T> operator/(const std::vector<T> vec_a, S val){
+std::vector<T> operator/(const std::vector<T>& vec_a, S val){
   std::vector<T> res = vec_a;
   for(auto& entry: res) entry /= val;
   return res;
@@ -167,9 +166,9 @@ void operator/=( std::vector<T>& vec, S val){
   vec = vec / val;
 }
 
-// enable to divide vector entries by scalar
+// element-wise exp() of vector
 template<typename T>
-std::vector<T> exp(const std::vector<T> vec){
+std::vector<T> exp(const std::vector<T>& vec){
   std::vector<T> res = vec;
   for(auto& entry: res) entry = exp(entry);
   return res;
@@ -177,7 +176,7 @@ std::vector<T> exp(const std::vector<T> vec){
 
 // enable to add two vectors
 template<typename T>
-std::vector<T> operator+(const std::vector<T> vec_a, const std::vector<T> vec_b){
+std::vector<T> operator+(const std::vector<T>& vec_a, const std::vector<T>& vec_b){
   if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
 
   std::vector<T> res = vec_a;
@@ -185,9 +184,17 @@ std::vector<T> operator+(const std::vector<T> vec_a, const std::vector<T> vec_b)
   return res;
 }
 
+// enable to add two vectors inplace
+template<typename T>
+void operator+=(std::vector<T>& vec_a, const std::vector<T>& vec_b){
+  if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
+  
+  for(int i=0;i<vec_b.size(); ++i) vec_a[i] += vec_b[i];
+}
+
 // enable to subtract two vectors
 template<typename T>
-std::vector<T> operator-(const std::vector<T> vec_a, const std::vector<T> vec_b){
+std::vector<T> operator-(const std::vector<T>& vec_a, const std::vector<T>& vec_b){
   if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
   
   std::vector<T> res = vec_a;
@@ -195,14 +202,30 @@ std::vector<T> operator-(const std::vector<T> vec_a, const std::vector<T> vec_b)
   return res;
 }
 
+// enable to subtract two vectors inplace
+template<typename T>
+void operator-=(std::vector<T>& vec_a, const std::vector<T>& vec_b){
+  if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
+  
+  for(int i=0;i<vec_b.size(); ++i) vec_a[i] -= vec_b[i];
+}
+
 // enable to multiply two vectors
 template<typename T>
-std::vector<T> operator*(const std::vector<T> vec_a, const std::vector<T> vec_b){
+std::vector<T> operator*(const std::vector<T>& vec_a, const std::vector<T>& vec_b){
   if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
 
   std::vector<T> res = vec_a;
   for(int i=0;i<vec_b.size(); ++i) res[i] *= vec_b[i];
   return res;
+}
+
+// enable to multiply two vectors inplace
+template<typename T>
+void operator*=(std::vector<T>& vec_a, const std::vector<T>& vec_b){
+  if(vec_a.size() != vec_b.size()) throw std::invalid_argument("The two vectors are not of same size.");
+  
+  for(int i=0;i<vec_b.size(); ++i) vec_a[i] *= vec_b[i];
 }
 
 
@@ -645,6 +668,9 @@ void RandomPlantedForest::L2_loss(rpf::Split &split){
 RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                                          const NumericVector parameters){
 
+    // Ensure correct Rcpp RNG state
+    Rcpp::RNGScope scope; 
+  
     // initialize class members 
     std::vector<double> pars = to_std_vec(parameters);
     if(pars.size() != 9){
@@ -2373,6 +2399,9 @@ void ClassificationRPF::exponential_loss_3(rpf::Split &split){
 ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                                      const String loss, const NumericVector parameters)
    : RandomPlantedForest{}{
+
+  // Ensure correct Rcpp RNG state
+  Rcpp::RNGScope scope; 
 
   // initialize class members 
   std::vector<double> pars = to_std_vec(parameters);
