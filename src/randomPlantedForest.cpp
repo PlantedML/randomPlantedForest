@@ -573,17 +573,24 @@ VT calcMean(std::vector<VT> vec){
 template <typename VT>
 std::vector<VT> calcMean(std::vector<std::vector<VT>> mat, bool colwise = true){
   
-  std::vector<VT> res;
+  if(mat.size() == 0) throw std::invalid_argument("calcMean: Matrix empty - no data provided.");
+
+  int colSize = mat[0].size(), rowSize = mat.size();
+  std::vector<VT> res( std::max( colSize, rowSize), 0);
   
   if(colwise){
-    std::vector<std::vector<VT>> columns = transpose(mat);
-    
-    for(auto vec: columns){
-      res.push_back(calcMean(vec));
-    } 
+    res = std::vector<VT>( colSize, 0);
+    for(int col=0; col < colSize; ++col){
+      for(int row=0; row < rowSize; ++row){
+        res[col] += mat[row][col];
+      }
+    }
   }else{
-    for(auto vec: mat){
-      res.push_back(calcMean(vec));
+    res = std::vector<VT>( rowSize, 0);
+    for(int row=0; row < rowSize; ++row){
+      for(int col=0; col < colSize; ++col){
+        res[row] += mat[row][col];
+      }
     } 
   }
   
@@ -765,8 +772,8 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         splitable = true;
         
         int start = 0;
-        int end = std::min(split_try, int(unique_samples.size() - 1)); // ??
-        if(deterministic){//deterministic){
+        int end = std::min(split_try, int(unique_samples.size() - 1));
+        if(deterministic){
           start = 1;
           end = unique_samples.size() - 1;
         }
@@ -791,6 +798,10 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
             curr_split.I_b.clear();
             curr_split.Y_s.clear();
             curr_split.Y_b.clear();
+            curr_split.I_s.reserve(curr_individuals.size());
+            curr_split.I_b.reserve(curr_individuals.size());
+            curr_split.Y_s.reserve(curr_individuals.size());
+            curr_split.Y_b.reserve(curr_individuals.size());
           }
           
           // get samples greater/smaller than samplepoint
