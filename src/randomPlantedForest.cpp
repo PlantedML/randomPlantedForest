@@ -579,20 +579,20 @@ std::vector<VT> calcMean(std::vector<std::vector<VT>> mat, bool colwise = true){
   std::vector<VT> res( std::max( colSize, rowSize), 0);
   
   if(colwise){
-    
     res = std::vector<VT>( colSize, 0);
     for(int col=0; col < colSize; ++col){
       for(int row=0; row < rowSize; ++row){
         res[col] += mat[row][col];
-      } 
-    } 
+      }
+      res[col] /= rowSize;
+    }
   }else{
-    
     res = std::vector<VT>( rowSize, 0);
     for(int row=0; row < rowSize; ++row){
       for(int col=0; col < colSize; ++col){
         res[row] += mat[row][col];
-      } 
+      }
+      res[row] /= colSize;
     } 
   }
   
