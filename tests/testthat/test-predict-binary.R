@@ -18,6 +18,59 @@ test_that("Default: L2 with 'prob'", {
   expect_lte(max(bin_pred), 1)
 })
 
+# Sanity ----
+test_that("Predictions are not constant: L1", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L1")
+  bin_pred <- predict(bin_fit, new_data = xdat)
+  
+  # More than one unique prediction
+  expect_gt(nrow(unique(bin_pred)), 1)
+  
+  # unique predictions should be different than all 0 or 1
+  expect_failure(expect_equal(
+    sort(unique(bin_pred[[1]])), c(0, 1)
+  ))
+})
+
+test_that("Predictions are not constant: L2", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
+  bin_pred <- predict(bin_fit, new_data = xdat)
+  
+  # More than one unique prediction
+  expect_gt(nrow(unique(bin_pred)), 1)
+  
+  # unique predictions should be different than all 0 or 1
+  expect_failure(expect_equal(
+    sort(unique(bin_pred[[1]])), c(0, 1)
+  ))
+})
+
+test_that("Predictions are not constant: logit", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  bin_pred <- predict(bin_fit, new_data = xdat)
+  
+  # More than one unique prediction
+  expect_gt(nrow(unique(bin_pred)), 1)
+  
+  # unique predictions should be different than all 0 or 1
+  expect_failure(expect_equal(
+    sort(unique(bin_pred[[1]])), c(0, 1)
+  ))
+})
+
+test_that("Predictions are not constant: exponential", {
+  bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
+  bin_pred <- predict(bin_fit, new_data = xdat)
+  
+  # More than one unique prediction
+  expect_gt(nrow(unique(bin_pred)), 1)
+  
+  # unique predictions should be different than all 0 or 1
+  expect_failure(expect_equal(
+    sort(unique(bin_pred[[1]])), c(0, 1)
+  ))
+})
+
 # L2 loss -----------------------------------------------------------------
 test_that("L2: Probability prediction", {
   bin_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
@@ -140,6 +193,10 @@ test_that("prob and classif yield same result", {
   pred_prob <- predict(bin_fit, new_data = xdat, type = "prob")
   
   pred_max <- apply(pred_prob, 1, which.max)
+  
+  # Fail early if only one unique value is predicted
+  expect_equal(length(unique(pred_max)), 2)
+  
   pred_prob$pred_prob_class <- factor(pred_max, labels = levels(xdat$yfact)) 
   
   pred_both <- cbind(pred_prob, pred_class)
