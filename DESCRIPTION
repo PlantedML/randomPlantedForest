@@ -2,14 +2,17 @@ Package: randomPlantedForest
 Title: What the Package Does (One Line, Title Case)
 Version: 0.0.0.9000
 Authors@R: c(
-    person("Lukas", "Burk", , "github@quantenbrot.de", role = c("cre", "ctb"),
-           comment = c(ORCID = "0000-0001-7528-3795")),
-    person("Munir", "Hiabu", role = "aut"),
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
-    person("Maike", role = "aut")
+    person("Munir", "Hiabu", role = "aut"),
+    person("Maike", "Spankus", role = "aut"),
+    person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut"),
+    person("Lukas", "Burk", , "burk@leibniz-bips.de", role = c("cre", "aut"),
+           comment = c(ORCID = "0000-0001-7528-3795"))
   )
 Description: What the package does (one paragraph).
 License: Apache License (>= 2)
+URL: https://github.com/PlantedML/randomPlantedForest
+BugReports: https://github.com/PlantedML/randomPlantedForest/issues
 Imports: 
     checkmate,
     data.table,

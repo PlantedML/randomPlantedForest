@@ -11,6 +11,7 @@
 #' @param y Response
 #'
 #' @return Re-ordered (ordered) factor
+#' @noRd
 order_factor_by_response <- function(x, y) {
   if (is.numeric(y)) {
     # Regression: Order by mean(y)
@@ -53,6 +54,7 @@ order_factor_by_response <- function(x, y) {
 #' Coppersmith, D., Hong, S.J. & Hosking, J.R. (1999)
 #' Partitioning Nominal Attributes in Decision Trees.
 #' Data Min Knowl Discov 3:197. \doi{10.1023/A:1009869804967}.
+#' @noRd
 pca_order <- function(x, y) {
   if (nlevels(x) < 2) {
     return(seq(1, nlevels(x)))
