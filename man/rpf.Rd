@@ -42,7 +42,9 @@ rpf(
 \item{...}{(Ignored).}
 
 \item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
-number of split dimensions for a tree.}
+number of split dimensions for a tree.
+If \code{0}, the number fo columns in \code{x} is used, i.e. for 10 predictors,
+this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{ntrees}{\verb{[50]}: Number of trees generated per family.}
 

@@ -8,3 +8,7 @@
 ^randomPlantedForest\.Rcheck$
 ^randomPlantedForest.*\.tar\.gz$
 ^randomPlantedForest.*\.tgz$
+^codecov\.yml$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
