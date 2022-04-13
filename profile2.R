@@ -19,7 +19,7 @@ max_interaction <- 4
 splits <- 30
 split_try <- 10
 t_try <- 0.4
-loss <- "L1" # "logit" # "L1" # "L2" # "exponential"
+loss <- "L2" # "logit" # "L1" # "L2" # "exponential"
 
 randomPlantedForest:::start_profiler("/tmp/profile.out")
 rpf_cpp <- randomPlantedForest::rpf(y = yfac, x = x, ntrees = ntrees, max_interaction = max_interaction, 
