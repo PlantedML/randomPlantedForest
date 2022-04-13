@@ -1,0 +1,13 @@
+url: http://plantedml.com/randomPlantedForest/
+template:
+  bootstrap: 5
+
+reference:
+- title: Model fitting and prediction
+  desc: >
+    Modeling fundamentals for creation and prediction from Random Planted
+    Forest models.
+- contents:
+  - rpf
+  - predict.rpf
+

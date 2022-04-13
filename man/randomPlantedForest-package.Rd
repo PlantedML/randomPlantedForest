@@ -8,14 +8,23 @@
 \description{
 What the package does (one paragraph).
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/PlantedML/randomPlantedForest}
+  \item Report bugs at \url{https://github.com/PlantedML/randomPlantedForest/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Lukas Burk \email{github@quantenbrot.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID}) [contributor]
 
 Authors:
 \itemize{
-  \item Munir Hiabu
   \item Joseph Theo Meyer
+  \item Munir Hiabu
   \item Maike
+  \item Marvin N. Wright \email{cran@wrig.de}
 }
 
 }
