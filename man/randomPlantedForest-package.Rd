@@ -17,13 +17,13 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Lukas Burk \email{github@quantenbrot.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID}) [contributor]
+\strong{Maintainer}: Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
 
 Authors:
 \itemize{
   \item Joseph Theo Meyer
   \item Munir Hiabu
-  \item Maike
+  \item Maike Spankus
   \item Marvin N. Wright \email{cran@wrig.de}
 }
 
