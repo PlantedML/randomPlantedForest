@@ -226,7 +226,7 @@ void operator*=(std::vector<T>& vec_a, const std::vector<T>& vec_b){
 // ----------------- custom data types ----------------- 
 
 struct setComp{
-  bool operator()(const std::set<int> &a, const std::set<int> &b) const{
+  bool operator()(const std::set<int>& a, const std::set<int>& b) const{
     if(a == b) return false; // what if same?
     if(a.size() == b.size()){
       std::set<int>::iterator it2 = b.begin();
@@ -269,7 +269,7 @@ class DecisionTree {
     
     public:
         DecisionTree() {};
-        DecisionTree(std::set<int> dims, std::vector<Leaf> first_leaves):
+        DecisionTree(std::set<int> dims, std::vector<Leaf>& first_leaves):
             split_dims(dims), leaves(first_leaves) {};
         DecisionTree(std::set<int> dims): split_dims(dims) {};
         std::set<int> get_split_dims() const;
@@ -328,7 +328,7 @@ namespace rpf{
       entries = std::vector<T>(n_entries, initial_value);
       if(n_entries != entries.size()) throw std::invalid_argument("Invalid matrix size.");
     }
-    T& operator[](std::vector<int> indices){
+    T& operator[](std::vector<int>& indices){
       if(indices.size() != dims.size()) throw std::invalid_argument("Invalid index.");
       int index = 0;
       for(int i=indices.size()-1; i>0; --i){
@@ -440,7 +440,7 @@ namespace NDGrid{
  * \param split_dims defining the tree to be searched for.
  * \param tree_family the family to be tested whether containing the tree.
  */
-std::shared_ptr<DecisionTree> treeExists(const std::set<int> split_dims, TreeFamily &tree_family){
+std::shared_ptr<DecisionTree> treeExists(const std::set<int>& split_dims, TreeFamily& tree_family){
     if(tree_family.find(split_dims) != tree_family.end()) return tree_family[split_dims];
     return nullptr;
 }
@@ -452,7 +452,7 @@ std::shared_ptr<DecisionTree> treeExists(const std::set<int> split_dims, TreeFam
  * \param possible_splits containing all possible splits.
  * \param resulting_dims as union set of split dimension and dimensions of tree which is splitted.
  */
-bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, const std::set<int> &resulting_dims){
+bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, const std::set<int>& resulting_dims){
     for(auto& elem:possible_splits){
         if(elem.first == dim && elem.second->get_split_dims() == resulting_dims) return 1;
     }
@@ -488,7 +488,7 @@ bool leafExists(std::vector<Interval>& intervals, const std::shared_ptr<Decision
  * \param map with arbitrary key and value type.
  */
 template <typename KT, typename VT>
-std::vector<KT> getKeys(std::map<KT, VT, setComp> m){
+std::vector<KT> getKeys(std::map<KT, VT, setComp>& m){
   std::vector<KT> keys;
   for(const auto& entry: m){
     keys.push_back(entry.first);
@@ -497,7 +497,7 @@ std::vector<KT> getKeys(std::map<KT, VT, setComp> m){
 }
 
 template <typename VT>
-std::vector<std::vector<VT>> transpose(std::vector<std::vector<VT>> mat){
+std::vector<std::vector<VT>> transpose(std::vector<std::vector<VT>>& mat){
   
   if(mat.size()<=0) throw std::invalid_argument("Matrix is empty.");
   int value_size = mat[0].size();
@@ -517,7 +517,7 @@ std::vector<std::vector<VT>> transpose(std::vector<std::vector<VT>> mat){
  * \param vec a vector of arbitrary type.
  */
 template <typename VT>
-VT calcMedian(std::vector<VT> vec){
+VT calcMedian(std::vector<VT>& vec){
   
   // sort vector
   std::sort(vec.begin(), vec.end());
@@ -535,7 +535,7 @@ VT calcMedian(std::vector<VT> vec){
  * \param mat a matrix of arbitrary type.
  */
 template <typename VT>
-std::vector<VT> calcMedian(std::vector<std::vector<VT>> mat, bool colwise = true){
+std::vector<VT> calcMedian(std::vector<std::vector<VT>>& mat, bool colwise = true){
   
   std::vector<VT> res;
   
@@ -560,7 +560,7 @@ std::vector<VT> calcMedian(std::vector<std::vector<VT>> mat, bool colwise = true
  * \param vec a vector of arbitrary type.
  */
 template <typename VT>
-VT calcMean(std::vector<VT> vec){
+VT calcMean(std::vector<VT>& vec){
   if(vec.empty()) return 0;
   return std::accumulate(vec.begin(), vec.end(), 0.0) / vec.size();
 }
@@ -571,7 +571,7 @@ VT calcMean(std::vector<VT> vec){
  * \param mat a matrix of arbitrary type.
  */
 template <typename VT>
-std::vector<VT> calcMean(std::vector<std::vector<VT>> mat, bool colwise = true){
+std::vector<VT> calcMean(std::vector<std::vector<VT>>& mat, bool colwise = true){
   
   if(mat.size() == 0) throw std::invalid_argument("calcMean: Matrix empty - no data provided.");
 
@@ -608,23 +608,23 @@ std::vector<VT> calcMean(std::vector<std::vector<VT>> mat, bool colwise = true){
 class RandomPlantedForest {
   
     public:
-        RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+        RandomPlantedForest(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                             const NumericVector parameters={1,50,30,10,0.4,0,0,0,0});
         RandomPlantedForest() {};
-        void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
-        NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
-        NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
+        void set_data(const NumericMatrix& samples_Y, const NumericMatrix& samples_X);
+        NumericMatrix predict_matrix(const NumericMatrix& X, const NumericVector components = {0});
+        NumericMatrix predict_vector(const NumericVector& X, const NumericVector components = {0});
         void purify();
         void new_purify();
         void print();
         void cross_validation(int n_sets=4, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
-        double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true); 
+        double MSE(const NumericMatrix& Y_predicted, const NumericMatrix& Y_true); 
         void get_parameters();
         void set_parameters(StringVector keys, NumericVector values);
         List get_model();
         
     protected:
-        double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
+        double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
         std::vector<std::vector<double>> X;         /**< Nested vector feature samples of size (sample_size x feature_size) */
         std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */          
         int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
@@ -648,11 +648,11 @@ class RandomPlantedForest {
         void L2_loss(rpf::Split &split);
         virtual void fit();
         virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
-        virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                              std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
+        virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                              std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family);
 };
 
-void RandomPlantedForest::L2_loss(rpf::Split &split){
+void RandomPlantedForest::L2_loss(rpf::Split& split){
   split.min_sum = 0;
   split.M_s = calcMean(split.Y_s);
   split.M_b = calcMean(split.Y_b);
@@ -668,7 +668,7 @@ void RandomPlantedForest::L2_loss(rpf::Split &split){
 }
 
 // constructor
-RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+RandomPlantedForest::RandomPlantedForest(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                                          const NumericVector parameters){
 
     // Ensure correct Rcpp RNG state
@@ -704,8 +704,8 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
 }
 
 // determine optimal split
-rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                               std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family){
+rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                                               std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family){
 
   rpf::Split curr_split, min_split;
   std::set<int> tree_dims;
@@ -849,7 +849,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   return min_split;
 }
 
-void RandomPlantedForest::set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X){
+void RandomPlantedForest::set_data(const NumericMatrix& samples_Y, const NumericMatrix& samples_X){
 
     this->Y = to_std_vec(samples_Y);
     this->X = to_std_vec(samples_X);
@@ -1239,7 +1239,7 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
 }
 
 // predict single feature vector
-std::vector<double> RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index){
+std::vector<double> RandomPlantedForest::predict_single(const std::vector<double>& X, std::set<int> component_index){
 
     std::vector<double> total_res = std::vector<double>(value_size, 0);
     
@@ -1294,7 +1294,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 }
 
 // predict multiple feature vectors
-Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, const NumericVector components){
+Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix& X, const NumericVector components){
     std::vector<std::vector<double>> feature_vec = to_std_vec(X);
     std::set<int> component_index = to_std_set(components);
     std::vector<std::vector<double>> predictions;
@@ -1311,7 +1311,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
     return from_std_vec(predictions);
 }
 
-Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector &X, const NumericVector components){
+Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector& X, const NumericVector components){
     std::vector<double> feature_vec = to_std_vec(X);
     std::set<int> component_index = to_std_set(components);
     std::vector<std::vector<double>> predictions;
@@ -1336,11 +1336,11 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector &X, 
     return res;
 }
 
-double RandomPlantedForest::MSE_vec(const NumericVector&Y_predicted, const NumericVector &Y_true){
+double RandomPlantedForest::MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true){
     return sum(Rcpp::pow(Y_true - Y_predicted, 2)) / Y_true.size();
 }
 
-double RandomPlantedForest::MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true){
+double RandomPlantedForest::MSE(const NumericMatrix& Y_predicted, const NumericMatrix& Y_true){
     // todo: multiclass
     double sum = 0;
     int Y_size = Y_predicted.size();
@@ -1943,7 +1943,7 @@ List RandomPlantedForest::get_model(){
 class ClassificationRPF : public RandomPlantedForest {
 
   public:
-    ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+    ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                       const String loss="L2", const NumericVector parameters={1,50,30,10,0.4,0,0,0,0,0,0.1});
     void set_parameters(StringVector keys, NumericVector values);
     
@@ -1955,9 +1955,9 @@ class ClassificationRPF : public RandomPlantedForest {
     void (ClassificationRPF::*calcLoss)(rpf::Split&);  
     void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
     void fit() override;
-    rpf::Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                               std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family, 
-                               std::vector<std::vector<double>> &weights);
+    rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                               std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family, 
+                               std::vector<std::vector<double>>& weights);
     void L1_loss(rpf::Split &split);
     void median_loss(rpf::Split &split);
     void logit_loss(rpf::Split &split);
@@ -1968,7 +1968,7 @@ class ClassificationRPF : public RandomPlantedForest {
     void exponential_loss_3(rpf::Split &split);
 };
 
-void ClassificationRPF::L1_loss(rpf::Split &split){
+void ClassificationRPF::L1_loss(rpf::Split& split){
   split.min_sum = 0;
   split.M_s = calcMean(split.Y_s);
   split.M_b = calcMean(split.Y_b); 
@@ -1983,7 +1983,7 @@ void ClassificationRPF::L1_loss(rpf::Split &split){
   }
 }
 
-void ClassificationRPF::median_loss(rpf::Split &split){
+void ClassificationRPF::median_loss(rpf::Split& split){
   split.min_sum = 0;
   split.M_s = calcMedian(split.Y_s);
   split.M_b = calcMedian(split.Y_b); 
@@ -1998,7 +1998,7 @@ void ClassificationRPF::median_loss(rpf::Split &split){
   }
 }
   
-void ClassificationRPF::logit_loss(rpf::Split &split){
+void ClassificationRPF::logit_loss(rpf::Split& split){
     
     split.min_sum = 0;
     split.M_s = calcMean(split.Y_s);  
@@ -2055,7 +2055,7 @@ void ClassificationRPF::logit_loss(rpf::Split &split){
     }
   }
 
-void ClassificationRPF::logit_loss_2(rpf::Split &split){
+void ClassificationRPF::logit_loss_2(rpf::Split& split){
   
   split.min_sum = 0;
   split.M_s = calcMean(split.Y_s);  
@@ -2106,7 +2106,7 @@ void ClassificationRPF::logit_loss_2(rpf::Split &split){
   } 
 }
 
-void ClassificationRPF::logit_loss_3(rpf::Split &split){
+void ClassificationRPF::logit_loss_3(rpf::Split& split){
   
   split.min_sum = 0;
   split.M_s = calcMean(split.Y_s);  
@@ -2228,7 +2228,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split &split){
   } 
 }
 
-void ClassificationRPF::exponential_loss(rpf::Split &split){
+void ClassificationRPF::exponential_loss(rpf::Split& split){
   
   split.min_sum = 0;
   split.M_s =  std::vector<double>(value_size, 0);
@@ -2283,7 +2283,7 @@ void ClassificationRPF::exponential_loss(rpf::Split &split){
   if(std::isnan(split.min_sum)) split.min_sum = INF; 
 }
 
-void ClassificationRPF::exponential_loss_2(rpf::Split &split){
+void ClassificationRPF::exponential_loss_2(rpf::Split& split){
   
   split.min_sum = 0;
   std::vector<double> W_s_sum(value_size, 0);
@@ -2337,7 +2337,7 @@ void ClassificationRPF::exponential_loss_2(rpf::Split &split){
   if(std::isnan(split.min_sum)) split.min_sum = INF;
 }
 
-void ClassificationRPF::exponential_loss_3(rpf::Split &split){
+void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   
   split.min_sum = 0;
   split.M_s =  std::vector<double>(value_size, 0);
@@ -2403,7 +2403,7 @@ void ClassificationRPF::exponential_loss_3(rpf::Split &split){
 }
 
 // constructor with parameters split_try, t_try, purify_forest, deterministic, parallelize
-ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+ClassificationRPF::ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                                      const String loss, const NumericVector parameters)
    : RandomPlantedForest{}{
 
@@ -2476,8 +2476,8 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
 }
 
 // determine optimal split
-rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                                 std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family, std::vector<std::vector<double>> &weights){
+rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                                                 std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family, std::vector<std::vector<double>>& weights){
 
   rpf::Split curr_split, min_split;
   std::set<int> tree_dims;
