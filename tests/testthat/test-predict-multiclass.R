@@ -3,7 +3,9 @@ xdat <- data.frame(
   yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
   ychar = sample(c("hi", "mid", "lo"), 100, replace = TRUE),
   x1 = rnorm(100),
-  x2 = rnorm(100)
+  x2 = rnorm(100),
+  x3 = cut(runif(100), 3, labels = 1:3),
+  x4 = cut(runif(100), 2, labels = 1:2)
 )
 
 test_that("Default: L2 with 'prob'", {
@@ -41,7 +43,7 @@ test_that("L2: Class prediction", {
 })
 
 test_that("L2: Numeric prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L2")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L2")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
 
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
@@ -70,7 +72,7 @@ test_that("L1: Class prediction", {
 })
 
 test_that("L1: Numeric prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "L1")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L1")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
   
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
@@ -81,7 +83,7 @@ test_that("L1: Numeric prediction", {
 
 # logit loss --------------------------------------------------------------
 test_that("logit: Probability prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
   
   # FIXME: Should this be stored as logit_2 or logit?
@@ -92,7 +94,7 @@ test_that("logit: Probability prediction", {
 })
 
 test_that("logit: Class prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "class")
   
   expect_equal(dim(classif_pred), c(nrow(xdat), 1))
@@ -100,7 +102,7 @@ test_that("logit: Class prediction", {
 })
 
 test_that("logit: Numeric/link prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
   classif_pred_lnk <- predict(classif_fit, new_data = xdat, type = "link")
@@ -111,7 +113,7 @@ test_that("logit: Numeric/link prediction", {
 
 # exponential loss --------------------------------------------------------
 test_that("exponential: Probability prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
   
   expect_identical(classif_fit$loss, "exponential_2")
@@ -121,7 +123,7 @@ test_that("exponential: Probability prediction", {
 })
 
 test_that("exponential: Class prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "class")
   
   expect_equal(dim(classif_pred), c(nrow(xdat), 1))
@@ -129,7 +131,7 @@ test_that("exponential: Class prediction", {
 })
 
 test_that("exponential: Numeric/link prediction", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "exponential")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
   
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
   classif_pred_lnk <- predict(classif_fit, new_data = xdat, type = "link")
@@ -141,7 +143,7 @@ test_that("exponential: Numeric/link prediction", {
 # Classif and prob agree with each other ----------------------------------
 
 test_that("prob and classif yield same result", {
-  classif_fit <- rpf(yfact ~ x1 + x2, data = xdat, loss = "logit")
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   pred_class <- predict(classif_fit, new_data = xdat, type = "class")
   pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")
   

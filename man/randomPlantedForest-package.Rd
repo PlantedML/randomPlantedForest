@@ -4,9 +4,9 @@
 \name{randomPlantedForest-package}
 \alias{randomPlantedForest}
 \alias{randomPlantedForest-package}
-\title{randomPlantedForest: What the Package Does (One Line, Title Case)}
+\title{randomPlantedForest: Random Planted Forest: A Directly Interpretable Tree Ensemble}
 \description{
-What the package does (one paragraph).
+An implementation of the Random Planted Forest algorithm for directly interpretable tree ensembles based on a functional ANOVA decomposition.
 }
 \seealso{
 Useful links:
