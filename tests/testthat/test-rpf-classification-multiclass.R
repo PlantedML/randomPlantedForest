@@ -3,7 +3,9 @@ xdat <- data.frame(
   yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
   ychar = sample(c("hi", "mid", "lo"), 100, replace = TRUE),
   x1 = rnorm(100),
-  x2 = rnorm(100)
+  x2 = rnorm(100),
+  x3 = cut(runif(100), 3, labels = 1:3),
+  x4 = cut(runif(100), 2, labels = 1:2)
 )
 
 # Basic model creation ----------------------------------------------------
@@ -17,13 +19,14 @@ test_that("Multiclass: All numeric", {
 # Classif task detection ---------------------------------------------------
 test_that("Multiclass: Detection works", {
   # y 3-level factor
-  y_fact <- rpf(yfact ~ x1 + x2, xdat)
+  y_fact <- rpf(yfact ~ ., xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
   
   # y is integer: should _not_ be treated as classif task
-  y_int <- rpf(yint ~ x1 + x2, xdat)
+  y_int <- rpf(yint ~ ., xdat)
   expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
   
   # y 3-level character
   expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
+  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })

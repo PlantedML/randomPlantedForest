@@ -21,6 +21,21 @@ test_that("XY matrix interface", {
   expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
 })
 
+test_that("recipe interface", {
+  skip_if_not_installed("recipes")
+
+  rec <- recipes::recipe(mpg ~ ., data = mtcars)
+  rpf_fit <- rpf(rec, data = mtcars)
+  
+  expect_s3_class(rpf_fit, "rpf")
+  expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
+})
+
+test_that("Unsupported interface", {
+  pred_tab <- as.table(as.matrix(mtcars[, c(2, 6)]))
+  expect_error(rpf(x = pred_tab, y = mtcars$mpg))
+})
+
 
 # Randomness --------------------------------------------------------------
 
