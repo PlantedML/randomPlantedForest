@@ -23,6 +23,7 @@ Imports:
     Rcpp
 Suggests: 
     covr,
+    recipes,
     rmarkdown,
     testthat (>= 3.0.0)
 LinkingTo: 
