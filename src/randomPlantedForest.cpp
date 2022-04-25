@@ -574,7 +574,7 @@ template <typename VT>
 std::vector<VT> calcMean(std::vector<std::vector<VT>>& mat, bool colwise = true){
   
   if(mat.size() == 0) throw std::invalid_argument("calcMean: Matrix empty - no data provided.");
-
+  
   int colSize = mat[0].size(), rowSize = mat.size();
   std::vector<VT> res( std::max( colSize, rowSize), 0);
   

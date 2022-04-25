@@ -10,10 +10,33 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// start_profiler
+SEXP start_profiler(SEXP str);
+RcppExport SEXP _randomPlantedForest_start_profiler(SEXP strSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type str(strSEXP);
+    rcpp_result_gen = Rcpp::wrap(start_profiler(str));
+    return rcpp_result_gen;
+END_RCPP
+}
+// stop_profiler
+SEXP stop_profiler();
+RcppExport SEXP _randomPlantedForest_stop_profiler() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(stop_profiler());
+    return rcpp_result_gen;
+END_RCPP
+}
 
 RcppExport SEXP _rcpp_module_boot_mod_rpf();
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_randomPlantedForest_start_profiler", (DL_FUNC) &_randomPlantedForest_start_profiler, 1},
+    {"_randomPlantedForest_stop_profiler", (DL_FUNC) &_randomPlantedForest_stop_profiler, 0},
     {"_rcpp_module_boot_mod_rpf", (DL_FUNC) &_rcpp_module_boot_mod_rpf, 0},
     {NULL, NULL, 0}
 };
