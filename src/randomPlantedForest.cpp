@@ -1110,7 +1110,6 @@ void RandomPlantedForest::fit(){
         if(n >= (n_trees - n_threads)) n_threads = n_trees % n_threads;
         std::vector<std::thread> threads(n_threads);
         for(size_t t=0; t<n_threads; ++t){
-          Rcout << (n + t) << "/" << n_trees << std::endl;
           threads[t] = std::thread(&RandomPlantedForest::create_tree_family, this, std::ref(initial_leaves), n + t);
         }
         for(auto& t: threads){
