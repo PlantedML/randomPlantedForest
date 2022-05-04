@@ -312,10 +312,8 @@ namespace rpf{
       std::vector<int> I_b;           /**< individuals bigger than splitpoint */
       std::vector<double> M_s;        /**< mean or median of individuals smaller than splitpoin */
       std::vector<double> M_b;        /**< mean or median of individuals bigger than splitpoint */
-      std::vector<std::vector<double>> W_s;
-      std::vector<std::vector<double>> W_b;
-      std::vector<std::vector<double>> Y_s;          
-      std::vector<std::vector<double>> Y_b; 
+      const std::vector<std::vector<double>>* W;        
+      const std::vector<std::vector<double>>* Y; 
       Split(): min_sum(INF), tree_index(nullptr), leaf_index(nullptr), split_coordinate(1), split_point(0), M_sp(0), M_bp(0) {};
   };
 
@@ -497,7 +495,7 @@ std::vector<KT> getKeys(std::map<KT, VT, setComp>& m){
 }
 
 template <typename VT>
-std::vector<std::vector<VT>> transpose(std::vector<std::vector<VT>>& mat){
+std::vector<std::vector<VT>> transpose(const std::vector<std::vector<VT>>& mat){
   
   if(mat.size()<=0) throw std::invalid_argument("Matrix is empty.");
   int value_size = mat[0].size();
@@ -517,28 +515,30 @@ std::vector<std::vector<VT>> transpose(std::vector<std::vector<VT>>& mat){
  * \param vec a vector of arbitrary type.
  */
 template <typename VT>
-VT calcMedian(std::vector<VT>& vec){
+VT calcMedian(const std::vector<VT>& vec){
   
   // sort vector
-  std::sort(vec.begin(), vec.end());
-  size_t s = vec.size();
+  auto res = vec;
+  std::sort(res.begin(), res.end());
+  size_t s = res.size();
   
   // differ between even and odd case
   if(s % 2 == 0)
-    return (vec[s / 2 -1] + vec[s / 2]) / 2;
-  return vec[s / 2];
+    return (res[s / 2 - 1] + res[s / 2]) / 2;
+  return res[s / 2];
 }
 
 /**
  * \brief Calculates row- or columnwise median of a matrix.
  * 
  * \param mat a matrix of arbitrary type.
+ * \param colwise a bool indicating if calculate row or columnwise.
  */
 template <typename VT>
-std::vector<VT> calcMedian(std::vector<std::vector<VT>>& mat, bool colwise = true){
+std::vector<VT> calcMedian(const std::vector<std::vector<VT>>& mat, bool colwise = true){
   
   std::vector<VT> res;
-  
+
   if(colwise){
     std::vector<std::vector<VT>> columns = transpose(mat);
     
@@ -555,12 +555,49 @@ std::vector<VT> calcMedian(std::vector<std::vector<VT>>& mat, bool colwise = tru
 }
 
 /**
+ * \brief Calculates row- or columnwise median of a matrix.
+ * 
+ * \param mat a matrix of arbitrary type.
+ * \param indices a vector giving the rows/columns to calculate for.
+ * \param colwise a bool indicating if calculate row or columnwise.
+ */
+template <typename VT>
+std::vector<VT> calcMedian(const std::vector<std::vector<VT>>& mat, const std::vector<int>& indices = NULL, bool colwise = true){
+  
+  if(mat.size() == 0) throw std::invalid_argument("calcMedian: Matrix empty - no data provided.");
+  
+  int colSize = mat[0].size(), rowSize = mat.size(), index;
+  
+  std::vector<VT> res;
+  std::vector<VT> tmp = std::vector<VT>(indices.size(), 0);
+
+  if(colwise){
+    res = std::vector<VT>( colSize, 0);
+    
+    for(int col=0; col<colSize; ++col){
+      
+      index = 0;
+      for(int row: indices){
+        if(row >= rowSize) throw std::invalid_argument("Row index out of range.");
+        tmp[index] = mat[row][col];
+        ++index;
+      }
+      res[col] = calcMedian(tmp);
+    }
+  }else{
+    // todo
+  }
+
+  return res;
+}
+
+/**
  * \brief Calculate mean of a vector.
  * 
  * \param vec a vector of arbitrary type.
  */
 template <typename VT>
-VT calcMean(std::vector<VT>& vec){
+VT calcMean(const std::vector<VT>& vec){
   if(vec.empty()) return 0;
   return std::accumulate(vec.begin(), vec.end(), 0.0) / vec.size();
 }
@@ -569,15 +606,16 @@ VT calcMean(std::vector<VT>& vec){
  * \brief Calculate  row- or columnwise mean of a matrix.
  * 
  * \param mat a matrix of arbitrary type.
+ * \param colwise a bool indicating if calculate row or columnwise.
  */
 template <typename VT>
-std::vector<VT> calcMean(std::vector<std::vector<VT>>& mat, bool colwise = true){
+std::vector<VT> calcMean(const std::vector<std::vector<VT>>& mat, bool colwise = true){
   
   if(mat.size() == 0) throw std::invalid_argument("calcMean: Matrix empty - no data provided.");
   
   int colSize = mat[0].size(), rowSize = mat.size();
-  std::vector<VT> res( std::max( colSize, rowSize), 0);
-  
+  std::vector<VT> res;
+
   if(colwise){
     res = std::vector<VT>( colSize, 0);
     for(int col=0; col < colSize; ++col){
@@ -596,6 +634,44 @@ std::vector<VT> calcMean(std::vector<std::vector<VT>>& mat, bool colwise = true)
     } 
   }
   
+  return res;
+}
+
+/**
+ * \brief Calculate  row- or columnwise mean of a matrix.
+ * 
+ * \param mat a matrix of arbitrary type.
+ * \param indices a vector giving the individuals to calculate for.
+ * \param colwise a bool indicating if calculate row or columnwise.
+ */
+template <typename VT>
+std::vector<VT> calcMean(const std::vector<std::vector<VT>>& mat, const std::vector<int>& indices = NULL, bool colwise = true){
+  
+  if(mat.size() == 0) throw std::invalid_argument("calcMean: Matrix empty - no data provided.");
+  
+  int colSize = mat[0].size(), rowSize = mat.size();
+  std::vector<VT> res;
+
+  if(colwise){
+    res = std::vector<VT>( colSize, 0);
+    for(int col=0; col<colSize; ++col){
+      for(int row: indices){
+        if(row >= rowSize) throw std::invalid_argument("Column index out of range.");
+        res[col] += mat[row][col];
+      }
+      res[col] /= rowSize;
+    }
+  }else{
+    res = std::vector<VT>( rowSize, 0);
+    for(int row: indices){
+      if(row > rowSize) throw std::invalid_argument("Row index out of range.");
+      for(int col=0; col < colSize; ++col){
+        res[row] += mat[row][col];
+      }
+      res[row] /= colSize;
+    } 
+  }
+
   return res;
 }
 
@@ -654,15 +730,15 @@ class RandomPlantedForest {
 
 void RandomPlantedForest::L2_loss(rpf::Split& split){
   split.min_sum = 0;
-  split.M_s = calcMean(split.Y_s);
-  split.M_b = calcMean(split.Y_b);
+  split.M_s = calcMean(*split.Y, split.I_s);
+  split.M_b = calcMean(*split.Y, split.I_b);
   
-  for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += pow(split.Y_s[individual][p] - split.M_s[p], 2) - pow(split.Y_s[individual][p], 2);
+  for(unsigned int p=0; p<value_size; ++p){
+    for(unsigned int individual: split.I_s){
+      split.min_sum += pow((*split.Y)[individual][p] - split.M_s[p], 2) - pow((*split.Y)[individual][p], 2);
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += pow(split.Y_b[individual][p] - split.M_b[p], 2) - pow(split.Y_b[individual][p], 2);
+    for(unsigned int individual: split.I_b){
+      split.min_sum += pow((*split.Y)[individual][p] - split.M_b[p], 2) - pow((*split.Y)[individual][p], 2);
     }
   }
 }
@@ -708,11 +784,15 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
                                                std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family){
 
   rpf::Split curr_split, min_split;
+  curr_split.Y = &Y;
   std::set<int> tree_dims;
-  int k;
-  bool splitable;
+  std::vector<double> unique_samples;
+  int k, start = 0, end, s_size, b_size, i_s, i_b;
   size_t n = 0;
+  bool splitable;
   double leaf_size, sample_point;
+  auto candidate = possible_splits.begin();
+  auto sample_pos = unique_samples.begin();
   
   // sample possible splits
   unsigned int n_candidates = ceil(t_try * possible_splits.size()); // number of candidates that will be considered
@@ -736,7 +816,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
     if(possible_splits.empty() || iter == 0) break;
     if(split_candidates[n] >= possible_splits.size()) continue;
     
-    auto candidate = possible_splits.begin();
+    candidate = possible_splits.begin();
     std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
     k = candidate->first - 1; // split dim of current candidate, converted to index starting at 0
     leaf_size = n_leaves[k];
@@ -759,12 +839,11 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
       
       // go through all leaves of current tree
       for(auto& leaf: curr_tree->leaves){
-        std::vector<int> curr_individuals = leaf.individuals; // consider individuals of current leaf
         
         // extract sample points according to individuals from X and Y
-        std::vector<double> unique_samples(curr_individuals.size());
-        for(unsigned int i=0; i<curr_individuals.size(); ++i){
-          unique_samples[i] = X[curr_individuals[i]][k];
+        unique_samples = std::vector<double>(leaf.individuals.size());
+        for(unsigned int i=0; i<leaf.individuals.size(); ++i){
+          unique_samples[i] = X[leaf.individuals[i]][k];
         }
         std::sort(unique_samples.begin(), unique_samples.end());
         unique_samples.erase(std::unique(unique_samples.begin(), unique_samples.end()), unique_samples.end());
@@ -773,19 +852,19 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         if(unique_samples.size() < 2*leaf_size) continue;
         splitable = true;
         
-        int start = 0;
-        int end = std::min(split_try, int(unique_samples.size() - 1));
+        start = 0, end = split_try;
         if(deterministic){
           start = 1;
           end = unique_samples.size() - 1;
+        }else{
+          end = std::min(split_try, int(unique_samples.size() - 1));
         }
         
         // consider split_try-number of random samples
         for(int t = start; t<end; ++t){
           
           // get samplepoint
-          auto sample_pos = unique_samples.begin();
-          std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size);
+          sample_pos = unique_samples.begin();
           if(deterministic){
             std::advance(sample_pos, t);
           }else{
@@ -794,34 +873,41 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
           }
           sample_point = *sample_pos;
           
+          // get number of samples greater/smaller than samplepoint
+          s_size = 0, b_size = 0;
+          for(int individual: leaf.individuals){
+            if(X[individual][k] < sample_point){
+              ++s_size;
+            }else{
+              ++b_size;
+            }
+          }
+          
           // clear current split
           {
-            curr_split.I_s.clear();
-            curr_split.I_b.clear();
-            curr_split.Y_s.clear();
-            curr_split.Y_b.clear();
-            curr_split.I_s.reserve(curr_individuals.size());
-            curr_split.I_b.reserve(curr_individuals.size());
-            curr_split.Y_s.reserve(curr_individuals.size());
-            curr_split.Y_b.reserve(curr_individuals.size());
+            curr_split.I_s = std::vector<int>(s_size);
+            curr_split.I_b = std::vector<int>(b_size);
+            curr_split.M_s = std::vector<double>(value_size, 0);
+            curr_split.M_b = std::vector<double>(value_size, 0);
           }
           
           // get samples greater/smaller than samplepoint
-          for(int individual: curr_individuals){
+          i_s = 0, i_b = 0;
+          for(int individual: leaf.individuals){
             if(X[individual][k] < sample_point){
-              curr_split.Y_s.push_back(Y[individual]);
-              curr_split.I_s.push_back(individual);
+              curr_split.I_s[i_s] = individual;
+              ++i_s;
             }else{
-              curr_split.Y_b.push_back(Y[individual]);
-              curr_split.I_b.push_back(individual);
+              curr_split.I_b[i_b] = individual;
+              ++i_b;
             }
           }
           
           // ensure individuals are sorted and unique
-          std::sort(curr_split.I_s.begin(), curr_split.I_s.end());
-          std::sort(curr_split.I_b.begin(), curr_split.I_b.end());
-          curr_split.I_s.erase(std::unique(curr_split.I_s.begin(), curr_split.I_s.end()), curr_split.I_s.end());
-          curr_split.I_b.erase(std::unique(curr_split.I_b.begin(), curr_split.I_b.end()), curr_split.I_b.end());
+          //std::sort(curr_split.I_s.begin(), curr_split.I_s.end());
+          //std::sort(curr_split.I_b.begin(), curr_split.I_b.end());
+          //curr_split.I_s.erase(std::unique(curr_split.I_s.begin(), curr_split.I_s.end()), curr_split.I_s.end());
+          //curr_split.I_b.erase(std::unique(curr_split.I_b.begin(), curr_split.I_b.end()), curr_split.I_b.end());
           
           // accumulate squared mean and get mean
           L2_loss(curr_split);
@@ -1969,30 +2055,30 @@ class ClassificationRPF : public RandomPlantedForest {
 
 void ClassificationRPF::L1_loss(rpf::Split& split){
   split.min_sum = 0;
-  split.M_s = calcMean(split.Y_s);
-  split.M_b = calcMean(split.Y_b); 
+  split.M_s = calcMean(*split.Y, split.I_s);
+  split.M_b = calcMean(*split.Y, split.I_b); 
   
-  for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += abs(split.Y_s[individual][p] - split.M_s[p]) - abs(split.Y_s[individual][p]); 
+  for(unsigned int p=0; p<value_size; ++p){
+    for(auto individual: split.I_s){
+      split.min_sum += abs((*split.Y)[individual][p] - split.M_s[p]) - abs((*split.Y)[individual][p]); 
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += abs(split.Y_b[individual][p] - split.M_b[p]) - abs(split.Y_b[individual][p]);
+    for(auto individual: split.I_b){
+      split.min_sum += abs((*split.Y)[individual][p] - split.M_b[p]) - abs((*split.Y)[individual][p]);
     }
   }
 }
 
 void ClassificationRPF::median_loss(rpf::Split& split){
   split.min_sum = 0;
-  split.M_s = calcMedian(split.Y_s);
-  split.M_b = calcMedian(split.Y_b); 
+  split.M_s = calcMedian(*split.Y, split.I_s);
+  split.M_b = calcMedian(*split.Y, split.I_b); 
   
-  for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += abs(split.Y_s[individual][p] - split.M_s[p]) - abs(split.Y_s[individual][p]);
+  for(unsigned int p=0; p<value_size; ++p){
+    for(auto individual: split.I_s){
+      split.min_sum += abs((*split.Y)[individual][p] - split.M_s[p]) - abs((*split.Y)[individual][p]);
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += abs(split.Y_b[individual][p] - split.M_b[p]) - abs(split.Y_b[individual][p]); 
+    for(auto individual: split.I_b){
+      split.min_sum += abs((*split.Y)[individual][p] - split.M_b[p]) - abs((*split.Y)[individual][p]); 
     }
   }
 }
@@ -2000,8 +2086,8 @@ void ClassificationRPF::median_loss(rpf::Split& split){
 void ClassificationRPF::logit_loss(rpf::Split& split){
     
     split.min_sum = 0;
-    split.M_s = calcMean(split.Y_s);  
-    split.M_b = calcMean(split.Y_b);
+    split.M_s = calcMean(*split.Y, split.I_s); 
+    split.M_b = calcMean(*split.Y, split.I_b);
     split.M_sp = 1 - std::accumulate(split.M_s.begin(),split.M_s.end(), 0.0);
     split.M_bp = 1 - std::accumulate(split.M_b.begin(),split.M_b.end(), 0.0);
 
@@ -2014,39 +2100,38 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
     double M_sp = std::max(delta, split.M_sp);
     double M_bp = std::max(delta, split.M_bp);
 
-    std::vector<double> W_s_mean = calcMean(split.W_s);
-    std::vector<double> W_b_mean = calcMean(split.W_b);
+    std::vector<double> W_s_mean = calcMean(*split.W, split.I_s);
+    std::vector<double> W_b_mean = calcMean(*split.W, split.I_b);
 
-    std::vector<std::vector<double>> W_s = split.W_s, W_b = split.W_b, W_s_new = split.W_s, W_b_new = split.W_b;  
+    std::vector<std::vector<double>> W = *split.W, W_new = *split.W;  
     
-    for(unsigned int p=0; p<W_s[0].size(); ++p){ 
-      for(unsigned int individual=0; individual<W_s.size(); ++individual){
-        W_s[individual][p] = exp(W_s[individual][p]); 
-        W_s_new[individual][p] = exp(W_s_new[individual][p] + log(M_s[p] / M_sp) - W_s_mean[p]); 
+    for(unsigned int p=0; p<value_size; ++p){ 
+      for(auto individual: split.I_s){
+        W[individual][p] = exp(W[individual][p]); 
+        W_new[individual][p] = exp(W_new[individual][p] + log(M_s[p] / M_sp) - W_s_mean[p]); 
       }
-      for(unsigned int individual=0; individual<W_b.size(); ++individual){
-        
-        W_b[individual][p] = exp(W_b[individual][p]); 
-        W_b_new[individual][p] = exp(W_b_new[individual][p] + log(M_b[p] / M_bp) - W_b_mean[p]);
+      for(auto individual: split.I_b){
+        W[individual][p] = exp(W[individual][p]); 
+        W_new[individual][p] = exp(W_new[individual][p] + log(M_b[p] / M_bp) - W_b_mean[p]);
       } 
     }   
 
-    for(unsigned int p=0; p<W_b[0].size(); ++p){
-      for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-        split.min_sum += split.Y_s[individual][p] * log(W_s[individual][p] / (1 + std::accumulate(W_s[individual].begin(),W_s[individual].end(),0.0)) ); // ~ R_old
-        split.min_sum -= split.Y_s[individual][p] * log(W_s_new[individual][p] / (1 + std::accumulate(W_s_new[individual].begin(),W_s_new[individual].end(),0.0)) ); // ~ R_new
+    for(unsigned int p=0; p<value_size; ++p){
+      for(auto individual: split.I_s){
+        split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(),W[individual].end(), 0.0)) ); // ~ R_old
+        split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + std::accumulate(W_new[individual].begin(),W_new[individual].end(), 0.0)) ); // ~ R_new
       }
-      for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-        split.min_sum += split.Y_b[individual][p] * log(W_b[individual][p] / (1 + std::accumulate(W_b[individual].begin(),W_b[individual].end(),0.0)) ); // ~ R_old
-        split.min_sum -= split.Y_b[individual][p] * log(W_b_new[individual][p] / (1 + std::accumulate(W_b_new[individual].begin(),W_b_new[individual].end(),0.0)) ); // ~ R_new
+      for(auto individual: split.I_b){
+        split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) ); // ~ R_old
+        split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + std::accumulate(W_new[individual].begin(), W_new[individual].end(), 0.0)) ); // ~ R_new
       }
     }     
 
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      split.min_sum += (1 - std::accumulate(split.Y_s[individual].begin(), split.Y_s[individual].end(), 0.0) * log(1 / (1 + std::accumulate(W_s[individual].begin(), W_s[individual].end(), 0.0)) )); // ~ R_old
+    for(auto individual: split.I_s){
+      split.min_sum += (1 - std::accumulate((*split.Y)[individual].begin(), (*split.Y)[individual].end(), 0.0) * log(1 / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) )); // ~ R_old
     }
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      split.min_sum += (1 - std::accumulate(split.Y_b[individual].begin(), split.Y_b[individual].end(), 0.0) * log(1 / (1 + std::accumulate(W_b[individual].begin(), W_b[individual].end(), 0.0)) )); // ~ R_old
+    for(auto individual: split.I_b){
+      split.min_sum += (1 - std::accumulate((*split.Y)[individual].begin(), (*split.Y)[individual].end(), 0.0) * log(1 / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) )); // ~ R_old
     }
     
     if(std::isnan(split.min_sum)){
@@ -2057,8 +2142,8 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
 void ClassificationRPF::logit_loss_2(rpf::Split& split){
   
   split.min_sum = 0;
-  split.M_s = calcMean(split.Y_s);  
-  split.M_b = calcMean(split.Y_b);
+  split.M_s = calcMean(*split.Y, split.I_s);  
+  split.M_b = calcMean(*split.Y, split.I_b);
   
   std::vector<double> M_s = split.M_s;
   std::vector<double> M_b = split.M_b;
@@ -2072,31 +2157,30 @@ void ClassificationRPF::logit_loss_2(rpf::Split& split){
   std::for_each(M_s2.begin(), M_s2.end(), [this](double &M) { M = std::max(delta, 1-M); });
   std::for_each(M_b2.begin(), M_b2.end(), [this](double &M) { M = std::max(delta, 1-M); });
   
-  std::vector<double> W_s_mean = calcMean(split.W_s);
-  std::vector<double> W_b_mean = calcMean(split.W_b);
+  std::vector<double> W_s_mean = calcMean(*split.W, split.I_s);
+  std::vector<double> W_b_mean = calcMean(*split.W, split.I_b);
   
-  std::vector<std::vector<double>> W_s = split.W_s, W_b = split.W_b, W_s_new = split.W_s, W_b_new = split.W_b;  
+  std::vector<std::vector<double>> W = *split.W, W_new = *split.W;  
   
   for(int p=0; p<value_size; ++p){ 
-    for(unsigned int individual=0; individual<W_s.size(); ++individual){
-      W_s[individual][p] = exp(W_s[individual][p]); 
-      W_s_new[individual][p] = exp(W_s_new[individual][p] + log(M_s[p] / M_s2[p]) - W_s_mean[p]); 
+    for(auto individual: split.I_s){
+      W[individual][p] = exp(W[individual][p]); 
+      W_new[individual][p] = exp(W_new[individual][p] + log(M_s[p] / M_s2[p]) - W_s_mean[p]); 
     }
-    for(unsigned int individual=0; individual<W_b.size(); ++individual){
-      
-      W_b[individual][p] = exp(W_b[individual][p]); 
-      W_b_new[individual][p] = exp(W_b_new[individual][p] + log(M_b[p] / M_b2[p]) - W_b_mean[p]); 
+    for(auto individual: split.I_b){
+      W[individual][p] = exp(W[individual][p]); 
+      W_new[individual][p] = exp(W_new[individual][p] + log(M_b[p] / M_b2[p]) - W_b_mean[p]); 
     } 
   }
   
   for(int p=0; p<value_size; ++p){
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      split.min_sum += split.Y_s[individual][p] * log(W_s[individual][p] / (1 + W_s[individual][p] )); // ~ R_old
-      split.min_sum -= split.Y_s[individual][p] * log(W_s_new[individual][p] / (1 + W_s_new[individual][p] )); // ~ R_new
+    for(auto individual: split.I_s){
+      split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + W[individual][p] )); // ~ R_old
+      split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + W_new[individual][p] )); // ~ R_new
     }
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      split.min_sum += split.Y_b[individual][p] * log(W_b[individual][p] / (1 + W_b[individual][p] )); // ~ R_old
-      split.min_sum -= split.Y_b[individual][p] * log(W_b_new[individual][p] / (1 + W_b_new[individual][p] )); // ~ R_new
+    for(auto individual: split.I_b){
+      split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + W[individual][p] )); // ~ R_old
+      split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + W_new[individual][p] )); // ~ R_new
     }
   }
   
@@ -2107,6 +2191,7 @@ void ClassificationRPF::logit_loss_2(rpf::Split& split){
 
 void ClassificationRPF::logit_loss_3(rpf::Split& split){
   
+  /*
   split.min_sum = 0;
   split.M_s = calcMean(split.Y_s);  
   split.M_b = calcMean(split.Y_b);
@@ -2225,6 +2310,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
   if(std::isnan(split.min_sum)){
     split.min_sum = INF;
   } 
+  */
 }
 
 void ClassificationRPF::exponential_loss(rpf::Split& split){
@@ -2238,17 +2324,18 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
   std::vector<double> sum_b(value_size, 0);
   
   for(int p=0; p<value_size; ++p){
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      W_s_sum[p] += split.W_s[individual][p];
+    for(auto individual: split.I_s){
+      W_s_sum[p] += (*split.W)[individual][p];
     }
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      W_b_sum[p] += split.W_b[individual][p];
+    for(auto individual: split.I_b){
+      W_b_sum[p] += (*split.W)[individual][p];
     }
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      sum_s[p] += ((split.Y_s[individual][p] + 1) / 2) * (split.W_s[individual][p] / W_s_sum[p]);
+    
+    for(auto individual: split.I_s){
+      sum_s[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_s_sum[p]);
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      sum_b[p] += ((split.Y_b[individual][p] + 1) / 2) * (split.W_b[individual][p] / W_b_sum[p]);
+    for(auto individual: split.I_s){
+      sum_b[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_b_sum[p]);
     }
     
     split.M_s[p] = sum_s[p];
@@ -2264,13 +2351,13 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
   double sum_sp = std::max(delta, split.M_sp);
   double sum_bp = std::max(delta, split.M_bp);
   
-  for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
+  for(unsigned int p=0; p<value_size; ++p){
     
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += split.W_s[individual][p] * exp(-0.5 * split.Y_s[individual][p] * log(sum_s[p] / sum_sp));
+    for(auto individual: split.I_s){
+      split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_s[p] / sum_sp));
     } 
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += split.W_b[individual][p] * exp(-0.5 * split.Y_b[individual][p] * log(sum_b[p] / sum_bp));
+    for(auto individual: split.I_b){
+      split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_b[p] / sum_bp));
     }
     
     split.min_sum -= W_s_sum[p] + W_b_sum[p];
@@ -2294,18 +2381,18 @@ void ClassificationRPF::exponential_loss_2(rpf::Split& split){
   
   for(int p=0; p<value_size; ++p){
     
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      W_s_sum[p] += split.W_s[individual][p];
+    for(auto individual: split.I_s){
+      W_s_sum[p] += (*split.W)[individual][p];
     }
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      W_b_sum[p] += split.W_b[individual][p];
+    for(auto individual: split.I_b){
+      W_b_sum[p] += (*split.W)[individual][p];
     }
     
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      sum_s[p] += ((split.Y_s[individual][p] + 1) / 2) * (split.W_s[individual][p] / W_s_sum[p]);
+    for(auto individual: split.I_s){
+      sum_s[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_s_sum[p]);
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      sum_b[p] += ((split.Y_b[individual][p] + 1) / 2) * (split.W_b[individual][p] / W_b_sum[p]);
+    for(auto individual: split.I_b){
+      sum_b[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_b_sum[p]);
     }
     
     split.M_s[p] = sum_s[p];
@@ -2320,11 +2407,11 @@ void ClassificationRPF::exponential_loss_2(rpf::Split& split){
   
   for(int p=0; p<value_size; ++p){
     
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      split.min_sum += split.W_s[individual][p] * exp(-0.5 * split.Y_s[individual][p] * log(sum_s[p] / sum_s2[p]));
+    for(auto individual: split.I_s){
+      split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_s[p] / sum_s2[p]));
     } 
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      split.min_sum += split.W_b[individual][p] * exp(-0.5 * split.Y_b[individual][p] * log(sum_b[p] / sum_b2[p]));
+    for(auto individual: split.I_b){
+      split.min_sum +=(*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_b[p] / sum_b2[p]));
     }
     
     split.min_sum -= W_s_sum[p] + W_b_sum[p]; 
@@ -2347,17 +2434,17 @@ void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   std::vector<double> sum_b(value_size, 0);
   
   for(int p=0; p<value_size; ++p){
-    for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
-      W_s_sum[p] += split.W_s[individual][p];
+    for(auto individual: split.I_s){
+      W_s_sum[p] += (*split.W)[individual][p];
     }
-    for(unsigned int individual=0; individual<split.W_b.size(); ++individual){
-      W_b_sum[p] += split.W_b[individual][p];
+    for(auto individual: split.I_b){
+      W_b_sum[p] += (*split.W)[individual][p];
     }
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      sum_s[p] += ((split.Y_s[individual][p] + 1) / 2) * (split.W_s[individual][p] / W_s_sum[p]);
+    for(auto individual: split.I_s){
+      sum_s[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_s_sum[p]);
     }
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      sum_b[p] += ((split.Y_b[individual][p] + 1) / 2) * (split.W_b[individual][p] / W_b_sum[p]);
+    for(auto individual: split.I_b){
+      sum_b[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_b_sum[p]);
     }
     
     split.M_s[p] = sum_s[p];
@@ -2383,13 +2470,13 @@ void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   sum_sp = sum_sp/(sum_s.size()+1);
   sum_bp = sum_bp/(sum_b.size()+1);
   
-  for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
+  for(unsigned int p=0; p<value_size; ++p){
     
-    for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += split.W_s[individual][p] * exp(-0.5 * split.Y_s[individual][p] * (sum_s[p] - sum_sp));
+    for(auto individual: split.I_s){
+      split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * (sum_s[p] - sum_sp));
     } 
-    for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += split.W_b[individual][p] * exp(-0.5 * split.Y_b[individual][p] * (sum_b[p] - sum_bp));
+    for(auto individual: split.I_b){
+      split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * (sum_b[p] - sum_bp));
     }
     
     split.min_sum -= W_s_sum[p] + W_b_sum[p];
@@ -2479,11 +2566,16 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
                                                  std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family, std::vector<std::vector<double>>& weights){
 
   rpf::Split curr_split, min_split;
+  curr_split.Y = &Y;
+  curr_split.W = &weights;
   std::set<int> tree_dims;
-  int k;
-  bool splitable;
+  std::vector<double> unique_samples;
+  int k, start = 0, end, s_size, b_size, i_s, i_b;
   size_t n = 0;
+  bool splitable;
   double leaf_size, sample_point;
+  auto candidate = possible_splits.begin();
+  auto sample_pos = unique_samples.begin();
   
   // sample possible splits
   int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
@@ -2527,12 +2619,11 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
       
       // go through all leaves of current tree
       for(auto& leaf: curr_tree->leaves){
-        std::vector<int> curr_individuals = leaf.individuals; // consider individuals of current leaf
         
         // extract sample points according to individuals from X and Y
-        std::vector<double> unique_samples(curr_individuals.size());
-        for(unsigned int i=0; i<curr_individuals.size(); ++i){
-          unique_samples[i] = X[curr_individuals[i]][k];
+        unique_samples = std::vector<double>(leaf.individuals.size());
+        for(unsigned int i=0; i<leaf.individuals.size(); ++i){
+          unique_samples[i] = X[leaf.individuals[i]][k];
         }
         std::sort(unique_samples.begin(), unique_samples.end());
         unique_samples.erase(std::unique(unique_samples.begin(), unique_samples.end()), unique_samples.end());
@@ -2541,17 +2632,19 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         if(unique_samples.size() < 2 * leaf_size) continue;
         splitable = true;
         
-        int start = 0, end = split_try;
+        start = 0, end = split_try;
         if(deterministic){
           start = 1;
           end = unique_samples.size() - 1;
+        }else{
+          end = std::min(split_try, int(unique_samples.size() - 1));
         }
         
         // consider split_try-number of random samples
         for(int t=start; t<end; ++t){
           
           // get samplepoint
-          auto sample_pos = unique_samples.begin();
+          sample_pos = unique_samples.begin();
           std::uniform_int_distribution<> distrib(leaf_size, unique_samples.size() - leaf_size);
           if(deterministic){
             std::advance(sample_pos, t);
@@ -2561,36 +2654,41 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           }
           sample_point = *sample_pos;
           
+          // get number of samples greater/smaller than samplepoint
+          s_size = 0, b_size = 0;
+          for(int individual: leaf.individuals){
+            if(X[individual][k] < sample_point){
+              ++s_size;
+            }else{
+              ++b_size;
+            }
+          }
+          
           // clear current split
           {
-            curr_split.I_s.clear();
-            curr_split.I_b.clear();
-            curr_split.Y_s.clear();
-            curr_split.Y_b.clear();
-            curr_split.W_s.clear();
-            curr_split.W_b.clear();
-            curr_split.M_s =  std::vector<double>(value_size, 0);
-            curr_split.M_b =  std::vector<double>(value_size, 0);
+            curr_split.I_s = std::vector<int>(s_size);
+            curr_split.I_b = std::vector<int>(b_size);
+            curr_split.M_s = std::vector<double>(value_size, 0);
+            curr_split.M_b = std::vector<double>(value_size, 0);
           }
 
           // get samples greater/smaller than samplepoint
-          for(int individual: curr_individuals){
+          i_s = 0, i_b = 0;
+          for(int individual: leaf.individuals){
             if(X[individual][k] < sample_point){
-              curr_split.Y_s.push_back(Y[individual]);
-              curr_split.I_s.push_back(individual);
-              curr_split.W_s.push_back(weights[individual]);
+              curr_split.I_s[i_s] = individual;
+              ++i_s;
             }else{
-              curr_split.Y_b.push_back(Y[individual]);
-              curr_split.I_b.push_back(individual);
-              curr_split.W_b.push_back(weights[individual]);
+              curr_split.I_b[i_b] = individual;
+              ++i_b;
             }
           }
           
           // ensure individuals are sorted and unique
-          std::sort(curr_split.I_s.begin(), curr_split.I_s.end());
-          std::sort(curr_split.I_b.begin(), curr_split.I_b.end());
-          curr_split.I_s.erase(std::unique(curr_split.I_s.begin(), curr_split.I_s.end()), curr_split.I_s.end());
-          curr_split.I_b.erase(std::unique(curr_split.I_b.begin(), curr_split.I_b.end()), curr_split.I_b.end());
+          //std::sort(curr_split.I_s.begin(), curr_split.I_s.end());
+          //std::sort(curr_split.I_b.begin(), curr_split.I_b.end());
+          //curr_split.I_s.erase(std::unique(curr_split.I_s.begin(), curr_split.I_s.end()), curr_split.I_s.end());
+          //curr_split.I_b.erase(std::unique(curr_split.I_b.begin(), curr_split.I_b.end()), curr_split.I_b.end());
           
           // accumulate squared mean and get mean
           (this->*ClassificationRPF::calcLoss)(curr_split);
@@ -2717,16 +2815,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
           possible_splits.insert(std::make_pair(feature_dim, curr_family[curr_dims]));
         }
-        
-        if(false){
-          Rcout << "Updated Possible Splits: " << std::endl;
-          for(auto split: possible_splits){
-            Rcout << split.first << "-";
-            for(auto dim: split.second->split_dims) Rcout << dim << ",";
-            Rcout << "; ";
-          }
-          Rcout << std::endl;
-        }
       }
           
       // update values of individuals of split interval
@@ -2734,7 +2822,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       switch(this->loss){
       case LossType::L1: case LossType::L2: case LossType::median: {
         for(int individual: curr_split.leaf_index->individuals){
-          if(samples_X[individual][curr_split.split_coordinate-1] < curr_split.split_point){
+          if(samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point){
             samples_Y[individual] -= update_s;
           }else{
             samples_Y[individual] -= update_b;
@@ -2753,8 +2841,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         double M_sp = std::max(epsilon, curr_split.M_sp);
         double M_bp = std::max(epsilon, curr_split.M_bp);
         
-        std::vector<double> W_s_mean = calcMean(curr_split.W_s);
-        std::vector<double> W_b_mean = calcMean(curr_split.W_b);
+        std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
+        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
         
         for(unsigned int p=0; p<M_s.size(); ++p){
           update_s[p] = log(M_s[p] / M_sp) - W_s_mean[p];
@@ -2785,8 +2873,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::for_each(M_s2.begin(), M_s2.end(), [this](double &M) { M = std::max(epsilon, 1-M); });
         std::for_each(M_b2.begin(), M_b2.end(), [this](double &M) { M = std::max(epsilon, 1-M); });
         
-        std::vector<double> W_s_mean = calcMean(curr_split.W_s);
-        std::vector<double> W_b_mean = calcMean(curr_split.W_b);
+        std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
+        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
         
         for(int p=0; p<value_size; ++p){
           update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
@@ -2823,8 +2911,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         double sum_s = (std::accumulate(M_s.begin(), M_s.end(),0.0)+M_sp)/(M_s.size()+1);
         double sum_b = (std::accumulate(M_b.begin(), M_b.end(),0.0)+M_bp)/(M_b.size()+1);
         
-        std::vector<double> W_s_mean = calcMean(curr_split.W_s);
-        std::vector<double> W_b_mean = calcMean(curr_split.W_b);
+        std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
+        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
         
         for(unsigned int p=0; p<M_s.size(); ++p){
           update_s[p] = M_s[p] - sum_s - W_s_mean[p];
