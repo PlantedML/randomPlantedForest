@@ -787,7 +787,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   curr_split.Y = &Y;
   std::set<int> tree_dims;
   std::vector<double> unique_samples;
-  int k, start = 0, end;
+  int k, start = 0, end, offset;
   size_t n = 0;
   double leaf_size, sample_point;
   auto candidate = possible_splits.begin();
@@ -843,12 +843,10 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         // check if number of sample points is within limit
         if(unique_samples.size() < 2*leaf_size) continue;
 
-        start = 0, end = split_try;
+        start = 0, end = std::min(split_try, int(unique_samples.size() - 1));
         if(deterministic){
           start = 1;
           end = unique_samples.size() - 1;
-        }else{
-          end = std::min(split_try, int(unique_samples.size() - 1));
         }
         
         // consider split_try-number of random samples
@@ -859,7 +857,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
           if(deterministic){
             std::advance(sample_pos, t);
           }else{
-            int offset = R::runif(leaf_size, unique_samples.size() - leaf_size );
+            offset = R::runif(leaf_size, unique_samples.size() - leaf_size );
             std::advance(sample_pos, offset); // consider only sample points with offset
           }
           sample_point = *sample_pos;
@@ -2264,7 +2262,7 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
     for(auto individual: split.I_s){
       sum_s[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_s_sum[p]);
     }
-    for(auto individual: split.I_s){
+    for(auto individual: split.I_b){
       sum_b[p] += (((*split.Y)[individual][p] + 1) / 2) * ((*split.W)[individual][p] / W_b_sum[p]);
     }
     
@@ -2500,7 +2498,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
   curr_split.W = &weights;
   std::set<int> tree_dims;
   std::vector<double> unique_samples;
-  int k, start = 0, end;
+  int k, start = 0, end, offset;
   size_t n = 0;
   double leaf_size, sample_point;
   auto candidate = possible_splits.begin();
@@ -2556,12 +2554,10 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         // check if number of sample points is within limit
         if(unique_samples.size() < 2 * leaf_size) continue;
         
-        start = 0, end = split_try;
+        start = 0, end = std::min(split_try, int(unique_samples.size() - 1));
         if(deterministic){
           start = 1;
           end = unique_samples.size() - 1;
-        }else{
-          end = std::min(split_try, int(unique_samples.size() - 1));
         }
         
         // consider split_try-number of random samples
@@ -2573,7 +2569,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           if(deterministic){
             std::advance(sample_pos, t);
           }else{
-            int offset = R::runif(leaf_size, unique_samples.size() - leaf_size );
+            offset = R::runif(leaf_size, unique_samples.size() - leaf_size );
             std::advance(sample_pos, offset); // consider only sample points with offset
           }
           sample_point = *sample_pos;
