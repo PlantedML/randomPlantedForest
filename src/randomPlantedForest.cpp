@@ -804,16 +804,13 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   }
   
   // consider a fraction of possible splits
-  int iter = 100;
   while(n < n_candidates){
-    
-    iter--;
     
     // in the beginning not known if split viable
     splitable = false;
     
     // since size of possible splits changes, check if candidate in range
-    if(possible_splits.empty() || iter == 0) break;
+    if(possible_splits.empty()) break;
     if(split_candidates[n] >= possible_splits.size()) continue;
     
     candidate = possible_splits.begin();
