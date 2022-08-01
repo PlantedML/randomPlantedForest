@@ -748,12 +748,8 @@ void RandomPlantedForest::L2_loss(rpf::Split& split){
   split.min_sum = 0;
   
   for(unsigned int p=0; p<value_size; ++p){
-    for(unsigned int individual: split.I_s){
-      split.min_sum += pow((*split.Y)[individual][p] - split.M_s[p], 2) - pow((*split.Y)[individual][p], 2);
-    }
-    for(unsigned int individual: split.I_b){
-      split.min_sum += pow((*split.Y)[individual][p] - split.M_b[p], 2) - pow((*split.Y)[individual][p], 2);
-    }
+    split.min_sum  += pow(split.sum_s[p], 2) - 2 * split.M_s[p] * split.sum_s[p] + split.I_s.size() * pow(split.M_s[p], 2);
+    split.min_sum  += pow(split.sum_b[p], 2) - 2 * split.M_b[p] * split.sum_b[p] + split.I_b.size() * pow(split.M_b[p], 2);
   }
 }
 
