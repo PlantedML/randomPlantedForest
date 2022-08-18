@@ -109,8 +109,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
       Ikx_opt <- R[2:length(R)]
       Ikx_opt[6:length(Ikx_opt)][Ikx_opt[6:length(Ikx_opt)]==Inf] <- NA
       
-      print(c("Min Split Sum", R[1]))
-      print(c("Min Split Point", R[5]))
+      # print(c("Min Split Sum", R[1]))
+      # print(c("Min Split Point", R[5]))
       
       if(R_opt<Inf){
         
@@ -145,8 +145,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
             R21 = sum(((Y[I_1]+1)/2) *W[I_1])/sum(W[I_1])
             R31 = sum(((Y[I_2]+1)/2) *W[I_2])/sum(W[I_2])
             
-            print(c("M_s = ", R31))
-            print(c("M_b = ", R21))
+            # print(c("M_s = ", R31))
+            # print(c("M_b = ", R21))
             
             R21 = min(1-epsilon,max(epsilon,R21))
             R31 = min(1-epsilon,max(epsilon,R31))
@@ -181,8 +181,8 @@ rpf<- function(Y, X, max_interaction=2, ntrees=50, splits=30, split_try=10, t_tr
             
           }
           
-          print(y_1)
-          print(y_2)
+          # print(y_1)
+          # print(y_2)
           
           if(Ikx_opt[3] %in% variables[[Ikx_opt[1]]]){  ### if split variable is already in tree to be split
             
