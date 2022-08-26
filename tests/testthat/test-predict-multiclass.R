@@ -1,3 +1,4 @@
+set.seed(245)
 xdat <- data.frame(
   yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
   yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
@@ -86,8 +87,7 @@ test_that("logit: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  # FIXME: Should this be stored as logit_2 or logit?
-  expect_identical(classif_fit$loss, "logit_2")
+  expect_identical(classif_fit$loss, "logit")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
@@ -148,7 +148,10 @@ test_that("prob and classif yield same result", {
   pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")
 
   pred_max <- apply(pred_prob, 1, which.max)
-  pred_prob$pred_prob_class <- factor(pred_max, labels = levels(xdat$yfact))
+  pred_prob$pred_prob_class <- factor(
+    levels(xdat$yfact)[pred_max],
+    levels = levels(xdat$yfact)
+  )
 
   pred_both <- cbind(pred_prob, pred_class)
 
