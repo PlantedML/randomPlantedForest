@@ -103,9 +103,10 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
 
   # FIXME: loss function handling for multiclass is a clunky hack to ensure
   # the user only sees e.g. "logit" as an option
+  # As per Theo: logit_{2,3,4} and exponential_{2,3} are not relevant anymore
   if (ncol(outcomes$outcomes) > 1) {
     loss <- switch (loss,
-      "logit" = "logit_2",
+      # "logit" = "logit_2",
       "exponential" = "exponential_2",
       loss
     )
