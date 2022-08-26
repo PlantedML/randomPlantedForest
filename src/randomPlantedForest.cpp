@@ -21,7 +21,6 @@ using namespace Rcpp;
 // [0,n) as required by the STL algorithm
 inline int randWrapper(const int n) { return floor(R::runif(0,1)*n); }
 
-
 /**
  * \brief Convert the std container set of type int into an IntegerVector
  * from rcpp.
@@ -434,6 +433,7 @@ public:
 
 
 // ----------------- helper functions -----------------
+
 /**
  * \brief Check whether a tree with specified split_dims already exists in tree_family
  *
@@ -622,6 +622,7 @@ public:
   void get_parameters();
   void set_parameters(StringVector keys, NumericVector values);
   List get_model();
+  virtual ~RandomPlantedForest(){};
 
 protected:
   double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
@@ -710,8 +711,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   rpf::Split curr_split, min_split;
   std::set<int> tree_dims;
   int k;
-  // bool splitable;
-  size_t n = 0;
+  unsigned int n = 0;
   double leaf_size, sample_point;
 
   // sample possible splits
@@ -720,7 +720,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
 
   if(!deterministic){
-
     std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
   }
 
@@ -731,29 +730,9 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
     iter--;
 
     // in the beginning not known if split viable
-    // splitable = false;
-
-    // since size of possible splits changes, check if candidate in range
-    // if(possible_splits.empty() || iter == 0) break;
-    // if(split_candidates[n] >= possible_splits.size()) continue;
-
-    // auto candidate = possible_splits.begin();
-    // std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
-    // k = candidate->first - 1; // split dim of current candidate, converted to index starting at 0
-    // leaf_size = n_leaves[k];
-
-    // Test if splitting in the current tree w.r.t. the coordinate "k" is an element of candidate tree
-    // tree_dims = candidate->second->split_dims;
-    // tree_dims.erase(k+1);
-    // tree_dims.erase(0);
-
-    // consider only null tree or tree with same dims as candidate or with same dims excluding the splitting coordinate
-    // std::vector<std::shared_ptr<DecisionTree>> curr_trees{curr_family[std::set<int>{0}]};
-    // if(curr_family.find(candidate->second->split_dims) != curr_family.end()) curr_trees.push_back(curr_family[candidate->second->split_dims]);
-    // if(curr_family.find(tree_dims) != curr_family.end()) curr_trees.push_back(curr_family[tree_dims]);
 
     if(possible_splits.empty()) break;
-    if(split_candidates[n] >= possible_splits.size()) continue;
+    if(split_candidates[n] >= 0 && (size_t)split_candidates[n] >= possible_splits.size()) continue;
 
     auto candidate = possible_splits.begin();
     std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
@@ -764,9 +743,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
     tree_dims = candidate->second->split_dims;
     tree_dims.erase(k+1);
     tree_dims.erase(0);
-
-    // consider only null tree or tree with same dims as candidate or with same dims excluding the splitting coordinate
-    // std::vector<std::shared_ptr<DecisionTree>> curr_trees{curr_family[std::set<int>{0}]};
 
     std::vector<std::shared_ptr<DecisionTree>> curr_trees;
     if(tree_dims.size()==0) curr_trees.push_back(curr_family[std::set<int>{0}]);
@@ -793,7 +769,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
 
         // check if number of sample points is within limit
         if(unique_samples.size() < 2*leaf_size) continue;
-        // splitable = true;
 
         int start = 0;
         int end = split_try;
@@ -861,20 +836,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
     }
 
     ++n;
-
-    // if split viable, increase count, otherwise remove candidate
-
-    //if(splitable){
-    //  ++n;
-    //}else{
-    //  possible_splits.erase(candidate);
-    //}
   }
-
-  // Rcout << min_split.min_sum;
-  // Rcout << min_split.tree_index;
-  // Rcout << min_split.split_coordinate;
-  // Rcout << min_split.split_point;
 
   return min_split;
 }
@@ -890,7 +852,7 @@ void RandomPlantedForest::set_data(const NumericMatrix& samples_Y, const Numeric
   this->feature_size = X[0].size();
   this->value_size = Y[0].size(); // multiclass
   for(const auto &vec:X){
-    if(vec.size() != feature_size) throw std::invalid_argument("Feature dimensions of X not uniform.");
+    if(vec.size() != (size_t)feature_size) throw std::invalid_argument("Feature dimensions of X not uniform.");
   }
   if(Y.size() != X.size()) throw std::invalid_argument("X and Y are not of the same length!");
 
@@ -901,9 +863,9 @@ void RandomPlantedForest::set_data(const NumericMatrix& samples_Y, const Numeric
 
   // get upper/lower bounds
   double minVal, maxVal, currVal;
-  for(size_t i=0; i<feature_size; ++i){
+  for(int i=0; i<feature_size; ++i){
     minVal = maxVal = X[0][i];
-    for(size_t j=0; j<sample_size; ++j){
+    for(int j=0; j<sample_size; ++j){
       currVal = X[j][i];
       if(currVal<minVal) minVal = currVal;
       if(currVal>maxVal) maxVal = currVal;
@@ -932,16 +894,6 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     possible_splits.insert(std::make_pair(feature_dim, curr_family[std::set<int>{feature_dim}]));
   }
 
-  if(false){
-    Rcout << "Initial Possible Splits: ";
-    for(auto split: possible_splits){
-      Rcout << split.first << "-";
-      for(auto dim: split.second->split_dims) Rcout << dim << ",";
-      Rcout << "; ";
-    }
-    Rcout << std::endl;
-  }
-
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X;
@@ -956,7 +908,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
-    for(size_t i=0; i<sample_size; ++i){
+    for(int i=0; i<sample_size; ++i){
+
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
@@ -965,20 +918,13 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
   // modify existing or add new trees through splitting
   rpf::Split curr_split;
-  for(size_t split_count=0; split_count<n_splits; ++split_count){
+  for(int split_count=0; split_count<n_splits; ++split_count){
 
     // find optimal split
     curr_split = calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family);
 
     // continue only if we get a significant result
     if(!std::isinf(curr_split.min_sum)){
-
-      if(false){
-        Rcout << "Current Optimal Split: " << curr_split.min_sum << "; " << curr_split.split_coordinate << "- ";
-        for(auto dim: curr_split.tree_index->split_dims) Rcout << dim << ", ";
-        //Rcout << "; " << curr_split.I_s.size() << "/" << curr_split.I_b.size() << "=" << curr_split.I_s.size()+curr_split.I_b.size() << "; " <<
-        //  curr_split.M_s << "/" << curr_split.M_b <<  std::endl;
-      }
 
       // update possible splits
       for(int feature_dim=1; feature_dim<=feature_size; ++feature_dim){ // consider all possible dimensions
@@ -993,7 +939,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         curr_dims.erase(0);
 
         // do not exceed maximum level of interaction
-        if(curr_dims.size() > max_interaction) continue;
+        if(max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction) continue;
 
         // skip if possible_split already exists
         if(possibleExists(feature_dim, possible_splits, curr_dims)) continue;
@@ -1007,16 +953,6 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         }else{ // if not create new tree
           curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
           possible_splits.insert(std::make_pair(feature_dim, curr_family[curr_dims]));
-        }
-
-        if(false){
-          Rcout << "Updated Possible Splits: " << std::endl;
-          for(auto split: possible_splits){
-            Rcout << split.first << "-";
-            for(auto dim: split.second->split_dims) Rcout << dim << ",";
-            Rcout << "; ";
-          }
-          Rcout << std::endl;
         }
       }
 
@@ -1048,18 +984,6 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         leaf_b.intervals[curr_split.split_coordinate-1].first = curr_split.split_point;
       }
 
-      if(false){
-        Rcout << "First leaf: intervals=" << std::endl;
-        for(auto interval: leaf_s.intervals) Rcout << interval.first << "," << interval.second << ";";
-        Rcout << "individuals=";
-        for(auto i: leaf_s.individuals) Rcout << i << ",";
-        Rcout << std::endl << "Second leaf: intervals=" << std::endl;
-        for(auto interval: leaf_b.intervals) Rcout << interval.first << "," << interval.second << ";";
-        Rcout << "individuals=";
-        for(auto i: leaf_b.individuals) Rcout << i << ",";
-        Rcout << std::endl;
-      }
-
       // construct split_dims of resulting tree when splitting in split_coordinate
       std::set<int> resulting_dims = curr_split.tree_index->split_dims;
       resulting_dims.insert(curr_split.split_coordinate);
@@ -1080,17 +1004,6 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       } else{ // otherwise
         found_tree->leaves.push_back(leaf_s); //append new leaves
         found_tree->leaves.push_back(leaf_b);
-      }
-
-      if(false){
-        Rcout << "Current TreeFamily: (" << curr_family.size() << ") ";
-        for(auto tree: curr_family){
-          Rcout << "Dims = ";
-          for(auto dim: tree.first) Rcout << dim << ", ";
-          Rcout << "; " << "Number of Leaves = " << tree.second->leaves.size();
-          Rcout << " / ";
-        }
-        Rcout << std::endl << std::endl;
       }
     }
   }
@@ -1119,7 +1032,7 @@ void RandomPlantedForest::fit(){
 
   // initialize intervals with lower and upper bounds
   std::vector<Interval> initial_intervals(feature_size);
-  for(size_t i = 0; i<feature_size; ++i) initial_intervals[i] = Interval{lower_bounds[i], upper_bounds[i]};
+  for(int i = 0; i<feature_size; ++i) initial_intervals[i] = Interval{lower_bounds[i], upper_bounds[i]};
 
   // set properties of first leaf
   Leaf initial_leaf;
@@ -1139,7 +1052,7 @@ void RandomPlantedForest::fit(){
     for(int n = 0; n<n_trees; n+=n_threads){
       if(n >= (n_trees - n_threads)) n_threads = n_trees % n_threads;
       std::vector<std::thread> threads(n_threads);
-      for(size_t t=0; t<n_threads; ++t){
+      for(int t=0; t<n_threads; ++t){
         Rcout << (n + t) << "/" << n_trees << std::endl;
         threads[t] = std::thread(&RandomPlantedForest::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
@@ -1148,7 +1061,7 @@ void RandomPlantedForest::fit(){
       }
     }
   }else{
-    for(size_t n=0; n<n_trees; ++n){
+    for(int n=0; n<n_trees; ++n){
       create_tree_family(initial_leaves, n);
     }
   }
@@ -1337,7 +1250,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix& X, 
 
   // todo: sanity check for X
   if( feature_vec.empty() ) throw std::invalid_argument("Feature vector is empty.");
-  if( component_index == std::set<int>{0} && feature_vec[0].size() != this->feature_size ) throw std::invalid_argument("Feature vector has wrong dimension.");
+  if( component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec[0].size() != (size_t)this->feature_size ) throw std::invalid_argument("Feature vector has wrong dimension.");
   if( component_index != std::set<int>{0} && component_index.size() != feature_vec[0].size() ) throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
 
   for(auto& vec: feature_vec){
@@ -1356,7 +1269,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector& X, 
   // todo: sanity check for X
   if(feature_vec.empty()) { Rcout << "Feature vector is empty." << std::endl; return res; }
 
-  if(component_index == std::set<int>{0} && feature_vec.size() != this->feature_size){
+  if(component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec.size() != (size_t)this->feature_size){
     Rcout << "Feature vector has wrong dimension." << std::endl; return res;
   }
 
@@ -1849,7 +1762,6 @@ void RandomPlantedForest::new_purify(){
 
  // ------------- todo: convert to rpf class -------------
 
- /*
   for(int tree_index=0; i<variables.size(); ++tree_index){
 
   NDGrid::NDGrid grid = grids[tree_index];
@@ -1873,9 +1785,8 @@ void RandomPlantedForest::new_purify(){
 void RandomPlantedForest::print(){
   for(int n=0; n<n_trees; ++n){
     TreeFamily family = tree_families[n];
-    // Rcout << n+1 << " TreeFamily: constant=" << family.constant << std::endl << std::endl;
     auto keys = getKeys(family);
-    for(int m=0; m<keys.size(); ++m){
+    for(size_t m=0; m<keys.size(); ++m){
       DecisionTree tree = *(family[keys[m]]);
       Rcout << m+1 << " Tree: ";
       Rcout << "Dims=";
@@ -1982,6 +1893,7 @@ public:
   ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                     const String loss="L2", const NumericVector parameters={1,50,30,10,0.4,0,0,0,0,0,0.1});
   void set_parameters(StringVector keys, NumericVector values);
+  ~ClassificationRPF(){};
 
 private:
   double delta;
@@ -2046,12 +1958,6 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
   std::vector<double> M_s = split.M_s;
   std::vector<double> M_b = split.M_b;
 
-  // std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::max(delta, M); });
-  // std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::max(delta, M); });
-
-  // double M_sp = std::max(delta, split.M_sp);
-  // double M_bp = std::max(delta, split.M_bp);
-
   std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::min(std::max(delta, M),1-delta); });
   std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::min(std::max(delta, M),1-delta); });
 
@@ -2062,16 +1968,6 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
   std::vector<double> W_b_mean = calcMean(split.W_b);
 
   std::vector<std::vector<double>> W_s = split.W_s, W_b = split.W_b, W_s_new = split.W_s, W_b_new = split.W_b;
-
-  // double weightweight = M_s[0];
-  // double weightweightweight = M_sp;
-  // double weightweight2 = M_b[0];
-  // double weightweightweight2 = M_bp;
-
-  // Rcout <<weightweight  << "\n";
-  // Rcout <<weightweight2  << "\n";
-  // Rcout << weightweightweight2 << "\n";
-  // Rcout << weightweightweight << "\n";
 
   for(unsigned int p=0; p<W_s[0].size(); ++p){
     for(unsigned int individual=0; individual<W_s.size(); ++individual){
@@ -2084,16 +1980,6 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
       W_b_new[individual][p] = exp(W_b_new[individual][p] + log(M_b[p] / M_bp) - W_b_mean[p]);
     }
   }
-
-  // double weightweight = W_s[0][0] / (1 + std::accumulate(W_s[0].begin(),W_s[0].end(),0.0));
-  // double weightweightweight = W_s_new[0][0]/(1 + std::accumulate(W_s_new[0].begin(),W_s_new[0].end(),0.0));
-  // double weightweight2 = W_b[0][0]/(1 + std::accumulate(W_b[0].begin(),W_b[0].end(),0.0));
-  // double weightweightweight2 = W_b_new[0][0]/(1 + std::accumulate(W_b_new[0].begin(),W_b_new[0].end(),0.0));
-
-  // Rcout <<weightweight  << "\n";
-  // Rcout <<weightweight2  << "\n";
-  // Rcout << weightweightweight2 << "\n";
-  // Rcout << weightweightweight << "\n";
 
   for(unsigned int p=0; p<W_b[0].size(); ++p){
     for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
@@ -2114,8 +2000,6 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
     split.min_sum += (1 - std::accumulate(split.Y_b[individual].begin(), split.Y_b[individual].end(), 0.0)) * log(1 / (1 + std::accumulate(W_b[individual].begin(), W_b[individual].end(), 0.0)) ); // ~ R_old
     split.min_sum -= (1 - std::accumulate(split.Y_b[individual].begin(), split.Y_b[individual].end(), 0.0)) * log(1 / (1 + std::accumulate(W_b_new[individual].begin(), W_b_new[individual].end(), 0.0)) ); // ~ R_new
   }
-
-  // Rcout << "Split sum = " << split.min_sum << "\n";
 
   if(std::isnan(split.min_sum)){
     split.min_sum = INF;
@@ -2294,6 +2178,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
     split.min_sum = INF;
   }
 }
+
 void ClassificationRPF::logit_loss_4(rpf::Split& split){
 
   split.min_sum = 0;
@@ -2355,10 +2240,6 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
   std::vector<double> sum_s(value_size, 0);
   std::vector<double> sum_b(value_size, 0);
 
-  double weightweight = split.W_s[0].size();
-
-  // Rcout << weightweight << "\n";
-
   for(int p=0; p<value_size; ++p){
     for(unsigned int individual=0; individual<split.W_s.size(); ++individual){
       W_s_sum[p] += split.W_s[individual][p];
@@ -2368,11 +2249,9 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
     }
     for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
       sum_s[p] += ((split.Y_s[individual][p] + 1) / 2) * (split.W_s[individual][p] / W_s_sum[p]);
-      // sum_s[p] += split.Y_s[individual][p] * (split.W_s[individual][p] / W_s_sum[p]);
     }
     for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
       sum_b[p] += ((split.Y_b[individual][p] + 1) / 2) * (split.W_b[individual][p] / W_b_sum[p]);
-      // sum_b[p] += split.Y_b[individual][p] * (split.W_b[individual][p] / W_b_sum[p]);
     }
 
     split.M_s[p] = sum_s[p];
@@ -2380,27 +2259,13 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
 
     sum_s[p] = std::min(std::max(delta, sum_s[p]),1-delta);
     sum_b[p] = std::min(std::max(delta, sum_b[p]),1-delta);
-
-    // sum_s[p] = std::max(delta, sum_s[p]);
-    // sum_b[p] = std::max(delta, sum_b[p]);
   }
-
-  // Rcout << (split.Y_s[0][0] + 1) / 2 << "\n";
-  // Rcout << (split.Y_b[0][0] + 1) / 2 << "\n";
-
-  // Rcout << sum_s[0] << "\n";
-  // Rcout << sum_b[0] << "\n";
-  // Rcout << W_s_sum[0] << "\n";
-  // Rcout << W_b_sum[0] << "\n";
 
   split.M_sp = 1 - std::accumulate(split.M_s.begin(), split.M_s.end(), 0.0);
   split.M_bp = 1 - std::accumulate(split.M_b.begin(), split.M_b.end(), 0.0);
 
   double sum_sp = std::min(std::max(delta, split.M_sp),1-delta);
   double sum_bp = std::min(std::max(delta, split.M_bp),1-delta);
-
-  // double sum_sp = std::max(delta, split.M_sp);
-  // double sum_bp = std::max(delta, split.M_bp);
 
   for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
 
@@ -2413,8 +2278,6 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
 
     split.min_sum -= W_s_sum[p] + W_b_sum[p];
   }
-
-  // Rcout << "Split sum = " << split.min_sum << "\n";
 
   // check if valid result
   for(const auto& s: W_s_sum) if(s == 0) split.min_sum = INF;
@@ -2624,31 +2487,24 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
   rpf::Split curr_split, min_split;
   std::set<int> tree_dims;
   int k;
-  // bool splitable;
-  size_t n = 0;
+  unsigned int n = 0;
   double leaf_size, sample_point;
 
   // sample possible splits
-  int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
+  unsigned int n_candidates = ceil(t_try*possible_splits.size()); // number of candidates that will be considered
   std::vector<int> split_candidates(possible_splits.size());
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
 
   if(!deterministic){
-
     std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
-
-    // split_candidates = R::sample(split_candidates, split_candidates.size());
   }
 
   // consider a fraction of possible splits
   while(n < n_candidates){
 
-    // in the beginning not known if split viable
-    // splitable = false;
-
     // since size of possible splits changes, check if candidate in range
     if(possible_splits.empty()) break;
-    if(split_candidates[n] >= possible_splits.size()) continue;
+    if(split_candidates[n] >= 0 && (size_t)split_candidates[n] >= possible_splits.size()) continue;
 
     auto candidate = possible_splits.begin();
     std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
@@ -2660,16 +2516,10 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
     tree_dims.erase(k+1);
     tree_dims.erase(0);
 
-    // consider only null tree or tree with same dims as candidate or with same dims excluding the splitting coordinate
-    // std::vector<std::shared_ptr<DecisionTree>> curr_trees{curr_family[std::set<int>{0}]};
-
     std::vector<std::shared_ptr<DecisionTree>> curr_trees;
     if(tree_dims.size()==0) curr_trees.push_back(curr_family[std::set<int>{0}]);
     if(curr_family.find(tree_dims) != curr_family.end()) curr_trees.push_back(curr_family[tree_dims]);
     if(curr_family.find(candidate->second->split_dims) != curr_family.end()) curr_trees.push_back(curr_family[candidate->second->split_dims]);
-
-
-    // if( curr_trees.size()==1) std::cout << candidate->second->split_dims.size();
 
     // go through all trees in current family
     for(auto& curr_tree: curr_trees){
@@ -2691,7 +2541,6 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
         // check if number of sample points is within limit
         if(unique_samples.size() < 2 * leaf_size) continue;
-        // splitable = true;
 
         int start = 0;
         int end = split_try;
@@ -2700,7 +2549,6 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           start = 1;
           testtest = unique_samples.size();
           testtest = std::min(testtest,10.0);
-          // end = std::min(unique_samples.size() - 1,4);
           end = testtest;
         }
 
@@ -2718,19 +2566,17 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           }
           sample_point = *sample_pos;
 
-          // Rcout << "Sample Point" << sample_point << "\n";
-
           // clear current split
-
-          curr_split.I_s.clear();
-          curr_split.I_b.clear();
-          curr_split.Y_s.clear();
-          curr_split.Y_b.clear();
-          curr_split.W_s.clear();
-          curr_split.W_b.clear();
-          curr_split.M_s =  std::vector<double>(value_size, 0);
-          curr_split.M_b =  std::vector<double>(value_size, 0);
-
+          {
+            curr_split.I_s.clear();
+            curr_split.I_b.clear();
+            curr_split.Y_s.clear();
+            curr_split.Y_b.clear();
+            curr_split.W_s.clear();
+            curr_split.W_b.clear();
+            curr_split.M_s =  std::vector<double>(value_size, 0);
+            curr_split.M_b =  std::vector<double>(value_size, 0);
+          }
 
           // get samples greater/smaller than samplepoint
           for(int individual: curr_individuals){
@@ -2744,12 +2590,6 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
               curr_split.W_b.push_back(weights[individual]);
             }
           }
-
-          // ensure individuals are sorted and unique
-          // std::sort(curr_split.I_s.begin(), curr_split.I_s.end());
-          // std::sort(curr_split.I_b.begin(), curr_split.I_b.end());
-          // curr_split.I_s.erase(std::unique(curr_split.I_s.begin(), curr_split.I_s.end()), curr_split.I_s.end());
-          // curr_split.I_b.erase(std::unique(curr_split.I_b.begin(), curr_split.I_b.end()), curr_split.I_b.end());
 
           // accumulate squared mean and get mean
           (this->*ClassificationRPF::calcLoss)(curr_split);
@@ -2767,20 +2607,8 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
     }
 
     // if split viable, increase count, otherwise remove candidate
-
     ++n;
-
-    // if(splitable){
-    //   ++n;
-    // }else{
-    //   possible_splits.erase(candidate);
-    // }
   }
-
-  // Rcout << "Min Split sum" << min_split.min_sum << "\n";
-  // Rcout << min_split.tree_index << ",";
-  // Rcout << min_split.split_coordinate << ",";
-  // Rcout << "Min Split Point" << min_split.split_point << "\n";
 
   return min_split;
 }
@@ -2798,16 +2626,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     possible_splits.insert(std::make_pair(feature_dim, curr_family[std::set<int>{feature_dim}]));
   }
 
-  if(false){
-    Rcout << "Initial Possible Splits: ";
-    for(auto split: possible_splits){
-      Rcout << split.first << "-";
-      for(auto dim: split.second->split_dims) Rcout << dim << ",";
-      Rcout << "; ";
-    }
-    Rcout << std::endl;
-  }
-
   // sample data points with replacement
   int sample_index;
   std::vector<std::vector<double>> samples_X;
@@ -2822,7 +2640,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
-    for(size_t i=0; i<sample_size; ++i){
+    for(int i=0; i<sample_size; ++i){
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
@@ -2830,7 +2648,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   }
 
   // initialize weights
-  // function pointer
   std::vector<std::vector<double>> weights;
   switch(this->loss){
   case LossType::logit: case LossType::logit_2: case LossType::logit_3: case LossType::logit_4:
@@ -2848,7 +2665,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
 
   // modify existing or add new trees through splitting
   rpf::Split curr_split;
-  for(size_t split_count=0; split_count<n_splits; ++split_count){
+  for(int split_count=0; split_count<n_splits; ++split_count){
 
     // find optimal split
     curr_split = calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family, weights);
@@ -2861,11 +2678,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
 
         for(int feature_dim = 1; feature_dim<=feature_size; ++feature_dim){ // consider all possible dimensions
 
-          // ignore dim if same as split coordinate or in dimensions of old tree NO
-          // if(feature_dim == curr_split.split_coordinate || curr_split.tree_index->split_dims.count(feature_dim) > 0) continue;
-
-          //if(curr_split.tree_index->split_dims.count(curr_split.split_coordinate)==0 && curr_split.tree_index->split_dims.count(feature_dim) > 0) continue;
-
           // create union of split coord, feature dim and dimensions of old tree
           std::set<int> curr_dims = curr_split.tree_index->split_dims;
           curr_dims.insert(curr_split.split_coordinate);
@@ -2874,7 +2686,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           curr_dims.erase(0);
 
           // do not exceed maximum level of interaction
-          if(curr_dims.size() > max_interaction) continue;
+          if(max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction) continue;
 
           // skip if possible_split already exists
           if(possibleExists(feature_dim, possible_splits, curr_dims)) continue;
@@ -2888,16 +2700,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           }else{ // if not create new tree
             curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
             possible_splits.insert(std::make_pair(feature_dim, curr_family[curr_dims]));
-          }
-
-          if(false){
-            Rcout << "Updated Possible Splits: " << std::endl;
-            for(auto split: possible_splits){
-              Rcout << split.first << "-";
-              for(auto dim: split.second->split_dims) Rcout << dim << ",";
-              Rcout << "; ";
-            }
-            Rcout << std::endl;
           }
         }
       }
@@ -2917,16 +2719,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       case LossType::logit: {
 
-        // std::cout << "0";
-
         std::vector<double> M_s = curr_split.M_s;
         std::vector<double> M_b = curr_split.M_b;
-
-        //std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::max(epsilon, M); });
-        //std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::max(epsilon, M); });
-
-        //double M_sp = std::max(epsilon, curr_split.M_sp);
-        // double M_bp = std::max(epsilon, curr_split.M_bp);
 
         std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::min(std::max(epsilon, M),1-epsilon); });
         std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::min(std::max(epsilon, M),1-epsilon); });
@@ -2953,8 +2747,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         break;
       }
       case LossType::logit_2: {
-
-        // std::cout << "2";
 
         std::vector<double> M_s = curr_split.M_s;
         std::vector<double> M_b = curr_split.M_b;
@@ -2987,8 +2779,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         break;
       }
       case LossType::logit_3: {
-
-        // std::cout << "3";
 
         std::vector<double> M_s = curr_split.M_s;
         std::vector<double> M_b = curr_split.M_b;
@@ -3028,8 +2818,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       case LossType::logit_4: {
 
-        // std::cout << "4";
-
         std::vector<double> M_s = curr_split.M_s;
         std::vector<double> M_b = curr_split.M_b;
 
@@ -3064,15 +2852,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
 
         std::vector<double> sum_s = curr_split.M_s;
         std::vector<double> sum_b = curr_split.M_b;
-
-        // Rcout << "M_s = " << curr_split.M_s[0] << "\n";
-        // Rcout << "M_b = " << curr_split.M_b[0] << "\n";
-
-        // std::for_each(sum_s.begin(), sum_s.end(), [this](double &S) { S = std::max(epsilon, S); });
-        // std::for_each(sum_b.begin(), sum_b.end(), [this](double &S) { S = std::max(epsilon, S); });
-
-        // double sum_sp = std::max(epsilon, curr_split.M_sp);
-        // double sum_bp = std::max(epsilon, curr_split.M_bp);
 
         std::for_each(sum_s.begin(), sum_s.end(), [this](double &S) { S = std::min(std::max(epsilon, S), 1-epsilon); });
         std::for_each(sum_b.begin(), sum_b.end(), [this](double &S) { S = std::min(std::max(epsilon, S), 1-epsilon); });
@@ -3169,12 +2948,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       }
 
-      // double updateSS = update_s[0];
-      // double updateBB = update_b[0];
-
-      // Rcout << updateSS << "\n";
-      // Rcout << updateBB << "\n";
-
       // construct new leaves
       Leaf leaf_s, leaf_b;
       {
@@ -3208,8 +2981,6 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         {
           leaf_s.value += curr_split.leaf_index->value;
           leaf_b.value += curr_split.leaf_index->value;
-          // leaf_s.value += curr_split.leaf_index->value + update_s;
-          // leaf_b.value += curr_split.leaf_index->value + update_b;
         }
         *curr_split.leaf_index = leaf_b; // replace old interval
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
@@ -3244,7 +3015,7 @@ void ClassificationRPF::fit(){
 
   // initialize intervals with lower and upper bounds
   std::vector<Interval> initial_intervals(feature_size);
-  for(size_t i = 0; i<feature_size; ++i) initial_intervals[i] = Interval{lower_bounds[i], upper_bounds[i]};
+  for(int i = 0; i<feature_size; ++i) initial_intervals[i] = Interval{lower_bounds[i], upper_bounds[i]};
 
   // set properties of first leaf
   Leaf initial_leaf;
@@ -3264,7 +3035,7 @@ void ClassificationRPF::fit(){
     for(int n = 0; n<n_trees; n+=n_threads){
       if(n >= (n_trees - n_threads)) n_threads = n_trees % n_threads;
       std::vector<std::thread> threads(n_threads);
-      for(size_t t=0; t<n_threads; ++t){
+      for(int t=0; t<n_threads; ++t){
         threads[t] = std::thread(&ClassificationRPF::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
       for(auto& t: threads){
@@ -3272,7 +3043,7 @@ void ClassificationRPF::fit(){
       }
     }
   }else{
-    for(size_t n=0; n<n_trees; ++n){
+    for(int n=0; n<n_trees; ++n){
       create_tree_family(initial_leaves, n);
     }
   }
