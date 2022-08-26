@@ -28,7 +28,7 @@ test_that("Binary: All numeric, logit loss", {
 
 test_that("Binary: All numeric, exponential loss", {
   bin_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
-  
+
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
   expect_identical(bin_fit$loss, "exponential")
@@ -62,7 +62,7 @@ test_that("Binary detection: Fail for character, logical", {
   # similar problem as factor but w/o levels no order can be assumed
   expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
-  
+
   # y logical: should error and note what it expects
   expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "^y should be")
   expect_error(rpf(ylogi ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
