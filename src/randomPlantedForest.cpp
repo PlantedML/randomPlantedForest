@@ -711,7 +711,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   rpf::Split curr_split, min_split;
   std::set<int> tree_dims;
   int k;
-  bool splitable;
   unsigned int n = 0;
   double leaf_size, sample_point;
 
@@ -731,7 +730,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
     iter--;
 
     // in the beginning not known if split viable
-    splitable = false;
 
     if(possible_splits.empty()) break;
     if(split_candidates[n] >= 0 && (size_t)split_candidates[n] >= possible_splits.size()) continue;
@@ -771,7 +769,6 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
 
         // check if number of sample points is within limit
         if(unique_samples.size() < 2*leaf_size) continue;
-        splitable = true;
 
         int start = 0;
         int end = split_try;
@@ -838,12 +835,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
       }
     }
 
-    // if split viable, increase count, otherwise remove candidate
-    if(splitable){
-      ++n;
-    }else{
-      possible_splits.erase(candidate);
-    }
+    ++n;
   }
 
   return min_split;
@@ -917,6 +909,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
     for(int i=0; i<sample_size; ++i){
+
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
