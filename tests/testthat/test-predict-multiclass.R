@@ -1,3 +1,4 @@
+set.seed(245)
 xdat <- data.frame(
   yint = sample(c(0L, 1L, 2L), 100, replace = TRUE),
   yfact = factor(sample(c("hi", "mid", "lo"), 100, replace = TRUE)),
