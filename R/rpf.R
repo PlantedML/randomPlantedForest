@@ -8,21 +8,21 @@
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
 #' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction `[1]`: Maximum level of interaction determining maximum
-#'   number of split dimensions for a tree.  
-#'   If `0`, the number fo columns in `x` is used, i.e. for 10 predictors, 
+#'   number of split dimensions for a tree.
+#'   If `0`, the number fo columns in `x` is used, i.e. for 10 predictors,
 #'   this is equivalent to setting `max_interaction = 10`.
 #' @param ntrees `[50]`: Number of trees generated per family.
 #' @param splits `[30]`: Number of performed splits for each tree family.
 #' @param split_try `[10]`: Number of split points to be considered when considering a split candidate.
-#' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of split-candidetes viable in each round. 
+#' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of split-candidetes viable in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
 #' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
 #'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
-#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split. 
-#' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave. 
+#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.
+#' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave.
 #' @param ... (Ignored).
 #'
 #' @return Object of class `"rpf"` with model object contained in `$fit`.
@@ -113,12 +113,12 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
 
   # Check arguments
   checkmate::assert_integerish(max_interaction, lower = 0, len = 1)
-  
+
   # rewrite max_interaction so 0 -> "maximum", e.g. ncol(x):
   if (max_interaction == 0) {
     max_interaction <- ncol(predictors$predictors_matrix)
   }
-  
+
   checkmate::assert_integerish(ntrees, lower = 1, len = 1)
   checkmate::assert_integerish(splits, lower = 1, len = 1)
   checkmate::assert_integerish(split_try, lower = 1, len = 1)
@@ -131,7 +131,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2"), 
+    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2"),
     null.ok = FALSE
   )
 
@@ -178,7 +178,7 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
   # checkmate::assert_matrix(Y, mode = "numeric", any.missing = FALSE)
 
   if (mode == "classification") {
-    # FIXME: Handling for classification modes, must allow 1/0 or 1/-1 and 
+    # FIXME: Handling for classification modes, must allow 1/0 or 1/-1 and
     # be a matrix
     #checkmate::assert_integer(Y, lower = 0)
 
