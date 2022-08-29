@@ -779,7 +779,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   rpf::Split curr_split, min_split;
   curr_split.Y = &Y;
   std::set<int> tree_dims;
-  int k, i_s, i_b, s_size, b_size;
+  int k;
   unsigned int n = 0;
   double leaf_size, sample_point;
 
@@ -858,33 +858,22 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
           }
           sample_point = *sample_pos;
 
-          // get number of samples greater/smaller than samplepoint
-          s_size = 0, b_size = 0;
-          for(int individual: leaf.individuals){
-            if(X[individual][k] < sample_point){
-              ++s_size;
-            }else{
-              ++b_size;
-            }
-          }
-
           // clear current split
           {
-            curr_split.I_s = std::vector<int>(s_size);
-            curr_split.I_b = std::vector<int>(b_size);
+            curr_split.I_s.clear();
+            curr_split.I_b.clear();
+            curr_split.I_s.reserve(leaf.individuals.size());
+            curr_split.I_b.reserve(leaf.individuals.size());
             curr_split.M_s = std::vector<double>(value_size, 0);
             curr_split.M_b = std::vector<double>(value_size, 0);
           }
 
           // get samples greater/smaller than samplepoint
-          i_s = 0, i_b = 0;
           for(int individual: curr_individuals){
             if(X[individual][k] < sample_point){
-              curr_split.I_s[i_s] = individual;
-              ++i_s;
+              curr_split.I_s.push_back(individual);
             }else{
-              curr_split.I_b[i_b] = individual;
-              ++i_b;
+              curr_split.I_b.push_back(individual);
             }
           }
 
@@ -2548,7 +2537,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
   curr_split.Y = &Y;
   curr_split.W = &weights;
   std::set<int> tree_dims;
-  int k, s_size, b_size, i_s, i_b;
+  int k;
   unsigned int n = 0;
   double leaf_size, sample_point;
 
@@ -2628,33 +2617,22 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           }
           sample_point = *sample_pos;
 
-          // get number of samples greater/smaller than samplepoint
-          s_size = 0, b_size = 0;
-          for(int individual: leaf.individuals){
-            if(X[individual][k] < sample_point){
-              ++s_size;
-            }else{
-              ++b_size;
-            }
-          }
-
           // clear current split
           {
-            curr_split.I_s = std::vector<int>(s_size);
-            curr_split.I_b = std::vector<int>(b_size);
+            curr_split.I_s.clear();
+            curr_split.I_b.clear();
+            curr_split.I_s.reserve(leaf.individuals.size());
+            curr_split.I_b.reserve(leaf.individuals.size());
             curr_split.M_s = std::vector<double>(value_size, 0);
             curr_split.M_b = std::vector<double>(value_size, 0);
           }
 
           // get samples greater/smaller than samplepoint
-          i_s = 0, i_b = 0;
           for(int individual: curr_individuals){
             if(X[individual][k] < sample_point){
-              curr_split.I_s[i_s] = individual;
-              ++i_s;
+              curr_split.I_s.push_back(individual);
             }else{
-              curr_split.I_b[i_b] = individual;
-              ++i_b;
+              curr_split.I_b.push_back(individual);
             }
           }
 
