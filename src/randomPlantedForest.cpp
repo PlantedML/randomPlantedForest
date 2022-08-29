@@ -793,10 +793,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   }
 
   // consider a fraction of possible splits
-  int iter = 100;
   while(n < n_candidates){
-
-    iter--;
 
     if(possible_splits.empty()) break;
     if(split_candidates[n] >= 0 && (size_t)split_candidates[n] >= possible_splits.size()) continue;
@@ -837,11 +834,10 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         // check if number of sample points is within limit
         if(unique_samples.size() < 2*leaf_size) continue;
 
-        int start = 0;
-        int end = split_try;
+        int start = 0, end = split_try;
         if(deterministic){
           start = 1;
-          end = unique_samples.size() - 1;
+          end = std::min((int)unique_samples.size(), 10);
         }
 
         // consider split_try-number of random samples
@@ -2593,14 +2589,11 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         // check if number of sample points is within limit
         if(unique_samples.size() < 2 * leaf_size) continue;
 
-        int start = 0;
-        int end = split_try;
+        int start = 0, end = split_try;
         double testtest;
         if(deterministic){
           start = 1;
-          testtest = unique_samples.size();
-          testtest = std::min(testtest,10.0);
-          end = testtest;
+          end = std::min((int)unique_samples.size(), 10);
         }
 
         // consider split_try-number of random samples
