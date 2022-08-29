@@ -1992,10 +1992,10 @@ void ClassificationRPF::L1_loss(rpf::Split& split){
 
   for(int p=0; p<value_size; ++p){
     for(auto individual: split.I_s){
-      split.min_sum += abs((*split.Y)[individual][p] - split.M_s[p]) - abs((*split.Y)[individual][p]);
+      split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_s[p]) - std::fabs((*split.Y)[individual][p]);
     }
     for(auto individual: split.I_b){
-      split.min_sum += abs((*split.Y)[individual][p] - split.M_b[p]) - abs((*split.Y)[individual][p]);
+      split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_b[p]) - std::fabs((*split.Y)[individual][p]);
     }
   }
 }
@@ -2007,10 +2007,10 @@ void ClassificationRPF::median_loss(rpf::Split& split){
 
   for(int p=0; p<value_size; ++p){
     for(auto individual: split.I_s){
-      split.min_sum += abs((*split.Y)[individual][p] - split.M_s[p]) - abs((*split.Y)[individual][p]);
+      split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_s[p]) - std::fabs((*split.Y)[individual][p]);
     }
     for(auto individual: split.I_b){
-      split.min_sum += abs((*split.Y)[individual][p] - split.M_b[p]) - abs((*split.Y)[individual][p]);
+      split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_b[p]) - std::fabs((*split.Y)[individual][p]);
     }
   }
 }
@@ -2050,8 +2050,8 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
 
   for(int p=0; p<value_size; ++p){
     for(auto individual: split.I_s){
-      split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(),W[individual].end(), 0.0)) ); // ~ R_old
-      split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + std::accumulate(W_new[individual].begin(),W_new[individual].end(), 0.0)) ); // ~ R_new
+      split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) ); // ~ R_old
+      split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + std::accumulate(W_new[individual].begin(), W_new[individual].end(), 0.0)) ); // ~ R_new
     }
     for(auto individual: split.I_b){
       split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) ); // ~ R_old
@@ -2787,8 +2787,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> M_s = curr_split.M_s;
         std::vector<double> M_b = curr_split.M_b;
 
-        std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::min(std::max(epsilon, M),1-epsilon); });
-        std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::min(std::max(epsilon, M),1-epsilon); });
+        std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::min(std::max(epsilon, M), 1-epsilon); });
+        std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::min(std::max(epsilon, M), 1-epsilon); });
 
         double M_sp = std::min(std::max(epsilon, curr_split.M_sp), 1-epsilon);
         double M_bp = std::min(std::max(epsilon, curr_split.M_bp), 1-epsilon);
@@ -2796,7 +2796,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
         std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
-        for(unsigned int p=0; p<M_s.size(); ++p){
+        for(unsigned int p=0; p<value_size; ++p){
           update_s[p] = log(M_s[p] / M_sp) - W_s_mean[p];
           update_b[p] = log(M_b[p] / M_bp) - W_b_mean[p];
         }
