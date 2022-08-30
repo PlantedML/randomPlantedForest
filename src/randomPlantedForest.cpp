@@ -911,14 +911,13 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
+                if(X[individual][k] > unique_samples[samples[sample_pos - 1]].first){
+                  curr_split.sum_s += Y[individual];
+                }
                 curr_split.I_s.push_back(individual);
               }else{
                 curr_split.I_b.push_back(individual);
               }
-            }
-
-            for(int i=samples[sample_pos-1]+1; i<=samples[sample_pos]; ++i){
-              curr_split.sum_s += Y[unique_samples[i].second];
             }
 
             curr_split.sum_b = tot_sum - curr_split.sum_s;
@@ -2693,16 +2692,15 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
+                if(X[individual][k] > unique_samples[samples[sample_pos - 1]].first){
+                  curr_split.sum_s += Y[individual];
+                }
                 curr_split.I_s.push_back(individual);
                 // sum_s += Y[individual];
               }else{
                 curr_split.I_b.push_back(individual);
                 // sum_b += Y[individual];
               }
-            }
-
-            for(int i=samples[sample_pos-1]+1; i<=samples[sample_pos]; ++i){
-              curr_split.sum_s += Y[unique_samples[i].second];
             }
 
             // Rcout << "Sum_s: ";
