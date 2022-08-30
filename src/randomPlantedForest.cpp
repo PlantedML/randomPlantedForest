@@ -774,7 +774,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         int end = split_try;
         if(deterministic){
           start = 1;
-          end = unique_samples.size() - 1;
+          end = std::min((int)unique_samples.size(), 10);
         }
 
         // consider split_try-number of random samples
@@ -1924,10 +1924,10 @@ void ClassificationRPF::L1_loss(rpf::Split& split){
 
   for(unsigned int p=0; p<split.Y_s[0].size(); ++p){
     for(unsigned int individual=0; individual<split.Y_s.size(); ++individual){
-      split.min_sum += abs(split.Y_s[individual][p] - split.M_s[p]) - abs(split.Y_s[individual][p]);
+      split.min_sum += std::fabs(split.Y_s[individual][p] - split.M_s[p]) - std::fabs(split.Y_s[individual][p]);
     }
     for(unsigned int individual=0; individual<split.Y_b.size(); ++individual){
-      split.min_sum += abs(split.Y_b[individual][p] - split.M_b[p]) - abs(split.Y_b[individual][p]);
+      split.min_sum += std::fabs(split.Y_b[individual][p] - split.M_b[p]) - std::fabs(split.Y_b[individual][p]);
     }
   }
 }
@@ -2544,12 +2544,9 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
         int start = 0;
         int end = split_try;
-        double testtest;
         if(deterministic){
           start = 1;
-          testtest = unique_samples.size();
-          testtest = std::min(testtest,10.0);
-          end = testtest;
+          end = std::min((int)unique_samples.size(), 10);
         }
 
         // consider split_try-number of random samples
