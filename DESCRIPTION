@@ -27,8 +27,7 @@ Suggests:
     mvtnorm,
     recipes,
     rmarkdown,
-    testthat (>= 3.0.0),
-    tidyr
+    testthat (>= 3.0.0)
 LinkingTo: 
     Rcpp
 Config/testthat/edition: 3
