@@ -22,6 +22,7 @@ theme_set(
 )
 
 # Load old RPF R/Cpp implementation. Old rpf function is renamed to oldrpf(), predict function is predict_rpf()
+Rcpp::sourceCpp("C-Code.cpp")
 source("rpf.R")
 source("predict_rpf.R")
 
