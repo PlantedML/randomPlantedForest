@@ -1,29 +1,105 @@
 ---
 title: "Regression Test: oldrpf"
+date: '`r format(Sys.time(), "%F %T %Z")`'
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r, include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-```
 
-```{r setup}
 library(randomPlantedForest)
 library(mvtnorm)
-library(microbenchmark)
 library(data.table)
 library(ggplot2)
+
+theme_set(
+  theme_minimal() +
+    theme(legend.position = "bottom")
+)
 
 # Load old RPF R/Cpp implementation. Old rpf function is renamed to oldrpf(), predict function is predict_rpf()
 source(here::here("oldrpf_compare", "rpf.R"))
 source(here::here("oldrpf_compare", "predict_rpf.R"))
+
+# Comparison helpers
+regression_comparer <- function(y, x, ntrees, max_interaction, splits, split_try, t_try, loss, delta, epsilon, lp = lp) {
+  rpf_r <- oldrpf(
+  Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+  )
+  pred_r <- predict_rpf(x, rpf_r)
+  misclass_R_reg <- mean((lp[, 1] - pred_r)^2)
+  
+  # C++ version
+  rpf_cpp <- rpf(
+    y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+    splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+  )
+  pred_cpp <- predict(rpf_cpp, x)
+  
+  misclass_C_reg <- mean((lp[, 1] - pred_cpp$.pred)^2)
+  diff_reg <- mean((pred_r - pred_cpp$.pred)^2)
+  pred_regr <- data.table(Task = "regr", R = pred_r, Cpp = pred_cpp$.pred)
+  
+  data.table(
+    method = "regr", loss = "L2",
+    misclass_R = misclass_R_reg, misclass_cpp = misclass_C_reg,
+    diff = diff_reg, preds = list(pred_regr)
+  )
+}
+
+classif_comparer <- function(y, x, ntrees, max_interaction, splits, split_try, t_try, loss, delta, epsilon, lop = lop) {
+  # R version
+  #browser()
+  y_cpp <- factor(y)
+  y_oldrpf <- y
+  if (loss == "exponential") {
+    y_oldrpf[y_oldrpf == 0] <- -1
+  } 
+  
+  rpf_r <- oldrpf(
+    Y = y_oldrpf, X = x, ntrees = ntrees, max_interaction = max_interaction,
+    splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+  )
+  pred_r <- predict_rpf(x, rpf_r)
+  if (loss %in% c("logit", "exponential")) {
+    pred_r <- 1 / (1 + exp(-pred_r))
+  }
+  pred_r <- pmin(1, pred_r)
+  pred_r <- pmax(0, pred_r)
+
+  misclass_R <- mean((lop - pred_r)^2)
+
+  # C++ version
+  rpf_cpp <- rpf(
+    y = y_cpp, x = x, ntrees = ntrees, max_interaction = max_interaction,
+    splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+  )
+  pred_cpp <- predict(rpf_cpp, x, type = "prob")
+
+  misclass_C <- mean((lop - pred_cpp$.pred_1)^2)
+
+  diff <- mean((pred_r - pred_cpp$.pred_1)^2)
+
+  pred <- data.table(Task = "classif", R = pred_r, Cpp = pred_cpp$.pred_1)
+
+  data.table(
+    method = "classif", loss = loss,
+    misclass_R = misclass_R, misclass_cpp = misclass_C,
+    diff = diff, preds = list(pred)
+  )
+}
+
 ```
 
-## Regression
+This article serves as a regression test to check the behavior of the current (C++) implementation against the previous
+"old" implementation, referred to as `oldrpf`.
 
-```{r regression}
+```{r sim-params}
 n <- 1000
 p <- 4
 beta <- c(.5, 1, 0, -1.5)
@@ -36,7 +112,6 @@ x <- matrix(rmvnorm(n = n, sigma = sigma),
 )
 lp <- x %*% beta + beta0
 y <- lp[, 1] + rnorm(n)
-# dat <- data.frame(y = y, x)
 
 ntrees <- 10
 max_interaction <- 4
@@ -46,57 +121,47 @@ t_try <- 0.4
 loss <- "L2"
 delta <- 0.1
 epsilon <- 0.1
+```
 
-# R version
-rpf_r <- oldrpf(
-  Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
-)
-pred_r <- predict_rpf(x, rpf_r)
 
-misclass_R_reg <- mean((lp[, 1] - pred_r)^2)
+## Regression
 
-# C++ version
-rpf_cpp <- rpf(
+```{r regression}
+cmp_regr <- regression_comparer(
   y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon, lp = lp
 )
-pred_cpp <- predict(rpf_cpp, x)
-
-misclass_C_reg <- mean((lp[, 1] - pred_cpp$.pred)^2)
-
-diff_reg <- mean((pred_r - pred_cpp$.pred)^2)
-
-pred_regr <- data.table(Task = "regr", R = pred_r, Cpp = pred_cpp$.pred)
-
-# # Plot predictions
 ```
 
 ### Comparison
 
 ```{r regression-plot}
-plot(pred_r, pred_cpp$.pred)
-abline(0, 1, col = "red")
-
-# Compare runtime
-# bench::mark(
-#   r = {
-#     oldrpf(
-#       Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
-#       splits = splits, split_try = split_try, t_try = t_try, loss = loss
-#     )
-#   },
-#   cpp = {
-#     rpf(
-#       y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
-#       splits = splits, split_try = split_try, t_try = t_try, loss = loss
-#     )
-#   },
-#   iterations = 5,
-#   check = FALSE
-# ) |> plot(type = "boxplot")
+cmp_regr[["preds"]][[1]] |>
+  ggplot(aes(x = R, y = Cpp)) +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 ```
 
+
+```{r regression-benchmark, include = FALSE, eval = FALSE}
+# Compare runtime
+bench::mark(
+  r = {
+    oldrpf(
+      Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
+      splits = splits, split_try = split_try, t_try = t_try, loss = loss
+    )
+  },
+  cpp = {
+    rpf(
+      y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+      splits = splits, split_try = split_try, t_try = t_try, loss = loss
+    )
+  },
+  iterations = 5,
+  check = FALSE
+) |> plot(type = "boxplot")
+```
 
 
 ## Classification
@@ -106,7 +171,6 @@ y <- rbinom(n, 1, plogis(lp[, 1]))
 yfac <- factor(y)
 
 lop <- (sign(lp[, 1]) + 1) / 2
-# dat <- data.frame(y = y, x)
 ```
 
 ### L1 Loss
@@ -114,32 +178,15 @@ lop <- (sign(lp[, 1]) + 1) / 2
 ```{r classif-L1}
 loss <- "L1" # "logit" # "L1" # "L2" # "exponential"
 
-# R version
-rpf_r <- oldrpf(
-  Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+cmp_classif_l1 <- classif_comparer(
+  y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon, lop = lop
 )
-pred_r <- predict_rpf(x, rpf_r)
-if (loss %in% c("logit", "exponential")) {
-  pred_r <- 1 / (1 + exp(-pred_r))
-}
-pred_r <- pmin(1, pred_r)
-pred_r <- pmax(0, pred_r)
 
-misclass_R_L1 <- mean((lop - pred_r)^2)
-
-# C++ version
-rpf_cpp <- rpf(
-  y = yfac, x = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
-)
-pred_cpp <- predict(rpf_cpp, x, type = "prob")
-
-misclass_C_L1 <- mean((lop - pred_cpp$.pred_1)^2)
-
-diff_L1 <- mean((pred_r - pred_cpp$.pred_1)^2)
-
-pred_classif_L1 <- data.table(Task = "classif_L1", R = pred_r, Cpp = pred_cpp$.pred_1)
+cmp_classif_l1[["preds"]][[1]] |>
+  ggplot(aes(x = R, y = Cpp)) +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 ```
 
 
@@ -148,32 +195,15 @@ pred_classif_L1 <- data.table(Task = "classif_L1", R = pred_r, Cpp = pred_cpp$.p
 ```{r classif-L2}
 loss <- "L2" # "logit" # "L1" # "L2" # "exponential"
 
-# R version
-rpf_r <- oldrpf(
-  Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+cmp_classif_l2 <- classif_comparer(
+  y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon, lop = lop
 )
-pred_r <- predict_rpf(x, rpf_r)
-if (loss %in% c("logit", "exponential")) {
-  pred_r <- 1 / (1 + exp(-pred_r))
-}
-pred_r <- pmin(1, pred_r)
-pred_r <- pmax(0, pred_r)
 
-misclass_R_L2 <- mean((lop - pred_r)^2)
-
-# C++ version
-rpf_cpp <- rpf(
-  y = yfac, x = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
-)
-pred_cpp <- predict(rpf_cpp, x, type = "prob")
-
-misclass_C_L2 <- mean((lop - pred_cpp$.pred_1)^2)
-
-diff_L2 <- mean((pred_r - pred_cpp$.pred_1)^2)
-
-pred_classif_L2 <- data.table(Task = "classif_L2", R = pred_r, Cpp = pred_cpp$.pred_1)
+cmp_classif_l2[["preds"]][[1]] |>
+  ggplot(aes(x = R, y = Cpp)) +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 ```
 
 ### Logit Loss
@@ -181,35 +211,15 @@ pred_classif_L2 <- data.table(Task = "classif_L2", R = pred_r, Cpp = pred_cpp$.p
 ```{r classif-logit}
 loss <- "logit" # "logit" # "L1" # "L2" # "exponential"
 
-# R version
-rpf_r <- oldrpf(
-  Y = y, X = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+cmp_classif_logit <- classif_comparer(
+  y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon, lop = lop
 )
-pred_r <- predict_rpf(x, rpf_r)
-if (loss %in% c("logit", "exponential")) {
-  pred_r <- 1 / (1 + exp(-pred_r))
-}
-pred_r <- pmin(1, pred_r)
-pred_r <- pmax(0, pred_r)
 
-misclass_R_logit <- mean((lop - pred_r)^2)
-
-# C++ version
-
-# loss <- "logit_2" # "logit" # "L1" # "L2" # "exponential"
-
-rpf_cpp <- rpf(
-  y = yfac, x = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
-)
-pred_cpp <- predict(rpf_cpp, x, type = "prob")
-
-pred_classif_logit <- data.table(Task = "classif_logit", R = pred_r, Cpp = pred_cpp$.pred_1)
-
-diff_logit <- mean((pred_r - pred_cpp$.pred_1)^2)
-
-misclass_C_logit <- mean((lop - pred_cpp$.pred_1)^2)
+cmp_classif_logit[["preds"]][[1]] |>
+  ggplot(aes(x = R, y = Cpp)) +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 ```
 
 
@@ -218,75 +228,39 @@ misclass_C_logit <- mean((lop - pred_cpp$.pred_1)^2)
 ```{r classif-exponential}
 loss <- "exponential" # "logit" # "L1" # "L2" # "exponential"
 
-yexp <- y
-yexp[yexp == 0] <- -1
-
-# R version
-rpf_r <- oldrpf(
-  Y = yexp, X = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
+cmp_classif_exp <- classif_comparer(
+  y = y, x = x, ntrees = ntrees, max_interaction = max_interaction,
+  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon, lop = lop
 )
-pred_r <- predict_rpf(x, rpf_r)
-if (loss %in% c("logit", "exponential")) {
-  pred_r <- 1 / (1 + exp(-pred_r))
-}
-pred_r <- pmin(1, pred_r)
-pred_r <- pmax(0, pred_r)
 
-misclass_R_expo <- mean((lop - pred_r)^2)
-
-# C++ version
-
-# loss <- "exponential_2" # "logit" # "L1" # "L2" # "exponential"
-
-rpf_cpp <- rpf(
-  y = yfac, x = x, ntrees = ntrees, max_interaction = max_interaction,
-  splits = splits, split_try = split_try, t_try = t_try, loss = loss, delta = delta, epsilon = epsilon
-)
-pred_cpp <- predict(rpf_cpp, x, type = "prob")
-
-misclass_C_expo <- mean((lop - pred_cpp$.pred_1)^2)
-
-diff_expo <- mean((pred_r - pred_cpp$.pred_1)^2)
-
-pred_classif_exp <- data.table(Task = "classif_exp", R = pred_r, Cpp = pred_cpp$.pred_1)
+cmp_classif_exp[["preds"]][[1]] |>
+  ggplot(aes(x = R, y = Cpp)) +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 ```
 
-### Comparison
+## Summary Comparison
 
-```{r classif-plot}
-df <- rbind(
-  pred_regr, pred_classif_L1, pred_classif_L2,
-  pred_classif_logit, pred_classif_exp
-)
+```{r classif-plot, fig.dim=c(9, 7)}
+cmp_nested <- rbindlist(list(cmp_regr, cmp_classif_l1, cmp_classif_l2, cmp_classif_logit, cmp_classif_exp))
 
-ggplot(df, aes(x = R, y = Cpp)) +
-  facet_wrap(~Task, scales = "free") +
-  geom_point() +
-  geom_abline(intercept = 0, slope = 1, color = "red") +
-  theme_bw() #+ 
-# xlim(0,1) + ylim(0, 1)
+cmp_nested[, c("method", "loss", "misclass_R", "misclass_cpp", "diff")] |>
+  knitr::kable(digits = 5)
+
+cmp_long <- cmp_nested |>
+  tidyr::unnest(preds) |>
+  as.data.table()
+
+ggplot(cmp_long, aes(x = R, y = Cpp)) +
+  facet_wrap(~Task + loss, scales = "free") +
+  geom_point(size = 2, alpha = 2/3) +
+  geom_abline(color = "red")
 
 # Plot distributions
-df1 <- df[, .(Task, R)]
-df1[, Version := "R"]
-df2 <- df[, .(Task, Cpp)]
-df2[, Version := "Cpp"]
-colnames(df1)[2] <- "Pred"
-colnames(df2)[2] <- "Pred"
-df_both <- rbind(df1, df2)
-
-ggplot(df_both, aes(x = Pred, col = Version)) +
-  facet_wrap(~Task, scales = "free") +
-  stat_ecdf()
-
-tibble::tribble(
-  ~type,     ~loss, ~misclass_R,      ~missclass_cpp,   ~difference,
-  "regr",    "L2",  misclass_R_reg,   misclass_C_reg,   diff_reg,
-  "classif", "L2",  misclass_R_L2,    misclass_C_L2,    diff_L2,
-  "classif", "L2",  misclass_R_L1,    misclass_C_L1,    diff_L1,
-  "classif", "L2",  misclass_R_logit, misclass_C_logit, diff_logit,
-  "classif", "L2",  misclass_R_expo,  misclass_C_expo,  diff_expo
-)
+melt(cmp_long, measure.vars = c("R", "Cpp"), value.name = "Pred", variable.name = "Version") |>
+  ggplot(aes(x = Pred, col = Version)) +
+    facet_wrap(~Task + loss, scales = "free") +
+    stat_ecdf() +
+    scale_color_brewer(palette = "Dark2")
 ```
 
