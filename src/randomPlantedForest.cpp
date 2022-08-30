@@ -748,8 +748,8 @@ void RandomPlantedForest::L2_loss(rpf::Split& split){
   for(int p=0; p<value_size; ++p){
 
     // new formula
-    split.min_sum  += pow(split.sum_s[p], 2) - 2 * split.M_s[p] * split.sum_s[p] + split.I_s.size() * pow(split.M_s[p], 2);
-    split.min_sum  += pow(split.sum_b[p], 2) - 2 * split.M_b[p] * split.sum_b[p] + split.I_b.size() * pow(split.M_b[p], 2);
+    split.min_sum  += - 2 * split.M_s[p] * split.sum_s[p] + split.I_s.size() * pow(split.M_s[p], 2);
+    split.min_sum  += - 2 * split.M_b[p] * split.sum_b[p] + split.I_b.size() * pow(split.M_b[p], 2);
 
     // old formula
     // for(unsigned int individual: split.I_s){
@@ -865,10 +865,12 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         if(unique_samples.size() < 2*leaf_size) continue;
 
         // consider split_try-number of samples
-        std::vector<int> samples(std::min(split_try, int(unique_samples.size())));
+        std::vector<int> samples;
         if(deterministic){ // sequential samples if deterministic
-          std::iota(samples.begin(), samples.end(), 1);
+          samples = std::vector<int>(std::min((int)unique_samples.size() - 1, 10));
+          std::iota(samples.begin(), samples.end(), 0);
         }else{ // randomly picked samples otherwise
+          samples = std::vector<int>(split_try);
           for(int i=0; i<samples.size(); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
           std::sort(samples.begin(), samples.end());
         }
@@ -2641,10 +2643,12 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         if(unique_samples.size() < 2 * leaf_size) continue;
 
         // consider split_try-number of samples
-        std::vector<int> samples(std::min(split_try, int(unique_samples.size())));
+        std::vector<int> samples;
         if(deterministic){ // sequential samples if deterministic
-          std::iota(samples.begin(), samples.end(), 1);
+          samples = std::vector<int>(std::min((int)unique_samples.size() - 1, 10));
+          std::iota(samples.begin(), samples.end(), 0);
         }else{ // randomly picked samples otherwise
+          samples = std::vector<int>(split_try);
           for(int i=0; i<samples.size(); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
           std::sort(samples.begin(), samples.end());
         }
