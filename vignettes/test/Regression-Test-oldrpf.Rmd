@@ -22,8 +22,8 @@ theme_set(
 )
 
 # Load old RPF R/Cpp implementation. Old rpf function is renamed to oldrpf(), predict function is predict_rpf()
-source(here::here("oldrpf_compare", "rpf.R"))
-source(here::here("oldrpf_compare", "predict_rpf.R"))
+source("rpf.R")
+source("predict_rpf.R")
 
 # Comparison helpers
 regression_comparer <- function(y, x, ntrees, max_interaction, splits, split_try, t_try, loss, delta, epsilon, lp = lp) {
