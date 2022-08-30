@@ -23,6 +23,8 @@ Imports:
     Rcpp
 Suggests: 
     covr,
+    ggplot2,
+    mvtnorm,
     recipes,
     rmarkdown,
     testthat (>= 3.0.0)
