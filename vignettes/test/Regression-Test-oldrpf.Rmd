@@ -121,7 +121,7 @@ plot_comparison <- function(comp_dt) {
       scale_color_brewer(palette = "Dark2") +
       labs(
         subtitle = "ECDF of old (R) vs. new (Cpp) version",
-        x = "Predicted Y", y = "True Y"
+        x = "Predicted Y", y = "F(Predicted Y)"
       )
   
   (p1 + p2) +
@@ -155,7 +155,7 @@ plot_comparison_all <- function(...) {
       scale_color_brewer(palette = "Dark2") +
       labs(
         subtitle = "ECDF of old (R) vs. new (Cpp) version",
-        x = "Predicted Y", y = "True Y"
+        x = "Predicted Y", y = "F(Predicted Y)"
       )
   
   #list(p1, p2)
