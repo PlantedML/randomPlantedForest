@@ -8,17 +8,24 @@ editor_options:
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  echo = FALSE,
+  fig.align = "center",
+  fig.width = 10, 
+  fig.height = 7
 )
 
 library(randomPlantedForest)
 library(mvtnorm)
 library(data.table)
 library(ggplot2)
+library(patchwork)
 
 theme_set(
-  theme_minimal() +
-    theme(legend.position = "bottom")
+  theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom"
+    )
 )
 
 # Load old RPF R/Cpp implementation. Old rpf function is renamed to oldrpf(), predict function is predict_rpf()
@@ -92,6 +99,70 @@ classif_comparer <- function(y, x, ntrees, max_interaction, splits, split_try, t
     preds = data.table(method = "classif", loss = loss, R = pred_r, Cpp = pred_cpp$.pred_1)
   )
 }
+
+plot_comparison <- function(comp_dt) {
+  preds <- comp_dt[["preds"]]
+  method <- unique(comp_dt[["preds"]][["method"]])
+  loss <- unique(comp_dt[["preds"]][["loss"]])
+  misclass <- comp_dt[["misclass"]]
+  
+  p1 <- preds |>
+    ggplot(aes(x = R, y = Cpp)) +
+    geom_point(size = 2, alpha = 2/3) +
+    geom_abline(color = "red") +
+    labs(
+      subtitle = "Predictions of old (R) vs. new (Cpp) version"
+    )
+  
+  p2 <- melt(preds, measure.vars = c("R", "Cpp"), value.name = "Pred", variable.name = "Version") |>
+    ggplot(aes(x = Pred, col = Version)) +
+      #facet_wrap(~method + loss, scales = "free") +
+      stat_ecdf() +
+      scale_color_brewer(palette = "Dark2") +
+      labs(
+        subtitle = "ECDF of old (R) vs. new (Cpp) version",
+        x = "Predicted Y", y = "True Y"
+      )
+  
+  (p1 + p2) +
+     plot_annotation(
+        title = sprintf(
+          "Method: %s — Loss: %s\nMSE: R | Cpp | diff — %0.4f | %0.4f | %0.4f", 
+          method, loss, misclass$R, misclass$Cpp, misclass$diff
+        )
+      )
+}
+
+plot_comparison_all <- function(...) {
+ # browser()
+  
+  complist <- list(...)
+  preds <- rbindlist(lapply(complist, function(x) x[["preds"]]))
+  
+  p1 <- preds |>
+    ggplot(aes(x = R, y = Cpp)) +
+    facet_wrap(vars(method, loss), scales = "free") +
+    geom_point(size = 2, alpha = 2/3) +
+    geom_abline(color = "red") +
+    labs(
+      subtitle = "Predictions of old (R) vs. new (Cpp) version"
+    )
+  
+  p2 <- melt(preds, measure.vars = c("R", "Cpp"), value.name = "Pred", variable.name = "Version") |>
+    ggplot(aes(x = Pred, col = Version)) +
+      facet_wrap(vars(method, loss), scales = "free") +
+      stat_ecdf() +
+      scale_color_brewer(palette = "Dark2") +
+      labs(
+        subtitle = "ECDF of old (R) vs. new (Cpp) version",
+        x = "Predicted Y", y = "True Y"
+      )
+  
+  #list(p1, p2)
+  print(p1)
+  print(p2)
+  invisible(list(p1, p2))
+}
 ```
 
 This article serves as a regression test to check the behavior of the current (C++) implementation against the previous
@@ -123,7 +194,7 @@ epsilon <- 0.1
 
 ## Regression
 
-Only supports `loss = "L2"` and parameters `epsilon` and `delta` are not applicable, at least in Cpp version.
+Only supports `loss = "L2"` and parameters `epsilon` and `delta` are not applicable.
 
 ```{r regression}
 cmp_regr <- regression_comparer(
@@ -131,10 +202,9 @@ cmp_regr <- regression_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "L2", delta = delta, epsilon = epsilon, lp = lp
 )
 
-cmp_regr[["preds"]] |>
-  ggplot(aes(x = R, y = Cpp)) +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
+plot_comparison(cmp_regr)
+
+knitr::kable(cmp_regr[["misclass"]], digits = 5)
 ```
 
 
@@ -175,10 +245,9 @@ cmp_classif_l1 <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "L1", delta = delta, epsilon = epsilon, lop = lop
 )
 
-cmp_classif_l1[["preds"]] |>
-  ggplot(aes(x = R, y = Cpp)) +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
+plot_comparison(cmp_regr)
+
+knitr::kable(cmp_regr[["misclass"]], digits = 5)
 ```
 
 
@@ -190,10 +259,9 @@ cmp_classif_l2 <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "L2", delta = delta, epsilon = epsilon, lop = lop
 )
 
-cmp_classif_l2[["preds"]] |>
-  ggplot(aes(x = R, y = Cpp)) +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
+plot_comparison(cmp_regr)
+
+knitr::kable(cmp_regr[["misclass"]], digits = 5)
 ```
 
 ### Logit Loss
@@ -204,10 +272,9 @@ cmp_classif_logit <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "logit", delta = delta, epsilon = epsilon, lop = lop
 )
 
-cmp_classif_logit[["preds"]] |>
-  ggplot(aes(x = R, y = Cpp)) +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
+plot_comparison(cmp_regr)
+
+knitr::kable(cmp_regr[["misclass"]], digits = 5)
 ```
 
 
@@ -220,15 +287,14 @@ cmp_classif_exp <- classif_comparer(
   delta = delta, epsilon = epsilon, lop = lop
 )
 
-cmp_classif_exp[["preds"]] |>
-  ggplot(aes(x = R, y = Cpp)) +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
+plot_comparison(cmp_regr)
+
+knitr::kable(cmp_regr[["misclass"]], digits = 5)
 ```
 
 ## Summary Comparison
 
-```{r comp-misclassif-table, fig.dim=c(9, 7)}
+```{r comp-misclassif-table}
 cmp_misclass <- rbindlist(list(
   cmp_regr[["misclass"]], cmp_classif_l1[["misclass"]], cmp_classif_l2[["misclass"]], 
   cmp_classif_logit[["misclass"]], cmp_classif_exp[["misclass"]]
@@ -238,24 +304,10 @@ knitr::kable(cmp_misclass, digits = 5)
 ```
 
 
-```{r comp-preds-plot, fig.dim=c(9, 7)}
-cmp_preds <- rbindlist(list(
-  cmp_regr[["preds"]], cmp_classif_l1[["preds"]], cmp_classif_l2[["preds"]], 
-  cmp_classif_logit[["preds"]], cmp_classif_exp[["preds"]]
-))
-
-ggplot(cmp_preds, aes(x = R, y = Cpp)) +
-  facet_wrap(~method + loss, scales = "free") +
-  geom_point(size = 2, alpha = 2/3) +
-  geom_abline(color = "red")
-```
-
-
-```{r comp-preds-plot-ecdf, fig.dim=c(9, 7)}
-melt(cmp_preds, measure.vars = c("R", "Cpp"), value.name = "Pred", variable.name = "Version") |>
-  ggplot(aes(x = Pred, col = Version)) +
-    facet_wrap(~method + loss, scales = "free") +
-    stat_ecdf() +
-    scale_color_brewer(palette = "Dark2")
+```{r comp-preds-plot}
+plot_comparison_all(
+  cmp_regr, cmp_classif_l1, cmp_classif_l2, 
+  cmp_classif_logit, cmp_classif_exp
+)
 ```
 

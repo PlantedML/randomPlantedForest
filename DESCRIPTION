@@ -25,6 +25,7 @@ Suggests:
     covr,
     ggplot2,
     mvtnorm,
+    patchwork,
     recipes,
     rmarkdown,
     testthat (>= 3.0.0)
