@@ -787,7 +787,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   rpf::Split curr_split, min_split;
   curr_split.Y = &Y;
   std::set<int> tree_dims;
-  std::vector<std::pair<double, int>> unique_samples;
+  std::vector<double> unique_samples;
   int k;
   unsigned int n = 0;
   double leaf_size, sample_point;
@@ -834,9 +834,9 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         std::vector<double> tot_sum(value_size, 0);
 
         // extract sample points according to individuals from X and Y
-        unique_samples = std::vector<std::pair<double, int>>(leaf.individuals.size());
+        unique_samples = std::vector<double>(leaf.individuals.size());
         for(unsigned int i=0; i<leaf.individuals.size(); ++i){
-          unique_samples[i] = std::make_pair(X[leaf.individuals[i]][k], leaf.individuals[i]);
+          unique_samples[i] = X[leaf.individuals[i]][k];
         }
         std::sort(unique_samples.begin(), unique_samples.end());
         unique_samples.erase(std::unique(unique_samples.begin(), unique_samples.end()), unique_samples.end());
@@ -859,7 +859,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
         for(int sample_pos=0; sample_pos<samples.size(); ++sample_pos){
 
           // get samplepoint
-          sample_point = unique_samples[samples[sample_pos]].first;
+          sample_point = unique_samples[samples[sample_pos]];
 
           // clear current split
           {
@@ -891,7 +891,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
-                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]].first){
+                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]]){
                   curr_split.sum_s += Y[individual];
                 }
                 curr_split.I_s.push_back(individual);
@@ -2563,7 +2563,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
   curr_split.Y = &Y;
   curr_split.W = &weights;
   std::set<int> tree_dims;
-  std::vector<std::pair<double, int>> unique_samples;
+  std::vector<double> unique_samples;
   int k, sample_pos;
   unsigned int n = 0;
   double leaf_size, sample_point;
@@ -2611,9 +2611,9 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         std::vector<double> tot_sum(value_size, 0);
 
         // extract sample points according to individuals from X and Y
-        unique_samples = std::vector<std::pair<double, int>>(leaf.individuals.size());
+        unique_samples = std::vector<double>(leaf.individuals.size());
         for(unsigned int i=0; i<leaf.individuals.size(); ++i){
-          unique_samples[i] = std::make_pair(X[leaf.individuals[i]][k], leaf.individuals[i]);
+          unique_samples[i] = X[leaf.individuals[i]][k];
         }
         std::sort(unique_samples.begin(), unique_samples.end());
         unique_samples.erase(std::unique(unique_samples.begin(), unique_samples.end()), unique_samples.end());
@@ -2636,7 +2636,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
         for(int sample_pos=0; sample_pos<samples.size(); ++sample_pos){
 
           // get samplepoint
-          sample_point = unique_samples[samples[sample_pos]].first;
+          sample_point = unique_samples[samples[sample_pos]];
 
           // clear current split
           {
@@ -2668,7 +2668,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
-                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]].first){
+                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]]){
                   curr_split.sum_s += Y[individual];
                 }
                 curr_split.I_s.push_back(individual);
