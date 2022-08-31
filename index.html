@@ -71,14 +71,14 @@
 <div class="page-header"><h1 id="randomplantedforest">randomPlantedForest<a class="anchor" aria-label="anchor" href="#randomplantedforest"></a>
 </h1></div>
 <!-- badges: start -->
-<p>The goal of randomPlantedForest is to …</p>
+<p><code>randomPlantedForest</code> …</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of randomPlantedForest from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
+<p>You can install the development version of <code>randomPlantedForest</code> from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("devtools")</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PlantedML/randomPlantedForest"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PlantedML/randomPlantedForest"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
@@ -87,7 +87,41 @@
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">rp_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span>, data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span>, data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
+<span><span class="va">rpfit</span></span>
+<span><span class="co">#&gt; -- Regression Random Planted Forest --</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Formula: mpg ~ cyl + wt </span></span>
+<span><span class="co">#&gt; Fit using 2 predictors and main effects only.</span></span>
+<span><span class="co">#&gt; Called with parameters:</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;             loss: L2</span></span>
+<span><span class="co">#&gt;           ntrees: 50</span></span>
+<span><span class="co">#&gt;  max_interaction: 1</span></span>
+<span><span class="co">#&gt;           splits: 30</span></span>
+<span><span class="co">#&gt;        split_try: 10</span></span>
+<span><span class="co">#&gt;            t_try: 0.4</span></span>
+<span><span class="co">#&gt;            delta: 0</span></span>
+<span><span class="co">#&gt;          epsilon: 0.1</span></span>
+<span><span class="co">#&gt;    deterministic: FALSE</span></span>
+<span><span class="co">#&gt;         parallel: FALSE</span></span>
+<span><span class="co">#&gt;           purify: FALSE</span></span>
+<span><span class="co">#&gt;               cv: FALSE</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">10</span>, <span class="op">]</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 10 × 1</span></span>
+<span><span class="co">#&gt;    .pred</span></span>
+<span><span class="co">#&gt;    &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt;  1  19.4</span></span>
+<span><span class="co">#&gt;  2  20.2</span></span>
+<span><span class="co">#&gt;  3  24.5</span></span>
+<span><span class="co">#&gt;  4  20.2</span></span>
+<span><span class="co">#&gt;  5  27.1</span></span>
+<span><span class="co">#&gt;  6  18.7</span></span>
+<span><span class="co">#&gt;  7  25.1</span></span>
+<span><span class="co">#&gt;  8  23.5</span></span>
+<span><span class="co">#&gt;  9  23.3</span></span>
+<span><span class="co">#&gt; 10  19.1</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

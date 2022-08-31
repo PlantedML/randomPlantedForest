@@ -100,6 +100,7 @@
 <dt>max_interaction</dt>
 <dd><p><code>[1]</code>: Maximum level of interaction determining maximum
 number of split dimensions for a tree.
+The default <code>1</code> corresponds to main effects only.
 If <code>0</code>, the number fo columns in <code>x</code> is used, i.e. for 10 predictors,
 this is equivalent to setting <code>max_interaction = 10</code>.</p></dd>
 
@@ -142,11 +143,13 @@ classification, <code>"L1"</code>, <code>"logit"</code> and "<code>exponential</
 
 
 <dt>delta</dt>
-<dd><p><code>[0]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.</p></dd>
+<dd><p><code>[0]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>. Proportion of class membership
+is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.</p></dd>
 
 
 <dt>epsilon</dt>
-<dd><p><code>[0.1]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave.</p></dd>
+<dd><p><code>[0.1]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>. Proportion of class membership
+is truncated to be smaller 1-epsilon when calculating the fit in a leave.</p></dd>
 
 
 <dt>y</dt>
