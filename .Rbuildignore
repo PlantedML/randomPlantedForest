@@ -1,8 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^test_class.R$
 ^test_purify.R$
-^test_regression.R$
 ^LICENSE\.md$
 ^\.github$
 ^randomPlantedForest\.Rcheck$
@@ -13,4 +11,4 @@
 ^docs$
 ^pkgdown$
 ^vignettes/articles$
-^oldrpf_compare$
+^vignettes/test$

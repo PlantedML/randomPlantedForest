@@ -1,3 +1,4 @@
+set.seed(124)
 xdat <- data.frame(
   y01 = sample(c(0L, 1L), 100, replace = TRUE),
   y12 = sample(c(1L, 2L), 100, replace = TRUE),
