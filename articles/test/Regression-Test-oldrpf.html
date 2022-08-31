@@ -69,7 +69,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="" class="logo" alt=""><h1>Regression Test: oldrpf</h1>
             
-            <h4 data-toc-skip class="date">2022-08-31 16:25:45 UTC</h4>
+            <h4 data-toc-skip class="date">2022-08-31 17:28:52 UTC</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/HEAD/vignettes/test/Regression-Test-oldrpf.Rmd" class="external-link"><code>vignettes/test/Regression-Test-oldrpf.Rmd</code></a></small>
       <div class="d-none name"><code>Regression-Test-oldrpf.Rmd</code></div>
@@ -78,121 +78,119 @@
     
     
 <p>This article serves as a regression test to check the behavior of the current (C++) implementation against the previous “old” implementation, referred to as <code>oldrpf</code>.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">1000</span></span>
-<span><span class="va">p</span> <span class="op">&lt;-</span> <span class="fl">4</span></span>
-<span><span class="va">beta</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">.5</span>, <span class="fl">1</span>, <span class="fl">0</span>, <span class="op">-</span><span class="fl">1.5</span><span class="op">)</span></span>
-<span><span class="va">beta0</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
-<span><span class="va">cov_base</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
-<span><span class="va">sigma</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/toeplitz.html" class="external-link">toeplitz</a></span><span class="op">(</span><span class="va">cov_base</span><span class="op">^</span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="op">(</span><span class="va">p</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu">rmvnorm</span><span class="op">(</span>n <span class="op">=</span> <span class="va">n</span>, sigma <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span>,</span>
-<span>  ncol <span class="op">=</span> <span class="va">p</span>,</span>
-<span>  dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">NULL</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"x"</span>, <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">p</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">lp</span> <span class="op">&lt;-</span> <span class="va">x</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">beta</span> <span class="op">+</span> <span class="va">beta0</span></span>
-<span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">lp</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">ntrees</span> <span class="op">&lt;-</span> <span class="fl">10</span></span>
-<span><span class="va">max_interaction</span> <span class="op">&lt;-</span> <span class="fl">4</span></span>
-<span><span class="va">splits</span> <span class="op">&lt;-</span> <span class="fl">10</span></span>
-<span><span class="va">split_try</span> <span class="op">&lt;-</span> <span class="fl">10</span></span>
-<span><span class="va">t_try</span> <span class="op">&lt;-</span> <span class="fl">0.4</span></span>
-<span><span class="va">delta</span> <span class="op">&lt;-</span> <span class="fl">0.1</span></span>
-<span><span class="va">epsilon</span> <span class="op">&lt;-</span> <span class="fl">0.1</span></span></code></pre></div>
 <div class="section level2">
 <h2 id="regression">Regression<a class="anchor" aria-label="anchor" href="#regression"></a>
 </h2>
-<p>Only supports <code>loss = "L2"</code> and parameters <code>epsilon</code> and <code>delta</code> are not applicable, at least in Cpp version.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_regr</span> <span class="op">&lt;-</span> <span class="fu">regression_comparer</span><span class="op">(</span></span>
-<span>  y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, ntrees <span class="op">=</span> <span class="va">ntrees</span>, max_interaction <span class="op">=</span> <span class="va">max_interaction</span>,</span>
-<span>  splits <span class="op">=</span> <span class="va">splits</span>, split_try <span class="op">=</span> <span class="va">split_try</span>, t_try <span class="op">=</span> <span class="va">t_try</span>, loss <span class="op">=</span> <span class="st">"L2"</span>, delta <span class="op">=</span> <span class="va">delta</span>, epsilon <span class="op">=</span> <span class="va">epsilon</span>, lp <span class="op">=</span> <span class="va">lp</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">cmp_regr</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/regression-1.png" width="700"></p>
+<p>Only supports <code>loss = "L2"</code> and parameters <code>epsilon</code> and <code>delta</code> are not applicable.</p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/regression-1.png" width="960" style="display: block; margin: auto;"></p>
+<table class="table">
+<thead><tr class="header">
+<th align="left">method</th>
+<th align="left">loss</th>
+<th align="right">R</th>
+<th align="right">Cpp</th>
+<th align="right">diff</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">regr</td>
+<td align="left">L2</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
+</tr></tbody>
+</table>
 </div>
 <div class="section level2">
 <h2 id="classification">Classification<a class="anchor" aria-label="anchor" href="#classification"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="va">n</span>, <span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="va">lp</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">lop</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sign.html" class="external-link">sign</a></span><span class="op">(</span><span class="va">lp</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span> <span class="op">/</span> <span class="fl">2</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="l1-loss">L1 Loss<a class="anchor" aria-label="anchor" href="#l1-loss"></a>
 </h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_classif_l1</span> <span class="op">&lt;-</span> <span class="fu">classif_comparer</span><span class="op">(</span></span>
-<span>  y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, ntrees <span class="op">=</span> <span class="va">ntrees</span>, max_interaction <span class="op">=</span> <span class="va">max_interaction</span>,</span>
-<span>  splits <span class="op">=</span> <span class="va">splits</span>, split_try <span class="op">=</span> <span class="va">split_try</span>, t_try <span class="op">=</span> <span class="va">t_try</span>, loss <span class="op">=</span> <span class="st">"L1"</span>, delta <span class="op">=</span> <span class="va">delta</span>, epsilon <span class="op">=</span> <span class="va">epsilon</span>, lop <span class="op">=</span> <span class="va">lop</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">cmp_classif_l1</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L1-1.png" width="700"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L1-1.png" width="960" style="display: block; margin: auto;"></p>
+<table class="table">
+<thead><tr class="header">
+<th align="left">method</th>
+<th align="left">loss</th>
+<th align="right">R</th>
+<th align="right">Cpp</th>
+<th align="right">diff</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">regr</td>
+<td align="left">L2</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
+</tr></tbody>
+</table>
 </div>
 <div class="section level3">
 <h3 id="l2-loss">L2 Loss<a class="anchor" aria-label="anchor" href="#l2-loss"></a>
 </h3>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_classif_l2</span> <span class="op">&lt;-</span> <span class="fu">classif_comparer</span><span class="op">(</span></span>
-<span>  y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, ntrees <span class="op">=</span> <span class="va">ntrees</span>, max_interaction <span class="op">=</span> <span class="va">max_interaction</span>,</span>
-<span>  splits <span class="op">=</span> <span class="va">splits</span>, split_try <span class="op">=</span> <span class="va">split_try</span>, t_try <span class="op">=</span> <span class="va">t_try</span>, loss <span class="op">=</span> <span class="st">"L2"</span>, delta <span class="op">=</span> <span class="va">delta</span>, epsilon <span class="op">=</span> <span class="va">epsilon</span>, lop <span class="op">=</span> <span class="va">lop</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">cmp_classif_l2</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L2-1.png" width="700"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L2-1.png" width="960" style="display: block; margin: auto;"></p>
+<table class="table">
+<thead><tr class="header">
+<th align="left">method</th>
+<th align="left">loss</th>
+<th align="right">R</th>
+<th align="right">Cpp</th>
+<th align="right">diff</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">regr</td>
+<td align="left">L2</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
+</tr></tbody>
+</table>
 </div>
 <div class="section level3">
 <h3 id="logit-loss">Logit Loss<a class="anchor" aria-label="anchor" href="#logit-loss"></a>
 </h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_classif_logit</span> <span class="op">&lt;-</span> <span class="fu">classif_comparer</span><span class="op">(</span></span>
-<span>  y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, ntrees <span class="op">=</span> <span class="va">ntrees</span>, max_interaction <span class="op">=</span> <span class="va">max_interaction</span>,</span>
-<span>  splits <span class="op">=</span> <span class="va">splits</span>, split_try <span class="op">=</span> <span class="va">split_try</span>, t_try <span class="op">=</span> <span class="va">t_try</span>, loss <span class="op">=</span> <span class="st">"logit"</span>, delta <span class="op">=</span> <span class="va">delta</span>, epsilon <span class="op">=</span> <span class="va">epsilon</span>, lop <span class="op">=</span> <span class="va">lop</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">cmp_classif_logit</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-logit-1.png" width="700"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-logit-1.png" width="960" style="display: block; margin: auto;"></p>
+<table class="table">
+<thead><tr class="header">
+<th align="left">method</th>
+<th align="left">loss</th>
+<th align="right">R</th>
+<th align="right">Cpp</th>
+<th align="right">diff</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">regr</td>
+<td align="left">L2</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
+</tr></tbody>
+</table>
 </div>
 <div class="section level3">
 <h3 id="exponential-loss">Exponential Loss<a class="anchor" aria-label="anchor" href="#exponential-loss"></a>
 </h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_classif_exp</span> <span class="op">&lt;-</span> <span class="fu">classif_comparer</span><span class="op">(</span></span>
-<span>  y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, ntrees <span class="op">=</span> <span class="va">ntrees</span>, max_interaction <span class="op">=</span> <span class="va">max_interaction</span>,</span>
-<span>  splits <span class="op">=</span> <span class="va">splits</span>, split_try <span class="op">=</span> <span class="va">split_try</span>, t_try <span class="op">=</span> <span class="va">t_try</span>, loss <span class="op">=</span> <span class="st">"exponential"</span>, </span>
-<span>  delta <span class="op">=</span> <span class="va">delta</span>, epsilon <span class="op">=</span> <span class="va">epsilon</span>, lop <span class="op">=</span> <span class="va">lop</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">cmp_classif_exp</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-exponential-1.png" width="700"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-exponential-1.png" width="960" style="display: block; margin: auto;"></p>
+<table class="table">
+<thead><tr class="header">
+<th align="left">method</th>
+<th align="left">loss</th>
+<th align="right">R</th>
+<th align="right">Cpp</th>
+<th align="right">diff</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">regr</td>
+<td align="left">L2</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
+</tr></tbody>
+</table>
 </div>
 </div>
 <div class="section level2">
 <h2 id="summary-comparison">Summary Comparison<a class="anchor" aria-label="anchor" href="#summary-comparison"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_misclass</span> <span class="op">&lt;-</span> <span class="fu">rbindlist</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  <span class="va">cmp_regr</span><span class="op">[[</span><span class="st">"misclass"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_l1</span><span class="op">[[</span><span class="st">"misclass"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_l2</span><span class="op">[[</span><span class="st">"misclass"</span><span class="op">]</span><span class="op">]</span>, </span>
-<span>  <span class="va">cmp_classif_logit</span><span class="op">[[</span><span class="st">"misclass"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_exp</span><span class="op">[[</span><span class="st">"misclass"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">cmp_misclass</span>, digits <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></code></pre></div>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -205,58 +203,41 @@
 <tr class="odd">
 <td align="left">regr</td>
 <td align="left">L2</td>
-<td align="right">0.17545</td>
-<td align="right">0.16876</td>
-<td align="right">0.08233</td>
+<td align="right">0.18602</td>
+<td align="right">0.17566</td>
+<td align="right">0.10227</td>
 </tr>
 <tr class="even">
 <td align="left">classif</td>
 <td align="left">L1</td>
-<td align="right">0.08116</td>
-<td align="right">0.07677</td>
-<td align="right">0.00422</td>
+<td align="right">0.08390</td>
+<td align="right">0.08017</td>
+<td align="right">0.00368</td>
 </tr>
 <tr class="odd">
 <td align="left">classif</td>
 <td align="left">L2</td>
-<td align="right">0.08454</td>
-<td align="right">0.08360</td>
-<td align="right">0.00456</td>
+<td align="right">0.08637</td>
+<td align="right">0.08857</td>
+<td align="right">0.00325</td>
 </tr>
 <tr class="even">
 <td align="left">classif</td>
 <td align="left">logit</td>
-<td align="right">0.08343</td>
-<td align="right">0.08342</td>
-<td align="right">0.00286</td>
+<td align="right">0.08422</td>
+<td align="right">0.08770</td>
+<td align="right">0.00364</td>
 </tr>
 <tr class="odd">
 <td align="left">classif</td>
 <td align="left">exponential</td>
-<td align="right">0.07780</td>
-<td align="right">0.07070</td>
-<td align="right">0.00446</td>
+<td align="right">0.07702</td>
+<td align="right">0.08158</td>
+<td align="right">0.00409</td>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">cmp_preds</span> <span class="op">&lt;-</span> <span class="fu">rbindlist</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  <span class="va">cmp_regr</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_l1</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_l2</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span>, </span>
-<span>  <span class="va">cmp_classif_logit</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span>, <span class="va">cmp_classif_exp</span><span class="op">[[</span><span class="st">"preds"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">ggplot</span><span class="op">(</span><span class="va">cmp_preds</span>, <span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">R</span>, y <span class="op">=</span> <span class="va">Cpp</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">facet_wrap</span><span class="op">(</span><span class="op">~</span><span class="va">method</span> <span class="op">+</span> <span class="va">loss</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_point</span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">/</span><span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">geom_abline</span><span class="op">(</span>color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-1.png" width="864"></p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">melt</span><span class="op">(</span><span class="va">cmp_preds</span>, measure.vars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"R"</span>, <span class="st">"Cpp"</span><span class="op">)</span>, value.name <span class="op">=</span> <span class="st">"Pred"</span>, variable.name <span class="op">=</span> <span class="st">"Version"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">Pred</span>, col <span class="op">=</span> <span class="va">Version</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">facet_wrap</span><span class="op">(</span><span class="op">~</span><span class="va">method</span> <span class="op">+</span> <span class="va">loss</span>, scales <span class="op">=</span> <span class="st">"free"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">stat_ecdf</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu">scale_color_brewer</span><span class="op">(</span>palette <span class="op">=</span> <span class="st">"Dark2"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-ecdf-1.png" width="864"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-1.png" width="960" style="display: block; margin: auto;"><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-2.png" width="960" style="display: block; margin: auto;"></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside>
