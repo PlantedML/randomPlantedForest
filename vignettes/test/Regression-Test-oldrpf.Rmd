@@ -245,9 +245,9 @@ cmp_classif_l1 <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "L1", delta = delta, epsilon = epsilon, lop = lop
 )
 
-plot_comparison(cmp_regr)
+plot_comparison(cmp_classif_l1)
 
-knitr::kable(cmp_regr[["misclass"]], digits = 5)
+knitr::kable(cmp_classif_l1[["misclass"]], digits = 5)
 ```
 
 
@@ -259,9 +259,9 @@ cmp_classif_l2 <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "L2", delta = delta, epsilon = epsilon, lop = lop
 )
 
-plot_comparison(cmp_regr)
+plot_comparison(cmp_classif_l2)
 
-knitr::kable(cmp_regr[["misclass"]], digits = 5)
+knitr::kable(cmp_classif_l2[["misclass"]], digits = 5)
 ```
 
 ### Logit Loss
@@ -272,9 +272,9 @@ cmp_classif_logit <- classif_comparer(
   splits = splits, split_try = split_try, t_try = t_try, loss = "logit", delta = delta, epsilon = epsilon, lop = lop
 )
 
-plot_comparison(cmp_regr)
+plot_comparison(cmp_classif_logit)
 
-knitr::kable(cmp_regr[["misclass"]], digits = 5)
+knitr::kable(cmp_classif_logit[["misclass"]], digits = 5)
 ```
 
 
@@ -287,9 +287,9 @@ cmp_classif_exp <- classif_comparer(
   delta = delta, epsilon = epsilon, lop = lop
 )
 
-plot_comparison(cmp_regr)
+plot_comparison(cmp_classif_exp)
 
-knitr::kable(cmp_regr[["misclass"]], digits = 5)
+knitr::kable(cmp_classif_exp[["misclass"]], digits = 5)
 ```
 
 ## Summary Comparison
