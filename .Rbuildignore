@@ -12,3 +12,4 @@
 ^pkgdown$
 ^vignettes/articles$
 ^vignettes/test$
+^README\.Rmd$

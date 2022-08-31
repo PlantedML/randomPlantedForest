@@ -1,0 +1,46 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# randomPlantedForest
+
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/workflows/R-CMD-check/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions)
+[![Codecov test coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
+<!-- badges: end -->
+
+`randomPlantedForest` ...
+
+## Installation
+
+You can install the development version of `randomPlantedForest` from [GitHub](https://github.com/) with:
+
+```r
+# install.packages("remotes")
+remotes::install_github("PlantedML/randomPlantedForest")
+```
+
+## Example
+
+This is a basic example which shows you how to solve a common problem:
+
+```{r}
+library(randomPlantedForest)
+
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
+rpfit
+
+predict(rpfit, new_data = mtcars[1:10, ])
+```
+
