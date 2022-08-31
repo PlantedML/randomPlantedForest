@@ -738,13 +738,16 @@ void RandomPlantedForest::L2_loss(rpf::Split& split){
   split.M_b = split.sum_b / split.I_b.size();
 
   // old mean calculation
-  // auto M_s = calcMean(*split.Y, split.I_s);
-  // auto M_b = calcMean(*split.Y, split.I_b);
+  // split.M_s = calcMean(*split.Y, split.I_s);
+  // split.M_b = calcMean(*split.Y, split.I_b);
   // for(int i=0; i< M_s.size(); ++i) Rcout << M_s[i] << "/" << split.M_s[i] << ", ";
   // Rcout << std::endl;
 
+  //std::vector<double> M_s = split.M_s;
+  //std::vector<double> M_b = split.M_b;
+
   split.min_sum = 0;
-  // auto min_sum = split.min_sum;
+  //auto min_sum = split.min_sum;
   for(int p=0; p<value_size; ++p){
 
     // new formula
@@ -752,12 +755,12 @@ void RandomPlantedForest::L2_loss(rpf::Split& split){
     split.min_sum  += - 2 * split.M_b[p] * split.sum_b[p] + split.I_b.size() * pow(split.M_b[p], 2);
 
     // old formula
-    // for(unsigned int individual: split.I_s){
-    //   min_sum += pow((*split.Y)[individual][p] - M_s[p], 2) - pow((*split.Y)[individual][p], 2);
-    // }
-    // for(unsigned int individual: split.I_b){
-    //   min_sum += pow((*split.Y)[individual][p] - M_b[p], 2) - pow((*split.Y)[individual][p], 2);
-    // }
+    //for(unsigned int individual: split.I_s){
+    //  split.min_sum += pow((*split.Y)[individual][p] - M_s[p], 2) - pow((*split.Y)[individual][p], 2);
+    //}
+    //for(unsigned int individual: split.I_b){
+    //  split.min_sum += pow((*split.Y)[individual][p] - M_b[p], 2) - pow((*split.Y)[individual][p], 2);
+    //}
   }
 
   // Rcout << split.min_sum << " vs. " << min_sum << ", ";
@@ -911,7 +914,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
-                if(X[individual][k] > unique_samples[samples[sample_pos - 1]].first){
+                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]].first){
                   curr_split.sum_s += Y[individual];
                 }
                 curr_split.I_s.push_back(individual);
@@ -2692,7 +2695,7 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
             for(int individual: leaf.individuals){
               if(X[individual][k] < sample_point){
-                if(X[individual][k] > unique_samples[samples[sample_pos - 1]].first){
+                if(X[individual][k] >= unique_samples[samples[sample_pos - 1]].first){
                   curr_split.sum_s += Y[individual];
                 }
                 curr_split.I_s.push_back(individual);
