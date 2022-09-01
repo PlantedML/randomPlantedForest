@@ -104,15 +104,6 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed, loss)
 
-  # FIXME: Remove exponential_2 if discarded
-  if (ncol(outcomes$outcomes) > 1) {
-    loss <- switch (loss,
-      # "logit" = "logit_2",
-      "exponential" = "exponential_2",
-      loss
-    )
-  }
-
   # Check arguments
   checkmate::assert_int(
     max_interaction,
@@ -136,7 +127,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2")
+    choices = c("L1", "L2", "logit", "exponential")
   )
 
   checkmate::assert_logical(deterministic, len = 1)

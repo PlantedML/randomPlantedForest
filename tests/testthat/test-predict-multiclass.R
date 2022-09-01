@@ -116,7 +116,7 @@ test_that("exponential: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  expect_identical(classif_fit$loss, "exponential_2")
+  expect_identical(classif_fit$loss, "exponential")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
