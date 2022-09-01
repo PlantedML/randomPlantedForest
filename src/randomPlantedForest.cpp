@@ -224,14 +224,6 @@ void operator*=(std::vector<T>& vec_a, const std::vector<T>& vec_b){
 
 // ----------------- custom data types -----------------
 
-bool comparator(const std::pair<double, int>& l, const std::pair<double, int>& r){
-  return l.first < r.first;
-}
-
-bool operator==(const std::pair<double, int>& l, std::pair<double, int>& r){
-  return l.first == r.first;
-}
-
 struct setComp{
   bool operator()(const std::set<int>& a, const std::set<int>& b) const{
     if(a == b) return false; // what if same?
@@ -261,8 +253,8 @@ double eps = 1e-16;
  */
 struct Leaf{
   std::vector<int> individuals;       /**< considered samples for each leaf */
-std::vector<double> value;          /**< residual */
-std::vector<Interval> intervals;    /**< min/max for each feature of the interval */
+  std::vector<double> value;          /**< residual */
+  std::vector<Interval> intervals;    /**< min/max for each feature of the interval */
 };
 
 /**
@@ -271,21 +263,20 @@ std::vector<Interval> intervals;    /**< min/max for each feature of the interva
  */
 class DecisionTree {
 
-  friend class RandomPlantedForest;
-  friend class ClassificationRPF;
+    friend class RandomPlantedForest;
+    friend class ClassificationRPF;
 
-public:
-  DecisionTree() {};
-  DecisionTree(std::set<int> dims, std::vector<Leaf>& first_leaves):
-    split_dims(dims), leaves(first_leaves) {};
-  DecisionTree(std::set<int> dims): split_dims(dims) {};
-  std::set<int> get_split_dims() const;
-  std::vector<Leaf> get_leaves() const;
+  public:
+    DecisionTree() {};
+    DecisionTree(std::set<int> dims, std::vector<Leaf>& first_leaves):
+                split_dims(dims), leaves(first_leaves) {};
+    DecisionTree(std::set<int> dims): split_dims(dims) {};
+    std::set<int> get_split_dims() const;
+    std::vector<Leaf> get_leaves() const;
 
-private:
-  std::set<int> split_dims;       /**<  dimensions of the performed splits */
-std::vector<Leaf> leaves;       /**<  leaves of tree containing intervals and approximating value */
-// idea: save intervals as interval-tree with nodes and corresponding values
+  private:
+    std::set<int> split_dims;       /**<  dimensions of the performed splits */
+    std::vector<Leaf> leaves;       /**<  leaves of tree containing intervals and approximating value */
 };
 
 std::set<int> DecisionTree::get_split_dims() const{
@@ -368,74 +359,74 @@ typedef std::vector< typename Dimension::iterator > Point;
 
 class NDGrid{
 
-private:
-  Space space;
-  bool first = true;
-  Point current;
+  private:
+    Space space;
+    bool first = true;
+    Point current;
 
-public:
+  public:
 
-  NDGrid(){}
+    NDGrid(){}
 
-  NDGrid(std::vector<int> dims) : dimensions(dims){
-    // fill space with dimensions
-    for(const auto& dim: dims){
-      Dimension d;
-      for(int i=0; i<dim; ++i){
-        d.push_back(i);
+    NDGrid(std::vector<int> dims) : dimensions(dims){
+      // fill space with dimensions
+      for(const auto& dim: dims){
+        Dimension d;
+        for(int i=0; i<dim; ++i){
+          d.push_back(i);
+        }
+        space.push_back(d);
       }
-      space.push_back(d);
     }
-  }
 
-  Dimension dimensions;
-  std::vector<int> getPoint(){
-    std::vector<int> gridPoint(current.size());
-    for(unsigned int i=0; i<current.size(); ++i){
-      gridPoint[i] = *current[i];
-    }
-    return gridPoint;
-  };
+    Dimension dimensions;
+    std::vector<int> getPoint(){
+      std::vector<int> gridPoint(current.size());
+      for(unsigned int i=0; i<current.size(); ++i){
+        gridPoint[i] = *current[i];
+      }
+      return gridPoint;
+    };
 
-  // the loop over space and the function-pointer to call at each point
-  bool nextPoint(){
+    // the loop over space and the function-pointer to call at each point
+    bool nextPoint(){
 
-    // get first point in N-dimensional space
-    if(first){
-      first = false;
-      for( Space::iterator dims_it = space.begin() ; dims_it!=space.end() ; ++dims_it ){
-        current.push_back( (*dims_it).begin() );
+      // get first point in N-dimensional space
+      if(first){
+        first = false;
+        for( Space::iterator dims_it = space.begin() ; dims_it!=space.end() ; ++dims_it ){
+          current.push_back( (*dims_it).begin() );
+        }
+        return false;
+      }
+
+      // go to next point in space
+      Space::iterator dims_it = space.begin();
+      Point::iterator cur_it = current.begin();
+      for(  ; dims_it!=space.end() ; ++dims_it, ++cur_it ){
+
+        // check if next in dimension is at the end
+        if ( ++(*cur_it) == (*dims_it).end() ){
+
+          // check if we have finished whole space
+          if( dims_it == space.end() - 1 ){
+            // reset setup for next time of iteration
+            first = true;
+            current.clear();
+            // stop running now
+            return true;
+          }
+          // reset this dimension to begin
+          // and go to next dimension
+          *cur_it = (*dims_it).begin();
+        }else{
+          // next point is valid
+          break;
+        }
       }
       return false;
     }
-
-    // go to next point in space
-    Space::iterator dims_it = space.begin();
-    Point::iterator cur_it = current.begin();
-    for(  ; dims_it!=space.end() ; ++dims_it, ++cur_it ){
-
-      // check if next in dimension is at the end
-      if ( ++(*cur_it) == (*dims_it).end() ){
-
-        // check if we have finished whole space
-        if( dims_it == space.end() - 1 ){
-          // reset setup for next time of iteration
-          first = true;
-          current.clear();
-          // stop running now
-          return true;
-        }
-        // reset this dimension to begin
-        // and go to next dimension
-        *cur_it = (*dims_it).begin();
-      }else{
-        // next point is valid
-        break;
-      }
-    }
-    return false;
-  }
-};
+  };
 
 }
 
@@ -685,50 +676,50 @@ std::vector<VT> calcMean(const std::vector<std::vector<VT>>& mat, const std::vec
  */
 class RandomPlantedForest {
 
-public:
-  RandomPlantedForest(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
-                      const NumericVector parameters={1,50,30,10,0.4,0,0,0,0});
-  RandomPlantedForest() {};
-  void set_data(const NumericMatrix& samples_Y, const NumericMatrix& samples_X);
-  NumericMatrix predict_matrix(const NumericMatrix& X, const NumericVector components = {0});
-  NumericMatrix predict_vector(const NumericVector& X, const NumericVector components = {0});
-  void purify();
-  void new_purify();
-  void print();
-  void cross_validation(int n_sets=4, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
-  double MSE(const NumericMatrix& Y_predicted, const NumericMatrix& Y_true);
-  void get_parameters();
-  void set_parameters(StringVector keys, NumericVector values);
-  List get_model();
-  virtual ~RandomPlantedForest(){};
+  public:
+    RandomPlantedForest(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
+                        const NumericVector parameters={1,50,30,10,0.4,0,0,0,0});
+    RandomPlantedForest() {};
+    void set_data(const NumericMatrix& samples_Y, const NumericMatrix& samples_X);
+    NumericMatrix predict_matrix(const NumericMatrix& X, const NumericVector components = {0});
+    NumericMatrix predict_vector(const NumericVector& X, const NumericVector components = {0});
+    void purify();
+    void new_purify();
+    void print();
+    void cross_validation(int n_sets=4, IntegerVector splits={5,50}, NumericVector t_tries={0.2,0.5,0.7,0.9}, IntegerVector split_tries={1,2,5,10});
+    double MSE(const NumericMatrix& Y_predicted, const NumericMatrix& Y_true);
+    void get_parameters();
+    void set_parameters(StringVector keys, NumericVector values);
+    List get_model();
+    virtual ~RandomPlantedForest(){};
 
-protected:
-  double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
-  std::vector<std::vector<double>> X;         /**< Nested vector feature samples of size (sample_size x feature_size) */
-  std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
-  int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
-  int n_trees;                                /**< Number of trees generated per family */
-  int n_splits;                               /**< Number of performed splits for each tree family */
-  std::vector<int> n_leaves;                  /**< */
-  double t_try = 0.4;                         /**< */
-  int split_try = 10;                         /**< */
-  int value_size = 1;
-  int feature_size = 0;                       /**< Number of feature dimension in X */
-  int sample_size = 0;                        /**< Number of samples of X */
-  bool purify_forest = 0;                     /**< Whether the forest should be purified */
-  bool purified = false;                      /**< Track if forest is currently purified */
-  bool deterministic = false;                 /**< Choose whether approach deterministic or random */
-  bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
-  bool cross_validate = false;                /**< Determines if cross validation is performed */
-  std::vector<double> upper_bounds;
-  std::vector<double> lower_bounds;
-  std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
-  std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
-  void L2_loss(rpf::Split &split);
-  virtual void fit();
-  virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
-  virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
-                                      std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family);
+  protected:
+    double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
+    std::vector<std::vector<double>> X;         /**< Nested vector feature samples of size (sample_size x feature_size) */
+    std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
+    int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
+    int n_trees;                                /**< Number of trees generated per family */
+    int n_splits;                               /**< Number of performed splits for each tree family */
+    std::vector<int> n_leaves;                  /**< */
+    double t_try = 0.4;                         /**< */
+    int split_try = 10;                         /**< */
+    int value_size = 1;
+    int feature_size = 0;                       /**< Number of feature dimension in X */
+    int sample_size = 0;                        /**< Number of samples of X */
+    bool purify_forest = 0;                     /**< Whether the forest should be purified */
+    bool purified = false;                      /**< Track if forest is currently purified */
+    bool deterministic = false;                 /**< Choose whether approach deterministic or random */
+    bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
+    bool cross_validate = false;                /**< Determines if cross validation is performed */
+    std::vector<double> upper_bounds;
+    std::vector<double> lower_bounds;
+    std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
+    std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+    void L2_loss(rpf::Split &split);
+    virtual void fit();
+    virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+    virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                                        std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family);
 };
 
 void RandomPlantedForest::L2_loss(rpf::Split& split){
@@ -1972,38 +1963,38 @@ List RandomPlantedForest::get_model(){
  */
 class ClassificationRPF : public RandomPlantedForest {
 
-public:
-  ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
-                    const String loss="L2", const NumericVector parameters={1,50,30,10,0.4,0,0,0,0,0,0.1});
-  void set_parameters(StringVector keys, NumericVector values);
-  ~ClassificationRPF(){};
+  public:
+    ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
+                      const String loss="L2", const NumericVector parameters={1,50,30,10,0.4,0,0,0,0,0,0.1});
+    void set_parameters(StringVector keys, NumericVector values);
+    ~ClassificationRPF(){};
 
-private:
-  double delta;
-  double epsilon;
-  enum LossType { L1, L2, median, logit, logit_2, logit_3, logit_4, exponential, exponential_2, exponential_3};
-  LossType loss;
-  void (ClassificationRPF::*calcLoss)(rpf::Split&);
-  void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
-  void fit() override;
-  rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
-                              std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family,
-                              std::vector<std::vector<double>>& weights);
-  void L1_loss(rpf::Split &split);
-  void median_loss(rpf::Split &split);
-  void logit_loss(rpf::Split &split);
-  void logit_loss_2(rpf::Split &split);
-  void logit_loss_3(rpf::Split &split);
-  void logit_loss_4(rpf::Split &split);
-  void exponential_loss(rpf::Split &split);
-  void exponential_loss_2(rpf::Split &split);
-  void exponential_loss_3(rpf::Split &split);
+  private:
+    double delta;
+    double epsilon;
+    enum LossType { L1, L2, median, logit, logit_2, logit_3, logit_4, exponential, exponential_2, exponential_3};
+    LossType loss;
+    void (ClassificationRPF::*calcLoss)(rpf::Split&);
+    void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
+    void fit() override;
+    rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+                                std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family,
+                                std::vector<std::vector<double>>& weights);
+    void L1_loss(rpf::Split &split);
+    void median_loss(rpf::Split &split);
+    void logit_loss(rpf::Split &split);
+    void logit_loss_2(rpf::Split &split);
+    void logit_loss_3(rpf::Split &split);
+    void logit_loss_4(rpf::Split &split);
+    void exponential_loss(rpf::Split &split);
+    void exponential_loss_2(rpf::Split &split);
+    void exponential_loss_3(rpf::Split &split);
 };
 
 void ClassificationRPF::L1_loss(rpf::Split& split){
   split.min_sum = 0;
-  split.M_s = calcMean(*split.Y, split.I_s);
-  split.M_b = calcMean(*split.Y, split.I_b);
+  split.M_s = split.sum_s / split.I_s.size();
+  split.M_b = split.sum_b / split.I_b.size();
 
   for(int p=0; p<value_size; ++p){
     for(auto individual: split.I_s){
@@ -2033,8 +2024,8 @@ void ClassificationRPF::median_loss(rpf::Split& split){
 void ClassificationRPF::logit_loss(rpf::Split& split){
 
   split.min_sum = 0;
-  split.M_s = calcMean(*split.Y, split.I_s);
-  split.M_b = calcMean(*split.Y, split.I_b);
+  split.M_s = split.sum_s / split.I_s.size();
+  split.M_b = split.sum_b / split.I_b.size();
   split.M_sp = 1 - std::accumulate(split.M_s.begin(), split.M_s.end(), 0.0);
   split.M_bp = 1 - std::accumulate(split.M_b.begin(), split.M_b.end(), 0.0);
 
@@ -2091,8 +2082,8 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
 void ClassificationRPF::logit_loss_2(rpf::Split& split){
 
   split.min_sum = 0;
-  split.M_s = calcMean(*split.Y, split.I_s);
-  split.M_b = calcMean(*split.Y, split.I_b);
+  split.M_s = split.sum_s / split.I_s.size();
+  split.M_b = split.sum_b / split.I_b.size();
 
   std::vector<double> M_s = split.M_s;
   std::vector<double> M_b = split.M_b;
@@ -2141,8 +2132,8 @@ void ClassificationRPF::logit_loss_2(rpf::Split& split){
 void ClassificationRPF::logit_loss_3(rpf::Split& split){
 
   split.min_sum = 0;
-  split.M_s = calcMean(*split.Y, split.I_s);
-  split.M_b = calcMean(*split.Y, split.I_b);
+  split.M_s = split.sum_s / split.I_s.size();
+  split.M_b = split.sum_b / split.I_b.size();
   split.M_sp = 1 - std::accumulate(split.M_s.begin(),split.M_s.end(), 0.0);
   split.M_bp = 1 - std::accumulate(split.M_b.begin(),split.M_b.end(), 0.0);
 
@@ -2257,8 +2248,8 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
 void ClassificationRPF::logit_loss_4(rpf::Split& split){
 
   split.min_sum = 0;
-  split.M_s = calcMean(*split.Y, split.I_s);
-  split.M_b = calcMean(*split.Y, split.I_b);
+  split.M_s = split.sum_s / split.I_s.size();
+  split.M_b = split.sum_b / split.I_b.size();
 
   std::vector<double> M_s = split.M_s;
   std::vector<double> M_b = split.M_b;
