@@ -10,4 +10,7 @@ reference:
 - contents:
   - rpf
   - predict.rpf
+- title: Utility functions
+- contents:
+  - print.rpf
 

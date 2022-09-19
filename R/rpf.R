@@ -8,21 +8,24 @@
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
 #' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction `[1]`: Maximum level of interaction determining maximum
-#'   number of split dimensions for a tree.  
-#'   If `0`, the number fo columns in `x` is used, i.e. for 10 predictors, 
+#'   number of split dimensions for a tree.
+#'   The default `1` corresponds to main effects only.
+#'   If `0`, the number fo columns in `x` is used, i.e. for 10 predictors,
 #'   this is equivalent to setting `max_interaction = 10`.
 #' @param ntrees `[50]`: Number of trees generated per family.
 #' @param splits `[30]`: Number of performed splits for each tree family.
 #' @param split_try `[10]`: Number of split points to be considered when considering a split candidate.
-#' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of split-candidetes viable in each round. 
+#' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of split-candidetes viable in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
 #' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
 #'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
-#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split. 
-#' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave. 
+#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership
+#' is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.
+#' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`. Proportion of class membership
+#' is truncated to be smaller 1-epsilon when calculating the fit in a leave.
 #' @param ... (Ignored).
 #'
 #' @return Object of class `"rpf"` with model object contained in `$fit`.
@@ -101,38 +104,39 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed, loss)
 
-  # FIXME: loss function handling for multiclass is a clunky hack to ensure
-  # the user only sees e.g. "logit" as an option
+  # FIXME: Remove exponential_2 if discarded
   if (ncol(outcomes$outcomes) > 1) {
     loss <- switch (loss,
-      "logit" = "logit_2",
+      # "logit" = "logit_2",
       "exponential" = "exponential_2",
       loss
     )
   }
 
   # Check arguments
-  checkmate::assert_integerish(max_interaction, lower = 0, len = 1)
-  
+  checkmate::assert_int(
+    max_interaction,
+    lower = 0, upper = ncol(predictors$predictors_matrix)
+  )
+
   # rewrite max_interaction so 0 -> "maximum", e.g. ncol(x):
   if (max_interaction == 0) {
     max_interaction <- ncol(predictors$predictors_matrix)
   }
-  
-  checkmate::assert_integerish(ntrees, lower = 1, len = 1)
-  checkmate::assert_integerish(splits, lower = 1, len = 1)
-  checkmate::assert_integerish(split_try, lower = 1, len = 1)
 
-  checkmate::assert_numeric(t_try, lower = 0, upper = 1, len = 1)
+  checkmate::assert_int(ntrees, lower = 1)
+  checkmate::assert_int(splits, lower = 1)
+  checkmate::assert_int(split_try, lower = 1)
+
+  checkmate::assert_number(t_try, lower = 0, upper = 1)
   # FIXME: What is delta/epsilon and what can it look like?
-  checkmate::assert_numeric(delta, lower = 0, upper = 1, len = 1)
-  checkmate::assert_numeric(epsilon, lower = 0, upper = 1, len = 1)
+  checkmate::assert_number(delta, lower = 0, upper = 1)
+  checkmate::assert_number(epsilon, lower = 0, upper = 1)
 
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2"), 
-    null.ok = FALSE
+    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2")
   )
 
   checkmate::assert_logical(deterministic, len = 1)
@@ -149,12 +153,26 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
     loss = loss, delta = delta, epsilon = epsilon
   )
 
+  forest <- fit$get_model()
+  class(forest) <- "rpf_forest"
+
   new_rpf(
     fit = fit,
     blueprint = processed$blueprint,
     mode = outcomes$mode,
     factor_levels = predictors$factor_levels,
-    loss = loss
+    loss = loss,
+    params = list(
+      loss = loss, # FIXME: Dedup, requires changes in tests and predict
+      ntrees = ntrees,
+      max_interaction = max_interaction,
+      splits = splits,
+      split_try = split_try, t_try = t_try,
+      delta = delta, epsilon = epsilon,
+      deterministic = deterministic,
+      parallel = parallel, purify = purify, cv = cv
+    ),
+    forest = forest
   )
 }
 
@@ -175,28 +193,18 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
                      loss = "L2", delta = 0, epsilon = 0.1) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
-  # checkmate::assert_matrix(Y, mode = "numeric", any.missing = FALSE)
+  mode <- match.arg(mode)
 
   if (mode == "classification") {
-    # FIXME: Handling for classification modes, must allow 1/0 or 1/-1 and 
-    # be a matrix
-    #checkmate::assert_integer(Y, lower = 0)
-
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv, delta, epsilon
     ))
   } else if (mode == "regression") {
-    # FIXME: Loss missing here?
-    # Passing loss as arg gives error
-    # "no valid constructor available for the argument list"
-    # N.B. Neither delta nor epsilon are passed as well
     fit <- new(RandomPlantedForest, Y, X, c(
       max_interaction, ntrees, splits, split_try, t_try,
       purify, deterministic, parallel, cv
     ))
-  } else {
-    stop("y should be either numeric (regression) or factor (classification)")
   }
 
   fit

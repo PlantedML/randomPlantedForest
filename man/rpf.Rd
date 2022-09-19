@@ -43,6 +43,7 @@ rpf(
 
 \item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
 number of split dimensions for a tree.
+The default \code{1} corresponds to main effects only.
 If \code{0}, the number fo columns in \code{x} is used, i.e. for 10 predictors,
 this is equivalent to setting \code{max_interaction = 10}.}
 
@@ -65,9 +66,11 @@ this is equivalent to setting \code{max_interaction = 10}.}
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
 classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.}
 
-\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.}
+\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership
+is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.}
 
-\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership is truncated to be smaller 1-epsilon when calculating the fit in a leave.}
+\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership
+is truncated to be smaller 1-epsilon when calculating the fit in a leave.}
 
 \item{y}{Target vector for use with \code{x}.
 The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
