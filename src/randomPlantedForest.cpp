@@ -2786,7 +2786,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::for_each(M_b2.begin(), M_b2.end(), [this](double &M) { M = std::max(epsilon, 1-M); });
 
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_s);
+        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
         for(int p=0; p<value_size; ++p){
           update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
@@ -2824,7 +2824,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         double sum_b = (std::accumulate(M_b.begin(), M_b.end(),0.0) + M_bp) / (M_b.size() + 1);
 
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_s);
+        std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
         for(unsigned int p=0; p<M_s.size(); ++p){
           update_s[p] = M_s[p] - sum_s - W_s_mean[p];
