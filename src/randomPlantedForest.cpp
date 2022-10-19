@@ -300,6 +300,7 @@ struct Matrix{
     if(indices.size() != dims.size()) throw std::invalid_argument("Invalid number of indices.");
     int index = 0;
     for(int i=indices.size()-1; i>0; --i){
+      if(indices[i] >= dims[i]) throw std::invalid_argument("Index out of range.");
       int a = indices[i];
       for(unsigned int d=0; d<dims.size(); ++d){
         if(d<i){
@@ -1930,10 +1931,7 @@ void RandomPlantedForest::purify_3(){
     variables.insert(variables.begin(), std::set<int>{0});
 
     // recap maximum number of dimensions of current family
-    unsigned int curr_max = 0;
-    for(const auto& tree: curr_family){
-      if(tree.first.size() > curr_max) curr_max = tree.first.size();
-    }
+    unsigned int curr_max = curr_family.rbegin()->first.size();
 
     auto keys = getKeys(curr_family);
     while(curr_max > 1){
@@ -2012,35 +2010,183 @@ void RandomPlantedForest::purify_3(){
 
     // ------------- purify -------------
 
-    for(auto vars: variables){
-      for(auto var: vars) Rcout << var << ", ";
-      Rcout << std::endl;
-    }
-
     // iterate backwards through tree family
-    /*
-    int curr_tree_index = curr_family.size() - 1;
-    for(TreeFamily::reverse_iterator curr_tree = curr_family.rbegin(); curr_tree != curr_family.rend(); ++curr_tree ) {
-      std::set<int> curr_dims = curr_tree->second->get_split_dims();
+    int tree_index_t = curr_family.size() - 1;
+    for(auto tree_t = variables.rbegin(); tree_t != variables.rend(); ++tree_t) {
+      std::set<int> curr_dims = *tree_t;
 
       // do not purify null
       if(curr_dims == std::set<int>{0}) continue;
 
-      // go through feature dims
-      int curr_dim_index = 0;
-      for(const auto& feature_dim: curr_dims){
+      Rcout << std::endl << tree_index_t << " - T: ";
+      for(auto dim: curr_dims) Rcout << dim << ", ";
+      Rcout << std::endl;
 
-        // get tree that has same variables as curr_tree minus j-variable
-        std::set<int> tree_dims = curr_dims;
-        tree_dims.erase(tree_dims.find(feature_dim));
-        int tree_index = 0; // if tree not exist, set to null tree
-        if(curr_family.find(tree_dims) != curr_family.end()) tree_index = std::distance(std::begin(curr_family), curr_family.find(tree_dims)) - 1;
-        Rcout << tree_index << ", ";
+      auto grid = grids[tree_index_t];
+
+      Rcout << "Grid dimensions of T: ";
+      for(auto dim: grid.dimensions) Rcout << dim << ", ";
+      Rcout << std::endl;
+
+      // go through subtrees of t
+      int tree_index_u = variables.size();
+      for(auto tree_u = variables.rbegin(); tree_u != variables.rend(); ++tree_u ) {
+
+        --tree_index_u;
+
+        // dims of t without u
+        std::set<int> j_dims = curr_dims;
+
+        if(tree_u->size() >= curr_dims.size()) continue;
+
+        // check if subset
+        bool subset = true;
+        for(const auto dim: *tree_u){
+          if(tree_t->count(dim) == 0){
+            subset = false;
+            break;
+          }
+          j_dims.erase(dim);
+        }
+        if(!subset) continue;
+
+        Rcout << "   " << tree_index_u << " - U: ";
+        for(auto dim: *tree_u) Rcout << dim << ", ";
+        Rcout << std::endl;
+
+        Rcout << "Individuals: ";
+
+        double tot_sum = 0;
+        grid = grids[tree_index_u];
+        while(!grid.nextPoint()){
+          auto gridPoint = grid.getPoint();
+
+          Rcout << individuals[tree_index_u][gridPoint] << ", ";
+
+          tot_sum += individuals[tree_index_u][gridPoint];
+        }
+
+        Rcout << "Total sum: " << tot_sum << std::endl;
+
+        Rcout << std::endl;
+
+        grid = grids[tree_index_u];
+
+        Rcout << "      Grid dimensions of U: ";
+        for(auto dim: grid.dimensions) Rcout << dim << ", ";
+        Rcout << std::endl;
+
+        std::vector<int> j_sizes(j_dims.size(), 0);
+        for(int j=0; j<j_dims.size(); ++j){
+          auto tmp = j_dims.begin();
+          std::advance(tmp, j);
+          int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
+          j_sizes[j] = grids[tree_index_t].dimensions[j_index];
+        }
+
+        NDGrid::NDGrid grid_j = NDGrid::NDGrid(j_sizes);
+
+        while(!grid_j.nextPoint()){
+
+          auto gridPoint_j = grid_j.getPoint();
+
+          Rcout << "         " << "j: ";
+          for(auto p: gridPoint_j) Rcout << p << ", ";
+          Rcout << std::endl;
+
+          // calc update
+          std::vector<double> update(value_size, 0);
+
+          grid = grids[tree_index_u];
+          while(!grid.nextPoint()){
+
+            auto gridPoint_i = grid.getPoint();
+
+            Rcout << "         " << "i: ";
+            for(auto p: gridPoint_i) Rcout << p << ", ";
+            Rcout << std::endl << "         ";
+
+            double curr_sum = individuals[tree_index_u][gridPoint_i];
+            Rcout << ", Current Sum: " << curr_sum << std::endl;
+
+            std::vector<int> gridPoint_ij(tree_t->size(), 0);
+            for(int j=0; j<gridPoint_j.size(); ++j){
+              auto j_dim = j_dims.begin();
+              std::advance(j_dim, j);
+              int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*j_dim));
+              Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
+              gridPoint_ij[j_index] = gridPoint_j[j];
+            }
+            for(int i=0; i<gridPoint_i.size(); ++i){
+              auto i_dim = tree_u->begin();
+              std::advance(i_dim, i);
+              int i_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*i_dim));
+              Rcout << "         i_dim=" << *i_dim << ", i_index=" << i_index;
+              gridPoint_ij[i_index] = gridPoint_i[i];
+            }
+
+            Rcout << std::endl << "         " << "i, j: ";
+            for(auto p: gridPoint_ij) Rcout << p << ", ";
+            Rcout << std::endl;
+
+            //update += (tot_sum / curr_sum) * values[tree_index_t][gridPoint_ij];
+            Rcout << std::endl;
+          }
+
+          // update trees
+          /*
+          int tree_index_s = variables.size();
+          for(auto tree_s = variables.rbegin(); tree_s != variables.rend(); ++tree_s ) {
+
+            --tree_index_s;
+
+            // check if T\U=j_dims subset of S and S subset of T
+            bool subset = true;
+            for(const auto dim: j_dims){
+              if(tree_s->count(dim) == 0){
+                subset = false;
+                break;
+              }
+            }
+            for(const auto dim: *tree_s){
+              if(tree_t->count(dim) == 0){
+                subset = false;
+                break;
+              }
+            }
+            if(!subset) continue;
+
+            Rcout << "            " << "S: ";
+            for(auto dim: *tree_s) Rcout << dim << ", ";
+            Rcout << std::endl;
+
+            // S\T united with U
+            std::set<int> k_dims = *tree_s;
+            for(const auto dim: *tree_t) k_dims.erase(dim);
+            for(const auto dim: *tree_u) k_dims.insert(dim);
+
+            for(auto k: k_dims){
+
+              Rcout << "            " << "k: " << k << std::endl;
+
+              int k_index_s = std::distance(tree_s->begin(), tree_s->find(k));
+              grid = grids[tree_index_s];
+
+              while(!grid.nextPoint()){
+
+                auto gridPoint = grid.getPoint();
+                gridPoint[k_index_s] = k;
+
+                //values[tree_index_s][gridPoint][j] += pow(-1, (*tree_s).size() - j_dims.size()) * update[j];
+              }
+            }
+          }
+          */
+        }
       }
 
-      --curr_tree_index;
+      --tree_index_t;
     }
-    */
 
     // ------------- attach to rpf class -------------
 
@@ -2779,10 +2925,10 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
 
     auto candidate = possible_splits.begin();
     std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
-    k = candidate->first - 1; // split dim of current candidate, converted to index starting at 0
+    k = candidate->first - 1; // split dim of  candidate, converted to index starting at 0
     leaf_size = n_leaves[k];
 
-    // Test if splitting in the current tree w.r.t. the coordinate "k" is an element of candidate tree
+    // Test if splitting in the  tree w.r.t. the coordinate "k" is an element of candidate tree
     tree_dims = candidate->second->split_dims;
     tree_dims.erase(k+1);
     tree_dims.erase(0);
