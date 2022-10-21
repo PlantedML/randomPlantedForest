@@ -1930,6 +1930,7 @@ void RandomPlantedForest::purify_3(){
     individuals.insert(individuals.begin(), rpf::Matrix<int>(std::vector<int>{1}));
     variables.insert(variables.begin(), std::set<int>{0});
 
+    /*
     // recap maximum number of dimensions of current family
     unsigned int curr_max = curr_family.rbegin()->first.size();
 
@@ -2010,7 +2011,6 @@ void RandomPlantedForest::purify_3(){
 
     // ------------- purify -------------
 
-    /*
     // iterate backwards through tree family
     int tree_index_t = curr_family.size() - 1;
     for(auto tree_t = variables.rbegin(); tree_t != variables.rend(); ++tree_t) {
