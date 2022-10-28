@@ -1342,11 +1342,11 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
               --dim; // transform into index
             }
 
-            auto bounds =  tree.second->GridLeaves.lim_list[dim];
+            auto bounds =  tree.second->GridLeaves.lim_list[dim]; // dim_index ?
             for(double bound: bounds){
 
               // check if sample in leaf at dimension
-              if(X[dim] < bound) break; // changed
+              if(X[dim] < bound) break;
 
               // if no interval smaller, set to end of bounds, otherwise set to leaf index
               leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
@@ -1555,7 +1555,7 @@ void RandomPlantedForest::purify_2(){
      // initialize data for current tree
      grids[tree_index] = grid;
      individuals[tree_index] = rpf::Matrix<int>(dimensions, 0);
-     values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
+     values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0));
      variables[tree_index] = curr_tree.first;
 
      // fill grid points with individuals and values
@@ -1852,6 +1852,14 @@ void RandomPlantedForest::purify_3(){
       lim_list[curr_dim - 1] = bounds;
     }
 
+    Rcout << "Lim_list: " << std::endl;
+    for(auto bounds: lim_list){
+      for(auto lim: bounds){
+        Rcout << lim << ", ";
+      }
+      Rcout << std::endl;
+    }
+
     // initialize values and individuals for each tree in family
     std::vector< NDGrid::NDGrid> grids(curr_family.size() - 1);
     std::vector<rpf::Matrix<int>> individuals(curr_family.size() - 1);
@@ -1877,7 +1885,7 @@ void RandomPlantedForest::purify_3(){
       // initialize data for current tree
       grids[tree_index] = grid;
       individuals[tree_index] = rpf::Matrix<int>(dimensions, 0);
-      values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
+      values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0));
       variables[tree_index] = curr_tree.first;
 
       // fill grid points with individuals and values
@@ -1915,7 +1923,7 @@ void RandomPlantedForest::purify_3(){
           }
 
           // sum up values
-          if(in_leaf) values[tree_index][gridPoint] += leaf.value; // todo: multiclass
+          if(in_leaf) values[tree_index][gridPoint] += leaf.value;
         }
       }
 
@@ -1925,9 +1933,9 @@ void RandomPlantedForest::purify_3(){
     // ------------- create new trees -------------
 
     // insert null tree
-    grids.insert(grids.begin(), NDGrid::NDGrid());
+    grids.insert(grids.begin(), NDGrid::NDGrid(std::vector<int>{1}));
     values.insert(values.begin(), rpf::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
-    individuals.insert(individuals.begin(), rpf::Matrix<int>(std::vector<int>{1}));
+    individuals.insert(individuals.begin(), rpf::Matrix<int>(std::vector<int>{1}, X.size()));
     variables.insert(variables.begin(), std::set<int>{0});
 
     /*
@@ -2221,6 +2229,32 @@ void RandomPlantedForest::purify_3(){
     */
 
     // ------------- attach to rpf class -------------
+
+    // for(int tree_index=0; tree_index<variables.size(); tree_index++){
+    //
+    //   Rcout << std::endl << "Tree: ";
+    //   for(auto dim: variables[tree_index]) Rcout << dim<< ", ";
+    //
+    //   Rcout << std::endl << "Individuals: ";
+    //   auto grid = grids[tree_index];
+    //   while(!grid.nextPoint()){
+    //
+    //     std::vector<int> gridPoint = grid.getPoint();
+    //
+    //     Rcout << individuals[tree_index][gridPoint] << ", ";
+    //   }
+    //
+    //   Rcout << std::endl << "Values: ";
+    //   grid = grids[tree_index];
+    //   while(!grid.nextPoint()){
+    //
+    //     std::vector<int> gridPoint = grid.getPoint();
+    //
+    //     for(auto val: values[tree_index][gridPoint]) Rcout << val << ", ";
+    //     Rcout << "; ";
+    //   }
+    // }
+    // Rcout << std::endl;
 
     // fill with new trees
     for(int tree_index=0; tree_index<variables.size(); ++tree_index){
