@@ -1276,9 +1276,10 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
         for(auto& leaf: tree.second->leaves){
           bool valid = true;
           for(auto& dim: tree.first){
-            if(!(leaf.intervals[std::max(0, dim-1)].first <= X[std::max(0, dim-1)]
+            if(!((leaf.intervals[std::max(0, dim-1)].first <= X[std::max(0, dim-1)]
+                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
                    && (leaf.intervals[std::max(0, dim-1)].second > X[std::max(0, dim-1)]
-                         || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
+                   || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
                          valid = false;
             }
           }
@@ -1308,7 +1309,8 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 
             int dim = dims[i];
 
-            if(!(leaf.intervals[std::max(0, dim-1)].first <= X[i]
+            if(!((leaf.intervals[std::max(0, dim-1)].first <= X[i]
+                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
                    && (leaf.intervals[std::max(0, dim-1)].second > X[i]
                          || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
                          valid = false;
