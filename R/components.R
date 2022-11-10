@@ -42,7 +42,7 @@ extract_components <- function(object, new_data, predictors = NULL) {
   processed <- hardhat::forge(new_data, object$blueprint)
 
   # Encode factors to (re-)ordered integers according to information saved during model fit
-  new_data <- randomPlantedForest:::preprocess_predictors_predict(object, processed$predictors)
+  new_data <- preprocess_predictors_predict(object, processed$predictors)
 
   # Indices of selected predictors
   components <- match(predictors, colnames(new_data))

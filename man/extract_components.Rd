@@ -11,7 +11,8 @@ extract_components(object, new_data, predictors = NULL)
 
 \item{new_data}{Data for new observations to predict.}
 
-\item{predictors}{}
+\item{predictors}{\code{\link{character}} Vector of one or more column names of predictor variables in \code{new_data}
+to extract components for.}
 }
 \value{
 A numeric \code{matrix}
@@ -26,17 +27,22 @@ train <-  mtcars[1:20, ]
 test <-  mtcars[21:32, ]
 
 set.seed(23)
-object <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 35)
+object <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 
 # One component, first predictor column in test data
-extract_components_by_name(object, test, predictors = c("cyl"))
+extract_components(object, test, predictors = c("cyl"))
 
 # Two components, 1st and 3rd predictor columns in test data
-extract_components_by_name(object, test, predictors = c("cyl", "hp"))
+extract_components(object, test, predictors = c("cyl", "hp"))
 
-# trying to pass all columns in test data errors since outcome "mpg" is included
-extract_components_by_name(object, test, predictors = names(test))
+\dontrun{
+# trying to pass all columns in test data errors since target "mpg" is included
+extract_components(object, test, predictors = names(test))
 
-# If `predictors` is not specified, we don't know what to do. Are you looking for `[predict.rpf]`?
-extract_components_by_name(object, test)
+# passing all predictor names by dropping `"mpg"` first
+extract_components(object, test, predictors = names(test[, -1]))
+
+# If `predictors` is not specified, we don't know what to do
+extract_components(object, test)
+}
 }
