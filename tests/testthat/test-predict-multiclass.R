@@ -20,6 +20,7 @@ test_that("Default: L2 with 'prob'", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(min(classif_pred), 1)
+  # Tests 'prob' is default predict type
   expect_identical(classif_pred, classif_pred_prob)
 })
 
@@ -32,6 +33,18 @@ test_that("L2: Probability prediction", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
+
+  # Sanity check for multiclass probability predictions
+  # First compare to 1 with epsilon tolerance, then count number of offending obs
+  # Wanted to avoid runing expect_ on each obs to avoid clutter in test output
+
+  classif_pred$sum <- rowSums(classif_pred)
+
+  expect_equal(
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    label = "Sum of predicted class probabilities exceeds 1",
+    info = "Shown: Number of observations with out of bounds prediction"
+  )
 })
 
 test_that("L2: Class prediction", {
@@ -61,6 +74,18 @@ test_that("L1: Probability prediction", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
+
+  # Sanity check for multiclass probability predictions
+  # First compare to 1 with epsilon tolerance, then count number of offending obs
+  # Wanted to avoid runing expect_ on each obs to avoid clutter in test output
+
+  classif_pred$sum <- rowSums(classif_pred)
+
+  expect_equal(
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    label = "Sum of predicted class probabilities exceeds 1",
+    info = "Shown: Number of observations with out of bounds prediction"
+  )
 })
 
 test_that("L1: Class prediction", {
@@ -91,6 +116,18 @@ test_that("logit: Probability prediction", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
+
+  # Sanity check for multiclass probability predictions
+  # First compare to 1 with epsilon tolerance, then count number of offending obs
+  # Wanted to avoid runing expect_ on each obs to avoid clutter in test output
+
+  classif_pred$sum <- rowSums(classif_pred)
+
+  expect_equal(
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    label = "Sum of predicted class probabilities exceeds 1",
+    info = "Shown: Number of observations with out of bounds prediction"
+  )
 })
 
 test_that("logit: Class prediction", {
@@ -120,6 +157,18 @@ test_that("exponential: Probability prediction", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
+
+  # Sanity check for multiclass probability predictions
+  # First compare to 1 with epsilon tolerance, then count number of offending obs
+  # Wanted to avoid runing expect_ on each obs to avoid clutter in test output
+
+  classif_pred$sum <- rowSums(classif_pred)
+
+  expect_equal(
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    label = "Sum of predicted class probabilities exceeds 1",
+    info = "Shown: Number of observations with out of bounds prediction"
+  )
 })
 
 test_that("exponential: Class prediction", {
