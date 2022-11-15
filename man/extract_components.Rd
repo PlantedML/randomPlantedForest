@@ -27,22 +27,22 @@ train <-  mtcars[1:20, ]
 test <-  mtcars[21:32, ]
 
 set.seed(23)
-object <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
+rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 
 # One component, first predictor column in test data
-extract_components(object, test, predictors = c("cyl"))
+extract_components(rpfit, test, predictors = c("cyl"))
 
 # Two components, 1st and 3rd predictor columns in test data
-extract_components(object, test, predictors = c("cyl", "hp"))
+extract_components(rpfit, test, predictors = c("cyl", "hp"))
 
 \dontrun{
 # trying to pass all columns in test data errors since target "mpg" is included
-extract_components(object, test, predictors = names(test))
+extract_components(rpfit, test, predictors = names(test))
 
 # passing all predictor names by dropping `"mpg"` first
-extract_components(object, test, predictors = names(test[, -1]))
+extract_components(rpfit, test, predictors = names(test[, -1]))
 
 # If `predictors` is not specified, we don't know what to do
-extract_components(object, test)
+extract_components(rpfit, test)
 }
 }
