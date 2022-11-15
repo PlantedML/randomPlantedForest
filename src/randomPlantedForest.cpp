@@ -1257,7 +1257,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-  if(!purified){
+if(!purified){
     // consider all components
     if(component_index == std::set<int>{0}) {
       for(auto& tree_family: this->tree_families){
@@ -1265,10 +1265,11 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
           for(auto& leaf: tree.second->leaves){
             bool valid = true;
             for(auto& dim: tree.first){
-              if(!(leaf.intervals[std::max(0, dim-1)].first <= X[std::max(0, dim-1)]
-                     && (leaf.intervals[std::max(0, dim-1)].second > X[std::max(0, dim-1)]
-                           || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
-                           valid = false;
+              if(!((leaf.intervals[std::max(0, dim-1)].first <= X[std::max(0, dim-1)]
+                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
+                   && (leaf.intervals[std::max(0, dim-1)].second > X[std::max(0, dim-1)]
+                   || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
+                         valid = false;
               }
             }
             if(valid){
@@ -1294,11 +1295,12 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
             for(unsigned int i = 0; i<dims.size(); ++i){
 
               int dim = dims[i];
-
-              if(!(leaf.intervals[std::max(0, dim-1)].first <= X[i]
-                     && (leaf.intervals[std::max(0, dim-1)].second > X[i]
-                           || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
-                           valid = false;
+              
+              if(!((leaf.intervals[std::max(0, dim-1)].first <= X[i]
+                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
+                   && (leaf.intervals[std::max(0, dim-1)].second > X[i]
+                         || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
+                         valid = false;
               }
             }
             if(valid) total_res += leaf.value;

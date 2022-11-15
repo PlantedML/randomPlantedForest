@@ -103,25 +103,20 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed, loss)
-
-  # FIXME: Remove exponential_2 if discarded
-  if (ncol(outcomes$outcomes) > 1) {
-    loss <- switch (loss,
-      # "logit" = "logit_2",
-      "exponential" = "exponential_2",
-      loss
-    )
-  }
+  p <- ncol(predictors$predictors_matrix)
 
   # Check arguments
-  checkmate::assert_int(
-    max_interaction,
-    lower = 0, upper = ncol(predictors$predictors_matrix)
-  )
+  checkmate::assert_int(max_interaction, lower = 0)
 
-  # rewrite max_interaction so 0 -> "maximum", e.g. ncol(x):
+  # rewrite max_interaction so 0 -> "maximum", e.g. ncol(X)
   if (max_interaction == 0) {
-    max_interaction <- ncol(predictors$predictors_matrix)
+    max_interaction <- p
+  }
+  # same applies to values > p
+  if (max_interaction > p) {
+    message("`max_interaction` set to ", max_interaction, " but ncol(X) is ", p, ".\n",
+            "Setting `max_interaction` to ", p)
+    max_interaction <- p
   }
 
   checkmate::assert_int(ntrees, lower = 1)
@@ -136,7 +131,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   # "median" is implemented but discarded
   checkmate::assert_choice(
     loss,
-    choices = c("L1", "L2", "logit", "logit_2", "exponential", "exponential_2")
+    choices = c("L1", "L2", "logit", "exponential")
   )
 
   checkmate::assert_logical(deterministic, len = 1)

@@ -159,7 +159,7 @@ preprocess_outcome <- function(processed, loss) {
 
   if (is_factor) {
     mode <- "classification"
-    
+
     if (is_binary) {
       # Binary case: Convert to 0, 1 integer
       outcomes <- as.integer(outcomes) - 1L
@@ -169,17 +169,15 @@ preprocess_outcome <- function(processed, loss) {
       # One-hot encoding
       outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
       colnames(outcomes_mat) <- levels(outcomes)
-      
+
       outcomes <- outcomes_mat
     }
-    
+
     # Exponential expects outcome in 1/-1
-    # no need to check for exponential_2 here as rewriting exponential to
-    # exponential_2 is handled after this function is called
     if (loss == "exponential") {
       outcomes[outcomes == 0] <- -1
     }
-    
+
   } else if (is_numeric) {
     mode <- "regression"
     # rpf_impl expects Y to be a matrix
