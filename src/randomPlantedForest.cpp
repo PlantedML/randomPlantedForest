@@ -244,7 +244,7 @@ struct setComp{
 
 typedef std::pair<double, double> Interval;
 
-double eps = 1e-16;
+double eps = 0.01;
 
 const double INF = std::numeric_limits<double>::infinity();
 
@@ -406,6 +406,7 @@ struct LeafGrid{
   std::vector<std::vector<double>> lim_list;
   rpf::Matrix<int> individuals;
   rpf::Matrix<std::vector<double>> values;
+  //rpf::Matrix<std::vector<double>> values_old;
 };
 
 /**
@@ -1306,42 +1307,92 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
       }
     }
   }else{
-    for(auto& tree_family: this->tree_families){
-      for(auto& tree: tree_family){
-        std::vector<int> leaf_index(tree.first.size(), -1);
+    if(component_index == std::set<int>{0}) {
+      for(auto& tree_family: this->tree_families){
+        for(auto& tree: tree_family){
+          std::vector<int> leaf_index(tree.first.size(), -1);
 
-        // add value of null tree
-        if(tree.first == std::set<int>{0}){
-          leaf_index = std::vector<int>(tree.first.size(), 0);
-        }else{
+          // add value of null tree
+          if(tree.first == std::set<int>{0}){
 
-          // go through limits of grid
-          for(int dim_index=0; dim_index<tree.first.size(); ++dim_index){
-            // get dim at dim_index
-            int dim = 0;
-            {
-              auto dim_pnt = tree.first.begin();
-              std::advance(dim_pnt, dim_index);
-              dim = *dim_pnt;
-              --dim; // transform into index
-            }
+            // Rcout << tree.first.size() ;
+            leaf_index = std::vector<int>(tree.first.size(), 0);
+          }else{
 
-            auto bounds =  tree.second->GridLeaves.lim_list[dim];
-            for(double bound: bounds){
+            // go through limits of grid
+            for(int dim_index=0; dim_index<tree.first.size(); ++dim_index){
+              // get dim at dim_index
+              int dim = 0;
+              {
+                auto dim_pnt = tree.first.begin();
+                std::advance(dim_pnt, dim_index);
+                dim = *dim_pnt;
+                --dim; // transform into index
+              }
 
-              // check if sample in leaf at dimension
-              if(X[dim] < bound) break; // changed
+              auto bounds =  tree.second->GridLeaves.lim_list[dim];
+              for(double bound: bounds){
 
-              // if no interval smaller, set to end of bounds, otherwise set to leaf index
-              leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
+                // check if sample in leaf at dimension
+                if(X[dim] < bound) break; // changed
+
+                // if no interval smaller, set to end of bounds, otherwise set to leaf index
+                leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
+              }
             }
           }
+
+          // if interval of first leaf smaller smaller
+          for(int& index: leaf_index) index = std::max(0, index);
+
+          total_res += tree.second->GridLeaves.values[leaf_index];
         }
+      }
+    } else {
 
-        // if interval of first leaf smaller smaller
-        for(int& index: leaf_index) index = std::max(0, index);
+      for(auto& tree_family: this->tree_families){
+        for(auto& tree: tree_family){
 
-        total_res += tree.second->GridLeaves.values[leaf_index];
+          // only consider trees with same dimensions as component_index
+          if(tree.first != component_index) continue;
+
+          std::vector<int> leaf_index(tree.first.size(), -1);
+
+          // Rcout << "Hello";
+
+          // add value of null tree
+          if(tree.first == std::set<int>{0}){
+            leaf_index = std::vector<int>(tree.first.size(), 0);
+          }else{
+
+            // go through limits of grid
+            for(int dim_index=0; dim_index<tree.first.size(); ++dim_index){
+              // get dim at dim_index
+              int dim = 0;
+              {
+                auto dim_pnt = tree.first.begin();
+                std::advance(dim_pnt, dim_index);
+                dim = *dim_pnt;
+                --dim; // transform into index
+              }
+
+              auto bounds =  tree.second->GridLeaves.lim_list[dim];
+              for(double bound: bounds){
+
+                // check if sample in leaf at dimension
+                if(X[dim_index] < bound) break; // changed
+
+                // if no interval smaller, set to end of bounds, otherwise set to leaf index
+                leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
+              }
+            }
+          }
+
+          // if interval of first leaf smaller smaller
+          for(int& index: leaf_index) index = std::max(0, index);
+
+          total_res += tree.second->GridLeaves.values[leaf_index];
+        }
       }
     }
   }
@@ -1834,6 +1885,9 @@ void RandomPlantedForest::purify_3(){
       }
       std::sort(bounds.begin(), bounds.end());
       bounds.erase(std::unique(bounds.begin(), bounds.end()), bounds.end());
+      // int i_last = bounds.size()-1;
+      // double bibi = bounds[i_last] + 0.0001;
+      // bounds[i_last] = bounds[i_last] + 0.0001;
       lim_list[curr_dim - 1] = bounds;
     }
 
@@ -1841,6 +1895,7 @@ void RandomPlantedForest::purify_3(){
     std::vector< NDGrid::NDGrid> grids(curr_family.size() - 1);
     std::vector<rpf::Matrix<int>> individuals(curr_family.size() - 1);
     std::vector<rpf::Matrix<std::vector<double>>> values(curr_family.size() - 1);
+    std::vector<rpf::Matrix<std::vector<double>>> values_old(curr_family.size() - 1);
     std::vector<std::set<int>> variables(curr_family.size() - 1);
 
     //  ------------- setup finer grid  -------------
@@ -1848,7 +1903,11 @@ void RandomPlantedForest::purify_3(){
     int tree_index = 0;
     for(const auto& curr_tree: curr_family){
 
-      if(curr_tree.first == std::set<int>{0}) continue; // ignore null tree
+      if(curr_tree.first == std::set<int>{0}){
+
+        // values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
+        continue; // ignore null tree
+      }
 
       // fill space with dimensions
       std::vector<int> dimensions;
@@ -1863,6 +1922,7 @@ void RandomPlantedForest::purify_3(){
       grids[tree_index] = grid;
       individuals[tree_index] = rpf::Matrix<int>(dimensions, 0);
       values[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
+      values_old[tree_index] = rpf::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
       variables[tree_index] = curr_tree.first;
 
       // fill grid points with individuals and values
@@ -1900,7 +1960,11 @@ void RandomPlantedForest::purify_3(){
           }
 
           // sum up values
-          if(in_leaf) values[tree_index][gridPoint] += leaf.value; // todo: multiclass
+          if(in_leaf) {
+
+            values[tree_index][gridPoint] += leaf.value; // todo: multiclass
+            values_old[tree_index][gridPoint] += leaf.value; // todo: multiclass
+          }
         }
       }
 
@@ -1912,6 +1976,7 @@ void RandomPlantedForest::purify_3(){
     // insert null tree
     grids.insert(grids.begin(), NDGrid::NDGrid());
     values.insert(values.begin(), rpf::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
+    values_old.insert(values_old.begin(), rpf::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
     individuals.insert(individuals.begin(), rpf::Matrix<int>(std::vector<int>{1}));
     variables.insert(variables.begin(), std::set<int>{0});
 
@@ -1942,11 +2007,13 @@ void RandomPlantedForest::purify_3(){
                 auto tree_index = std::distance(std::begin(curr_family), curr_family.find(tree_dims));
                 // remove matrix dimension of respective variable
                 std::vector<int> matrix_dimensions = values[old_tree_index].dims;
+                //std::vector<int> matrix_dimensions = values_old[old_tree_index].dims;
                 matrix_dimensions.erase(matrix_dimensions.begin() + dim_index);
                 // initialize data for new tree
                 auto grid =  NDGrid::NDGrid(matrix_dimensions);
                 grids.insert(grids.begin() + tree_index, grid);
                 values.insert(values.begin() + tree_index, rpf::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0)));
+                values_old.insert(values_old.begin() + tree_index, rpf::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0)));
                 individuals.insert(individuals.begin() + tree_index, rpf::Matrix<int>(matrix_dimensions));
                 variables.insert(variables.begin() + tree_index, tree_dims);
                 // fill individuals of new trees
@@ -1994,9 +2061,9 @@ void RandomPlantedForest::purify_3(){
       int tree_index_u = variables.size();
       for(auto tree_u = variables.rbegin(); tree_u != variables.rend(); ++tree_u ) {
         --tree_index_u;
-        // dims of t without u
+        //j_dims = dims of t without u
         std::set<int> j_dims = curr_dims;
-        if(tree_u->size() >= curr_dims.size()) continue;
+        if(tree_u->size() > curr_dims.size()) continue;
         // check if subset
         bool subset = true;
         for(const auto dim: *tree_u){
@@ -2007,10 +2074,13 @@ void RandomPlantedForest::purify_3(){
           j_dims.erase(dim);
         }
         if(!subset) continue;
-        //     Rcout << "   " << tree_index_u << " - U: ";
-        //     for(auto dim: *tree_u) Rcout << dim << ", ";
-        //     Rcout << std::endl;
-        //     Rcout << "   Individuals: ";
+
+        // Rcout << "Hello";
+        // Rcout << "   " << tree_index_u << " - U: ";
+        //for(auto dim: *tree_u) Rcout << dim << ", ";
+        // Rcout << std::endl;
+        // Rcout << "   Individuals: ";
+
         double tot_sum = 0;
         grid = grids[tree_index_u];
         while(!grid.nextPoint()){
@@ -2018,27 +2088,20 @@ void RandomPlantedForest::purify_3(){
           //     Rcout << individuals[tree_index_u][gridPoint] << ", ";
           tot_sum += individuals[tree_index_u][gridPoint];
         }
-        //     Rcout << "Total sum: " << tot_sum << std::endl;
-        //     Rcout << std::endl;
+        Rcout << "Total sum: " << tot_sum << std::endl;
+        Rcout << std::endl;
+
         grid = grids[tree_index_u];
         //     Rcout << "      Grid dimensions of U: ";
         //     for(auto dim: grid.dimensions) Rcout << dim << ", ";
         //     Rcout << std::endl;
-        std::vector<int> j_sizes(j_dims.size(), 0);
-        for(int j=0; j<j_dims.size(); ++j){
-          auto tmp = j_dims.begin();
-          std::advance(tmp, j);
-          int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
-          j_sizes[j] = grids[tree_index_t].dimensions[j_index];
-        }
-        NDGrid::NDGrid grid_j = NDGrid::NDGrid(j_sizes);
-        while(!grid_j.nextPoint()){
-          auto gridPoint_j = grid_j.getPoint();
-          //     Rcout << "         " << "j: ";
-          //     for(auto p: gridPoint_j) Rcout << p << ", ";
-          //     Rcout << std::endl;
-          // calc update
-          std::vector<double> update(value_size, 0);
+
+        // Rcout<< "j_dims: "<<j_dims.size() << std::endl;;
+
+        std::vector<double> update(value_size, 0);
+
+        if(j_dims.size()==0){
+
           grid = grids[tree_index_u];
           while(!grid.nextPoint()){
             auto gridPoint_i = grid.getPoint();
@@ -2047,39 +2110,39 @@ void RandomPlantedForest::purify_3(){
             //     Rcout << std::endl << "         ";
             double curr_sum = individuals[tree_index_u][gridPoint_i];
             //     Rcout << ", Current Sum: " << curr_sum << std::endl;
-            std::vector<int> gridPoint_ij(tree_t->size(), 0);
-            for(int j=0; j<gridPoint_j.size(); ++j){
-              auto j_dim = j_dims.begin();
-              std::advance(j_dim, j);
-              int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*j_dim));
-              //     Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
-              gridPoint_ij[j_index] = gridPoint_j[j];
-            }
-            for(int i=0; i<gridPoint_i.size(); ++i){
-              auto i_dim = tree_u->begin();
-              std::advance(i_dim, i);
-              int i_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*i_dim));
-              //     Rcout << "         i_dim=" << *i_dim << ", i_index=" << i_index;
-              gridPoint_ij[i_index] = gridPoint_i[i];
-            }
             //     Rcout << std::endl << "         " << "i, j: ";
-            //     for(auto p: gridPoint_ij) Rcout << p << ", ";
-            //     Rcout << std::endl;
-            //update += (tot_sum / curr_sum) * values[tree_index_t][gridPoint_ij];
+            update += (curr_sum/tot_sum) * values_old[tree_index_t][gridPoint_i];
             //     Rcout << std::endl;
           }
-          // update trees
+
           int tree_index_s = variables.size();
           for(auto tree_s = variables.rbegin(); tree_s != variables.rend(); ++tree_s ) {
+
             --tree_index_s;
-            // check if T\U=j_dims subset of S and S subset of T
-            bool subset = true;
-            for(const auto dim: j_dims){
-              if(tree_s->count(dim) == 0){
-                subset = false;
-                break;
+            if(*tree_s == std::set<int>{0}) {
+
+              auto gridPoint_0 = std::vector<int>{0};
+              values[tree_index_s][gridPoint_0] += update;
+                //     Rcout << std::endl;
+              //}
+
+              for(auto tree_0: curr_family){
+
+                if(tree_0.first == std::set<int>{0}){
+
+                  // Rcout << tree_0.first.size();
+                  // std::vector<int> leaf_index(tree_0.first.size(), 0);
+                  // std::vector<int> leaf_index(tree_0.second->GridLeaves.values.size(), 0);
+
+                  // int Test = tree_0.second->GridLeaves.values.size();
+                  // Rcout << Test;
+                  // tree_0.second->GridLeaves.values[leaf_index] += update;
+                }
               }
-            }
+            } else {
+
+            // check if S subset of T
+            bool subset = true;
             for(const auto dim: *tree_s){
               if(tree_t->count(dim) == 0){
                 subset = false;
@@ -2087,51 +2150,160 @@ void RandomPlantedForest::purify_3(){
               }
             }
             if(!subset) continue;
-            //     Rcout << "         " << "S: ";
-            //     for(auto dim: *tree_s) Rcout << dim << ", ";
-            //     Rcout << std::endl;
-            // S\T united with U
-            std::set<int> k_dims = *tree_s;
-            for(const auto dim: *tree_t) k_dims.erase(dim);
-            for(const auto dim: *tree_u) k_dims.insert(dim);
-            //     Rcout << "         " << "k_dims: ";
-            //     for(auto dim: k_dims) Rcout << dim << ", ";
-            //     Rcout << std::endl;
-            std::vector<int> k_sizes(k_dims.size(), 0);
-            for(int k=0; k<k_dims.size(); ++k){
-              auto tmp = k_dims.begin();
-              std::advance(tmp, k);
-              int k_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
-              k_sizes[k] = grids[tree_index_t].dimensions[k_index];
+
+              auto grid_k = grids[tree_index_s];
+              while(!grid_k.nextPoint()){
+                 auto gridPoint_k = grid_k.getPoint();
+          //
+          //       // Rcout << std::endl << "            " << "j, k: ";
+          //       // for(auto p: gridPoint_jk) Rcout << p << ", ";
+          //       // Rcout << std::endl;
+          //
+          //       // Rcout << pow(-1, (*tree_s).size() - j_dims.size()) * update[0];
+                values[tree_index_s][gridPoint_k] += pow(-1, (*tree_s).size()) * update;
+              }
             }
-            //     Rcout << "         " << "k_sizes: ";
-            //     for(auto dim: k_sizes) Rcout << dim << ", ";
+          }
+        } else {
+
+          std::vector<int> j_sizes(j_dims.size(), 0);
+          for(int j=0; j<j_dims.size(); ++j){
+            auto tmp = j_dims.begin();
+            std::advance(tmp, j);
+            int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
+            j_sizes[j] = grids[tree_index_t].dimensions[j_index];
+          }
+
+          // Rcout<<"Hello 1";
+
+          NDGrid::NDGrid grid_j = NDGrid::NDGrid(j_sizes);
+          while(!grid_j.nextPoint()){
+
+            std::vector<double> update(value_size, 0);
+            auto gridPoint_j = grid_j.getPoint();
+            //     Rcout << "         " << "j: ";
+            //     for(auto p: gridPoint_j) Rcout << p << ", ";
             //     Rcout << std::endl;
-            NDGrid::NDGrid grid_k = NDGrid::NDGrid(k_sizes);
-            while(!grid_k.nextPoint()){
-              auto gridPoint_k = grid.getPoint();
-              //     Rcout << "            " << "k: ";
-              //     for(auto p: gridPoint_k) Rcout << p << ", ";
+            // calc update
+            grid = grids[tree_index_u];
+            while(!grid.nextPoint()){
+              auto gridPoint_i = grid.getPoint();
+              //     Rcout << "         " << "i: ";
+              //     for(auto p: gridPoint_i) Rcout << p << ", ";
               //     Rcout << std::endl << "         ";
-              std::vector<int> gridPoint_jk(tree_s->size(), 0);
+              double curr_sum = individuals[tree_index_u][gridPoint_i];
+              //     Rcout << ", Current Sum: " << curr_sum << std::endl;
+              std::vector<int> gridPoint_ij(tree_t->size(), 0);
               for(int j=0; j<gridPoint_j.size(); ++j){
                 auto j_dim = j_dims.begin();
                 std::advance(j_dim, j);
-                int j_index = std::distance(variables[tree_index_s].begin(), variables[tree_index_s].find(*j_dim));
-                // Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
-                gridPoint_jk[j_index] = gridPoint_j[j];
+                int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*j_dim));
+                //     Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
+                gridPoint_ij[j_index] = gridPoint_j[j];
               }
-              for(int k=0; k<gridPoint_k.size(); ++k){
-                auto k_dim = tree_u->begin();
-                std::advance(k_dim, k);
-                int k_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*k_dim));
-                // Rcout << "         k_dim=" << *k_dim << ", k_index=" << k_index;
-                gridPoint_jk[k_index] = gridPoint_k[k];
+              for(int i=0; i<gridPoint_i.size(); ++i){
+                auto i_dim = tree_u->begin();
+                std::advance(i_dim, i);
+                int i_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*i_dim));
+                //     Rcout << "         i_dim=" << *i_dim << ", i_index=" << i_index;
+                gridPoint_ij[i_index] = gridPoint_i[i];
               }
-              // Rcout << std::endl << "            " << "j, k: ";
-              // for(auto p: gridPoint_jk) Rcout << p << ", ";
-              // Rcout << std::endl;
-              //values[tree_index_s][gridPoint_jk] += pow(-1, (*tree_s).size() - j_dims.size()) * update;
+              //     Rcout << std::endl << "         " << "i, j: ";
+              //     for(auto p: gridPoint_ij) Rcout << p << ", ";
+              //     Rcout << std::endl;
+              update += (curr_sum/tot_sum) * values_old[tree_index_t][gridPoint_ij];
+              //     Rcout << std::endl;
+            }
+
+            // Rcout << "Hello_2";
+            // update trees
+            int tree_index_s = variables.size();
+            for(auto tree_s = variables.rbegin(); tree_s != variables.rend(); ++tree_s ) {
+              --tree_index_s;
+              // check if T\U=j_dims subset of S and S subset of T
+              bool subset = true;
+              for(const auto dim: j_dims){
+                if(tree_s->count(dim) == 0){
+                  subset = false;
+                  break;
+                }
+              }
+              for(const auto dim: *tree_s){
+                if(tree_t->count(dim) == 0){
+                  subset = false;
+                  break;
+                }
+              }
+              if(!subset) continue;
+              //     Rcout << "         " << "S: ";
+              //     for(auto dim: *tree_s) Rcout << dim << ", ";
+              //     Rcout << std::endl;
+              // S cap U
+              std::set<int> k_dims = *tree_s;
+              std::set<int> k_dims_h1 = *tree_s;
+              std::set<int> k_dims_h2 = *tree_u;
+              for(const auto dim: *tree_u) k_dims.insert(dim);
+              for(const auto dim: *tree_s) k_dims_h2.erase(dim);
+              for(const auto dim: *tree_u) k_dims_h1.erase(dim);
+              for(const auto dim: k_dims_h1) k_dims.erase(dim);
+              for(const auto dim: k_dims_h2) k_dims.erase(dim);
+
+              // std::set<int> k_dims = *tree_s;
+              // for(const auto dim: *tree_t) k_dims.erase(dim);
+              // for(const auto dim: *tree_u) k_dims.insert(dim);
+
+              //     Rcout << "         " << "k_dims: ";
+              //     for(auto dim: k_dims) Rcout << dim << ", ";
+              //     Rcout << std::endl;
+
+              if(k_dims.size()==0){
+
+                values[tree_index_s][gridPoint_j] += pow(-1, (*tree_s).size() - j_dims.size()) * update;
+              } else {
+
+                // Rcout <<"k_dims :";
+                // for(auto dim: k_dims) Rcout << dim << ", ";
+                // Rcout << std::endl;
+
+                std::vector<int> k_sizes(k_dims.size(), 0);
+                for(int k=0; k<k_dims.size(); ++k){
+                  auto tmp = k_dims.begin();
+                  std::advance(tmp, k);
+                  int k_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
+                  k_sizes[k] = grids[tree_index_t].dimensions[k_index];
+                }
+                // Rcout << "         " << "k_sizes: ";
+                // for(auto dim: k_sizes) Rcout << dim << ", ";
+                // Rcout << std::endl;
+                NDGrid::NDGrid grid_k = NDGrid::NDGrid(k_sizes);
+                while(!grid_k.nextPoint()){
+                  auto gridPoint_k = grid_k.getPoint();
+                  // Rcout << "            " << "k: ";
+                  // for(auto p: gridPoint_k) Rcout << p << ", ";
+                  // Rcout << std::endl << "         ";
+                  std::vector<int> gridPoint_jk(tree_s->size(), 0);
+                  for(int j=0; j<gridPoint_j.size(); ++j){
+                    auto j_dim = j_dims.begin();
+                    std::advance(j_dim, j);
+                    int j_index = std::distance(variables[tree_index_s].begin(), variables[tree_index_s].find(*j_dim));
+                    // Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
+                    gridPoint_jk[j_index] = gridPoint_j[j];
+                  }
+                  for(int k=0; k<gridPoint_k.size(); ++k){
+                    auto k_dim = k_dims.begin();
+                    std::advance(k_dim, k);
+                    int k_index = std::distance(variables[tree_index_s].begin(), variables[tree_index_s].find(*k_dim));
+                    // Rcout << "         k_dim=" << *k_dim << ", k_index=" << k_index;
+                    gridPoint_jk[k_index] = gridPoint_k[k];
+                  }
+                  // Rcout << std::endl << "            " << "j, k: ";
+                  // for(auto p: gridPoint_jk) Rcout << p << ", ";
+                  // Rcout << std::endl;
+
+                  // Rcout << pow(-1, (*tree_s).size() - j_dims.size()) * update[0];
+                  values[tree_index_s][gridPoint_jk] += pow(-1, (*tree_s).size() - j_dims.size()) * update;
+                }
+              }
             }
           }
         }
