@@ -35,6 +35,6 @@ test_that("C-level functionality works", {
   )
 
   # Not sure what to test for here
-  rpfit$fit$new_purify()
+  expect_output(rpfit$fit$purify())
 })
 
