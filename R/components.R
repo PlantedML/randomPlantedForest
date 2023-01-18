@@ -4,7 +4,7 @@
 #' The sum of all components equals the overall predicted value for an observation.
 #'
 #' * `extract_components` extracts all possible components up to `max_interaction` degrees,
-#' which is defined when calling [`rpf()`].
+#'  up to the degree `d` set when calling [`rpf(..., max_interaction = d)`].
 #' * `extract_component` allows extracting only a single component for a given predictor
 #' or combination of predictors.
 #'
@@ -14,7 +14,10 @@
 #'
 #' @inheritParams predict.rpf
 #' @param predictors [`character`] Vector of one or more column names of predictor variables
-#' in `new_data` to extract components for.
+#'   in `new_data` to extract components for.
+#' @param max_interaction [`integer`] Maximum degree of interactions to consider.
+#'   Default will use the `max_interaction` parameter from the [`rpf`] object.
+#'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
 #' @return A [`tibble`][tibble::tibble] with the same number of rows as `new_data` and one
 #' column for each main or interaction term.
@@ -37,15 +40,30 @@
 #' # sums to prediction
 #' cbind(rowSums(components), predict(rpfit, test))
 #'
+#' # Only get components with interactions of a lower degree, ignoring 3-way interactions
+#' extract_components(rpfit, test, max_interaction = 2)
+#'
+#' # Only retrieve main effects
+#' (main_effects <- extract_components(rpfit, test, max_interaction = 1))
+#'
+#' # The difference is the combined contribution of interaction effects
+#' cbind(rowSums(main_effects), predict(rpfit, test))
+#'
 #' # Component for interaction term of two predictors
 #' extract_component(rpfit, test, predictors = c("cyl", "hp"))
-extract_components <- function(object, new_data) {
+extract_components <- function(object, new_data, max_interaction = NULL) {
   # Get predictor names to keep track of them
   pred_names <- names(object$blueprint$ptypes$predictors)
 
+  if (is.null(max_interaction)) {
+    max_interaction <- object$params$max_interaction
+  } else {
+    checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
+  }
+
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
-  all_components <- lapply(seq_len(object$params$max_interaction), function(i) {
+  all_components <- lapply(seq_len(max_interaction), function(i) {
     combinations <- utils::combn(pred_names, i, simplify = FALSE)
     components <- lapply(combinations, function(x) extract_component(object, new_data, x))
     do.call(cbind, args = components)
@@ -62,7 +80,11 @@ extract_components <- function(object, new_data) {
 extract_component <- function(object, new_data, predictors = NULL) {
 
   # Ensure selected predictors are subset of original predictors
-  checkmate::assert_subset(predictors, choices = names(object$blueprint$ptypes$predictors), empty.ok = FALSE)
+  checkmate::assert_subset(
+    predictors,
+    choices = names(object$blueprint$ptypes$predictors),
+    empty.ok = FALSE
+  )
 
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
@@ -78,7 +100,6 @@ extract_component <- function(object, new_data, predictors = NULL) {
 
   ret <- object$fit$predict_matrix(new_data, components)
   colnames(ret) <- paste0(predictors, collapse = ":")
-  # colnames(ret) <- c(".pred_m")
 
   tibble::as_tibble(ret)
 }
