@@ -2,47 +2,49 @@
 % Please edit documentation in R/components.R
 \name{extract_components}
 \alias{extract_components}
+\alias{extract_component}
 \title{Extract predicted components from a Random Planted Forest}
 \usage{
-extract_components(object, new_data, predictors = NULL)
+extract_components(object, new_data)
+
+extract_component(object, new_data, predictors = NULL)
 }
 \arguments{
 \item{object}{A fit object of class \code{\link{rpf}}.}
 
 \item{new_data}{Data for new observations to predict.}
 
-\item{predictors}{\code{\link{character}} Vector of one or more column names of predictor variables in \code{new_data}
-to extract components for.}
+\item{predictors}{\code{\link{character}} Vector of one or more column names of predictor variables
+in \code{new_data} to extract components for.}
 }
 \value{
-A numeric \code{matrix}
+A \code{\link[tibble:tibble]{tibble}} with the same number of rows as \code{new_data} and one
+column for each main or interaction term.
 }
 \description{
-Extract predicted components from a Random Planted Forest
+Prediction components are a functional decomposition of the model prediction.
+The sum of all components equals the overall predicted value for an observation.
+}
+\details{
+\itemize{
+\item \code{extract_components} extracts all possible components up to \code{max_interaction} degrees,
+which is defined when calling \code{\link[=rpf]{rpf()}}.
+\item \code{extract_component} allows extracting only a single component for a given predictor
+or combination of predictors.
+}
 }
 \examples{
 
-# Regression task, only numeric predictors
-train <-  mtcars[1:20, ]
-test <-  mtcars[21:32, ]
+# Regression task, only some predictors
+train <-  mtcars[1:20, 1:4]
+test <-  mtcars[21:32, 1:4]
 
 set.seed(23)
 rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 
-# One component, first predictor column in test data
-extract_components(rpfit, test, predictors = c("cyl"))
-
-# Two components, 1st and 3rd predictor columns in test data
-extract_components(rpfit, test, predictors = c("cyl", "hp"))
-
-\dontrun{
-# trying to pass all columns in test data errors since target "mpg" is included
-extract_components(rpfit, test, predictors = names(test))
-
-# passing all predictor names by dropping `"mpg"` first
-extract_components(rpfit, test, predictors = names(test[, -1]))
-
-# If `predictors` is not specified, we don't know what to do
+# Extract all components, including main effects and interaction terms up to `max_interaction`
 extract_components(rpfit, test)
-}
+
+# Component for interaction term of two predictors
+extract_component(rpfit, test, predictors = c("cyl", "hp"))
 }
