@@ -33,6 +33,10 @@ which is defined when calling \code{\link[=rpf]{rpf()}}.
 or combination of predictors.
 }
 }
+\note{
+Depending on the number of predictors and \code{max_interaction}, the number of components will
+increase drastically to \code{sum(choose(ncol(new_data), seq_len(max_interaction)))}.
+}
 \examples{
 
 # Regression task, only some predictors
@@ -40,10 +44,13 @@ train <-  mtcars[1:20, 1:4]
 test <-  mtcars[21:32, 1:4]
 
 set.seed(23)
-rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
+rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = TRUE)
 
 # Extract all components, including main effects and interaction terms up to `max_interaction`
-extract_components(rpfit, test)
+(components <- extract_components(rpfit, test))
+
+# sums to prediction
+cbind(rowSums(components), predict(rpfit, test))
 
 # Component for interaction term of two predictors
 extract_component(rpfit, test, predictors = c("cyl", "hp"))

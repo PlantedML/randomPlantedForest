@@ -8,6 +8,10 @@
 #' * `extract_component` allows extracting only a single component for a given predictor
 #' or combination of predictors.
 #'
+#' @note
+#' Depending on the number of predictors and `max_interaction`, the number of components will
+#' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
+#'
 #' @inheritParams predict.rpf
 #' @param predictors [`character`] Vector of one or more column names of predictor variables
 #' in `new_data` to extract components for.
@@ -15,6 +19,8 @@
 #' @return A [`tibble`][tibble::tibble] with the same number of rows as `new_data` and one
 #' column for each main or interaction term.
 #' @export
+#' @importFrom tibble as_tibble
+#' @importFrom utils combn
 #'
 #' @examples
 #'
@@ -23,7 +29,7 @@
 #' test <-  mtcars[21:32, 1:4]
 #'
 #' set.seed(23)
-#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
+#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = TRUE)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
 #' (components <- extract_components(rpfit, test))
@@ -40,12 +46,12 @@ extract_components <- function(object, new_data) {
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(object$params$max_interaction), function(i) {
-    combn(pred_names, i, simplify = FALSE) |>
-      lapply(function(x) extract_component(object, test, x)) |>
-      do.call(cbind, args = _)
-  }) |>
-    do.call(cbind, args = _) |>
-    tibble::as_tibble()
+    combinations <- utils::combn(pred_names, i, simplify = FALSE)
+    components <- lapply(combinations, function(x) extract_component(object, new_data, x))
+    do.call(cbind, args = components)
+  })
+
+  all_components <- tibble::as_tibble(do.call(cbind, args = all_components))
 
   # Remove components with constant 0s
   all_components[, vapply(all_components, function(x) !all(x == 0), FUN.VALUE = logical(1))]

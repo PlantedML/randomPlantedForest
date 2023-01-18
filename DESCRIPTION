@@ -20,7 +20,9 @@ Imports:
     data.table,
     hardhat,
     methods,
-    Rcpp
+    Rcpp,
+    tibble,
+    utils
 Suggests: 
     covr,
     ggplot2,
