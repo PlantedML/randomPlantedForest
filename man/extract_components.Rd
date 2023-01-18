@@ -5,7 +5,7 @@
 \alias{extract_component}
 \title{Extract predicted components from a Random Planted Forest}
 \usage{
-extract_components(object, new_data)
+extract_components(object, new_data, max_interaction = NULL)
 
 extract_component(object, new_data, predictors = NULL)
 }
@@ -13,6 +13,10 @@ extract_component(object, new_data, predictors = NULL)
 \item{object}{A fit object of class \code{\link{rpf}}.}
 
 \item{new_data}{Data for new observations to predict.}
+
+\item{max_interaction}{\code{\link{integer}} Maximum degree of interactions to consider.
+Default will use the \code{max_interaction} parameter from the \code{\link{rpf}} object.
+Must be between \code{1} (main effects only) and the \code{max_interaction} of the \code{\link{rpf}} object.}
 
 \item{predictors}{\code{\link{character}} Vector of one or more column names of predictor variables
 in \code{new_data} to extract components for.}
@@ -28,7 +32,7 @@ The sum of all components equals the overall predicted value for an observation.
 \details{
 \itemize{
 \item \code{extract_components} extracts all possible components up to \code{max_interaction} degrees,
-which is defined when calling \code{\link[=rpf]{rpf()}}.
+up to the degree \code{d} set when calling \code{\link{rpf(..., max_interaction = d)}}.
 \item \code{extract_component} allows extracting only a single component for a given predictor
 or combination of predictors.
 }
@@ -51,6 +55,15 @@ rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = T
 
 # sums to prediction
 cbind(rowSums(components), predict(rpfit, test))
+
+# Only get components with interactions of a lower degree, ignoring 3-way interactions
+extract_components(rpfit, test, max_interaction = 2)
+
+# Only retrieve main effects
+(main_effects <- extract_components(rpfit, test, max_interaction = 1))
+
+# The difference is the combined contribution of interaction effects
+cbind(rowSums(main_effects), predict(rpfit, test))
 
 # Component for interaction term of two predictors
 extract_component(rpfit, test, predictors = c("cyl", "hp"))
