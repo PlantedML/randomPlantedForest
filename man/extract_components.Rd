@@ -32,7 +32,7 @@ The sum of all components equals the overall predicted value for an observation.
 \details{
 \itemize{
 \item \code{extract_components} extracts all possible components up to \code{max_interaction} degrees,
-up to the degree \code{d} set when calling \code{\link{rpf(..., max_interaction = d)}}.
+up to the value set when calling \code{\link[=rpf]{rpf()}}.
 \item \code{extract_component} allows extracting only a single component for a given predictor
 or combination of predictors.
 }

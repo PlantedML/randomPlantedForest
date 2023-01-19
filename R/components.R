@@ -4,7 +4,7 @@
 #' The sum of all components equals the overall predicted value for an observation.
 #'
 #' * `extract_components` extracts all possible components up to `max_interaction` degrees,
-#'  up to the degree `d` set when calling [`rpf(..., max_interaction = d)`].
+#'  up to the value set when calling [`rpf()`].
 #' * `extract_component` allows extracting only a single component for a given predictor
 #' or combination of predictors.
 #'
