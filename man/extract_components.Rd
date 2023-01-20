@@ -14,12 +14,12 @@ extract_component(object, new_data, predictors = NULL)
 
 \item{new_data}{Data for new observations to predict.}
 
-\item{max_interaction}{\code{\link{integer}} Maximum degree of interactions to consider.
+\item{max_interaction}{\code{\link{integer}} or \code{NULL} Maximum degree of interactions to consider.
 Default will use the \code{max_interaction} parameter from the \code{\link{rpf}} object.
 Must be between \code{1} (main effects only) and the \code{max_interaction} of the \code{\link{rpf}} object.}
 
 \item{predictors}{\code{\link{character}} Vector of one or more column names of predictor variables
-in \code{new_data} to extract components for.}
+in \code{new_data} to extract components for. IF \code{NULL}, the intercept component is returned.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble}} with the same number of rows as \code{new_data} and one
@@ -32,9 +32,9 @@ The sum of all components equals the overall predicted value for an observation.
 \details{
 \itemize{
 \item \code{extract_components} extracts all possible components up to \code{max_interaction} degrees,
-up to the value set when calling \code{\link[=rpf]{rpf()}}.
+up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
 \item \code{extract_component} allows extracting only a single component for a given predictor
-or combination of predictors.
+or combination of predictors, including the intercept if \code{predictors} is \code{NULL}.
 }
 }
 \note{
@@ -48,7 +48,7 @@ train <-  mtcars[1:20, 1:4]
 test <-  mtcars[21:32, 1:4]
 
 set.seed(23)
-rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = TRUE)
+rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = FALSE)
 
 # Extract all components, including main effects and interaction terms up to `max_interaction`
 (components <- extract_components(rpfit, test))
@@ -64,7 +64,15 @@ extract_components(rpfit, test, max_interaction = 2)
 
 # The difference is the combined contribution of interaction effects
 cbind(rowSums(main_effects), predict(rpfit, test))
+# Regression task, only some predictors
+train <-  mtcars[1:20, 1:4]
+test <-  mtcars[21:32, 1:4]
+
+set.seed(23)
+rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, purify = FALSE)
 
 # Component for interaction term of two predictors
 extract_component(rpfit, test, predictors = c("cyl", "hp"))
+
+extract_component(rpfit, test, predictors = NULL)
 }
