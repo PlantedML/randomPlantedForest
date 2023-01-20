@@ -705,35 +705,41 @@ public:
   void set_parameters(StringVector keys, NumericVector values);
   List get_model();
   virtual ~RandomPlantedForest(){};
+  bool is_purified();
 
 protected:
   double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
   std::vector<std::vector<double>> X;         /**< Nested vector feature samples of size (sample_size x feature_size) */
-std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
-int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
-int n_trees;                                /**< Number of trees generated per family */
-int n_splits;                               /**< Number of performed splits for each tree family */
-std::vector<int> n_leaves;                  /**< */
-double t_try = 0.4;                         /**< */
-int split_try = 10;                         /**< */
-int value_size = 1;
-int feature_size = 0;                       /**< Number of feature dimension in X */
-int sample_size = 0;                        /**< Number of samples of X */
-bool purify_forest = 0;                     /**< Whether the forest should be purified */
-bool purified = false;                      /**< Track if forest is currently purified */
-bool deterministic = false;                 /**< Choose whether approach deterministic or random */
-bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
-bool cross_validate = false;                /**< Determines if cross validation is performed */
-std::vector<double> upper_bounds;
-std::vector<double> lower_bounds;
-std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
-std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
-void L2_loss(rpf::Split &split);
-virtual void fit();
-virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
-virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+  std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
+  int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
+  int n_trees;                                /**< Number of trees generated per family */
+  int n_splits;                               /**< Number of performed splits for each tree family */
+  std::vector<int> n_leaves;                  /**< */
+  double t_try = 0.4;                         /**< */
+  int split_try = 10;                         /**< */
+  int value_size = 1;
+  int feature_size = 0;                       /**< Number of feature dimension in X */
+  int sample_size = 0;                        /**< Number of samples of X */
+  bool purify_forest = 0;                     /**< Whether the forest should be purified */
+  bool purified = false;                      /**< Track if forest is currently purified */
+  bool deterministic = false;                 /**< Choose whether approach deterministic or random */
+  bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
+  bool cross_validate = false;                /**< Determines if cross validation is performed */
+  std::vector<double> upper_bounds;
+  std::vector<double> lower_bounds;
+  std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
+  std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+  void L2_loss(rpf::Split &split);
+  virtual void fit();
+  virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+  virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
                                     std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family);
 };
+
+bool RandomPlantedForest::is_purified(){
+
+  return purified;
+}
 
 void RandomPlantedForest::L2_loss(rpf::Split& split){
 
@@ -1295,7 +1301,7 @@ if(!purified){
             for(unsigned int i = 0; i<dims.size(); ++i){
 
               int dim = dims[i];
-              
+
               if(!((leaf.intervals[std::max(0, dim-1)].first <= X[i]
                     || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
                    && (leaf.intervals[std::max(0, dim-1)].second > X[i]
@@ -1309,7 +1315,20 @@ if(!purified){
       }
     }
   }else{
-    if(component_index == std::set<int>{0}) {
+    if(component_index == std::set<int>{-1}){
+      for(auto& tree_family: this->tree_families){
+        for(auto& tree: tree_family){
+          std::vector<int> leaf_index(tree.first.size(), -1);
+          // add value of null tree
+          if(tree.first == std::set<int>{0}){
+
+            // Rcout << tree.first.size() ;
+            leaf_index = std::vector<int>(tree.first.size(), 0);
+            total_res += tree.second->GridLeaves.values[leaf_index];
+          }
+        }
+      }
+    } else if(component_index == std::set<int>{0}) {
       for(auto& tree_family: this->tree_families){
         for(auto& tree: tree_family){
           std::vector<int> leaf_index(tree.first.size(), -1);
@@ -1411,7 +1430,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix& X, 
   // todo: sanity check for X
   if( feature_vec.empty() ) throw std::invalid_argument("Feature vector is empty.");
   if( component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec[0].size() != (size_t)this->feature_size ) throw std::invalid_argument("Feature vector has wrong dimension.");
-  if( component_index != std::set<int>{0} && component_index.size() != feature_vec[0].size() ) throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
+  if( component_index != std::set<int>{0} && component_index != std::set<int>{-1} && component_index.size() != feature_vec[0].size() ) throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
 
   for(auto& vec: feature_vec){
     predictions.push_back(predict_single(vec, component_index));
@@ -3679,6 +3698,7 @@ RCPP_MODULE(mod_rpf) {
   .method("get_parameters", &RandomPlantedForest::get_parameters)
   .method("set_parameters", &RandomPlantedForest::set_parameters)
   .method("get_model", &RandomPlantedForest::get_model)
+  .method("is_purified", &RandomPlantedForest::is_purified)
   ;
 
   class_<ClassificationRPF>("ClassificationRPF")
