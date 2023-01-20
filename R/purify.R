@@ -29,8 +29,9 @@ purify.default <- function(x, ...) {
 
 #' @export
 #' @rdname purify
+#' @importFrom utils capture.output
 purify.rpf <- function(x, ...) {
-  # Silence output from C++ by capturing it
+  # FIXME: Silence output from C++ by capturing it
   capture.output(x$fit$purify())
   x
 }
