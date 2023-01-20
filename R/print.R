@@ -31,6 +31,9 @@ print.rpf <- function(x, ...) {
   cat("Formula:", model_formula, "\n")
   cat("Fit using", p, "predictors and", degree)
 
+  purification <- ifelse(x$fit$is_purified(), "is", "is _not_")
+  cat("Forest ", purification, "purified!\n\n")
+
   param_names <- names(x$params)
   nm_lengths <- nchar(param_names)
 
