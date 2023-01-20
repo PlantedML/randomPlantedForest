@@ -1315,7 +1315,20 @@ if(!purified){
       }
     }
   }else{
-    if(component_index == std::set<int>{0}) {
+    if(component_index == std::set<int>{-1}){
+      for(auto& tree_family: this->tree_families){
+        for(auto& tree: tree_family){
+          std::vector<int> leaf_index(tree.first.size(), -1);
+          // add value of null tree
+          if(tree.first == std::set<int>{0}){
+
+            // Rcout << tree.first.size() ;
+            leaf_index = std::vector<int>(tree.first.size(), 0);
+            total_res += tree.second->GridLeaves.values[leaf_index];
+          }
+        }
+      }
+    } else if(component_index == std::set<int>{0}) {
       for(auto& tree_family: this->tree_families){
         for(auto& tree: tree_family){
           std::vector<int> leaf_index(tree.first.size(), -1);
@@ -1417,7 +1430,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix& X, 
   // todo: sanity check for X
   if( feature_vec.empty() ) throw std::invalid_argument("Feature vector is empty.");
   if( component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec[0].size() != (size_t)this->feature_size ) throw std::invalid_argument("Feature vector has wrong dimension.");
-  if( component_index != std::set<int>{0} && component_index.size() != feature_vec[0].size() ) throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
+  if( component_index != std::set<int>{0} && component_index != std::set<int>{-1} && component_index.size() != feature_vec[0].size() ) throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
 
   for(auto& vec: feature_vec){
     predictions.push_back(predict_single(vec, component_index));
