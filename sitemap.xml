@@ -19,6 +19,9 @@
     <loc>http://plantedml.com/randomPlantedForest/index.html</loc>
   </url>
   <url>
+    <loc>http://plantedml.com/randomPlantedForest/reference/extract_components.html</loc>
+  </url>
+  <url>
     <loc>http://plantedml.com/randomPlantedForest/reference/index.html</loc>
   </url>
   <url>
@@ -26,6 +29,9 @@
   </url>
   <url>
     <loc>http://plantedml.com/randomPlantedForest/reference/print.rpf.html</loc>
+  </url>
+  <url>
+    <loc>http://plantedml.com/randomPlantedForest/reference/purify.html</loc>
   </url>
   <url>
     <loc>http://plantedml.com/randomPlantedForest/reference/randomPlantedForest-package.html</loc>
