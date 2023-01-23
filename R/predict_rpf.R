@@ -12,7 +12,6 @@
 #' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
 #' for `type = "numeric"`, as in this case the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
-#' @param components `[0]` TODO.
 #' @param ... Unused.
 #'
 #' @return For regression: A [`tbl`][tibble::tibble] with column `.pred` with
@@ -29,15 +28,15 @@
 #' @examples
 #' # Regression with L2 loss
 #' rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
-#' predict(rpfit, mtcars[, c("cyl", "wt")], components = 0)
+#' predict(rpfit, mtcars[, c("cyl", "wt")])
 predict.rpf <- function(object, new_data,
                         type = ifelse(object$mode == "regression", "numeric", "prob"),
-                        components = 0, ...) {
+                        ...) {
 
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
 
-  out <- predict_rpf_bridge(type, object, processed$predictors, components, ...)
+  out <- predict_rpf_bridge(type, object, processed$predictors, ...)
 
   hardhat::validate_prediction_size(out, new_data)
 
@@ -75,8 +74,8 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
 }
 
 # Predict function for numeric outcome / regression
-predict_rpf_numeric <- function(object, new_data, components, ...) {
-  pred <- object$fit$predict_matrix(new_data, components)
+predict_rpf_numeric <- function(object, new_data, ...) {
+  pred <- object$fit$predict_matrix(new_data, 0)
 
   if (ncol(pred) == 1) {
     # Regression or binary case: just return predictions as-is, single column
@@ -97,10 +96,10 @@ predict_rpf_numeric <- function(object, new_data, components, ...) {
 # Classification ----------------------------------------------------------
 
 # Predict function for classification: Probability prediction
-predict_rpf_prob <- function(object, new_data, components, ...) {
+predict_rpf_prob <- function(object, new_data, ...) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
-  pred_raw <- object$fit$predict_matrix(new_data, components)
+  pred_raw <- object$fit$predict_matrix(new_data, 0)
 
   if (length(outcome_levels) == 2) { # Binary outcome
 
@@ -134,11 +133,11 @@ predict_rpf_prob <- function(object, new_data, components, ...) {
 }
 
 # Class prediction: Take probability prediction and convert to class labels
-predict_rpf_class <- function(object, new_data, components, ...) {
+predict_rpf_class <- function(object, new_data, ...) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   # Predict probability
-  pred_prob <- predict_rpf_prob(object, new_data, components, ...)
+  pred_prob <- predict_rpf_prob(object, new_data, 0, ...)
 
   # For each instance, class with higher probability
   pred_class <- factor(outcome_levels[max.col(pred_prob)], levels = outcome_levels)
