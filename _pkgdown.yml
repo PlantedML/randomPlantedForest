@@ -10,6 +10,13 @@ reference:
 - contents:
   - rpf
   - predict.rpf
+
+- title: Functional decomposition
+  desc: Enabling and utilizing functional decomposition
+- contents:
+    - purify
+    - starts_with("extract_compon")
+
 - title: Utility functions
 - contents:
   - print.rpf

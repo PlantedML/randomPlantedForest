@@ -33,8 +33,5 @@ test_that("C-level functionality works", {
     strsplit(params_captured, "(, )|(: )")[[1]][[2]],
     "n_trees=60"
   )
-
-  # Not sure what to test for here
-  expect_output(rpfit$fit$purify())
 })
 

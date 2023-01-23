@@ -39,7 +39,7 @@ rpf(
 \arguments{
 \item{x}{Feature matrix or \code{data.frame}.}
 
-\item{...}{(Ignored).}
+\item{...}{(Unused).}
 
 \item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
 number of split dimensions for a tree.
@@ -49,28 +49,33 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{ntrees}{\verb{[50]}: Number of trees generated per family.}
 
-\item{splits}{\verb{[30]}: Number of performed splits for each tree family.}
+\item{splits}{\verb{[30]}: Number of splits performed for each tree family.}
 
-\item{split_try}{\verb{[10]}: Number of split points to be considered when considering a split candidate.}
+\item{split_try}{\verb{[10]}: Number of split points to be considered when choosing a split candidate.}
 
-\item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of split-candidetes viable in each round.}
+\item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of viable split-candidates in each round.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
 \item{parallel}{\verb{[FALSE]}: Perform algorithm in parallel or serialized.}
 
-\item{purify}{\verb{[FALSE]}: Whether the forest should be purified.}
+\item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
+Set to \code{TRUE} to enable components extract with \code{\link[=extract_components]{extract_components()}} are valid.
+Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
 
 \item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}
 
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
-classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.}
+classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.
+"\code{exponential}" yield similar results as "\code{logit}" while being significantly faster.}
 
-\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership
-is truncated to be smaller 1-delta when calculating the loss to determin the optimal split.}
+\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
+Proportion of class membership is truncated to be smaller 1-delta when calculating
+the loss to determine the optimal split.}
 
-\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}. Proportion of class membership
-is truncated to be smaller 1-epsilon when calculating the fit in a leave.}
+\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
+Proportion of class membership is truncated to be smaller 1-epsilon when calculating
+the fit in a leaf.}
 
 \item{y}{Target vector for use with \code{x}.
 The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression

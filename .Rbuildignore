@@ -13,3 +13,4 @@
 ^vignettes/articles$
 ^vignettes/test$
 ^README\.Rmd$
+^attic$

@@ -5,7 +5,7 @@
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/workflows/R-CMD-check/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions)
+[![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml)
 [![Codecov test
 coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
 <!-- badges: end -->
@@ -54,14 +54,14 @@ predict(rpfit, new_data = mtcars[1:10, ])
 #> # A tibble: 10 × 1
 #>    .pred
 #>    <dbl>
-#>  1  19.4
-#>  2  20.2
-#>  3  24.5
-#>  4  20.2
-#>  5  27.1
-#>  6  18.7
-#>  7  25.1
-#>  8  23.5
-#>  9  23.3
-#> 10  19.1
+#>  1  20.4
+#>  2  20.4
+#>  3  25.6
+#>  4  20.5
+#>  5  17.0
+#>  6  18.4
+#>  7  15.2
+#>  8  22.9
+#>  9  23.4
+#> 10  19.0
 ```

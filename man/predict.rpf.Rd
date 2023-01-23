@@ -8,7 +8,6 @@
   object,
   new_data,
   type = ifelse(object$mode == "regression", "numeric", "prob"),
-  components = 0,
   ...
 )
 }
@@ -28,8 +27,6 @@ If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} i
 for \code{type = "numeric"}, as in this case the raw predictions have the
 additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
 
-\item{components}{\verb{[0]} TODO.}
-
 \item{...}{Unused.}
 }
 \value{
@@ -47,5 +44,5 @@ Random Planted Forest Predictions
 \examples{
 # Regression with L2 loss
 rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
-predict(rpfit, mtcars[, c("cyl", "wt")], components = 0)
+predict(rpfit, mtcars[, c("cyl", "wt")])
 }
