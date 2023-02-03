@@ -20,7 +20,9 @@ Imports:
     data.table,
     hardhat,
     methods,
-    Rcpp
+    Rcpp,
+    tibble,
+    utils
 Suggests: 
     covr,
     ggplot2,
@@ -34,5 +36,5 @@ LinkingTo:
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.2
+RoxygenNote: 7.2.3
 SystemRequirements: C++11
