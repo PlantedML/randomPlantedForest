@@ -5,8 +5,9 @@
 #'
 #' * `extract_components` extracts all possible components up to `max_interaction` degrees,
 #'  up to the value set when calling [`rpf()`]. The intercept is always included.
+#'  Optionally `predictors` can be specified to only include components including the given variables.
 #' * `extract_component` allows extracting only a single component for a given predictor
-#' or combination of predictors, including the intercept if `predictors` is `NULL`.
+#' or interaction of predictors, including the intercept if `predictors` is `NULL`.
 #'
 #' @note
 #' Depending on the number of predictors and `max_interaction`, the number of components will
@@ -14,7 +15,9 @@
 #'
 #' @inheritParams predict.rpf
 #' @param predictors [`character`] or `NULL`: Vector of one or more column names of predictor variables
-#'   in `new_data` to extract components for. IF `NULL`, the intercept component is returned.
+#'   in `new_data` to extract components for.
+#'   In `extract_components`: If `NULL`, all variables and their interactions are returned.
+#'   in `extract_component`: If `NULL`, the intercept component is returned.
 #' @param max_interaction [`integer`] or `NULL`: Maximum degree of interactions to consider.
 #'   Default will use the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
@@ -51,9 +54,7 @@
 #' cbind(rowSums(main_effects), predict(rpfit, test))
 #'
 
-extract_components <- function(object, new_data, max_interaction = NULL) {
-  # Get predictor names to keep track of them
-  pred_names <- names(object$blueprint$ptypes$predictors)
+extract_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
 
   if (is.null(max_interaction)) {
     max_interaction <- object$params$max_interaction
@@ -61,10 +62,20 @@ extract_components <- function(object, new_data, max_interaction = NULL) {
     checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
   }
 
+  checkmate::assert_subset(
+    predictors,
+    choices = names(object$blueprint$ptypes$predictors),
+    empty.ok = TRUE
+  )
+
+  if (is.null(predictors)) {
+    predictors <- names(object$blueprint$ptypes$predictors)
+  }
+
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(max_interaction), function(i) {
-    combinations <- utils::combn(pred_names, i, simplify = FALSE)
+    combinations <- utils::combn(predictors, i, simplify = FALSE)
     components <- lapply(combinations, function(x) extract_component(object, new_data, x))
     do.call(cbind, args = components)
   })
@@ -73,8 +84,7 @@ extract_components <- function(object, new_data, max_interaction = NULL) {
   intercept <- extract_component(object, new_data, predictors = NULL)
   all_components <- cbind(intercept, all_components)
 
-  # Remove components with constant 0s
-  all_components[, vapply(all_components, function(x) !all(x == 0), FUN.VALUE = logical(1))]
+  all_components
 }
 
 #' @rdname extract_components
@@ -93,7 +103,6 @@ extract_components <- function(object, new_data, max_interaction = NULL) {
 #' # Retrieving the intercept
 #' extract_component(rpfit, test, predictors = NULL)
 extract_component <- function(object, new_data, predictors = NULL) {
-#browser()
   # Ensure selected predictors are subset of original predictors
   # but allow NULL if intercept is requested
   checkmate::assert_subset(
@@ -131,8 +140,8 @@ extract_component <- function(object, new_data, predictors = NULL) {
   # new_data may only contain columns required for components
   ret <- object$fit$predict_matrix(new_data, components)
 
-  # Make names, e.g. intercept, x1, x1:x2 etc.
-  out_names <- ifelse(is.null(predictors), "intercept", paste0(predictors, collapse = ":"))
+  # Make names, e.g. intercept, x1, x1:x2 etc. and sort predictors for consistent alphabetic order
+  out_names <- ifelse(is.null(predictors), "intercept", paste0(sort(predictors), collapse = ":"))
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambigation with one column for each predicted class
