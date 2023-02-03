@@ -710,29 +710,29 @@ public:
 protected:
   double MSE_vec(const NumericVector& Y_predicted, const NumericVector& Y_true);
   std::vector<std::vector<double>> X;         /**< Nested vector feature samples of size (sample_size x feature_size) */
-  std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
-  int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
-  int n_trees;                                /**< Number of trees generated per family */
-  int n_splits;                               /**< Number of performed splits for each tree family */
-  std::vector<int> n_leaves;                  /**< */
-  double t_try = 0.4;                         /**< */
-  int split_try = 10;                         /**< */
-  int value_size = 1;
-  int feature_size = 0;                       /**< Number of feature dimension in X */
-  int sample_size = 0;                        /**< Number of samples of X */
-  bool purify_forest = 0;                     /**< Whether the forest should be purified */
-  bool purified = false;                      /**< Track if forest is currently purified */
-  bool deterministic = false;                 /**< Choose whether approach deterministic or random */
-  bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
-  bool cross_validate = false;                /**< Determines if cross validation is performed */
-  std::vector<double> upper_bounds;
-  std::vector<double> lower_bounds;
-  std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
-  std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
-  void L2_loss(rpf::Split &split);
-  virtual void fit();
-  virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
-  virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
+std::vector<std::vector<double>> Y;         /**< Corresponding values for the feature samples */
+int max_interaction;                        /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
+int n_trees;                                /**< Number of trees generated per family */
+int n_splits;                               /**< Number of performed splits for each tree family */
+std::vector<int> n_leaves;                  /**< */
+double t_try = 0.4;                         /**< */
+int split_try = 10;                         /**< */
+int value_size = 1;
+int feature_size = 0;                       /**< Number of feature dimension in X */
+int sample_size = 0;                        /**< Number of samples of X */
+bool purify_forest = 0;                     /**< Whether the forest should be purified */
+bool purified = false;                      /**< Track if forest is currently purified */
+bool deterministic = false;                 /**< Choose whether approach deterministic or random */
+bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
+bool cross_validate = false;                /**< Determines if cross validation is performed */
+std::vector<double> upper_bounds;
+std::vector<double> lower_bounds;
+std::vector<TreeFamily> tree_families;      /**<  random planted forest containing result */
+std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+void L2_loss(rpf::Split &split);
+virtual void fit();
+virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+virtual rpf::Split calcOptimalSplit(const std::vector<std::vector<double>>& Y, const std::vector<std::vector<double>>& X,
                                     std::multimap<int, std::shared_ptr<DecisionTree>>& possible_splits, TreeFamily& curr_family);
 };
 
@@ -1263,7 +1263,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-if(!purified){
+  if(!purified){
     // consider all components
     if(component_index == std::set<int>{0}) {
       for(auto& tree_family: this->tree_families){
@@ -1272,10 +1272,10 @@ if(!purified){
             bool valid = true;
             for(auto& dim: tree.first){
               if(!((leaf.intervals[std::max(0, dim-1)].first <= X[std::max(0, dim-1)]
-                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
-                   && (leaf.intervals[std::max(0, dim-1)].second > X[std::max(0, dim-1)]
-                   || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
-                         valid = false;
+                      || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
+                     && (leaf.intervals[std::max(0, dim-1)].second > X[std::max(0, dim-1)]
+                     || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
+                     valid = false;
               }
             }
             if(valid){
@@ -1303,10 +1303,10 @@ if(!purified){
               int dim = dims[i];
 
               if(!((leaf.intervals[std::max(0, dim-1)].first <= X[i]
-                    || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
-                   && (leaf.intervals[std::max(0, dim-1)].second > X[i]
-                         || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
-                         valid = false;
+                      || leaf.intervals[std::max(0, dim-1)].first == lower_bounds[std::max(0, dim-1)])
+                     && (leaf.intervals[std::max(0, dim-1)].second > X[i]
+                     || leaf.intervals[std::max(0, dim-1)].second == upper_bounds[std::max(0, dim-1)]))){
+                     valid = false;
               }
             }
             if(valid) total_res += leaf.value;
@@ -2186,57 +2186,57 @@ void RandomPlantedForest::purify_3(){
 
               auto gridPoint_0 = std::vector<int>{0};
               values[tree_index_s][gridPoint_0] += update;
-                //     Rcout << std::endl;
+              //     Rcout << std::endl;
               //}
 
               /*
-              for(auto tree_0: curr_family){
+               for(auto tree_0: curr_family){
 
-                if(tree_0.first == std::set<int>{0}){
+               if(tree_0.first == std::set<int>{0}){
 
-                  Rcout << tree_0.first.size();
-                  std::vector<int> leaf_index(tree_0.first.size(), 0);
-                  std::vector<int> leaf_index(tree_0.second->GridLeaves.values.size(), 0);
+               Rcout << tree_0.first.size();
+               std::vector<int> leaf_index(tree_0.first.size(), 0);
+               std::vector<int> leaf_index(tree_0.second->GridLeaves.values.size(), 0);
 
-                  int Test = tree_0.second->GridLeaves.values.size();
-                  Rcout << Test;
-                  tree_0.second->GridLeaves.values[leaf_index] += update;
-                }
-              }
-              */
+               int Test = tree_0.second->GridLeaves.values.size();
+               Rcout << Test;
+               tree_0.second->GridLeaves.values[leaf_index] += update;
+               }
+               }
+               */
             } else {
 
-            // check if S subset of T
+              // check if S subset of T
 
-            bool subset = true;
-            for(const auto dim: *tree_s){
-              if(tree_t->count(dim) == 0){
-                subset = false;
-                break;
+              bool subset = true;
+              for(const auto dim: *tree_s){
+                if(tree_t->count(dim) == 0){
+                  subset = false;
+                  break;
+                }
               }
-            }
-            if(!subset) continue;
+              if(!subset) continue;
 
-            // Rcout << pow(-1, (*tree_s).size()) << std::endl;
+              // Rcout << pow(-1, (*tree_s).size()) << std::endl;
 
               auto grid_k = grids[tree_index_s];
               while(!grid_k.nextPoint()){
-                 auto gridPoint_k = grid_k.getPoint();
-          //
-          //      if((*tree_s).size()>2){
-          //      Rcout << std::endl << "            " << "j, k: ";
-          //      for(auto p: gridPoint_k) Rcout << p << ", ";
-          //      Rcout << std::endl;
-          //      }
-          //
-          //      Rcout << pow(-1, (*tree_s).size()) * update << std::endl;
+                auto gridPoint_k = grid_k.getPoint();
+                //
+                //      if((*tree_s).size()>2){
+                //      Rcout << std::endl << "            " << "j, k: ";
+                //      for(auto p: gridPoint_k) Rcout << p << ", ";
+                //      Rcout << std::endl;
+                //      }
+                //
+                //      Rcout << pow(-1, (*tree_s).size()) * update << std::endl;
                 values[tree_index_s][gridPoint_k] += pow(-1, (*tree_s).size()) * update;
               }
             }
           }
           // Rcout << std::endl;
 
-        } /*else {
+        } else {
 
           std::vector<int> j_sizes(j_dims.size(), 0);
           for(int j=0; j<j_dims.size(); ++j){
@@ -2378,7 +2378,7 @@ void RandomPlantedForest::purify_3(){
               }
             }
           }
-        }*/
+        }
       }
       --tree_index_t;
     }
