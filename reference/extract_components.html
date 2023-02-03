@@ -57,7 +57,7 @@ The sum of all components equals the overall predicted value for an observation.
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">extract_components</span><span class="op">(</span><span class="va">object</span>, <span class="va">new_data</span>, max_interaction <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">extract_components</span><span class="op">(</span><span class="va">object</span>, <span class="va">new_data</span>, max_interaction <span class="op">=</span> <span class="cn">NULL</span>, predictors <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">extract_component</span><span class="op">(</span><span class="va">object</span>, <span class="va">new_data</span>, predictors <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -80,7 +80,9 @@ Must be between <code>1</code> (main effects only) and the <code>max_interaction
 
 <dt>predictors</dt>
 <dd><p><code><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></code> or <code>NULL</code>: Vector of one or more column names of predictor variables
-in <code>new_data</code> to extract components for. IF <code>NULL</code>, the intercept component is returned.</p></dd>
+in <code>new_data</code> to extract components for.
+In <code>extract_components</code>: If <code>NULL</code>, all variables and their interactions are returned.
+in <code>extract_component</code>: If <code>NULL</code>, the intercept component is returned.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -95,9 +97,10 @@ number of output columns is multiplied by the number of levels in the outcome.</
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     
 <ul><li><p><code>extract_components</code> extracts all possible components up to <code>max_interaction</code> degrees,
-up to the value set when calling <code><a href="rpf.html">rpf()</a></code>. The intercept is always included.</p></li>
+up to the value set when calling <code><a href="rpf.html">rpf()</a></code>. The intercept is always included.
+Optionally <code>predictors</code> can be specified to only include components including the given variables.</p></li>
 <li><p><code>extract_component</code> allows extracting only a single component for a given predictor
-or combination of predictors, including the intercept if <code>predictors</code> is <code>NULL</code>.</p></li>
+or interaction of predictors, including the intercept if <code>predictors</code> is <code>NULL</code>.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
