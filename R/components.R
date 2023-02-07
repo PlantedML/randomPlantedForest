@@ -61,22 +61,20 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
     checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
   }
 
-  checkmate::assert_subset(
-    predictors,
-    choices = names(object$blueprint$ptypes$predictors),
-    empty.ok = TRUE
-  )
-
   if (is.null(predictors)) {
     predictors <- names(object$blueprint$ptypes$predictors)
+  } else {
+    checkmate::assert_subset(predictors, choices = names(object$blueprint$ptypes$predictors))
   }
+
+  # Check if forest is purified, if not we do that now
+  if (!is_purified(object)) purify(object)
 
   # If max_interaction is greater than number of predictors requested we need to adjust that
   max_interaction <- min(max_interaction, length(predictors))
 
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
-
   # Encode factors to (re-)ordered integers according to information saved during model fit
   new_data <- preprocess_predictors_predict(object, processed$predictors)
 
@@ -123,45 +121,26 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
 #' # Retrieving the intercept
 #' randomPlantedForest:::extract_component(rpfit, test, predictors = NULL)
 extract_component <- function(object, new_data, predictors = NULL) {
-  # Ensure selected predictors are subset of original predictors
-  # but allow NULL if intercept is requested
-  checkmate::assert_subset(
-    predictors,
-    choices = names(object$blueprint$ptypes$predictors),
-    empty.ok = TRUE
-  )
-
-  # Check if forest is purified, if not we do that now
-  # First, check that purification is reported correctly.
-  checkmate::assert_logical(object$fit$is_purified(), any.missing = FALSE, len = 1)
-  if (!object$fit$is_purified()) {
-    purify(object)
-  }
-
-  # # Enforces column order, type, column names, etc
-  # processed <- hardhat::forge(new_data, object$blueprint)
-  #
-  # # Encode factors to (re-)ordered integers according to information saved during model fit
-  # new_data <- preprocess_predictors_predict(object, processed$predictors)
 
   # Indices of selected predictors
   if (is.null(predictors)) {
     # Intercept is retrieved by passing -1 to predict_matrix() as a special case
     components <- -1
+    out_names <- "intercept"
   } else {
     # Indices of predictors need to be in ascending order such that new_data has columns in the correct order
     # Otherwise, predict_matrix will return wrong results
-    components <- sort(match(predictors, colnames(new_data)))
+    components <- sort.int(match(predictors, colnames(new_data)))
     # subset new_data to contain only selected components
     new_data <- new_data[, components, drop = FALSE]
+    # Make names, e.g. intercept, x1, x1:x2 etc. and sort predictors for consistent alphabetic order
+    out_names <- paste0(sort(predictors), collapse = ":")
   }
 
   # Get predicted components from C++
-  # new_data may only contain columns required for components
+  # new_data must be a matrix and may only contain columns required for components, in the original order
+  # components must be integer indices and refer to the column position in the original training data
   ret <- object$fit$predict_matrix(new_data, components)
-
-  # Make names, e.g. intercept, x1, x1:x2 etc. and sort predictors for consistent alphabetic order
-  out_names <- ifelse(is.null(predictors), "intercept", paste0(sort(predictors), collapse = ":"))
 
   # Get outcome levels for multiclass handling
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])

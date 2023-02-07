@@ -54,6 +54,28 @@ test_that("extract_components sums to prediction", {
 
 })
 
+test_that("extract_components errors appropriately", {
+  rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3)
+
+  # Unknown predictors requested
+  expect_error(extract_components(rp, mtcars, predictors = c("x1", "x2")))
+
+  # Predictors not in fit on
+  expect_error(extract_components(rp, mtcars, predictors = c("cyl", "disp")))
+
+  # new_data does not contain all original predictors
+  expect_error(extract_components(rp, mtcars[, c("cyl", "am")]))
+
+  # max_interaction higher than original fit
+  expect_error(extract_components(rp, mtcars, max_interaction = 30))
+
+  # max_interaction implausible
+  expect_error(extract_components(rp, mtcars, max_interaction = -1))
+
+  # predictors is wrong type
+  expect_error(extract_components(rp, mtcars, predictors = list("cyl")))
+})
+
 test_that("extract_component is consistent with predictor order", {
   rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
@@ -67,12 +89,15 @@ test_that("extract_component is consistent with predictor order", {
   )
 
   expect_equal(
-    extract_component(rp, new_data, c("cyl", "am", "gear")),
-    extract_component(rp, new_data, c("gear", "am", "cyl"))
+    Reduce(expect_equal, list(
+      extract_component(rp, new_data, c("cyl", "am", "gear")),
+      extract_component(rp, new_data, c("gear", "am", "cyl")),
+      extract_component(rp, new_data, c("am", "cyl", "gear")),
+      extract_component(rp, new_data, c("gear", "cyl", "am")),
+      extract_component(rp, new_data, c("am", "gear", "cyl")),
+      extract_component(rp, new_data, c("cyl", "gear", "am"))
+    )),
+    extract_component(rp, new_data, c("cyl", "gear", "am"))
   )
 
-  expect_equal(
-    extract_component(rp, new_data, c("am", "cyl", "gear")),
-    extract_component(rp, new_data, c("gear", "am", "cyl"))
-  )
 })
