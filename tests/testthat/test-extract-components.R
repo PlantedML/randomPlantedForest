@@ -40,3 +40,12 @@ test_that("extract_components purifies if needed", {
 
   expect_true(is_purified(rp))
 })
+
+test_that("extract_component is consistent with predictor order", {
+  rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, purify = TRUE)
+
+  expect_equal(
+    extract_component(rp, mtcars, c("cyl", "am")),
+    extract_component(rp, mtcars, c("am", "cyl"))
+  )
+})

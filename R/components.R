@@ -84,7 +84,7 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
   intercept <- extract_component(object, new_data, predictors = NULL)
   all_components <- cbind(intercept, all_components)
 
-  all_components
+  data.table::as.data.table(all_components)
 }
 
 #' @rdname extract_components
@@ -131,7 +131,9 @@ extract_component <- function(object, new_data, predictors = NULL) {
     # Intercept is retrieved by passing -1 to predict_matrix() as a special case
     components <- -1
   } else {
-    components <- match(predictors, colnames(new_data))
+    # Indices of predictors need to be in ascending order such that new_data has columns in the correct order
+    # Otherwise, predict_matrix will return wrong results
+    components <- sort(match(predictors, colnames(new_data)))
     # subset new_data to contain only selected components
     new_data <- new_data[, components, drop = FALSE]
   }
@@ -144,14 +146,14 @@ extract_component <- function(object, new_data, predictors = NULL) {
   out_names <- ifelse(is.null(predictors), "intercept", paste0(sort(predictors), collapse = ":"))
 
   if (length(outcome_levels) > 2) {
-    # Multiclass needs disambigation with one column for each predicted class
+    # Multiclass needs disambiguation with one column for each predicted class
     colnames(ret) <- paste0(out_names, "_", outcome_levels)
   } else {
     # Regression and binary classif: Single-column component
     colnames(ret) <- out_names
   }
 
-  tibble::as_tibble(ret)
+  ret
 }
 
 
