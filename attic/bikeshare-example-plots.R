@@ -20,7 +20,14 @@ bike[, hr := as.numeric(as.character(hr))]
 
 # xgboost
 # xg <- xgboost(data = x, label = y, params = list(max_depth = 4, eta = .1), nrounds = 20)
+tictoc::tic()
 rp <- rpf(bikers ~ day + hr + temp + windspeed + workingday + hum, data = bike, max_interaction = 3, ntrees = 200, parallel = TRUE)
+tictoc::toc()
+
+tictoc::tic()
+purify(rp)
+tictoc::toc()
+
 # SHAP decomposition
 # res <- glex::glex(xg, x)
 
@@ -29,7 +36,9 @@ vars <- c("hr", "temp", "workingday")
 
 # Main effects
 
+tictoc::tic()
 ms <- extract_components(rp, bike, predictors = vars)
+tictoc::toc()
 ms <- as.data.table(ms)
 
 ms2 <- rbindlist(lapply(vars, function(colname) {
@@ -67,7 +76,7 @@ p3_1 <- ggplot(int2way, aes(x = value, y = m, col = workingday)) +
   theme(legend.position = "bottom") +
   xlab("Feature value") +
   ylab(expression(2-way~interactions~italic(m[jk])))
-p3_2 <- ggplot(data.frame(hr = x[, "hr"], temp = x[, "temp"], m = ms[, "hr:temp"][[1]]), aes(x = hr, y = temp, col = m)) +
+p3_2 <- ggplot(data.frame(hr = bike[, "hr"], temp = bike[, "temp"], m = ms[, "hr:temp"][[1]]), aes(x = hr, y = temp, col = m)) +
   geom_point() +
   theme_bw() +
   scale_color_viridis_c(name = expression(italic(m[jk])))
