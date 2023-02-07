@@ -3,11 +3,10 @@
 #' Prediction components are a functional decomposition of the model prediction.
 #' The sum of all components equals the overall predicted value for an observation.
 #'
-#' * `extract_components` extracts all possible components up to `max_interaction` degrees,
-#'  up to the value set when calling [`rpf()`]. The intercept is always included.
-#'  Optionally `predictors` can be specified to only include components including the given variables.
-#' * `extract_component` allows extracting only a single component for a given predictor
-#' or interaction of predictors, including the intercept if `predictors` is `NULL`.
+#' Extracts all possible components up to `max_interaction` degrees,
+#' up to the value set when calling [`rpf()`]. The intercept is always included.
+#' Optionally `predictors` can be specified to only include components including the given variables.
+#' If `max_interaction` is greater than `length(predictors)`, the `max_interaction` will be lowered accordingly.
 #'
 #' @note
 #' Depending on the number of predictors and `max_interaction`, the number of components will
@@ -16,17 +15,17 @@
 #' @inheritParams predict.rpf
 #' @param predictors [`character`] or `NULL`: Vector of one or more column names of predictor variables
 #'   in `new_data` to extract components for.
-#'   In `extract_components`: If `NULL`, all variables and their interactions are returned.
-#'   in `extract_component`: If `NULL`, the intercept component is returned.
+#'   If `NULL`, all variables and their interactions are returned.
 #' @param max_interaction [`integer`] or `NULL`: Maximum degree of interactions to consider.
 #'   Default will use the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
-#' @return A [`tibble`][tibble::tibble] with the same number of rows as `new_data` and one
-#' column for each main and interaction term requested. For multiclass classification, the
-#' number of output columns is multiplied by the number of levels in the outcome.
+#' @return A [`data.table`][data.table::data.table] with the same number of rows as `new_data` and one
+#' column for each main and interaction term requested, including the intercept.
+#' For multiclass classification, the number of output columns is multiplied by the number of levels in the outcome.
 #' @export
-#' @importFrom tibble as_tibble
+#' @importFrom hardhat forge
+#' @importFrom data.table as.data.table
 #' @importFrom utils combn
 #'
 #' @examples
@@ -72,6 +71,15 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
     predictors <- names(object$blueprint$ptypes$predictors)
   }
 
+  # If max_interaction is greater than number of predictors requested we need to adjust that
+  max_interaction <- min(max_interaction, length(predictors))
+
+  # Enforces column order, type, column names, etc
+  processed <- hardhat::forge(new_data, object$blueprint)
+
+  # Encode factors to (re-)ordered integers according to information saved during model fit
+  new_data <- preprocess_predictors_predict(object, processed$predictors)
+
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(max_interaction), function(i) {
@@ -80,15 +88,23 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
     do.call(cbind, args = components)
   })
 
-  all_components <- tibble::as_tibble(do.call(cbind, args = all_components))
+  all_components <- do.call(cbind, args = all_components)
   intercept <- extract_component(object, new_data, predictors = NULL)
   all_components <- cbind(intercept, all_components)
 
   data.table::as.data.table(all_components)
 }
 
-#' @rdname extract_components
-#' @export
+#' Internal function to extract a single component
+#'
+#' Extracts one component at a time, consisting of supplied `predictors`.
+#' Not fit for general use since the preprocessing of `new_data` is only done in `extract_components`
+#' to save on computing time for cases where many interactions/components are extracted.
+#'
+# @rdname extract_components
+#' @noRd
+#' @keywords internal
+#' @return A n x 1 `matrix()`
 #' @examples
 #' # Regression task, only some predictors
 #' train <-  mtcars[1:20, 1:4]
@@ -97,11 +113,15 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
 #' set.seed(23)
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
+#' # Internal data preprocessing only done in extract_components to save time
+#' processed <- hardhat::forge(test, rpfit$blueprint)
+#' test <- randomPlantedForest:::preprocess_predictors_predict(rpfit, processed$predictors)
+#'
 #' # Component for interaction term of two predictors
-#' extract_component(rpfit, test, predictors = c("cyl", "hp"))
+#' randomPlantedForest:::extract_component(rpfit, test, predictors = c("cyl", "hp"))
 #'
 #' # Retrieving the intercept
-#' extract_component(rpfit, test, predictors = NULL)
+#' randomPlantedForest:::extract_component(rpfit, test, predictors = NULL)
 extract_component <- function(object, new_data, predictors = NULL) {
   # Ensure selected predictors are subset of original predictors
   # but allow NULL if intercept is requested
@@ -118,13 +138,11 @@ extract_component <- function(object, new_data, predictors = NULL) {
     purify(object)
   }
 
-  # Enforces column order, type, column names, etc
-  processed <- hardhat::forge(new_data, object$blueprint)
-  # Get outcome levels for later multiclass handling
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
-
-  # Encode factors to (re-)ordered integers according to information saved during model fit
-  new_data <- preprocess_predictors_predict(object, processed$predictors)
+  # # Enforces column order, type, column names, etc
+  # processed <- hardhat::forge(new_data, object$blueprint)
+  #
+  # # Encode factors to (re-)ordered integers according to information saved during model fit
+  # new_data <- preprocess_predictors_predict(object, processed$predictors)
 
   # Indices of selected predictors
   if (is.null(predictors)) {
@@ -144,6 +162,9 @@ extract_component <- function(object, new_data, predictors = NULL) {
 
   # Make names, e.g. intercept, x1, x1:x2 etc. and sort predictors for consistent alphabetic order
   out_names <- ifelse(is.null(predictors), "intercept", paste0(sort(predictors), collapse = ":"))
+
+  # Get outcome levels for multiclass handling
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class

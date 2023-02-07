@@ -2,12 +2,9 @@
 % Please edit documentation in R/components.R
 \name{extract_components}
 \alias{extract_components}
-\alias{extract_component}
 \title{Extract predicted components from a Random Planted Forest}
 \usage{
 extract_components(object, new_data, max_interaction = NULL, predictors = NULL)
-
-extract_component(object, new_data, predictors = NULL)
 }
 \arguments{
 \item{object}{A fit object of class \code{\link{rpf}}.}
@@ -20,26 +17,22 @@ Must be between \code{1} (main effects only) and the \code{max_interaction} of t
 
 \item{predictors}{\code{\link{character}} or \code{NULL}: Vector of one or more column names of predictor variables
 in \code{new_data} to extract components for.
-In \code{extract_components}: If \code{NULL}, all variables and their interactions are returned.
-in \code{extract_component}: If \code{NULL}, the intercept component is returned.}
+If \code{NULL}, all variables and their interactions are returned.}
 }
 \value{
-A \code{\link[tibble:tibble]{tibble}} with the same number of rows as \code{new_data} and one
-column for each main and interaction term requested. For multiclass classification, the
-number of output columns is multiplied by the number of levels in the outcome.
+A \code{\link[data.table:data.table]{data.table}} with the same number of rows as \code{new_data} and one
+column for each main and interaction term requested, including the intercept.
+For multiclass classification, the number of output columns is multiplied by the number of levels in the outcome.
 }
 \description{
 Prediction components are a functional decomposition of the model prediction.
 The sum of all components equals the overall predicted value for an observation.
 }
 \details{
-\itemize{
-\item \code{extract_components} extracts all possible components up to \code{max_interaction} degrees,
+Extracts all possible components up to \code{max_interaction} degrees,
 up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
 Optionally \code{predictors} can be specified to only include components including the given variables.
-\item \code{extract_component} allows extracting only a single component for a given predictor
-or interaction of predictors, including the intercept if \code{predictors} is \code{NULL}.
-}
+If \code{max_interaction} is greater than \code{length(predictors)}, the \code{max_interaction} will be lowered accordingly.
 }
 \note{
 Depending on the number of predictors and \code{max_interaction}, the number of components will
@@ -69,16 +62,4 @@ extract_components(rpfit, test, max_interaction = 2)
 # The difference is the combined contribution of interaction effects
 cbind(rowSums(main_effects), predict(rpfit, test))
 
-# Regression task, only some predictors
-train <-  mtcars[1:20, 1:4]
-test <-  mtcars[21:32, 1:4]
-
-set.seed(23)
-rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
-
-# Component for interaction term of two predictors
-extract_component(rpfit, test, predictors = c("cyl", "hp"))
-
-# Retrieving the intercept
-extract_component(rpfit, test, predictors = NULL)
 }
