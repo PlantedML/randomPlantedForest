@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
 [![Codecov test coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
 <!-- badges: end -->
 
-`randomPlantedForest` ...
+`randomPlantedForest` implements "Random Planted Forest", a directly interpretable tree ensemble [(arxiv)][arxiv1].
 
 ## Installation
 
@@ -33,14 +33,25 @@ remotes::install_github("PlantedML/randomPlantedForest")
 
 ## Example
 
-This is a basic example which shows you how to solve a common problem:
+Model fitting uses a familiar interface:
 
 ```{r}
 library(randomPlantedForest)
 
-rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
+rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
 rpfit
 
-predict(rpfit, new_data = mtcars[1:10, ])
+predict(rpfit, new_data = mtcars) |>
+  cbind(mpg = mtcars$mpg)
 ```
 
+Prediction components can be accessed via `extract_components`, including the intercept, main effects, and interactions up to a specified degree:
+
+```{r}
+m <- extract_components(rpfit, new_data = mtcars) 
+m
+```
+
+
+
+[arxiv1]: https://arxiv.org/abs/2012.14563
