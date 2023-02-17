@@ -9,9 +9,13 @@
 \alias{rpf.recipe}
 \title{Random Planted Forest}
 \usage{
-rpf(
+rpf(x, ...)
+
+\method{rpf}{default}(x, ...)
+
+\method{rpf}{data.frame}(
   x,
-  ...,
+  y,
   max_interaction = 1,
   ntrees = 50,
   splits = 30,
@@ -23,23 +27,72 @@ rpf(
   cv = FALSE,
   loss = "L2",
   delta = 0,
-  epsilon = 0.1
+  epsilon = 0.1,
+  ...
 )
 
-\method{rpf}{default}(x, ...)
+\method{rpf}{matrix}(
+  x,
+  y,
+  max_interaction = 1,
+  ntrees = 50,
+  splits = 30,
+  split_try = 10,
+  t_try = 0.4,
+  deterministic = FALSE,
+  parallel = FALSE,
+  purify = FALSE,
+  cv = FALSE,
+  loss = "L2",
+  delta = 0,
+  epsilon = 0.1,
+  ...
+)
 
-\method{rpf}{data.frame}(x, y, ...)
+\method{rpf}{formula}(
+  formula,
+  data,
+  max_interaction = 1,
+  ntrees = 50,
+  splits = 30,
+  split_try = 10,
+  t_try = 0.4,
+  deterministic = FALSE,
+  parallel = FALSE,
+  purify = FALSE,
+  cv = FALSE,
+  loss = "L2",
+  delta = 0,
+  epsilon = 0.1,
+  ...
+)
 
-\method{rpf}{matrix}(x, y, ...)
-
-\method{rpf}{formula}(formula, data, ...)
-
-\method{rpf}{recipe}(x, data, ...)
+\method{rpf}{recipe}(
+  x,
+  data,
+  max_interaction = 1,
+  ntrees = 50,
+  splits = 30,
+  split_try = 10,
+  t_try = 0.4,
+  deterministic = FALSE,
+  parallel = FALSE,
+  purify = FALSE,
+  cv = FALSE,
+  loss = "L2",
+  delta = 0,
+  epsilon = 0.1,
+  ...
+)
 }
 \arguments{
 \item{x}{Feature matrix or \code{data.frame}.}
 
 \item{...}{(Unused).}
+
+\item{y}{Target vector for use with \code{x}.
+The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
+or classification will be performed.}
 
 \item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
 number of split dimensions for a tree.
@@ -76,10 +129,6 @@ the loss to determine the optimal split.}
 \item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
 Proportion of class membership is truncated to be smaller 1-epsilon when calculating
 the fit in a leaf.}
-
-\item{y}{Target vector for use with \code{x}.
-The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
-or classification will be performed.}
 
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
 

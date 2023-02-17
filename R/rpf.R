@@ -47,10 +47,7 @@
 #'
 #' # Regression with formula
 #' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
-rpf <- function(x, ..., max_interaction = 1, ntrees = 50, splits = 30,
-                split_try = 10, t_try = 0.4, deterministic = FALSE,
-                parallel = FALSE, purify = FALSE, cv = FALSE,
-                loss = "L2", delta = 0, epsilon = 0.1) {
+rpf <- function(x, ...) {
   UseMethod("rpf")
 }
 
@@ -66,37 +63,68 @@ rpf.default <- function(x, ...) {
 # XY method - data frame
 #' @export
 #' @rdname rpf
-rpf.data.frame <- function(x, y, ...) {
+rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
+                           split_try = 10, t_try = 0.4, deterministic = FALSE,
+                           parallel = FALSE, purify = FALSE, cv = FALSE,
+                           loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
-  rpf_bridge(processed, ...)
+  rpf_bridge(
+    processed, max_interaction, ntrees, splits,
+    split_try, t_try, deterministic,
+    parallel, purify, cv,
+    loss, delta, epsilon
+  )
 }
 
 # XY method - matrix
 #' @export
 #' @rdname rpf
-rpf.matrix <- function(x, y, ...) {
+rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
+                       split_try = 10, t_try = 0.4, deterministic = FALSE,
+                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
-  rpf_bridge(processed, ...)
-}
+  rpf_bridge(
+    processed, max_interaction, ntrees, splits,
+    split_try, t_try, deterministic,
+    parallel, purify, cv,
+    loss, delta, epsilon
+  )}
 
 # Formula method
 #' @export
 #' @rdname rpf
-rpf.formula <- function(formula, data, ...) {
+rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits = 30,
+                        split_try = 10, t_try = 0.4, deterministic = FALSE,
+                        parallel = FALSE, purify = FALSE, cv = FALSE,
+                        loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
-  rpf_bridge(processed, ...)
+  rpf_bridge(
+    processed, max_interaction, ntrees, splits,
+    split_try, t_try, deterministic,
+    parallel, purify, cv,
+    loss, delta, epsilon
+  )
 }
 
 # Recipe method
 #' @export
 #' @rdname rpf
-rpf.recipe <- function(x, data, ...) {
+rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
+                       split_try = 10, t_try = 0.4, deterministic = FALSE,
+                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
-  rpf_bridge(processed, ...)
+  rpf_bridge(
+    processed, max_interaction, ntrees, splits,
+    split_try, t_try, deterministic,
+    parallel, purify, cv,
+    loss, delta, epsilon
+  )
 }
 
 # Bridge: Calls rpf_impl() with processed input
@@ -129,7 +157,6 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   checkmate::assert_int(split_try, lower = 1)
 
   checkmate::assert_number(t_try, lower = 0, upper = 1)
-  # FIXME: What is delta/epsilon and what can it look like?
   checkmate::assert_number(delta, lower = 0, upper = 1)
   checkmate::assert_number(epsilon, lower = 0, upper = 1)
 
@@ -139,10 +166,10 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
     choices = c("L1", "L2", "logit", "exponential")
   )
 
-  checkmate::assert_logical(deterministic, len = 1)
-  checkmate::assert_logical(parallel, len = 1)
-  checkmate::assert_logical(purify, len = 1)
-  checkmate::assert_logical(cv, len = 1)
+  checkmate::assert_flag(deterministic)
+  checkmate::assert_flag(parallel)
+  checkmate::assert_flag(purify)
+  checkmate::assert_flag(cv)
 
   fit <- rpf_impl(
     Y = outcomes$outcomes, X = predictors$predictors_matrix,
