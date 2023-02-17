@@ -11,6 +11,7 @@ knitr::opts_chunk$set(
   fig.path = "man/figures/README-",
   out.width = "100%"
 )
+
 ```
 
 # randomPlantedForest
@@ -42,14 +43,16 @@ rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 
 rpfit
 
 predict(rpfit, new_data = mtcars) |>
-  cbind(mpg = mtcars$mpg)
+  cbind(mpg = mtcars$mpg) |>
+  head()
 ```
 
 Prediction components can be accessed via `extract_components`, including the intercept, main effects, and interactions up to a specified degree:
 
 ```{r}
 m <- extract_components(rpfit, new_data = mtcars) 
-m
+
+str(m)
 ```
 
 
