@@ -21,12 +21,12 @@ Imports:
     hardhat,
     methods,
     Rcpp,
-    tibble,
     utils
 Suggests: 
     covr,
     ggplot2,
     ISLR2,
+    knitr,
     mvtnorm,
     patchwork,
     recipes,
@@ -39,3 +39,4 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 SystemRequirements: C++11
+VignetteBuilder: knitr

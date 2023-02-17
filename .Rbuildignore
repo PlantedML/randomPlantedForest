@@ -14,3 +14,5 @@
 ^vignettes/test$
 ^README\.Rmd$
 ^attic$
+^doc$
+^Meta$
