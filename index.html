@@ -45,6 +45,7 @@
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="articles/Bikesharing-Decomposition-Example.html">Bikesharing: Decomposition Example</a>
     <a class="dropdown-item" href="articles/test/Regression-Test-oldrpf.html">Regression Test: oldrpf</a>
   </div>
 </li>
@@ -72,7 +73,7 @@
 </h1></div>
 <!-- badges: start -->
 
-<p><code>randomPlantedForest</code> …</p>
+<p><code>randomPlantedForest</code> implements “Random Planted Forest”, a directly interpretable tree ensemble <a href="https://arxiv.org/abs/2012.14563" class="external-link">(arxiv)</a>.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -84,21 +85,23 @@
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h2>
-<p>This is a basic example which shows you how to solve a common problem:</p>
+<p>Model fitting uses a familiar interface:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span>, data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
+<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">25</span>, max_interaction <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
 <span><span class="co">#&gt; -- Regression Random Planted Forest --</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Formula: mpg ~ cyl + wt </span></span>
-<span><span class="co">#&gt; Fit using 2 predictors and main effects only.</span></span>
+<span><span class="co">#&gt; Formula: mpg ~ cyl + wt + hp </span></span>
+<span><span class="co">#&gt; Fit using 3 predictors and 2-degree interactions.</span></span>
+<span><span class="co">#&gt; Forest is _not_ purified!</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Called with parameters:</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;             loss: L2</span></span>
-<span><span class="co">#&gt;           ntrees: 50</span></span>
-<span><span class="co">#&gt;  max_interaction: 1</span></span>
+<span><span class="co">#&gt;           ntrees: 25</span></span>
+<span><span class="co">#&gt;  max_interaction: 2</span></span>
 <span><span class="co">#&gt;           splits: 30</span></span>
 <span><span class="co">#&gt;        split_try: 10</span></span>
 <span><span class="co">#&gt;            t_try: 0.4</span></span>
@@ -109,20 +112,30 @@
 <span><span class="co">#&gt;           purify: FALSE</span></span>
 <span><span class="co">#&gt;               cv: FALSE</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">10</span>, <span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 10 × 1</span></span>
-<span><span class="co">#&gt;    .pred</span></span>
-<span><span class="co">#&gt;    &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt;  1  20.4</span></span>
-<span><span class="co">#&gt;  2  20.4</span></span>
-<span><span class="co">#&gt;  3  25.6</span></span>
-<span><span class="co">#&gt;  4  20.5</span></span>
-<span><span class="co">#&gt;  5  17.0</span></span>
-<span><span class="co">#&gt;  6  18.4</span></span>
-<span><span class="co">#&gt;  7  15.2</span></span>
-<span><span class="co">#&gt;  8  22.9</span></span>
-<span><span class="co">#&gt;  9  23.4</span></span>
-<span><span class="co">#&gt; 10  19.0</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>mpg <span class="op">=</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      .pred  mpg</span></span>
+<span><span class="co">#&gt; 1 20.96153 21.0</span></span>
+<span><span class="co">#&gt; 2 20.73825 21.0</span></span>
+<span><span class="co">#&gt; 3 26.43672 22.8</span></span>
+<span><span class="co">#&gt; 4 20.89290 21.4</span></span>
+<span><span class="co">#&gt; 5 18.09168 18.7</span></span>
+<span><span class="co">#&gt; 6 18.19773 18.1</span></span></code></pre></div>
+<p>Prediction components can be accessed via <code>extract_components</code>, including the intercept, main effects, and interactions up to a specified degree:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">m</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Classes 'data.table' and 'data.frame':   32 obs. of  7 variables:</span></span>
+<span><span class="co">#&gt;  $ intercept: num  20.2 20.2 20.2 20.2 20.2 ...</span></span>
+<span><span class="co">#&gt;  $ cyl      : num  -0.72 -0.72 2.35 -0.72 -1.93 ...</span></span>
+<span><span class="co">#&gt;  $ wt       : num  0.16 -0.28 4.111 -0.301 -1.502 ...</span></span>
+<span><span class="co">#&gt;  $ hp       : num  0.51 0.51 0.509 0.51 0.478 ...</span></span>
+<span><span class="co">#&gt;  $ cyl:wt   : num  0.432 0.398 0.401 0.581 0.282 ...</span></span>
+<span><span class="co">#&gt;  $ cyl:hp   : num  0.417 0.417 -0.479 0.417 0.5 ...</span></span>
+<span><span class="co">#&gt;  $ hp:wt    : num  -0.0355 0.2149 -0.6549 0.2074 0.0648 ...</span></span>
+<span><span class="co">#&gt;  - attr(*, ".internal.selfref")=&lt;externalptr&gt;</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
