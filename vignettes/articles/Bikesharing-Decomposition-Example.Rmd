@@ -61,8 +61,7 @@ This step is not required for global predictions and may take some time, which i
 rp <- rpf(
   bikers ~ day + hr + temp + windspeed + workingday + hum,
   data = bike,
-  max_interaction = 3, ntrees = 20,
-  parallel = TRUE
+  max_interaction = 3, ntrees = 20
 )
 
 purify(rp)
