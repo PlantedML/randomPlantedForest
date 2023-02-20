@@ -294,7 +294,7 @@ struct Matrix{
     : dims(dimensions) {
     for(auto d: dimensions) n_entries *= d;
     entries = std::vector<T>(n_entries, initial_value);
-    if(n_entries != entries.size()) throw std::invalid_argument("Invalid matrix size.");
+    if(n_entries != static_cast<int>(entries.size())) throw std::invalid_argument("Invalid matrix size.");
   }
   T& operator[](std::vector<int>& indices){
     if(indices.size() != dims.size()) throw std::invalid_argument("Invalid number of indices.");
@@ -303,7 +303,7 @@ struct Matrix{
       if(indices[i] >= dims[i]) throw std::invalid_argument("Index out of range.");
       int a = indices[i];
       for(unsigned int d=0; d<dims.size(); ++d){
-        if(d<i){
+        if(static_cast<int>(d) < i){
           a *= dims[d];
         }
       }
@@ -861,12 +861,12 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
           std::iota(samples.begin(), samples.end(), 1);
         }else{ // randomly picked samples otherwise
           samples = std::vector<int>(split_try);
-          for(int i=0; i<samples.size(); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
+          for(int i=0; i < static_cast<int>(samples.size()); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
           std::sort(samples.begin(), samples.end());
         }
 
         // go through samples
-        for(int sample_pos=0; sample_pos<samples.size(); ++sample_pos){
+        for(int sample_pos=0; sample_pos < static_cast<int>(samples.size()); ++sample_pos){
 
           // get samplepoint
           sample_point = unique_samples[samples[sample_pos]];
@@ -958,7 +958,7 @@ void RandomPlantedForest::set_data(const NumericMatrix& samples_Y, const Numeric
   double minVal, maxVal, currVal;
   for(int i=0; i<feature_size; ++i){
     minVal = maxVal = X[0][i];
-    for(int j=0; j<sample_size; ++j){
+    for(int j=0; j < static_cast<int>(sample_size); ++j){
       currVal = X[j][i];
       if(currVal<minVal) minVal = currVal;
       if(currVal>maxVal) maxVal = currVal;
@@ -1001,7 +1001,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
-    for(int i=0; i<sample_size; ++i){
+    for(int i=0; i < static_cast<int>(sample_size); ++i){
 
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
@@ -1341,7 +1341,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
           }else{
 
             // go through limits of grid
-            for(int dim_index=0; dim_index<tree.first.size(); ++dim_index){
+            for(int dim_index=0; dim_index < static_cast<int>(tree.first.size()); ++dim_index){
               // get dim at dim_index
               int dim = 0;
               {
@@ -1387,7 +1387,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
           }else{
 
             // go through limits of grid
-            for(int dim_index=0; dim_index<tree.first.size(); ++dim_index){
+            for(int dim_index=0; dim_index < static_cast<int>(tree.first.size()); ++dim_index){
               // get dim at dim_index
               int dim = 0;
               {
@@ -1817,7 +1817,7 @@ void RandomPlantedForest::purify_2(){
               std::vector<double> avg(value_size, 0);
 
               // go through slice to sum up individuals
-              for(int j = 0; j<j_dim; ++j){
+              for(int j = 0; j < static_cast<int>(j_dim); ++j){
                 gridPoint.back() = j;
 
                 // get sum of individuals
@@ -1825,7 +1825,7 @@ void RandomPlantedForest::purify_2(){
               }
 
               // go through slice to calc avg
-              for(int j = 0; j<j_dim; ++j){
+              for(int j = 0; j < static_cast<int>(j_dim); ++j){
                 gridPoint.back() = j;
 
                 // calc avg
@@ -1833,7 +1833,7 @@ void RandomPlantedForest::purify_2(){
               }
 
               // go through slice to update values
-              for(int j = 0; j<j_dim; ++j){
+              for(int j = 0; j < static_cast<int>(j_dim); ++j){
                 gridPoint.back() = j;
 
                 // update values of current slice
@@ -1865,7 +1865,7 @@ void RandomPlantedForest::purify_2(){
     // ------------- attach to rpf class -------------
 
     // fill with new trees
-    for(int tree_index=0; tree_index<variables.size(); ++tree_index){
+    for(int tree_index=0; tree_index < static_cast<int>(variables.size()); ++tree_index){
       LeafGrid curr_gridLeaf;
       curr_gridLeaf.grid = grids[tree_index];
       curr_gridLeaf.individuals = individuals[tree_index];
@@ -2239,7 +2239,7 @@ void RandomPlantedForest::purify_3(){
         } else {
 
           std::vector<int> j_sizes(j_dims.size(), 0);
-          for(int j=0; j<j_dims.size(); ++j){
+          for(int j=0; j < static_cast<int>(j_dims.size()); ++j){
             auto tmp = j_dims.begin();
             std::advance(tmp, j);
             int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
@@ -2266,14 +2266,14 @@ void RandomPlantedForest::purify_3(){
               double curr_sum = individuals[tree_index_u][gridPoint_i];
               //     Rcout << ", Current Sum: " << curr_sum << std::endl;
               std::vector<int> gridPoint_ij(tree_t->size(), 0);
-              for(int j=0; j<gridPoint_j.size(); ++j){
+              for(int j=0; j < static_cast<int>(gridPoint_j.size()); ++j){
                 auto j_dim = j_dims.begin();
                 std::advance(j_dim, j);
                 int j_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*j_dim));
                 //     Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
                 gridPoint_ij[j_index] = gridPoint_j[j];
               }
-              for(int i=0; i<gridPoint_i.size(); ++i){
+              for(int i=0; i < static_cast<int>(gridPoint_i.size()); ++i){
                 auto i_dim = tree_u->begin();
                 std::advance(i_dim, i);
                 int i_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*i_dim));
@@ -2338,7 +2338,7 @@ void RandomPlantedForest::purify_3(){
                 // Rcout << std::endl;
 
                 std::vector<int> k_sizes(k_dims.size(), 0);
-                for(int k=0; k<k_dims.size(); ++k){
+                for(int k=0; k < static_cast<int>(k_dims.size()); ++k){
                   auto tmp = k_dims.begin();
                   std::advance(tmp, k);
                   int k_index = std::distance(variables[tree_index_t].begin(), variables[tree_index_t].find(*tmp));
@@ -2354,14 +2354,14 @@ void RandomPlantedForest::purify_3(){
                   // for(auto p: gridPoint_k) Rcout << p << ", ";
                   // Rcout << std::endl << "         ";
                   std::vector<int> gridPoint_jk(tree_s->size(), 0);
-                  for(int j=0; j<gridPoint_j.size(); ++j){
+                  for(int j=0; j < static_cast<int>(gridPoint_j.size()); ++j){
                     auto j_dim = j_dims.begin();
                     std::advance(j_dim, j);
                     int j_index = std::distance(variables[tree_index_s].begin(), variables[tree_index_s].find(*j_dim));
                     // Rcout << "         j_dim=" << *j_dim << ", j_index=" << j_index;
                     gridPoint_jk[j_index] = gridPoint_j[j];
                   }
-                  for(int k=0; k<gridPoint_k.size(); ++k){
+                  for(int k=0; k < static_cast<int>(gridPoint_k.size()); ++k){
                     auto k_dim = k_dims.begin();
                     std::advance(k_dim, k);
                     int k_index = std::distance(variables[tree_index_s].begin(), variables[tree_index_s].find(*k_dim));
@@ -2386,7 +2386,7 @@ void RandomPlantedForest::purify_3(){
     // ------------- attach to rpf class -------------
 
     // fill with new trees
-    for(int tree_index=0; tree_index<variables.size(); ++tree_index){
+    for(int tree_index=0; tree_index < static_cast<int>(variables.size()); ++tree_index){
       LeafGrid curr_gridLeaf;
       curr_gridLeaf.grid = grids[tree_index];
       curr_gridLeaf.individuals = individuals[tree_index];
@@ -2540,7 +2540,7 @@ void ClassificationRPF::L1_loss(rpf::Split& split){
   split.M_s = split.sum_s / split.I_s.size();
   split.M_b = split.sum_b / split.I_b.size();
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_s[p]) - std::fabs((*split.Y)[individual][p]);
     }
@@ -2555,7 +2555,7 @@ void ClassificationRPF::median_loss(rpf::Split& split){
   split.M_s = calcMedian(*split.Y, split.I_s);
   split.M_b = calcMedian(*split.Y, split.I_b);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += std::fabs((*split.Y)[individual][p] - split.M_s[p]) - std::fabs((*split.Y)[individual][p]);
     }
@@ -2587,7 +2587,7 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
 
   std::vector<std::vector<double>> W = *split.W, W_new = *split.W;
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W[individual][p] = exp(W[individual][p]);
       W_new[individual][p] = exp(W_new[individual][p] + log(M_s[p] / M_sp) - W_s_mean[p]);
@@ -2598,7 +2598,7 @@ void ClassificationRPF::logit_loss(rpf::Split& split){
     }
   }
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) ); // ~ R_old
       split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + std::accumulate(W_new[individual].begin(), W_new[individual].end(), 0.0)) ); // ~ R_new
@@ -2646,7 +2646,7 @@ void ClassificationRPF::logit_loss_2(rpf::Split& split){
 
   std::vector<std::vector<double>> W = *split.W, W_new = *split.W;
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W[individual][p] = exp(W[individual][p]);
       W_new[individual][p] = exp(W_new[individual][p] + log(M_s[p] / M_s2[p]) - W_s_mean[p]);
@@ -2657,7 +2657,7 @@ void ClassificationRPF::logit_loss_2(rpf::Split& split){
     }
   }
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + W[individual][p] )); // ~ R_old
       split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + W_new[individual][p] )); // ~ R_new
@@ -2707,7 +2707,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
   //std::vector<std::vector<double>> Y_s = split.Y_s;
   //std::vector<std::vector<double>> Y_b = split.Y_b;
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W_new[individual][p] = W_new[individual][p] + M_s[p] - sum_s - W_s_mean[p];
     }
@@ -2757,7 +2757,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
    Y_b = transpose(Y_b);
    */
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W[individual][p] = exp(W[individual][p]);
       W_new[individual][p] = exp(W_new[individual][p]);
@@ -2768,7 +2768,7 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
     }
   }
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (std::accumulate(W[individual].begin(), W[individual].end(), 0.0)) ); // ~ R_old
       split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (std::accumulate(W_new[individual].begin(), W_new[individual].end(), 0.0)) ); // ~ R_new
@@ -2807,7 +2807,7 @@ void ClassificationRPF::logit_loss_4(rpf::Split& split){
 
   std::vector<std::vector<double>> W = *split.W, W_new = *split.W;
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W[individual][p] = exp(W[individual][p]);
       W_new[individual][p] = exp(W_new[individual][p] + log(M_s[p] / M_s2[p]) - W_s_mean[p]);
@@ -2818,7 +2818,7 @@ void ClassificationRPF::logit_loss_4(rpf::Split& split){
     }
   }
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += (*split.Y)[individual][p] * log(W[individual][p] / (1 + W[individual][p] )); // ~ R_old
       split.min_sum -= (*split.Y)[individual][p] * log(W_new[individual][p] / (1 + W_new[individual][p] )); // ~ R_new
@@ -2844,7 +2844,7 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
   std::vector<double> sum_s(value_size, 0);
   std::vector<double> sum_b(value_size, 0);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       W_s_sum[p] += (*split.W)[individual][p];
     }
@@ -2871,7 +2871,7 @@ void ClassificationRPF::exponential_loss(rpf::Split& split){
   double sum_sp = std::min(std::max(delta, split.M_sp), 1-delta);
   double sum_bp = std::min(std::max(delta, split.M_bp), 1-delta);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
     for(auto individual: split.I_s){
       split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_s[p] / sum_sp));
     }
@@ -2898,7 +2898,7 @@ void ClassificationRPF::exponential_loss_2(rpf::Split& split){
   std::vector<double> sum_s2(value_size, 0);
   std::vector<double> sum_b2(value_size, 0);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
 
     for(auto individual: split.I_s){
       W_s_sum[p] += (*split.W)[individual][p];
@@ -2924,7 +2924,7 @@ void ClassificationRPF::exponential_loss_2(rpf::Split& split){
     sum_b[p] = std::max(delta, sum_b[p]);
   }
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
 
     for(auto individual: split.I_s){
       split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * log(sum_s[p] / sum_s2[p]));
@@ -2952,7 +2952,7 @@ void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   std::vector<double> sum_s(value_size, 0);
   std::vector<double> sum_b(value_size, 0);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
 
     for(auto individual: split.I_s){
       W_s_sum[p] += (*split.W)[individual][p];
@@ -2991,7 +2991,7 @@ void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   sum_sp = sum_sp / (sum_s.size() + 1);
   sum_bp = sum_bp / (sum_b.size() + 1);
 
-  for(int p=0; p<value_size; ++p){
+  for(int p=0; p < static_cast<int>(value_size); ++p){
 
     for(auto individual: split.I_s){
       split.min_sum += (*split.W)[individual][p] * exp(-0.5 * (*split.Y)[individual][p] * (sum_s[p] - sum_sp));
@@ -3158,12 +3158,12 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
           std::iota(samples.begin(), samples.end(), 1);
         }else{ // randomly picked samples otherwise
           samples = std::vector<int>(split_try);
-          for(int i=0; i<samples.size(); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
+          for(int i=0; i < static_cast<int>(samples.size()); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
           std::sort(samples.begin(), samples.end());
         }
 
         // go through samples
-        for(int sample_pos=0; sample_pos<samples.size(); ++sample_pos){
+        for(int sample_pos=0; sample_pos < static_cast<int>(samples.size()); ++sample_pos){
 
           // get samplepoint
           sample_point = unique_samples[samples[sample_pos]];
@@ -3258,7 +3258,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
-    for(int i=0; i<sample_size; ++i){
+    for(int i=0; i < static_cast<int>(sample_size); ++i){
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
@@ -3348,7 +3348,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
         std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
-        for(unsigned int p=0; p<value_size; ++p){
+        for(unsigned int p=0; p < static_cast<unsigned int>(value_size); ++p){
           update_s[p] = log(M_s[p] / M_sp) - W_s_mean[p];
           update_b[p] = log(M_b[p] / M_bp) - W_b_mean[p];
         }
@@ -3380,7 +3380,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
         std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
-        for(int p=0; p<value_size; ++p){
+        for(int p=0; p < static_cast<int>(value_size); ++p){
           update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
           update_b[p] = log(M_b[p] / M_b2[p]) - W_b_mean[p];
         }
@@ -3450,7 +3450,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
         std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
 
-        for(int p=0; p<value_size; ++p){
+        for(int p=0; p < static_cast<int>(value_size); ++p){
           update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
           update_b[p] = log(M_b[p] / M_b2[p]) - W_b_mean[p];
         }
