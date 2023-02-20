@@ -22,7 +22,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  n_threads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -40,7 +40,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  n_threads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -58,7 +58,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  n_threads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -76,7 +76,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  n_threads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -110,7 +110,7 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
-\item{parallel}{\verb{[FALSE]}: Perform algorithm in parallel or serialized.}
+\item{n_threads}{\verb{[1L]}: Number of threads used for ocmputation, defaulting to \code{1}, i.e. serial execution.}
 
 \item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
 Set to \code{TRUE} to enable components extract with \code{\link[=extract_components]{extract_components()}} are valid.

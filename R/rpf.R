@@ -17,7 +17,7 @@
 #' @param split_try `[10]`: Number of split points to be considered when choosing a split candidate.
 #' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of viable split-candidates in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
-#' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
+#' @param n_threads `[1L]`: Number of threads used for ocmputation, defaulting to `1`, i.e. serial execution.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #'   Set to `TRUE` to enable components extract with [`extract_components()`] are valid.
 #'   Can be achieved after fitting with [`purify()`].
@@ -65,14 +65,14 @@ rpf.default <- function(x, ...) {
 #' @rdname rpf
 rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                            split_try = 10, t_try = 0.4, deterministic = FALSE,
-                           parallel = FALSE, purify = FALSE, cv = FALSE,
+                           n_threads = 1, purify = FALSE, cv = FALSE,
                            loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
     processed, max_interaction, ntrees, splits,
     split_try, t_try, deterministic,
-    parallel, purify, cv,
+    n_threads, purify, cv,
     loss, delta, epsilon
   )
 }
@@ -82,14 +82,14 @@ rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
 #' @rdname rpf
 rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                        split_try = 10, t_try = 0.4, deterministic = FALSE,
-                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       n_threads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
     processed, max_interaction, ntrees, splits,
     split_try, t_try, deterministic,
-    parallel, purify, cv,
+    n_threads, purify, cv,
     loss, delta, epsilon
   )}
 
@@ -98,14 +98,14 @@ rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
 #' @rdname rpf
 rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits = 30,
                         split_try = 10, t_try = 0.4, deterministic = FALSE,
-                        parallel = FALSE, purify = FALSE, cv = FALSE,
+                        n_threads = 1, purify = FALSE, cv = FALSE,
                         loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
   rpf_bridge(
     processed, max_interaction, ntrees, splits,
     split_try, t_try, deterministic,
-    parallel, purify, cv,
+    n_threads, purify, cv,
     loss, delta, epsilon
   )
 }
@@ -115,14 +115,14 @@ rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits 
 #' @rdname rpf
 rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
                        split_try = 10, t_try = 0.4, deterministic = FALSE,
-                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       n_threads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1, ...) {
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
   rpf_bridge(
     processed, max_interaction, ntrees, splits,
     split_try, t_try, deterministic,
-    parallel, purify, cv,
+    n_threads, purify, cv,
     loss, delta, epsilon
   )
 }
@@ -131,7 +131,7 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        split_try = 10, t_try = 0.4, deterministic = FALSE,
-                       parallel = FALSE, purify = FALSE, cv = FALSE,
+                       n_threads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
@@ -167,7 +167,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   )
 
   checkmate::assert_flag(deterministic)
-  checkmate::assert_flag(parallel)
+  checkmate::assert_int(n_threads, lower = 1L)
   checkmate::assert_flag(purify)
   checkmate::assert_flag(cv)
 
@@ -176,7 +176,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
     mode = outcomes$mode,
     max_interaction = max_interaction, ntrees = ntrees, splits = splits,
     split_try = split_try, t_try = t_try, deterministic = deterministic,
-    parallel = parallel, purify = purify, cv = cv,
+    n_threads = n_threads, purify = purify, cv = cv,
     loss = loss, delta = delta, epsilon = epsilon
   )
 
@@ -196,7 +196,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
       split_try = split_try, t_try = t_try,
       delta = delta, epsilon = epsilon,
       deterministic = deterministic,
-      parallel = parallel, purify = purify, cv = cv
+      n_threads = n_threads, purify = purify, cv = cv
     ),
     forest = forest
   )
@@ -215,7 +215,7 @@ new_rpf <- function(fit, blueprint, ...) {
 # Main fitting function and interface to C++ implementation
 rpf_impl <- function(Y, X, mode = c("regression", "classification"),
                      max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
-                     deterministic = FALSE, parallel = FALSE, purify = FALSE, cv = FALSE,
+                     deterministic = FALSE, n_threads = 1, purify = FALSE, cv = FALSE,
                      loss = "L2", delta = 0, epsilon = 0.1) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
@@ -224,12 +224,12 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
   if (mode == "classification") {
     fit <- new(ClassificationRPF, Y, X, loss, c(
       max_interaction, ntrees, splits, split_try, t_try,
-      purify, deterministic, parallel, cv, delta, epsilon
+      purify, deterministic, n_threads, cv, delta, epsilon
     ))
   } else if (mode == "regression") {
     fit <- new(RandomPlantedForest, Y, X, c(
       max_interaction, ntrees, splits, split_try, t_try,
-      purify, deterministic, parallel, cv
+      purify, deterministic, n_threads, cv
     ))
   }
 
