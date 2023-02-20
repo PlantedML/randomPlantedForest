@@ -82,11 +82,11 @@
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span><span class="va">.</span>, data <span class="op">=</span> <span class="va">mtcars</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">drat</span>, data <span class="op">=</span> <span class="va">mtcars</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> -- Regression Random Planted Forest --</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Formula: mpg ~ . </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Fit using 10 predictors and 2-degree interactions.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Formula: mpg ~ cyl + wt + drat </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fit using 3 predictors and 2-degree interactions.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Forest is _not_ purified!</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Called with parameters:</span>
