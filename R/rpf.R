@@ -188,7 +188,6 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
     blueprint = processed$blueprint,
     mode = outcomes$mode,
     factor_levels = predictors$factor_levels,
-    loss = loss,
     params = list(
       loss = loss, # FIXME: Dedup, requires changes in tests and predict
       ntrees = ntrees,

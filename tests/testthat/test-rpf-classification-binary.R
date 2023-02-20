@@ -23,7 +23,7 @@ test_that("Binary: All numeric, logit loss", {
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
-  expect_identical(bin_fit$loss, "logit")
+  expect_identical(bin_fit$params$loss, "logit")
 })
 
 test_that("Binary: All numeric, exponential loss", {
@@ -31,7 +31,7 @@ test_that("Binary: All numeric, exponential loss", {
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
-  expect_identical(bin_fit$loss, "exponential")
+  expect_identical(bin_fit$params$loss, "exponential")
 })
 
 

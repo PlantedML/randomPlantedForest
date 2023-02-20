@@ -7,10 +7,14 @@
 \usage{
 \method{print}{rpf_forest}(x, ...)
 
-\method{str}{rpf_forest}(x, ...)
+\method{str}{rpf_forest}(object, ...)
 }
 \arguments{
 \item{x}{Object of class \code{rpf_forest}}
+
+\item{...}{Further arguments passed to or from other methods.}
+
+\item{object}{Object of class \code{rpf_forest}}
 }
 \description{
 These methods are provided to avoid flooding the console with long nested lists containing tree structures.

@@ -12,7 +12,7 @@ xdat <- data.frame(
 test_that("Default: L2 with 'prob'", {
   classif_fit <- rpf(yfact ~ ., data = xdat)
 
-  expect_identical(classif_fit$loss, "L2")
+  expect_identical(classif_fit$params$loss, "L2")
 
   classif_pred <- predict(classif_fit, xdat)
   classif_pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")
@@ -29,7 +29,7 @@ test_that("L2: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L2")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  expect_identical(classif_fit$loss, "L2")
+  expect_identical(classif_fit$params$loss, "L2")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
@@ -51,7 +51,7 @@ test_that("L2: Class prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L2")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "class")
 
-  expect_identical(classif_fit$loss, "L2")
+  expect_identical(classif_fit$params$loss, "L2")
   expect_equal(dim(classif_pred), c(nrow(xdat), 1))
   expect_true(all(classif_pred$.pred_class %in% levels(xdat$yfact)))
 })
@@ -70,7 +70,7 @@ test_that("L1: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L1")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  expect_identical(classif_fit$loss, "L1")
+  expect_identical(classif_fit$params$loss, "L1")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
@@ -92,7 +92,7 @@ test_that("L1: Class prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "L1")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "class")
 
-  expect_identical(classif_fit$loss, "L1")
+  expect_identical(classif_fit$params$loss, "L1")
   expect_equal(dim(classif_pred), c(nrow(xdat), 1))
   expect_true(all(classif_pred$.pred_class %in% levels(xdat$yfact)))
 })
@@ -112,7 +112,7 @@ test_that("logit: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  expect_identical(classif_fit$loss, "logit")
+  expect_identical(classif_fit$params$loss, "logit")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)
@@ -153,7 +153,7 @@ test_that("exponential: Probability prediction", {
   classif_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
   classif_pred <- predict(classif_fit, new_data = xdat, type = "prob")
 
-  expect_identical(classif_fit$loss, "exponential")
+  expect_identical(classif_fit$params$loss, "exponential")
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
   expect_lte(max(classif_pred), 1)

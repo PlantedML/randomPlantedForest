@@ -60,7 +60,7 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
     }
     type <- "numeric"
   } else if (object$mode == "classification") {
-    if (object$loss %in% c("logit", "exponential")) {
+    if (object$params$loss %in% c("logit", "exponential")) {
       # numeric yields raw predictions, which is the link in the binary case
       if (type == "link") type <- "numeric"
     }
@@ -103,10 +103,10 @@ predict_rpf_prob <- function(object, new_data, ...) {
 
   if (length(outcome_levels) == 2) { # Binary outcome
 
-    if (object$loss %in% c("logit", "exponential")) {
+    if (object$params$loss %in% c("logit", "exponential")) {
       # logit^-1 transformation for logit/exp loss
       pred_prob <- 1 / (1 + exp(-pred_raw))
-    } else if (object$loss %in% c("L1", "L2")) {
+    } else if (object$params$loss %in% c("L1", "L2")) {
       # Truncate probabilities at [0,1] for L1/L2 loss
       pred_prob <- apply(pred_raw, 2, function(col) pmax(0, pmin(1, col)))
     }
@@ -116,12 +116,12 @@ predict_rpf_prob <- function(object, new_data, ...) {
 
   } else { # Multiclass
 
-    if (object$loss %in% c("logit", "exponential")) {
+    if (object$params$loss %in% c("logit", "exponential")) {
       # FIXME:
       # softmax() defined in utils.R, should be identical to logit^-1 for
       # binary case but not properly tested yet
       pred_prob <- softmax(pred_raw)
-    } else if (object$loss %in% c("L1", "L2")) {
+    } else if (object$params$loss %in% c("L1", "L2")) {
       # Truncate probabilities at [0,1] for L1/L2 loss
       pred_prob <- apply(pred_raw, 2, function(col) pmax(0, pmin(1, col)))
       # Normalise such that sum of class probs is always 1

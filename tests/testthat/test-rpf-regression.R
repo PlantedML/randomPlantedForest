@@ -45,9 +45,9 @@ test_that("Setting L1 or L2 loss is saved in rpf object", {
   fit_l2 <- rpf(mpg ~ wt + cyl, data = mtcars, loss = "L2")
   fit_default <- rpf(mpg ~ wt + cyl, data = mtcars)
 
-  expect_identical(fit_l1$loss, "L1")
-  expect_identical(fit_l2$loss, "L2")
-  expect_identical(fit_default$loss, "L2")
+  expect_identical(fit_l1$params$loss, "L1")
+  expect_identical(fit_l2$params$loss, "L2")
+  expect_identical(fit_default$params$loss, "L2")
 })
 
 test_that("Warn for y = 0,1", {

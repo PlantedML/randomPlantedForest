@@ -51,6 +51,7 @@ print.rpf <- function(x, ...) {
 #' Note
 #'
 #' @param x Object of class `rpf_forest`
+#' @param ... Further arguments passed to or from other methods.
 #' @seealso [`rpf`]
 #' @export
 #' @examples
@@ -64,5 +65,6 @@ print.rpf_forest <- function(x, ...)  {
 }
 
 #' @rdname print.rpf_forest
+#' @param object Object of class `rpf_forest`
 #' @export
-str.rpf_forest <- function(x, ...) print(x, ...)
+str.rpf_forest <- function(object, ...) print(object, ...)
