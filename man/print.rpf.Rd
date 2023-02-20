@@ -18,7 +18,7 @@ Invisibly: \code{x}.
 Print an rpf fit
 }
 \examples{
-rpf(mpg ~., data = mtcars, max_interaction = 2, ntrees = 10)
+rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
 }
 \seealso{
 \code{\link{rpf}}.

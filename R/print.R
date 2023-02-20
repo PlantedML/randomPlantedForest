@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-#' rpf(mpg ~., data = mtcars, max_interaction = 2, ntrees = 10)
+#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
 print.rpf <- function(x, ...) {
   model_formula <- sub("\\s\\+ 0$", "" , deparse(x$blueprint$formula))
   mode <- switch(x$mode, regression = "Regression", classification = "Classification")
@@ -31,7 +31,7 @@ print.rpf <- function(x, ...) {
   cat("Formula:", model_formula, "\n")
   cat("Fit using", p, "predictors and", degree)
 
-  purification <- ifelse(x$fit$is_purified(), "is", "is _not_")
+  purification <- ifelse(is_purified(x), "is", "is _not_")
   cat("Forest", purification, "purified!\n\n")
 
   param_names <- names(x$params)
@@ -44,3 +44,25 @@ print.rpf <- function(x, ...) {
 
   invisible(x)
 }
+
+#' Compact printing of forest structures
+#'
+#' These methods are provided to avoid flooding the console with long nested lists containing tree structures.
+#' Note
+#'
+#' @param x Object of class `rpf_forest`
+#' @seealso [`rpf`]
+#' @export
+#' @examples
+#'
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10)
+#' print(rpfit$forest)
+#' str(rpfit$forest)
+print.rpf_forest <- function(x, ...)  {
+  cat(sprintf("<rpf_forest> of %i trees\n", length(x)))
+  invisible(x)
+}
+
+#' @rdname print.rpf_forest
+#' @export
+str.rpf_forest <- function(x, ...) print(x, ...)

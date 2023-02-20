@@ -19,5 +19,6 @@ reference:
 
 - title: Utility functions
 - contents:
-  - print.rpf
+  - starts_with("print.")
+  - starts_with("str.")
 
