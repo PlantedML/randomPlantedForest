@@ -1144,18 +1144,20 @@ void RandomPlantedForest::fit(){
   if(n_threads > 1){
     // Rcout << "Setting threads: " << n_threads << std::endl;
     // int n_threads = std::thread::hardware_concurrency() - 1;
-    for(int n = 0; n<n_trees; n+=n_threads){
+    // Creat local thread count to not overwrite n_threads, would get reported wrongly by get_parameters()
+    unsigned int current_threads = n_threads;
+    for(int n = 0; n<n_trees; n+=current_threads){
       // Rcout << "n = " << n << std::endl;
-      if(n >= (n_trees - n_threads)) {
+      if(n >= (n_trees - current_threads)) {
         // This can lead to 0 threads, which is not ideal as the loop never finishes then
-        n_threads = n_trees % n_threads;
+        current_threads = n_trees % current_threads;
         // Rcout << "Division gets " << n_threads << " threads" << std::endl;
+        // Shoddy fix to ensure we have at leats one thread
+        if (current_threads == 0) current_threads += 1;
       }
-      // Rcout << "Setting " << n_threads << " threads" << std::endl;
-      // Shoddy fix to ensure we have at leats one thread
-      if (n_threads == 0) n_threads += 1;
-      std::vector<std::thread> threads(n_threads);
-      for(int t=0; t<n_threads; ++t){
+
+      std::vector<std::thread> threads(current_threads);
+      for(int t=0; t < current_threads; ++t){
         // Rcout << (n + t) << "/" << n_trees << std::endl;
         threads[t] = std::thread(&RandomPlantedForest::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
@@ -3658,15 +3660,17 @@ void ClassificationRPF::fit(){
   // iterate over families of trees and modify
   if(n_threads > 1){
     // int n_threads = std::thread::hardware_concurrency() - 1;
-    for(int n = 0; n<n_trees; n+=n_threads){
-      if(n >= (n_trees - n_threads)) {
+    unsigned int current_threads = n_threads;
+    for(int n = 0; n<n_trees; n+=current_threads){
+      if(n >= (n_trees - current_threads)) {
         // This can lead to 0 threads, which is not ideal as the loop never finishes then
-        n_threads = n_trees % n_threads;
+        current_threads = n_trees % current_threads;
+        // Shoddy fix to ensure we have at leats one thread
+        if (current_threads == 0) current_threads += 1;
       }
-      // Shoddy fix to ensure we have at leats one thread
-      if (n_threads == 0) n_threads += 1;
-      std::vector<std::thread> threads(n_threads);
-      for(int t=0; t<n_threads; ++t){
+
+      std::vector<std::thread> threads(current_threads);
+      for(int t=0; t<current_threads; ++t){
         threads[t] = std::thread(&ClassificationRPF::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
       for(auto& t: threads){
