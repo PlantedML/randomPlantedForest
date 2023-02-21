@@ -99,10 +99,10 @@ str(components$m)
 ```{r, incluide=FALSE}
 t2 <- Sys.time()
 
-took <- round(as.numeric(difftime(t2, t1, units = "secs"))/10)*10
+took <- ceiling(as.numeric(difftime(t2, t1, units = "secs"))/10)*10
 ```
 
-Please note that fitting the model, purification, and the extraction of the components may toke some time, depending on available resources and the size of the data.
+Please note that fitting the model, purification, and the extraction of the components may take some time, depending on available resources and the size of the data.
 For example, the above steps took around `r took` seconds to complete on GitHub Actions.
 
 ## Main Effects
@@ -112,7 +112,7 @@ p_main <- plot_main_effect(components, "temp") +
   plot_main_effect(components, "hr") +
   plot_main_effect(components, "workingday")
 
-p_main
+p_main + plot_layout(widths = c(.3, .3, .4))
 ```
 
 ## 2-Way Interactions
@@ -127,7 +127,7 @@ p_2way <- (
   plot_twoway_effects(components, c("hr", "temp"))
 
 p_2way <- p_2way + 
-  plot_annotation(tag_levels = list(c("1,1", "3,2", "3,1")), tag_prefix = "m")
+  plot_annotation(tag_levels = list(c("1,2", "3,1", "3,3")), tag_prefix = "m(", tag_suffix = ")")
 
 p_2way
 ```
@@ -158,13 +158,14 @@ Iterating over `vars` (`r paste0(vars, collapse = ", ")`), and passing each to `
 wrap_plots(lapply(vars, plot_main_effect, components = components))
 ```
 
-From here we use `autoplot` for convenience. Internally it just passed its arguments on to the specialized `plot_*` functions, depending on the number of predictors supplied.
+From here we use `autoplot` for convenience. Internally it just passes its arguments on to the specialized `plot_*` functions, depending on the number of predictors supplied.
 
 ```{r}
 autoplot(components, c("season", "workingday"))
 autoplot(components, c("season", "temp"))
 autoplot(components, c("season", "weathersit"))
 autoplot(components, c("weathersit", "temp"))
+autoplot(components, c("hum", "temp"))
 ```
 
 
@@ -172,7 +173,7 @@ autoplot(components, c("weathersit", "temp"))
 
 ```{r}
 autoplot(components, c("season", "hr", "weathersit"))
-autoplot(components, c("workingday", "temp", "season"))
+autoplot(components, c("workingday", "hr", "season"))
 
 # Hard to interpret, likely spurious
 autoplot(components, c("workingday", "hr", "weathersit"))
