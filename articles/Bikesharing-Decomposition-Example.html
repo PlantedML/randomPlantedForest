@@ -87,9 +87,9 @@
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2023</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme_get.html" class="external-link">theme_set</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_minimal</a></span><span class="op">(</span>base_size <span class="op">=</span> <span class="fl">13</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="preparing-the-data">Preparing the Data<a class="anchor" aria-label="anchor" href="#preparing-the-data"></a>
-</h3>
+<div class="section level2">
+<h2 id="preparing-the-data">Preparing the Data<a class="anchor" aria-label="anchor" href="#preparing-the-data"></a>
+</h2>
 <p>First we load the <code>Bikeshare</code> data from the
 <code>ISLR2</code> package, which provides the dataset published at the
 <a href="https://archive.ics.uci.edu/ml/datasets/bike+sharing+dataset" class="external-link">UCI
@@ -118,26 +118,31 @@ day (1) or not (0)</li>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">Bikeshare</span><span class="op">)</span></span>
 <span><span class="va">bike</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://Rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span><span class="va">Bikeshare</span><span class="op">)</span></span>
 <span><span class="va">bike</span><span class="op">[</span>, <span class="va">hr</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">hr</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">bike</span><span class="op">[</span>, <span class="va">workingday</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">workingday</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"No Workingday"</span>, <span class="st">"Workingday"</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">bike</span><span class="op">[</span>, <span class="va">season</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">season</span>, levels <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Winter"</span>, <span class="st">"Spring"</span>, <span class="st">"Summer"</span>, <span class="st">"Fall"</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Only one observation with this condition, removing it to make space.</span></span>
+<span><span class="va">bike</span> <span class="op">&lt;-</span> <span class="va">bike</span><span class="op">[</span><span class="va">weathersit</span> <span class="op">!=</span> <span class="st">"heavy rain/snow"</span>, <span class="op">]</span> </span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">bike</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    season mnth day hr holiday weekday workingday   weathersit temp  atemp  hum</span></span>
-<span><span class="co">#&gt; 1:      1  Jan   1  0       0       6          0        clear 0.24 0.2879 0.81</span></span>
-<span><span class="co">#&gt; 2:      1  Jan   1  1       0       6          0        clear 0.22 0.2727 0.80</span></span>
-<span><span class="co">#&gt; 3:      1  Jan   1  2       0       6          0        clear 0.22 0.2727 0.80</span></span>
-<span><span class="co">#&gt; 4:      1  Jan   1  3       0       6          0        clear 0.24 0.2879 0.75</span></span>
-<span><span class="co">#&gt; 5:      1  Jan   1  4       0       6          0        clear 0.24 0.2879 0.75</span></span>
-<span><span class="co">#&gt; 6:      1  Jan   1  5       0       6          0 cloudy/misty 0.24 0.2576 0.75</span></span>
-<span><span class="co">#&gt;    windspeed casual registered bikers</span></span>
-<span><span class="co">#&gt; 1:    0.0000      3         13     16</span></span>
-<span><span class="co">#&gt; 2:    0.0000      8         32     40</span></span>
-<span><span class="co">#&gt; 3:    0.0000      5         27     32</span></span>
-<span><span class="co">#&gt; 4:    0.0000      3         10     13</span></span>
-<span><span class="co">#&gt; 5:    0.0000      0          1      1</span></span>
-<span><span class="co">#&gt; 6:    0.0896      0          1      1</span></span></code></pre></div>
+<span><span class="co">#&gt;    season mnth day hr holiday weekday    workingday   weathersit temp  atemp</span></span>
+<span><span class="co">#&gt; 1: Winter  Jan   1  0       0       6 No Workingday        clear 0.24 0.2879</span></span>
+<span><span class="co">#&gt; 2: Winter  Jan   1  1       0       6 No Workingday        clear 0.22 0.2727</span></span>
+<span><span class="co">#&gt; 3: Winter  Jan   1  2       0       6 No Workingday        clear 0.22 0.2727</span></span>
+<span><span class="co">#&gt; 4: Winter  Jan   1  3       0       6 No Workingday        clear 0.24 0.2879</span></span>
+<span><span class="co">#&gt; 5: Winter  Jan   1  4       0       6 No Workingday        clear 0.24 0.2879</span></span>
+<span><span class="co">#&gt; 6: Winter  Jan   1  5       0       6 No Workingday cloudy/misty 0.24 0.2576</span></span>
+<span><span class="co">#&gt;     hum windspeed casual registered bikers</span></span>
+<span><span class="co">#&gt; 1: 0.81    0.0000      3         13     16</span></span>
+<span><span class="co">#&gt; 2: 0.80    0.0000      8         32     40</span></span>
+<span><span class="co">#&gt; 3: 0.80    0.0000      5         27     32</span></span>
+<span><span class="co">#&gt; 4: 0.75    0.0000      3         10     13</span></span>
+<span><span class="co">#&gt; 5: 0.75    0.0000      0          1      1</span></span>
+<span><span class="co">#&gt; 6: 0.75    0.0896      0          1      1</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="fitting-purification-component-extraction">Fitting, Purification, Component Extraction<a class="anchor" aria-label="anchor" href="#fitting-purification-component-extraction"></a>
-</h3>
+<div class="section level2">
+<h2 id="fitting-purification-component-extraction">Fitting, Purification, Component Extraction<a class="anchor" aria-label="anchor" href="#fitting-purification-component-extraction"></a>
+</h2>
 <p>Next we can fit a Random Planted Forest on the <code>bikers</code>
 variable, using a subset of the available predictors. We limit the
 model’s complexity by setting <code>max_interaction = 3</code>, as we
@@ -150,7 +155,7 @@ required for global predictions and may take some time, which is why it
 is implemented as a separate step.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span></span>
-<span>  <span class="va">bikers</span> <span class="op">~</span> <span class="va">day</span> <span class="op">+</span> <span class="va">hr</span> <span class="op">+</span> <span class="va">temp</span> <span class="op">+</span> <span class="va">windspeed</span> <span class="op">+</span> <span class="va">workingday</span> <span class="op">+</span> <span class="va">hum</span>,</span>
+<span>  <span class="va">bikers</span> <span class="op">~</span> <span class="va">day</span> <span class="op">+</span> <span class="va">hr</span> <span class="op">+</span> <span class="va">temp</span> <span class="op">+</span> <span class="va">windspeed</span> <span class="op">+</span> <span class="va">workingday</span> <span class="op">+</span> <span class="va">hum</span> <span class="op">+</span> <span class="va">weathersit</span> <span class="op">+</span> <span class="va">season</span>,</span>
 <span>  data <span class="op">=</span> <span class="va">bike</span>,</span>
 <span>  max_interaction <span class="op">=</span> <span class="fl">3</span>, ntrees <span class="op">=</span> <span class="fl">20</span></span>
 <span><span class="op">)</span></span>
@@ -158,8 +163,8 @@ is implemented as a separate step.</p>
 <span><span class="fu"><a href="../reference/purify.html">purify</a></span><span class="op">(</span><span class="va">rp</span><span class="op">)</span></span>
 <span><span class="co">#&gt; -- Regression Random Planted Forest --</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Formula: bikers ~ day + hr + temp + windspeed + workingday + hum </span></span>
-<span><span class="co">#&gt; Fit using 6 predictors and 3-degree interactions.</span></span>
+<span><span class="co">#&gt; Formula: bikers ~ day + hr + temp + windspeed + workingday + hum + weathersit +      season </span></span>
+<span><span class="co">#&gt; Fit using 8 predictors and 3-degree interactions.</span></span>
 <span><span class="co">#&gt; Forest is purified!</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Called with parameters:</span></span>
@@ -182,113 +187,83 @@ that include them, from main effects to 3rd degree interactions. We also
 create an auxiliary table in long format which includes the observed
 predictor values, which we use for the plot of the main effects.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span>, <span class="st">"hum"</span>, <span class="st">"weathersit"</span>, <span class="st">"season"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">ms</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rp</span>, <span class="va">bike</span>, predictors <span class="op">=</span> <span class="va">vars</span><span class="op">)</span></span>
-<span><span class="va">ms</span></span>
-<span><span class="co">#&gt;       intercept         hr      temp workingday      hr:temp hr:workingday</span></span>
-<span><span class="co">#&gt;    1:  143.2853 -120.03035 -41.37863   1.230205  36.72889259    10.4351399</span></span>
-<span><span class="co">#&gt;    2:  143.2853 -120.03035 -41.37863   1.230205  36.72889259    10.4351399</span></span>
-<span><span class="co">#&gt;    3:  143.2853 -121.93906 -41.37863   1.230205  36.72889259     8.7556011</span></span>
-<span><span class="co">#&gt;    4:  143.2853 -121.93906 -41.37863   1.230205  36.72889259     8.7556011</span></span>
-<span><span class="co">#&gt;    5:  143.2853 -121.93906 -41.37863   1.230205  36.72889259     8.7556011</span></span>
-<span><span class="co">#&gt;   ---                                                                     </span></span>
-<span><span class="co">#&gt; 8641:  143.2853   85.18923 -15.58770   1.230205 -22.67729239   -37.2148270</span></span>
-<span><span class="co">#&gt; 8642:  143.2853   30.43344 -15.58770   1.230205 -10.32501271   -18.6352794</span></span>
-<span><span class="co">#&gt; 8643:  143.2853  -17.49218 -20.20000   1.230205  -1.36339065    -4.8843326</span></span>
-<span><span class="co">#&gt; 8644:  143.2853  -45.84159 -25.18386   1.230205   2.36921704     0.7853175</span></span>
-<span><span class="co">#&gt; 8645:  143.2853  -48.94899 -30.94988   1.230205  -0.04613987     0.7853175</span></span>
-<span><span class="co">#&gt;       temp:workingday hr:temp:workingday</span></span>
-<span><span class="co">#&gt;    1:      -10.066455           2.339399</span></span>
-<span><span class="co">#&gt;    2:      -10.066455           2.339399</span></span>
-<span><span class="co">#&gt;    3:      -10.066455           2.339399</span></span>
-<span><span class="co">#&gt;    4:      -10.066455           2.339399</span></span>
-<span><span class="co">#&gt;    5:      -10.066455           2.339399</span></span>
-<span><span class="co">#&gt;   ---                                   </span></span>
-<span><span class="co">#&gt; 8641:       -3.357617           9.564732</span></span>
-<span><span class="co">#&gt; 8642:       -3.357617           4.203181</span></span>
-<span><span class="co">#&gt; 8643:       -3.902431           3.454540</span></span>
-<span><span class="co">#&gt; 8644:       -7.819389           7.371499</span></span>
-<span><span class="co">#&gt; 8645:       -7.819389           7.371499</span></span>
+<span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rp</span>, <span class="va">bike</span>, predictors <span class="op">=</span> <span class="va">vars</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">ms_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://Rdatatable.gitlab.io/data.table/reference/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="kw">function</span><span class="op">(</span><span class="va">colname</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://Rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span>variable <span class="op">=</span> <span class="va">colname</span>, value <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="va">colname</span><span class="op">]</span><span class="op">]</span>, m <span class="op">=</span> <span class="va">ms</span><span class="op">[[</span><span class="va">colname</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">ms_long</span></span>
-<span><span class="co">#&gt;          variable value           m</span></span>
-<span><span class="co">#&gt;     1:         hr     0 -120.030353</span></span>
-<span><span class="co">#&gt;     2:         hr     1 -120.030353</span></span>
-<span><span class="co">#&gt;     3:         hr     2 -121.939063</span></span>
-<span><span class="co">#&gt;     4:         hr     3 -121.939063</span></span>
-<span><span class="co">#&gt;     5:         hr     4 -121.939063</span></span>
-<span><span class="co">#&gt;    ---                             </span></span>
-<span><span class="co">#&gt; 25931: workingday     0    1.230205</span></span>
-<span><span class="co">#&gt; 25932: workingday     0    1.230205</span></span>
-<span><span class="co">#&gt; 25933: workingday     0    1.230205</span></span>
-<span><span class="co">#&gt; 25934: workingday     0    1.230205</span></span>
-<span><span class="co">#&gt; 25935: workingday     0    1.230205</span></span></code></pre></div>
+<span><span class="co"># There's a lot of components...</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Classes 'data.table' and 'data.frame':   8644 obs. of  42 variables:</span></span>
+<span><span class="co">#&gt;  $ intercept                   : num  144 144 144 144 144 ...</span></span>
+<span><span class="co">#&gt;  $ hr                          : num  -120 -120 -120 -121 -121 ...</span></span>
+<span><span class="co">#&gt;  $ temp                        : num  -39.5 -39.5 -39.5 -39.5 -39.5 ...</span></span>
+<span><span class="co">#&gt;  $ workingday                  : num  -1.14 -1.14 -1.14 -1.14 -1.14 ...</span></span>
+<span><span class="co">#&gt;  $ hum                         : num  -10.74 -7.85 -7.85 -1.68 -1.68 ...</span></span>
+<span><span class="co">#&gt;  $ weathersit                  : num  4.26 4.26 4.26 4.26 4.26 ...</span></span>
+<span><span class="co">#&gt;  $ season                      : num  -22.4 -22.4 -22.4 -22.4 -22.4 ...</span></span>
+<span><span class="co">#&gt;  $ hr:temp                     : num  31.3 31.3 32.1 31.8 31.8 ...</span></span>
+<span><span class="co">#&gt;  $ hr:workingday               : num  12.2 12.2 12.2 12.2 10.4 ...</span></span>
+<span><span class="co">#&gt;  $ hr:hum                      : num  5.762 4.009 4.009 0.472 0.472 ...</span></span>
+<span><span class="co">#&gt;  $ hr:weathersit               : num  -3.49 -3.49 -3.49 -3.49 -3.49 ...</span></span>
+<span><span class="co">#&gt;  $ hr:season                   : num  17.7 17.7 17.7 17.7 17.7 ...</span></span>
+<span><span class="co">#&gt;  $ temp:workingday             : num  -10.3 -10.3 -10.3 -10.3 -10.3 ...</span></span>
+<span><span class="co">#&gt;  $ hum:temp                    : num  4.47 3.33 3.33 2.63 2.63 ...</span></span>
+<span><span class="co">#&gt;  $ temp:weathersit             : num  -0.288 -0.288 -0.288 -0.288 -0.288 ...</span></span>
+<span><span class="co">#&gt;  $ season:temp                 : num  -2.17 -2.17 -2.17 -2.17 -2.17 ...</span></span>
+<span><span class="co">#&gt;  $ hum:workingday              : num  -4.1 -3.58 -3.58 -3.56 -3.56 ...</span></span>
+<span><span class="co">#&gt;  $ weathersit:workingday       : num  0.0183 0.0183 0.0183 0.0183 0.0183 ...</span></span>
+<span><span class="co">#&gt;  $ season:workingday           : num  -1.27 -1.27 -1.27 -1.27 -1.27 ...</span></span>
+<span><span class="co">#&gt;  $ hum:weathersit              : num  -0.124 -0.319 -0.319 -0.433 -0.433 ...</span></span>
+<span><span class="co">#&gt;  $ hum:season                  : num  1.286 1.286 1.286 0.558 0.558 ...</span></span>
+<span><span class="co">#&gt;  $ season:weathersit           : num  -0.412 -0.412 -0.412 -0.412 -0.412 ...</span></span>
+<span><span class="co">#&gt;  $ hr:temp:workingday          : num  2.56 2.56 2.56 2.56 2.56 ...</span></span>
+<span><span class="co">#&gt;  $ hr:hum:temp                 : num  -0.872 -0.872 -0.872 -0.894 -0.894 ...</span></span>
+<span><span class="co">#&gt;  $ hr:temp:weathersit          : num  0.152 0.152 0.152 0.152 0.152 ...</span></span>
+<span><span class="co">#&gt;  $ hr:season:temp              : num  3.03 3.03 3.03 3.03 3.03 ...</span></span>
+<span><span class="co">#&gt;  $ hr:hum:workingday           : num  2.3 1.79 1.79 2.48 2.48 ...</span></span>
+<span><span class="co">#&gt;  $ hr:weathersit:workingday    : num  -0.0183 -0.0183 -0.0183 -0.0183 -0.0183 ...</span></span>
+<span><span class="co">#&gt;  $ hr:season:workingday        : num  1.27 1.27 1.27 1.27 1.27 ...</span></span>
+<span><span class="co">#&gt;  $ hr:hum:weathersit           : num  0.0653 0.2609 0.2609 0.6686 0.6686 ...</span></span>
+<span><span class="co">#&gt;  $ hr:hum:season               : num  -0.466 -0.466 -0.466 0.262 0.262 ...</span></span>
+<span><span class="co">#&gt;  $ hr:season:weathersit        : num  0.412 0.412 0.412 0.412 0.412 ...</span></span>
+<span><span class="co">#&gt;  $ hum:temp:workingday         : num  1.487 1.487 1.487 0.773 0.773 ...</span></span>
+<span><span class="co">#&gt;  $ temp:weathersit:workingday  : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ season:temp:workingday      : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ hum:temp:weathersit         : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ hum:season:temp             : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ season:temp:weathersit      : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ hum:weathersit:workingday   : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ hum:season:workingday       : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ season:weathersit:workingday: num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  $ hum:season:weathersit       : num  0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">#&gt;  - attr(*, ".internal.selfref")=&lt;externalptr&gt;</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="main-effects">Main Effects<a class="anchor" aria-label="anchor" href="#main-effects"></a>
-</h3>
+<div class="section level2">
+<h2 id="main-effects">Main Effects<a class="anchor" aria-label="anchor" href="#main-effects"></a>
+</h2>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">ms_long</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">value</span>, y <span class="op">=</span> <span class="va">m</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/vars.html" class="external-link">vars</a></span><span class="op">(</span><span class="va">variable</span><span class="op">)</span>, scales <span class="op">=</span> <span class="st">"free_x"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_hline</a></span><span class="op">(</span>yintercept <span class="op">=</span> <span class="fl">0</span>, color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    x <span class="op">=</span> <span class="st">"Feature Value"</span>,</span>
-<span>    y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="va">Main</span> <span class="op">~</span> <span class="va">effects</span> <span class="op">~</span> <span class="fu">italic</span><span class="op">(</span><span class="va">m</span><span class="op">[</span><span class="va">j</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_components.html">plot_main_effect</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"temp"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="../reference/plot_components.html">plot_main_effect</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"hr"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="../reference/plot_components.html">plot_main_effect</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"workingday"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">p_main</span></span></code></pre></div>
 <p><img src="Bikesharing-Decomposition-Example_files/figure-html/main-effects-1.png" width="864" style="display: block; margin: auto;"></p>
 </div>
-<div class="section level3">
-<h3 id="way-interactions">2-Way Interactions<a class="anchor" aria-label="anchor" href="#way-interactions"></a>
-</h3>
+<div class="section level2">
+<h2 id="way-interactions">2-Way Interactions<a class="anchor" aria-label="anchor" href="#way-interactions"></a>
+</h2>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">int2way_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://Rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
-<span>    variable <span class="op">=</span> <span class="st">"hr"</span>,</span>
-<span>    value <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"hr"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    workingday <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"workingday"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    m <span class="op">=</span> <span class="va">ms</span><span class="op">[[</span><span class="st">"hr:workingday"</span><span class="op">]</span><span class="op">]</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://Rdatatable.gitlab.io/data.table/reference/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
-<span>    variable <span class="op">=</span> <span class="st">"temp"</span>, value <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"temp"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    workingday <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"workingday"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    m <span class="op">=</span> <span class="va">ms</span><span class="op">[[</span><span class="st">"temp:workingday"</span><span class="op">]</span><span class="op">]</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">p_2way</span> <span class="op">&lt;-</span> <span class="op">(</span></span>
+<span>    <span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"workingday"</span>, <span class="st">"temp"</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span>
+<span>    <span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>    <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_layout.html" class="external-link">plot_layout</a></span><span class="op">(</span>guides <span class="op">=</span> <span class="st">"collect"</span><span class="op">)</span> <span class="op">&amp;</span></span>
+<span>      <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">"bottom"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span> <span class="op">|</span></span>
+<span>  <span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">int2way_long</span><span class="op">[</span>, <span class="va">workingday</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">workingday</span>,</span>
-<span>  levels <span class="op">=</span> <span class="fl">0</span><span class="op">:</span><span class="fl">1</span>,</span>
-<span>  labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"No working day"</span>, <span class="st">"Working day"</span><span class="op">)</span></span>
-<span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">p_2way</span> <span class="op">&lt;-</span> <span class="va">p_2way</span> <span class="op">+</span> </span>
+<span>  <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_annotation.html" class="external-link">plot_annotation</a></span><span class="op">(</span>tag_levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"1,1"</span>, <span class="st">"3,2"</span>, <span class="st">"3,1"</span><span class="op">)</span><span class="op">)</span>, tag_prefix <span class="op">=</span> <span class="st">"m"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">int2way_wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>hr <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"hr"</span><span class="op">]</span><span class="op">]</span>, temp <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"temp"</span><span class="op">]</span><span class="op">]</span>, m <span class="op">=</span> <span class="va">ms</span><span class="op">[[</span><span class="st">"hr:temp"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">p_2way_1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">int2way_long</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">value</span>, y <span class="op">=</span> <span class="va">m</span>, col <span class="op">=</span> <span class="va">workingday</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/vars.html" class="external-link">vars</a></span><span class="op">(</span><span class="va">variable</span><span class="op">)</span>, scales <span class="op">=</span> <span class="st">"free_x"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html" class="external-link">geom_hline</a></span><span class="op">(</span>yintercept <span class="op">=</span> <span class="fl">0</span>, color <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_d</a></span><span class="op">(</span>option <span class="op">=</span> <span class="st">"D"</span>, begin <span class="op">=</span> <span class="fl">.2</span>, end <span class="op">=</span> <span class="fl">.8</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    x <span class="op">=</span> <span class="st">"Feature Value"</span>,</span>
-<span>    y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="fl">2</span> <span class="op">-</span> <span class="va">way</span> <span class="op">~</span> <span class="va">interactions</span> <span class="op">~</span> <span class="fu">italic</span><span class="op">(</span><span class="va">m</span><span class="op">[</span><span class="va">jk</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    color <span class="op">=</span> <span class="cn">NULL</span></span>
-<span>  <span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">"bottom"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">p_2way_2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">int2way_wide</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">hr</span>, y <span class="op">=</span> <span class="va">temp</span>, color <span class="op">=</span> <span class="va">m</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="fu">italic</span><span class="op">(</span><span class="va">m</span><span class="op">[</span><span class="va">jk</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span></span>
-<span><span class="va">p_2way</span> <span class="op">&lt;-</span> <span class="va">p_2way_1</span> <span class="op">+</span> <span class="va">p_2way_2</span> <span class="op">+</span> <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_layout.html" class="external-link">plot_layout</a></span><span class="op">(</span>widths <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">.55</span>, <span class="fl">.45</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">p_2way</span></span></code></pre></div>
 <p><img src="Bikesharing-Decomposition-Example_files/figure-html/twoway-effects-1.png" width="864" style="display: block; margin: auto;"></p>
 </div>
@@ -296,34 +271,63 @@ predictor values, which we use for the plot of the main effects.</p>
 <h2 id="way-interaction">3-Way Interaction<a class="anchor" aria-label="anchor" href="#way-interaction"></a>
 </h2>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">int3way</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  hr <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"hr"</span><span class="op">]</span><span class="op">]</span>, </span>
-<span>  temp <span class="op">=</span> <span class="va">bike</span><span class="op">[[</span><span class="st">"temp"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>  workingday <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">bike</span><span class="op">[[</span><span class="st">"workingday"</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>                 levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"0"</span>, <span class="st">"1"</span><span class="op">)</span>,</span>
-<span>                 labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"No working day"</span>, <span class="st">"Working day"</span><span class="op">)</span></span>
-<span>               <span class="op">)</span>,</span>
-<span>  m <span class="op">=</span> <span class="va">ms</span><span class="op">[[</span><span class="st">"hr:temp:workingday"</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">p_3way</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">int3way</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">hr</span>, y <span class="op">=</span> <span class="va">temp</span>, color <span class="op">=</span> <span class="va">m</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/vars.html" class="external-link">vars</a></span><span class="op">(</span><span class="va">workingday</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span></span>
-<span>    y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="fu">atop</span><span class="op">(</span><span class="fl">3</span> <span class="op">-</span> <span class="va">way</span> <span class="op">~</span> <span class="va">interactions</span> <span class="op">~</span> <span class="fu">italic</span><span class="op">(</span><span class="va">m</span><span class="op">[</span><span class="va">jkl</span><span class="op">]</span><span class="op">)</span>, <span class="st">"temp"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    color <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/expression.html" class="external-link">expression</a></span><span class="op">(</span><span class="fu">italic</span><span class="op">(</span><span class="va">m</span><span class="op">[</span><span class="va">jkl</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">p_3way</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">p_3way</span></span></code></pre></div>
-<p><img src="Bikesharing-Decomposition-Example_files/figure-html/threeway-effects-1.png" width="864" style="display: block; margin: auto;"></p>
-<div class="section level3">
-<h3 id="everything-together">Everything Together<a class="anchor" aria-label="anchor" href="#everything-together"></a>
-</h3>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">+</span> <span class="va">p_2way</span> <span class="op">+</span> <span class="va">p_3way</span> <span class="op">+</span> <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_layout.html" class="external-link">plot_layout</a></span><span class="op">(</span>ncol <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="Bikesharing-Decomposition-Example_files/figure-html/all-effects-1.png" width="768" style="display: block; margin: auto;"></p>
 </div>
+<div class="section level2">
+<h2 id="everything-together">Everything Together<a class="anchor" aria-label="anchor" href="#everything-together"></a>
+</h2>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">/</span> <span class="va">p_2way</span> <span class="op">&amp;</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
+<span>  panel.grid.minor.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  panel.grid.minor.y <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/all-effects-1.png" width="768" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span></span>
+<span><span class="co"># p_main + p_2way + p_3way + plot_layout(ncol = 1)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="additional-effects">Additional effects<a class="anchor" aria-label="anchor" href="#additional-effects"></a>
+</h2>
+<p>All main effects:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://patchwork.data-imaginist.com/reference/wrap_plots.html" class="external-link">wrap_plots</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">vars</span>, <span class="va">plot_main_effect</span>, components <span class="op">=</span> <span class="va">components</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-2-1.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"season"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-3-1.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"season"</span>, <span class="st">"temp"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-3-2.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"season"</span>, <span class="st">"weathersit"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-3-3.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_twoway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"weathersit"</span>, <span class="st">"temp"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-3-4.png" width="864" style="display: block; margin: auto;"></p>
+<p>3rd degree interactions can be tricky, if they have any effect at
+all.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"season"</span>, <span class="st">"hr"</span>, <span class="st">"weathersit"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-4-1.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-4-2.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"workingday"</span>, <span class="st">"temp"</span>, <span class="st">"season"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-4-3.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span></span>
+<span><span class="co"># Hard to interpret, likely spurious</span></span>
+<span><span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"workingday"</span>, <span class="st">"hr"</span>, <span class="st">"weathersit"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-4-4.png" width="864" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span></span>
+<span><span class="co"># zero effect</span></span>
+<span><span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"weathersit"</span>, <span class="st">"season"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/unnamed-chunk-4-5.png" width="864" style="display: block; margin: auto;"></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside>
