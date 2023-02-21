@@ -274,12 +274,13 @@ predictor values, which we use for the plot of the main effects.</p>
 <code class="sourceCode R"><span><span class="va">p_3way</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_components.html">plot_threeway_effects</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">p_3way</span></span></code></pre></div>
+<p><img src="Bikesharing-Decomposition-Example_files/figure-html/threeway-effects-1.png" width="864" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level2">
 <h2 id="everything-together">Everything Together<a class="anchor" aria-label="anchor" href="#everything-together"></a>
 </h2>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">/</span> <span class="va">p_2way</span> <span class="op">&amp;</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">p_main</span> <span class="op">/</span> <span class="va">p_2way</span> <span class="op">/</span> <span class="va">p_3way</span> <span class="op">&amp;</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
 <span>  panel.grid.minor.x <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  panel.grid.minor.y <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
