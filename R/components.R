@@ -41,7 +41,7 @@
 #' (components <- extract_components(rpfit, test))
 #'
 #' # sums to prediction
-#' cbind(rowSums(components), predict(rpfit, test))
+#' cbind(rowSums(components$m), predict(rpfit, test))
 #'
 #' # Only get components with interactions of a lower degree, ignoring 3-way interactions
 #' extract_components(rpfit, test, max_interaction = 2)
@@ -50,9 +50,8 @@
 #' (main_effects <- extract_components(rpfit, test, max_interaction = 1))
 #'
 #' # The difference is the combined contribution of interaction effects
-#' cbind(rowSums(main_effects), predict(rpfit, test))
+#' cbind(rowSums(main_effects$m), predict(rpfit, test))
 #'
-
 extract_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
 
   if (is.null(max_interaction)) {
@@ -76,21 +75,28 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
   # Encode factors to (re-)ordered integers according to information saved during model fit
-  new_data <- preprocess_predictors_predict(object, processed$predictors)
+  new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)
+  data.table::setDT(new_data)
 
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(max_interaction), function(i) {
     combinations <- utils::combn(predictors, i, simplify = FALSE)
-    components <- lapply(combinations, function(x) extract_component(object, new_data, x))
+    components <- lapply(combinations, function(x) extract_component(object, new_data_matrix, x))
     do.call(cbind, args = components)
   })
 
   all_components <- do.call(cbind, args = all_components)
-  intercept <- extract_component(object, new_data, predictors = NULL)
+  intercept <- extract_component(object, new_data_matrix, predictors = NULL)
   all_components <- cbind(intercept, all_components)
 
-  data.table::as.data.table(all_components)
+  ret <- list(
+    m = data.table::as.data.table(all_components),
+    x = new_data[, predictors, with = FALSE]
+  )
+  class(ret) <- c("rpf_components", class(ret))
+  ret
+
 }
 
 #' Internal function to extract a single component

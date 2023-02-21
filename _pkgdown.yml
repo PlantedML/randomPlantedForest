@@ -16,6 +16,8 @@ reference:
 - contents:
     - purify
     - starts_with("extract_compon")
+    - starts_with("plot_")
+    - autoplot.rpf_components
 
 - title: Utility functions
 - contents:

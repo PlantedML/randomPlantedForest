@@ -51,7 +51,7 @@ rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 (components <- extract_components(rpfit, test))
 
 # sums to prediction
-cbind(rowSums(components), predict(rpfit, test))
+cbind(rowSums(components$m), predict(rpfit, test))
 
 # Only get components with interactions of a lower degree, ignoring 3-way interactions
 extract_components(rpfit, test, max_interaction = 2)
@@ -60,6 +60,6 @@ extract_components(rpfit, test, max_interaction = 2)
 (main_effects <- extract_components(rpfit, test, max_interaction = 1))
 
 # The difference is the combined contribution of interaction effects
-cbind(rowSums(main_effects), predict(rpfit, test))
+cbind(rowSums(main_effects$m), predict(rpfit, test))
 
 }
