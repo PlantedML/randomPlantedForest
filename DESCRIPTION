@@ -18,13 +18,14 @@ BugReports: https://github.com/PlantedML/randomPlantedForest/issues
 Imports: 
     checkmate,
     data.table,
+    ggplot2,
     hardhat,
     methods,
     Rcpp,
+    scales,
     utils
 Suggests: 
     covr,
-    ggplot2,
     ISLR2,
     knitr,
     mvtnorm,

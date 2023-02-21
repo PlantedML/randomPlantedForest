@@ -44,6 +44,7 @@ We recode the `hr` column from a 24-level `factor` to a numeric column.
 data(Bikeshare)
 bike <- data.table(Bikeshare)
 bike[, hr := as.numeric(as.character(hr))]
+bike[, workingday := factor(workingday, labels = c("No Workingday", "Workingday"))]
 
 head(bike)
 ```
@@ -75,26 +76,18 @@ We also create an auxiliary table in long format which includes the observed pre
 ```{r extract-components}
 vars <- c("hr", "temp", "workingday")
 
-ms <- extract_components(rp, bike, predictors = vars)
-ms
-
-ms_long <- rbindlist(lapply(vars, function(colname) {
-  data.table(variable = colname, value = bike[[colname]], m = ms[[colname]])
-}))
-ms_long
+components <- extract_components(rp, bike, predictors = vars)
+components$m
 ```
 
 ## Main Effects
 
 ```{r main-effects}
-p_main <- ggplot(ms_long, aes(x = value, y = m)) +
-  facet_wrap(vars(variable), scales = "free_x") +
-  geom_hline(yintercept = 0, color = "red") +
-  geom_line() +
-  labs(
-    x = "Feature Value",
-    y = expression(Main ~ effects ~ italic(m[j]))
-  )
+p_main <- plot_main_effect(components, "temp") +
+  plot_main_effect(components, "hr") +
+  plot_main_effect(components, "workingday") +
+  plot_layout(nrow = 1) +
+  plot_annotation(tag_levels = "1", tag_prefix = "m")
 
 p_main
 ```
@@ -102,61 +95,28 @@ p_main
 ## 2-Way Interactions
 
 ```{r twoway-effects}
-int2way_long <- rbind(
-  data.table(
-    variable = "hr",
-    value = bike[["hr"]],
-    workingday = bike[["workingday"]],
-    m = ms[["hr:workingday"]]
-  ),
-  data.table(
-    variable = "temp", value = bike[["temp"]],
-    workingday = bike[["workingday"]],
-    m = ms[["temp:workingday"]]
-  )
-)
+p_2way <- (
+    plot_twoway_effects(components, c("workingday", "temp")) /
+    plot_twoway_effects(components, c("hr", "workingday")) + 
+    plot_layout(guides = "collect") &
+      theme(legend.position = "bottom")
+  ) |
+  plot_twoway_effects(components, c("hr", "temp"))
 
-int2way_long[, workingday := factor(workingday,
-  levels = 0:1,
-  labels = c("No working day", "Working day")
-)]
+p_2way <- p_2way + 
+  plot_annotation(tag_levels = list(c("1,1", "3,2", "3,1")), tag_prefix = "m")
 
-int2way_wide <- data.frame(hr = bike[["hr"]], temp = bike[["temp"]], m = ms[["hr:temp"]])
-
-p_2way_1 <- ggplot(int2way_long, aes(x = value, y = m, col = workingday)) +
-  facet_wrap(vars(variable), scales = "free_x") +
-  geom_hline(yintercept = 0, color = "red") +
-  geom_line() +
-  scale_color_viridis_d(option = "D", begin = .2, end = .8) +
-  labs(
-    x = "Feature Value",
-    y = expression(2 - way ~ interactions ~ italic(m[jk])),
-    color = NULL
-  ) +
-  theme(legend.position = "bottom")
-
-p_2way_2 <- ggplot(int2way_wide, aes(x = hr, y = temp, color = m)) +
-  geom_point() +
-  scale_color_viridis_c() +
-  labs(
-    color = expression(italic(m[jk]))
-  )
-
-p_2way <- p_2way_1 + p_2way_2 + plot_layout(widths = c(.55, .45))
 p_2way
 ```
 
 # 3-Way Interaction
 
-```{r threeway-effects}
+```{r threeway-effects, eval = FALSE}
 int3way <- data.frame(
   hr = bike[["hr"]], 
   temp = bike[["temp"]],
-  workingday = factor(bike[["workingday"]],
-                 levels = c("0", "1"),
-                 labels = c("No working day", "Working day")
-               ),
-  m = ms[["hr:temp:workingday"]]
+  workingday = bike[["workingday"]],
+  m = components[["hr:temp:workingday"]]
 )
 
 p_3way <- ggplot(int3way, aes(x = hr, y = temp, color = m)) +
@@ -174,5 +134,10 @@ p_3way
 ## Everything Together
 
 ```{r all-effects, fig.width=8, fig.height=10}
-p_main + p_2way + p_3way + plot_layout(ncol = 1)
+p_main / p_2way & theme(
+  panel.grid.minor.x = element_blank(),
+  panel.grid.minor.y = element_blank()
+)
+
+# p_main + p_2way + p_3way + plot_layout(ncol = 1)
 ```
