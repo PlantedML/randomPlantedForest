@@ -21,7 +21,13 @@ library(ggplot2)
 library(patchwork) # To arrange plots
 set.seed(2023)
 
-theme_set(theme_minimal(base_size = 13))
+theme_set(
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+)
 ```
 
 ## Preparing the Data
@@ -137,40 +143,41 @@ p_3way
 ## Everything Together
 
 ```{r all-effects, fig.width=8, fig.height=10}
-p_main / p_2way / p_3way & theme(
-  panel.grid.minor.x = element_blank(),
-  panel.grid.minor.y = element_blank()
-)
+p_main / p_2way / p_3way + 
+  plot_layout(heights = c(.2, .5, .3))
 ```
 
 ## Additional effects
 
+
 All main effects:
+
+Iterating over `vars` (`r paste0(vars, collapse = ", ")`), and passing each to `plot_main_effect`, then collecting the plots with `patchwork::wrap_plots()`:
 
 ```{r}
 wrap_plots(lapply(vars, plot_main_effect, components = components))
 ```
 
+From here we use `autoplot` for convenience. Internally it just passed its arguments on to the specialized `plot_*` functions, depending on the number of predictors supplied.
 
 ```{r}
-plot_twoway_effects(components, c("season", "workingday"))
-plot_twoway_effects(components, c("season", "temp"))
-plot_twoway_effects(components, c("season", "weathersit"))
-plot_twoway_effects(components, c("weathersit", "temp"))
-
+autoplot(components, c("season", "workingday"))
+autoplot(components, c("season", "temp"))
+autoplot(components, c("season", "weathersit"))
+autoplot(components, c("weathersit", "temp"))
 ```
 
 
 3rd degree interactions can be tricky, if they have any effect at all.
 
 ```{r}
-plot_threeway_effects(components, c("season", "hr", "weathersit"))
-plot_threeway_effects(components, c("workingday", "temp", "season"))
+autoplot(components, c("season", "hr", "weathersit"))
+autoplot(components, c("workingday", "temp", "season"))
 
 # Hard to interpret, likely spurious
-plot_threeway_effects(components, c("workingday", "hr", "weathersit"))
+autoplot(components, c("workingday", "hr", "weathersit"))
 
 # zero effect
-plot_threeway_effects(components, c("weathersit", "season", "workingday"))
+autoplot(components, c("weathersit", "season", "workingday"))
 ```
 
