@@ -115,7 +115,7 @@ p_2way
 
 ## 3-Way Interaction
 
-```{r threeway-effects, eval = FALSE}
+```{r threeway-effects}
 p_3way <- plot_threeway_effects(components, c("hr", "temp", "workingday"))
 
 p_3way
@@ -124,7 +124,7 @@ p_3way
 ## Everything Together
 
 ```{r all-effects, fig.width=8, fig.height=10}
-p_main / p_2way & theme(
+p_main / p_2way / p_3way & theme(
   panel.grid.minor.x = element_blank(),
   panel.grid.minor.y = element_blank()
 )
