@@ -154,7 +154,7 @@ plot_twoway_effects(components, c("weathersit", "temp"))
 
 ```{r}
 plot_threeway_effects(components, c("season", "hr", "weathersit"))
-plot_threeway_effects(components, c("hr", "temp", "mnth"))
+plot_threeway_effects(components, c("hr", "temp", "workingday"))
 plot_threeway_effects(components, c("workingday", "temp", "season"))
 
 # Hard to interpret, likely spurious
