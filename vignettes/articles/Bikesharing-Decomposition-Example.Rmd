@@ -68,7 +68,7 @@ For our example here, a smaller model with merely 20 trees suffices.
 We also `purify` the forest to enable the desired decomposition.
 This step is not required for global predictions and may take some time, which is why it is implemented as a separate step.
 
-```{r, incluide=FALSE}
+```{r, include=FALSE}
 t1 <- Sys.time()
 ```
 
@@ -96,7 +96,7 @@ components <- extract_components(rp, bike, predictors = vars)
 str(components$m)
 ```
 
-```{r, incluide=FALSE}
+```{r, include=FALSE}
 t2 <- Sys.time()
 
 took <- ceiling(as.numeric(difftime(t2, t1, units = "secs"))/10)*10
