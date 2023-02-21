@@ -38,7 +38,10 @@ Model fitting uses a familiar interface:
 
 ```{r}
 library(randomPlantedForest)
+library(ggplot2)
+library(patchwork)
 
+mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
 rpfit
 
@@ -47,14 +50,33 @@ predict(rpfit, new_data = mtcars) |>
   head()
 ```
 
-Prediction components can be accessed via `extract_components`, including the intercept, main effects, and interactions up to a specified degree:
+Prediction components can be accessed via `extract_components`, including the intercept, main effects, and interactions up to a specified degree.
+The returned object also contains the original data as `x`, which is required for visualization.
 
 ```{r}
-m <- extract_components(rpfit, new_data = mtcars) 
+components <- extract_components(rpfit, new_data = mtcars) 
 
-str(m)
+str(components)
+```
+
+Various visualization options are available, e.g. for main and second-order interaction effects:
+
+```{r}
+p1 <- autoplot(components, "wt")
+p2 <- autoplot(components, "hp")
+p3 <- autoplot(components, "cyl")
+p4 <- autoplot(components, c("wt", "hp"))
+
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(
+    title = "Selected effects for mtcars",
+    caption = "(It's a tiny dataset but it has to fit in a README, okay?)"
+  )
 ```
 
 
+See the [Bikesharing: Decomposition Example][bikes] article for more examples.
+
 
 [arxiv1]: https://arxiv.org/abs/2012.14563
+[bikes]: http://plantedml.com/randomPlantedForest/articles/Bikesharing-Decomposition-Example.html
