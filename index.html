@@ -88,7 +88,10 @@
 <p>Model fitting uses a familiar interface:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
 <span></span>
+<span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">25</span>, max_interaction <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
 <span><span class="co">#&gt; -- Regression Random Planted Forest --</span></span>
@@ -116,26 +119,47 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>mpg <span class="op">=</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      .pred  mpg</span></span>
-<span><span class="co">#&gt; 1 20.96153 21.0</span></span>
-<span><span class="co">#&gt; 2 20.73825 21.0</span></span>
-<span><span class="co">#&gt; 3 26.43672 22.8</span></span>
-<span><span class="co">#&gt; 4 20.89290 21.4</span></span>
-<span><span class="co">#&gt; 5 18.09168 18.7</span></span>
-<span><span class="co">#&gt; 6 18.19773 18.1</span></span></code></pre></div>
-<p>Prediction components can be accessed via <code>extract_components</code>, including the intercept, main effects, and interactions up to a specified degree:</p>
+<span><span class="co">#&gt; 1 21.27391 21.0</span></span>
+<span><span class="co">#&gt; 2 21.13418 21.0</span></span>
+<span><span class="co">#&gt; 3 24.05330 22.8</span></span>
+<span><span class="co">#&gt; 4 20.59945 21.4</span></span>
+<span><span class="co">#&gt; 5 17.89879 18.7</span></span>
+<span><span class="co">#&gt; 6 18.73767 18.1</span></span></code></pre></div>
+<p>Prediction components can be accessed via <code>extract_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">m</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
+<code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Classes 'data.table' and 'data.frame':   32 obs. of  7 variables:</span></span>
-<span><span class="co">#&gt;  $ intercept: num  20.2 20.2 20.2 20.2 20.2 ...</span></span>
-<span><span class="co">#&gt;  $ cyl      : num  -0.72 -0.72 2.35 -0.72 -1.93 ...</span></span>
-<span><span class="co">#&gt;  $ wt       : num  0.16 -0.28 4.111 -0.301 -1.502 ...</span></span>
-<span><span class="co">#&gt;  $ hp       : num  0.51 0.51 0.509 0.51 0.478 ...</span></span>
-<span><span class="co">#&gt;  $ cyl:wt   : num  0.432 0.398 0.401 0.581 0.282 ...</span></span>
-<span><span class="co">#&gt;  $ cyl:hp   : num  0.417 0.417 -0.479 0.417 0.5 ...</span></span>
-<span><span class="co">#&gt;  $ hp:wt    : num  -0.0355 0.2149 -0.6549 0.2074 0.0648 ...</span></span>
-<span><span class="co">#&gt;  - attr(*, ".internal.selfref")=&lt;externalptr&gt;</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">)</span></span>
+<span><span class="co">#&gt; List of 2</span></span>
+<span><span class="co">#&gt;  $ m:Classes 'data.table' and 'data.frame':  32 obs. of  7 variables:</span></span>
+<span><span class="co">#&gt;   ..$ intercept: num [1:32] 20.2 20.2 20.2 20.2 20.2 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl      : num [1:32] 0.383 0.383 1.505 0.383 -1.245 ...</span></span>
+<span><span class="co">#&gt;   ..$ wt       : num [1:32] 0.515 0.152 1.567 -0.382 -1.137 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp       : num [1:32] 0.318 0.318 0.665 0.318 -0.122 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:wt   : num [1:32] -0.0773 -0.0123 0.2817 0.1982 -0.0894 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:hp   : num [1:32] -0.2054 -0.2054 -0.1045 -0.2054 -0.0994 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp:wt    : num [1:32] 0.0901 0.2489 -0.11 0.0375 0.3418 ...</span></span>
+<span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
+<span><span class="co">#&gt;  $ x:Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:</span></span>
+<span><span class="co">#&gt;   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...</span></span>
+<span><span class="co">#&gt;   ..$ wt : num [1:32] 2.62 2.88 2.32 3.21 3.44 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp : num [1:32] 110 110 93 110 175 105 245 62 95 123 ...</span></span>
+<span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
+<span><span class="co">#&gt;  - attr(*, "class")= chr [1:2] "rpf_components" "list"</span></span></code></pre></div>
+<p>Various visualization options are available, e.g. for main and second-order interaction effects:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">p1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"wt"</span><span class="op">)</span></span>
+<span><span class="va">p2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"hp"</span><span class="op">)</span></span>
+<span><span class="va">p3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"cyl"</span><span class="op">)</span></span>
+<span><span class="va">p4</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"wt"</span>, <span class="st">"hp"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="op">(</span><span class="va">p1</span> <span class="op">+</span> <span class="va">p2</span><span class="op">)</span> <span class="op">/</span> <span class="op">(</span><span class="va">p3</span> <span class="op">+</span> <span class="va">p4</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://patchwork.data-imaginist.com/reference/plot_annotation.html" class="external-link">plot_annotation</a></span><span class="op">(</span></span>
+<span>    title <span class="op">=</span> <span class="st">"Selected effects for mtcars"</span>,</span>
+<span>    caption <span class="op">=</span> <span class="st">"(It's a tiny dataset but it has to fit in a README, okay?)"</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-unnamed-chunk-4-1.png" width="100%"></p>
+<p>See the <a href="http://plantedml.com/randomPlantedForest/articles/Bikesharing-Decomposition-Example.html">Bikesharing: Decomposition Example</a> article for more examples.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
