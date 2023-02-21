@@ -119,12 +119,12 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>mpg <span class="op">=</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      .pred  mpg</span></span>
-<span><span class="co">#&gt; 1 21.27391 21.0</span></span>
-<span><span class="co">#&gt; 2 21.13418 21.0</span></span>
-<span><span class="co">#&gt; 3 24.05330 22.8</span></span>
-<span><span class="co">#&gt; 4 20.59945 21.4</span></span>
-<span><span class="co">#&gt; 5 17.89879 18.7</span></span>
-<span><span class="co">#&gt; 6 18.73767 18.1</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 21.08519 21.0</span></span>
+<span><span class="co">#&gt; 2 21.07633 21.0</span></span>
+<span><span class="co">#&gt; 3 25.39977 22.8</span></span>
+<span><span class="co">#&gt; 4 20.78283 21.4</span></span>
+<span><span class="co">#&gt; 5 17.56310 18.7</span></span>
+<span><span class="co">#&gt; 6 18.71368 18.1</span></span></code></pre></div>
 <p>Prediction components can be accessed via <code>extract_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
@@ -133,12 +133,12 @@
 <span><span class="co">#&gt; List of 2</span></span>
 <span><span class="co">#&gt;  $ m:Classes 'data.table' and 'data.frame':  32 obs. of  7 variables:</span></span>
 <span><span class="co">#&gt;   ..$ intercept: num [1:32] 20.2 20.2 20.2 20.2 20.2 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl      : num [1:32] 0.383 0.383 1.505 0.383 -1.245 ...</span></span>
-<span><span class="co">#&gt;   ..$ wt       : num [1:32] 0.515 0.152 1.567 -0.382 -1.137 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp       : num [1:32] 0.318 0.318 0.665 0.318 -0.122 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:wt   : num [1:32] -0.0773 -0.0123 0.2817 0.1982 -0.0894 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:hp   : num [1:32] -0.2054 -0.2054 -0.1045 -0.2054 -0.0994 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp:wt    : num [1:32] 0.0901 0.2489 -0.11 0.0375 0.3418 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl      : num [1:32] 0.477 0.477 1.343 0.477 -1.477 ...</span></span>
+<span><span class="co">#&gt;   ..$ wt       : num [1:32] 0.0623 0.0845 3.0677 -0.3823 -1.0544 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp       : num [1:32] 0.373 0.373 0.629 0.373 -0.584 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:wt   : num [1:32] -0.15403 -0.16567 -0.00392 -0.06926 0.14771 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:hp   : num [1:32] 0.0429 0.0429 0.2779 0.0429 0.4573 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp:wt    : num [1:32] 0.1049 0.0855 -0.0931 0.1623 -0.1054 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
 <span><span class="co">#&gt;  $ x:Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:</span></span>
 <span><span class="co">#&gt;   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...</span></span>
