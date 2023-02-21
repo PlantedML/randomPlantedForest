@@ -62,6 +62,11 @@ For our example here, a smaller model with merely 20 trees suffices.
 We also `purify` the forest to enable the desired decomposition.
 This step is not required for global predictions and may take some time, which is why it is implemented as a separate step.
 
+```{r, incluide=FALSE}
+t1 <- Sys.time()
+```
+
+
 ```{r model-fit}
 rp <- rpf(
   bikers ~ day + hr + temp + windspeed + workingday + hum + weathersit + season,
@@ -74,8 +79,7 @@ purify(rp)
 
 We select the predictors of interest and use `extract_components()` to retrieve all predictive components that include them,
 from main effects to 3rd degree interactions.
-We also create an auxiliary table in long format which includes the observed predictor values, which we use for the plot of the main effects.
-
+The resulting object also contains the original data as `x`, which we need for later visualization.
 
 ```{r extract-components}
 vars <- c("hr", "temp", "workingday", "hum", "weathersit", "season")
@@ -85,6 +89,15 @@ components <- extract_components(rp, bike, predictors = vars)
 # There's a lot of components...
 str(components$m)
 ```
+
+```{r, incluide=FALSE}
+t2 <- Sys.time()
+
+took <- round(as.numeric(difftime(t2, t1, units = "secs"))/10)*10
+```
+
+Please note that fitting the model, purification, and the extraction of the components may toke some time, depending on available resources and the size of the data.
+For example, the above steps took around `r took` seconds to complete on GitHub Actions.
 
 ## Main Effects
 
@@ -128,8 +141,6 @@ p_main / p_2way / p_3way & theme(
   panel.grid.minor.x = element_blank(),
   panel.grid.minor.y = element_blank()
 )
-
-# p_main + p_2way + p_3way + plot_layout(ncol = 1)
 ```
 
 ## Additional effects
@@ -154,7 +165,6 @@ plot_twoway_effects(components, c("weathersit", "temp"))
 
 ```{r}
 plot_threeway_effects(components, c("season", "hr", "weathersit"))
-plot_threeway_effects(components, c("hr", "temp", "workingday"))
 plot_threeway_effects(components, c("workingday", "temp", "season"))
 
 # Hard to interpret, likely spurious
