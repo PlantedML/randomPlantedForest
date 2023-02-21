@@ -3,6 +3,7 @@
 \name{plot_main_effect}
 \alias{plot_main_effect}
 \alias{plot_twoway_effects}
+\alias{plot_threeway_effects}
 \alias{autoplot.rpf_components}
 \title{Plot Prediction Components}
 \usage{
@@ -10,10 +11,12 @@ plot_main_effect(components, predictor, ...)
 
 plot_twoway_effects(components, predictors, ...)
 
+plot_threeway_effects(components, predictors, ...)
+
 \method{autoplot}{rpf_components}(object, predictors, ...)
 }
 \arguments{
-\item{components}{Predicted components of an \code{rpf()} including the original data the model was fit on, as
+\item{components, object}{Predicted components of an \code{rpf()} including the original data the model was fit on, as
 returned by \code{extract_components()}}
 
 \item{predictor, predictors}{\verb{[character]} vector of predictor names, e.g. \code{"x1"} to plot main effect of \code{x1}, and
@@ -55,4 +58,5 @@ plot_twoway_effects(components, c("wt", "cyl"))
 # 2d categorical, heatmap of arbitrary orientation
 plot_twoway_effects(components, c("vs", "cyl"))
 plot_twoway_effects(components, c("cyl", "vs"))
+# plot_threeway_effects(components, c("hr", "temp", "workingday"))
 }

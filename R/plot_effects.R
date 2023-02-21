@@ -1,7 +1,7 @@
 #' Plot Prediction Components
 #'
 #' @rdname plot_components
-#' @param components Predicted components of an `rpf()` including the original data the model was fit on, as
+#' @param components,object Predicted components of an `rpf()` including the original data the model was fit on, as
 #'   returned by `extract_components()`
 #' @param predictor,predictors `[character]` vector of predictor names, e.g. `"x1"` to plot main effect of `x1`, and
 #'   `c("x1", "x2")` to plot the interaction term `x1:x2`.
@@ -91,6 +91,7 @@ plot_twoway_effects <- function(components, predictors, ...) {
     cl <- class(components[["x"]][[p]])[1]
     tp[cl]
   }, "")
+  checkmate::assert_subset(x_types, c("categorical", "continuous"), empty.ok = FALSE)
 
   xdf <- data.table::data.table(
     x = components[["x"]][[predictors[[1]]]],
@@ -98,6 +99,7 @@ plot_twoway_effects <- function(components, predictors, ...) {
     m = components[["m"]][[paste0(sort(predictors), collapse = ":")]]
   )
 
+  # 2x continuous ----
   if (setequal(x_types, "continuous")) {
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
       x = .data[["x"]], y = .data[["y"]],
@@ -120,6 +122,7 @@ plot_twoway_effects <- function(components, predictors, ...) {
       )
   }
 
+  # 2x categorical ----
   if (setequal(x_types, "categorical")) {
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
       x = .data[["x"]], y = .data[["y"]],
@@ -142,6 +145,7 @@ plot_twoway_effects <- function(components, predictors, ...) {
       )
   }
 
+  # 1x categorical 1x continuous ----
   if (setequal(x_types, c("categorical", "continuous"))) {
 
     data.table::setnames(xdf, names(xdf), c(x_types, "m"))
@@ -165,8 +169,112 @@ plot_twoway_effects <- function(components, predictors, ...) {
     )
 }
 
-# # Used as bare name in after_scale, not sure if there's a non-NSE equivalent
-# globalVariables(c("colour"))
+#' @rdname plot_components
+#' @export
+#' @examples
+#' # plot_threeway_effects(components, c("hr", "temp", "workingday"))
+plot_threeway_effects <- function(components, predictors, ...) {
+  checkmate::assert_class(components, "rpf_components")
+  checkmate::assert_character(predictors, len = 3, unique = TRUE)
+  checkmate::assert_subset(predictors, names(components$x))
+
+  # Create look-up table for predictors and their types
+  tp <- c(numeric = "continuous", integer = "continuous", character = "categorical", factor = "categorical")
+  x_types <- vapply(predictors, function(p) {
+    cl <- class(components[["x"]][[p]])[1]
+    tp[cl]
+  }, "")
+  checkmate::assert_subset(x_types, c("categorical", "continuous"), empty.ok = FALSE)
+
+  xdf <- data.table::data.table(
+    x1 = components[["x"]][[predictors[[1]]]],
+    x2 = components[["x"]][[predictors[[2]]]],
+    x3 = components[["x"]][[predictors[[3]]]],
+    m = components[["m"]][[paste0(sort(predictors), collapse = ":")]]
+  )
+
+  # 3x continuous ----
+  if (all(x_types == "continuous")) {
+    stop("Can't visualize 3 continuous predictor effects (yet?), feel free to make a suggestion!")
+  }
+
+  # 1x categorical 2x continuous ----
+  if (all(sort(x_types) == c("categorical", "continuous", "continuous"))) {
+    x_cat <- names(xdf)[which(x_types == "categorical")]
+    x_cont <- names(xdf)[which(x_types == "continuous")]
+
+    p <- ggplot2::ggplot(xdf, ggplot2::aes(
+      x = .data[[x_cont[[1]]]],
+      y = .data[[x_cont[[2]]]],
+      colour = .data[["m"]],
+      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+    )) +
+      ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat]])) +
+      ggplot2::geom_point(size = 2, shape = 21, stroke = 2) +
+      ggplot2::scale_color_distiller(
+        palette = "PRGn", type = "div",
+        limits = c(-1,1) * max(abs(xdf$m)),
+        guide = ggplot2::guide_colorbar(
+          barwidth = ggplot2::unit(15, "char"),
+          title.position = "bottom", title.hjust = .5
+        )
+      ) +
+      ggplot2::labs(
+        x = predictors[[1]], y = predictors[[2]],
+        color = sprintf("m(%s)", paste0(predictors, collapse = ", "))
+      )
+  }
+
+  # 2x categorical 1x continuous ----
+  if (all(sort(x_types) == c("categorical", "categorical", "continuous"))) {
+    x_cat <- names(xdf)[which(x_types == "categorical")]
+    x_cont <- names(xdf)[which(x_types == "continuous")]
+
+    p <- ggplot2::ggplot(xdf, ggplot2::aes(
+      x = .data[[x_cont]],
+      y = .data[["m"]],
+      colour = .data[[x_cat[[1]]]],
+      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+    )) +
+      ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat[[2]]]]), scales = "free_y") +
+      ggplot2::geom_line() +
+      ggplot2::scale_color_brewer(palette = "Dark2") +
+      ggplot2::labs(
+        x = predictors[which(x_types == "continuous")],
+        y = sprintf("m(%s)", paste0(predictors, collapse = ", ")),
+        color = predictors[which(x_types == "categorical")][[2]]
+      )
+  }
+  # 3x categorical ----
+  if (all(x_types == "categorical")) {
+    p <- ggplot2::ggplot(xdf, ggplot2::aes(
+      x = .data[["x1"]],
+      y = .data[["x2"]],
+      colour = .data[["m"]],
+      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+    )) +
+      ggplot2::facet_wrap(ggplot2::vars(.data[["x3"]])) +
+      ggplot2::geom_tile() +
+      ggplot2::scale_color_distiller(
+        palette = "PRGn", type = "div",
+        limits = c(-1,1) * max(abs(xdf$m)),
+        guide = ggplot2::guide_colorbar(
+          barwidth = ggplot2::unit(15, "char"),
+          title.position = "bottom", title.hjust = .5
+        )
+      ) +
+      ggplot2::labs(
+        x = predictors[[1]], y = predictors[[2]],
+        color = sprintf("m(%s)", paste0(predictors, collapse = ", "))
+      )
+  }
+
+  p +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      legend.position = "bottom"
+    )
+}
 
 #' @rdname plot_components
 #' @export
@@ -174,6 +282,6 @@ autoplot.rpf_components <- function(object, predictors, ...) {
   np <- length(predictors)
   if (np == 1) p <- plot_main_effect(object, predictors, ...)
   if (np == 2) p <- plot_twoway_effects(object, predictors, ...)
-
+  if (np == 3) p <- plot_threeway_effects(object, predictors, ...)
   p
 }

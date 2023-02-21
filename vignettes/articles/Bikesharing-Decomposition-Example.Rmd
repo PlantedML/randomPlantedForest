@@ -44,7 +44,11 @@ We recode the `hr` column from a 24-level `factor` to a numeric column.
 data(Bikeshare)
 bike <- data.table(Bikeshare)
 bike[, hr := as.numeric(as.character(hr))]
-bike[, workingday := factor(workingday, labels = c("No Workingday", "Workingday"))]
+bike[, workingday := factor(workingday, levels = c(0, 1), labels = c("No Workingday", "Workingday"))]
+bike[, season := factor(season, levels = 1:4, labels = c("Winter", "Spring", "Summer", "Fall"))]
+
+# Only one observation with this condition, removing it to make space.
+bike <- bike[weathersit != "heavy rain/snow", ] 
 
 head(bike)
 ```
@@ -60,7 +64,7 @@ This step is not required for global predictions and may take some time, which i
 
 ```{r model-fit}
 rp <- rpf(
-  bikers ~ day + hr + temp + windspeed + workingday + hum,
+  bikers ~ day + hr + temp + windspeed + workingday + hum + weathersit + season,
   data = bike,
   max_interaction = 3, ntrees = 20
 )
@@ -74,10 +78,12 @@ We also create an auxiliary table in long format which includes the observed pre
 
 
 ```{r extract-components}
-vars <- c("hr", "temp", "workingday")
+vars <- c("hr", "temp", "workingday", "hum", "weathersit", "season")
 
 components <- extract_components(rp, bike, predictors = vars)
-components$m
+
+# There's a lot of components...
+str(components$m)
 ```
 
 ## Main Effects
@@ -85,9 +91,7 @@ components$m
 ```{r main-effects}
 p_main <- plot_main_effect(components, "temp") +
   plot_main_effect(components, "hr") +
-  plot_main_effect(components, "workingday") +
-  plot_layout(nrow = 1) +
-  plot_annotation(tag_levels = "1", tag_prefix = "m")
+  plot_main_effect(components, "workingday")
 
 p_main
 ```
@@ -109,24 +113,10 @@ p_2way <- p_2way +
 p_2way
 ```
 
-# 3-Way Interaction
+## 3-Way Interaction
 
 ```{r threeway-effects, eval = FALSE}
-int3way <- data.frame(
-  hr = bike[["hr"]], 
-  temp = bike[["temp"]],
-  workingday = bike[["workingday"]],
-  m = components[["hr:temp:workingday"]]
-)
-
-p_3way <- ggplot(int3way, aes(x = hr, y = temp, color = m)) +
-  facet_wrap(vars(workingday)) +
-  geom_point() +
-  scale_color_viridis_c() +
-  labs(
-    y = expression(atop(3 - way ~ interactions ~ italic(m[jkl]), "temp")),
-    color = expression(italic(m[jkl]))
-  )
+p_3way <- plot_threeway_effects(components, c("hr", "temp", "workingday"))
 
 p_3way
 ```
@@ -141,3 +131,36 @@ p_main / p_2way & theme(
 
 # p_main + p_2way + p_3way + plot_layout(ncol = 1)
 ```
+
+## Additional effects
+
+All main effects:
+
+```{r}
+wrap_plots(lapply(vars, plot_main_effect, components = components))
+```
+
+
+```{r}
+plot_twoway_effects(components, c("season", "workingday"))
+plot_twoway_effects(components, c("season", "temp"))
+plot_twoway_effects(components, c("season", "weathersit"))
+plot_twoway_effects(components, c("weathersit", "temp"))
+
+```
+
+
+3rd degree interactions can be tricky, if they have any effect at all.
+
+```{r}
+plot_threeway_effects(components, c("season", "hr", "weathersit"))
+plot_threeway_effects(components, c("hr", "temp", "mnth"))
+plot_threeway_effects(components, c("workingday", "temp", "season"))
+
+# Hard to interpret, likely spurious
+plot_threeway_effects(components, c("workingday", "hr", "weathersit"))
+
+# zero effect
+plot_threeway_effects(components, c("weathersit", "season", "workingday"))
+```
+
