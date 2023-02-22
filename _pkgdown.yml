@@ -2,6 +2,19 @@ url: http://plantedml.com/randomPlantedForest/
 template:
   bootstrap: 5
 
+articles:
+- title: Showcases
+  navbar: ~
+  desc: |
+    Applications of Random Planted Forest using datasets as case-studies.
+  contents:
+  - articles/Bikesharing-Decomposition-Example
+- title: Regression Tests
+  desc: |
+    Ensuring that the current implementation still produces the expected results, given some stochasticity.
+  contents:
+  - test/Regression-Test-oldrpf
+
 reference:
 - title: Model fitting and prediction
   desc: >
@@ -18,7 +31,7 @@ reference:
     - starts_with("extract_compon")
     - starts_with("plot_")
     - autoplot.rpf_components
-
+- text: -------
 - title: Utility functions
 - contents:
   - starts_with("print.")

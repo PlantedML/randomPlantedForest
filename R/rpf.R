@@ -1,12 +1,10 @@
 #' Random Planted Forest
 #'
-# FIXME: Parameters need describing
-#' @param x Feature matrix or `data.frame`.
+#' @param x,data Feature `matrix`, or `data.frame`, or [`recipe`][recipes::recipe].
 #' @param y Target vector for use with `x`.
 #'   The class of `y` (either `numeric` or [`factor`]) determines if regression
 #'   or classification will be performed.
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
-#' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction `[1]`: Maximum level of interaction determining maximum
 #'   number of split dimensions for a tree.
 #'   The default `1` corresponds to main effects only.
@@ -52,7 +50,8 @@ rpf <- function(x, ...) {
 }
 
 #' @export
-#' @rdname rpf
+#' @noRd
+# @rdname rpf
 rpf.default <- function(x, ...) {
   stop(
     "`rpf()` is not defined for a '", class(x)[1], "'.",
@@ -128,6 +127,8 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
 }
 
 # Bridge: Calls rpf_impl() with processed input
+#
+#' @param processed Output of `hardhat::mold` from respective rpf methods
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        split_try = 10, t_try = 0.4, deterministic = FALSE,

@@ -41,19 +41,19 @@
 #' plot_twoway_effects(components, c("vs", "cyl"))
 #' plot_twoway_effects(components, c("cyl", "vs"))
 plot_main_effect <- function(components, predictor, ...) {
-
   checkmate::assert_class(components, "rpf_components")
   checkmate::assert_string(predictor) # Must be a single predictor
   checkmate::assert_subset(predictor, names(components$x), empty.ok = FALSE)
 
   xdf <- assemble_components(components, predictor)
-
   x_type <- get_x_types(components, predictor)
 
   if (x_type == "continuous") {
-    p <- ggplot2::ggplot(xdf, ggplot2::aes(x = .data[[predictor]], y = .data[["m"]]))
+    p <- ggplot2::ggplot(xdf, ggplot2::aes(
+      x = .data[[predictor]], y = .data[["m"]])
+    )
     p <- p + ggplot2::geom_line()
-    #p <- p + ggplot2::geom_point()
+    # p <- p + ggplot2::geom_point()
   }
 
   if (x_type == "categorical") {
@@ -64,11 +64,8 @@ plot_main_effect <- function(components, predictor, ...) {
 
   p +
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed") +
-    ggplot2::labs(
-      y = label_m(predictor)
-    )
+    ggplot2::labs(y = label_m(predictor))
 }
-
 
 #' @rdname plot_components
 #' @export
@@ -82,28 +79,22 @@ plot_twoway_effects <- function(components, predictors, ...) {
   x_cat <- names(xdf)[which(x_types == "categorical")]
   x_cont <- names(xdf)[which(x_types == "continuous")]
 
+  fillaes <- ggplot2::aes(
+    color = .data[["m"]],
+    fill = ggplot2::after_scale(.data[["colour"]])
+  )
+
   # 2x continuous ----
   if (setequal(x_types, "continuous")) {
 
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
       x = .data[[x_cont[[1]]]],
       y = .data[[x_cont[[2]]]],
-      color = .data[["m"]],
-      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+      !!!fillaes
     ))
-    p <- p + ggplot2::geom_point(size = 2, shape = 21, stroke = 2)
-    p <- p + ggplot2::scale_color_distiller(
-      palette = "PRGn", type = "div",
-      limits = get_m_limits(xdf),
-      guide = ggplot2::guide_colorbar(
-        barwidth = ggplot2::unit(15, "char"),
-        title.position = "bottom", title.hjust = .5
-      )
-    )
-    p <- p +
-      ggplot2::labs(
-        color = label_m(predictors)
-      )
+    p <- p + ggplot2::geom_point(size = 2.5, shape = 21, stroke = 1)
+    p <- p + diverging_palette(limits = get_m_limits(xdf))
+    p <- p + ggplot2::labs(color = label_m(predictors))
   }
 
   # 2x categorical ----
@@ -111,34 +102,23 @@ plot_twoway_effects <- function(components, predictors, ...) {
 
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
       x = .data[[x_cat[[1]]]], y = .data[[x_cat[[2]]]],
-      color = .data[["m"]],
-      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+      !!!fillaes
       ))
     p <- p + ggplot2::geom_tile()
-    p <- p + ggplot2::scale_color_distiller(
-      palette = "PRGn",
-      limits = get_m_limits(xdf),
-      guide = ggplot2::guide_colorbar(
-        barwidth = ggplot2::unit(15, "char"),
-        title.position = "bottom", title.hjust = .5
-      )
-    )
-    p <- p +
-      ggplot2::labs(
-        color = label_m(predictors)
-      )
+    p <- p + diverging_palette(limits = get_m_limits(xdf))
+    p <- p + ggplot2::labs(color = label_m(predictors))
   }
 
   # 1x categorical 1x continuous ----
   if (setequal(x_types, c("categorical", "continuous"))) {
 
-    p <- ggplot2::ggplot(xdf, aes(x = .data[[x_cont]], y = .data[["m"]], color = .data[[x_cat]])) +
+    p <- ggplot2::ggplot(xdf, ggplot2::aes(
+        x = .data[[x_cont]], y = .data[["m"]], color = .data[[x_cat]]
+      )) +
       ggplot2::geom_line() +
       ggplot2::geom_hline(yintercept = 0, linetype = "dashed") +
       ggplot2::scale_color_brewer(palette = "Dark2") +
-      ggplot2::labs(
-        y = label_m(predictors)
-      )
+      ggplot2::labs(y = label_m(predictors))
   }
 
   # Final cleanup ----
@@ -172,22 +152,12 @@ plot_threeway_effects <- function(components, predictors, ...) {
       x = .data[[x_cont[[1]]]],
       y = .data[[x_cont[[2]]]],
       colour = .data[["m"]],
-      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+      fill = ggplot2::after_scale(.data[["colour"]])
     )) +
       ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat]])) +
-      ggplot2::geom_point(size = 2, shape = 21, stroke = 2) +
-      ggplot2::scale_color_distiller(
-        palette = "PRGn", type = "div",
-        limits = get_m_limits(xdf),
-        guide = ggplot2::guide_colorbar(
-          barwidth = ggplot2::unit(15, "char"),
-          title.position = "bottom", title.hjust = .5
-        )
-      ) +
-      ggplot2::labs(
-        #x = x_cont[[1]], y = x_cont[[2]]
-        color = label_m(predictors)
-      )
+      ggplot2::geom_point(size = 2.5, shape = 21, stroke = 1) +
+      diverging_palette(limits = get_m_limits(xdf)) +
+      ggplot2::labs(color = label_m(predictors))
   }
 
   # 2x categorical 1x continuous ----
@@ -197,16 +167,12 @@ plot_threeway_effects <- function(components, predictors, ...) {
       x = .data[[x_cont]],
       y = .data[["m"]],
       colour = .data[[x_cat[[1]]]],
-      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+      fill = ggplot2::after_scale(.data[["colour"]])
     )) +
       ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat[[2]]]]), scales = "free_y") +
       ggplot2::geom_line() +
       ggplot2::scale_color_brewer(palette = "Dark2") +
-      ggplot2::labs(
-        #x = x_cont,
-        y = label_m(predictors)
-        #color = x_cat[[1]]
-      )
+      ggplot2::labs(y = label_m(predictors))
   }
 
   # 3x categorical ----
@@ -216,20 +182,12 @@ plot_threeway_effects <- function(components, predictors, ...) {
       x = .data[[x_cat[[1]]]],
       y = .data[[x_cat[[2]]]],
       colour = .data[["m"]],
-      fill = ggplot2::after_scale(scales::alpha(.data[["colour"]], 0.9))
+      fill = ggplot2::after_scale(.data[["colour"]])
     )) +
       ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat[[3]]]])) +
       ggplot2::geom_tile() +
-      ggplot2::scale_color_distiller(
-        palette = "PRGn", type = "div",
-        limits = get_m_limits(xdf),
-        guide = ggplot2::guide_colorbar(
-          barwidth = ggplot2::unit(15, "char"),
-          title.position = "bottom", title.hjust = .5
-        )
-      ) +
+      diverging_palette(limits = get_m_limits(xdf)) +
       ggplot2::labs(
-        #x = x_cat[[1]], y = x_cat[[2]],
         color = label_m(predictors)
       )
   }
@@ -295,4 +253,36 @@ get_x_types <- function(components, predictors) {
   }, "")
   checkmate::assert_subset(x_types, c("categorical", "continuous"), empty.ok = FALSE)
   x_types
+}
+
+diverging_palette <- function(...) {
+
+  # guide_colorbar <- ggplot2::guide_colorbar(
+  #   barwidth = ggplot2::unit(15, "char"),
+  #   barheight = ggplot2::unit(1, "char"),
+  #   title.position = "right",
+  #   title.hjust = .5
+  # )
+  #
+  guide_colorbar <- ggplot2::guide_colorbar(
+    barwidth = ggplot2::unit(.5, "npc"),
+    barheight = ggplot2::unit(1, "char"),
+    title.position = "left",
+    title.hjust = .5, title.vjust = 1
+  )
+
+  if (!requireNamespace("scico")) {
+    ggplot2::scale_color_distiller(
+      palette = "PRGn", type = "div",
+      guide = guide_colorbar,
+      ...
+    )
+  } else {
+    scico::scale_color_scico(
+      palette = "vikO",
+      guide = guide_colorbar,
+      ...
+    )
+  }
+
 }

@@ -2,7 +2,6 @@
 % Please edit documentation in R/rpf.R
 \name{rpf}
 \alias{rpf}
-\alias{rpf.default}
 \alias{rpf.data.frame}
 \alias{rpf.matrix}
 \alias{rpf.formula}
@@ -10,8 +9,6 @@
 \title{Random Planted Forest}
 \usage{
 rpf(x, ...)
-
-\method{rpf}{default}(x, ...)
 
 \method{rpf}{data.frame}(
   x,
@@ -86,7 +83,7 @@ rpf(x, ...)
 )
 }
 \arguments{
-\item{x}{Feature matrix or \code{data.frame}.}
+\item{x, data}{Feature \code{matrix}, or \code{data.frame}, or \code{\link[recipes:recipe]{recipe}}.}
 
 \item{...}{(Unused).}
 
@@ -131,8 +128,6 @@ Proportion of class membership is truncated to be smaller 1-epsilon when calcula
 the fit in a leaf.}
 
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
-
-\item{data}{A \code{data.frame} for use with \code{formula}.}
 }
 \value{
 Object of class \code{"rpf"} with model object contained in \verb{$fit}.
