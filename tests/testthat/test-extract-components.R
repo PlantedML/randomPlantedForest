@@ -3,7 +3,7 @@ test_that("extract_components returns correct structure", {
 
   m <- extract_components(rp, mtcars)
 
-  expect_named(m$m, c("intercept", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs",
+  expect_named(m$m, c("cyl", "disp", "hp", "drat", "wt", "qsec", "vs",
                     "am", "gear", "carb", "cyl:disp", "cyl:hp", "cyl:drat", "cyl:wt",
                     "cyl:qsec", "cyl:vs", "am:cyl", "cyl:gear", "carb:cyl", "disp:hp",
                     "disp:drat", "disp:wt", "disp:qsec", "disp:vs", "am:disp", "disp:gear",
@@ -23,10 +23,10 @@ test_that("extract_components returns requested predictors, in order", {
 
   m <- extract_components(rp, mtcars, predictors = c("cyl", "am", "vs"))
 
-  expect_named(m$m, c("intercept", "cyl", "am", "vs", "am:cyl", "cyl:vs", "am:vs"))
+  expect_named(m$m, c("cyl", "am", "vs", "am:cyl", "cyl:vs", "am:vs"))
 
   expect_s3_class(m$m, "data.frame")
-  expect_length(m$m, 7)
+  expect_length(m$m, 6)
   expect_equal(nrow(mtcars), nrow(m$m))
 
 })
@@ -49,7 +49,7 @@ test_that("extract_components sums to prediction", {
 
   expect_equal(
     predict(rp, mtcars)[[1]],
-    rowSums(m$m)
+    rowSums(m$m) + m$intercept
   )
 
 })

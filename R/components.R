@@ -87,11 +87,11 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
   })
 
   all_components <- do.call(cbind, args = all_components)
-  intercept <- extract_component(object, new_data_matrix, predictors = NULL)
-  all_components <- cbind(intercept, all_components)
+  intercept <- extract_component(object, new_data_matrix[, 1, drop = FALSE], predictors = NULL)
 
   ret <- list(
     m = data.table::as.data.table(all_components),
+    intercept = intercept[[1]],
     x = new_data[, predictors, with = FALSE]
   )
   class(ret) <- c("rpf_components", class(ret))

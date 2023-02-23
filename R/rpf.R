@@ -127,7 +127,7 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
 }
 
 # Bridge: Calls rpf_impl() with processed input
-#
+#' @noRd
 #' @param processed Output of `hardhat::mold` from respective rpf methods
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
