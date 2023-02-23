@@ -73,7 +73,7 @@ t1 <- Sys.time()
 ```
 
 
-```{r model-fit}
+```{r model-fit, cache = TRUE}
 rp <- rpf(
   bikers ~ day + hr + temp + windspeed + workingday + hum + weathersit + season,
   data = bike,
@@ -87,7 +87,7 @@ We select the predictors of interest and use `extract_components()` to retrieve 
 from main effects to 3rd degree interactions.
 The resulting object also contains the original data as `x`, which we need for later visualization.
 
-```{r extract-components}
+```{r extract-components, cache=TRUE, dependson="model-fit"}
 vars <- c("hr", "temp", "workingday", "hum", "weathersit", "season")
 
 components <- extract_components(rp, bike, predictors = vars)
@@ -142,7 +142,7 @@ p_3way
 
 ## Everything Together
 
-```{r all-effects, fig.width=8, fig.height=10}
+```{r all-effects, fig.width=9, fig.height=10}
 p_main / p_2way / p_3way + 
   plot_layout(heights = c(.2, .5, .3))
 ```
@@ -154,7 +154,7 @@ All main effects:
 
 Iterating over `vars` (`r paste0(vars, collapse = ", ")`), and passing each to `plot_main_effect`, then collecting the plots with `patchwork::wrap_plots()`:
 
-```{r}
+```{r all-main-effects, fig.width=10}
 wrap_plots(lapply(vars, plot_main_effect, components = components))
 ```
 
@@ -174,10 +174,8 @@ autoplot(components, c("hum", "temp"))
 ```{r}
 autoplot(components, c("season", "hr", "weathersit"))
 autoplot(components, c("workingday", "hr", "season"))
-
 # Hard to interpret, likely spurious
 autoplot(components, c("workingday", "hr", "weathersit"))
-
 # zero effect
 autoplot(components, c("weathersit", "season", "workingday"))
 ```

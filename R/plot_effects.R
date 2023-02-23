@@ -52,7 +52,8 @@ plot_main_effect <- function(components, predictor, ...) {
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
       x = .data[[predictor]], y = .data[["m"]])
     )
-    p <- p + ggplot2::geom_line()
+    p <- p + ggplot2::geom_line(size = 1.2, key_glyph = "rect")
+
     # p <- p + ggplot2::geom_point()
   }
 
@@ -115,7 +116,7 @@ plot_twoway_effects <- function(components, predictors, ...) {
     p <- ggplot2::ggplot(xdf, ggplot2::aes(
         x = .data[[x_cont]], y = .data[["m"]], color = .data[[x_cat]]
       )) +
-      ggplot2::geom_line() +
+      ggplot2::geom_line(size = 1.2, key_glyph = "rect") +
       ggplot2::geom_hline(yintercept = 0, linetype = "dashed") +
       ggplot2::scale_color_brewer(palette = "Dark2") +
       ggplot2::labs(y = label_m(predictors))
@@ -170,7 +171,7 @@ plot_threeway_effects <- function(components, predictors, ...) {
       fill = ggplot2::after_scale(.data[["colour"]])
     )) +
       ggplot2::facet_wrap(ggplot2::vars(.data[[x_cat[[2]]]]), scales = "free_y") +
-      ggplot2::geom_line() +
+      ggplot2::geom_line(size = 1.2, key_glyph = "rect") +
       ggplot2::scale_color_brewer(palette = "Dark2") +
       ggplot2::labs(y = label_m(predictors))
   }
@@ -265,9 +266,9 @@ diverging_palette <- function(...) {
   # )
   #
   guide_colorbar <- ggplot2::guide_colorbar(
-    barwidth = ggplot2::unit(.5, "npc"),
+    barwidth = ggplot2::unit(10.2, "lines"),
     barheight = ggplot2::unit(1, "char"),
-    title.position = "left",
+    title.position = "bottom",
     title.hjust = .5, title.vjust = 1
   )
 
