@@ -28,7 +28,7 @@ reference:
   desc: Enabling and utilizing functional decomposition
 - contents:
     - purify
-    - starts_with("extract_compon")
+    - predict_components
     - starts_with("plot_")
     - autoplot.rpf_components
 - text: -------

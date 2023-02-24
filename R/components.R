@@ -20,9 +20,17 @@
 #'   Default will use the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
-#' @return A [`data.table`][data.table::data.table] with the same number of rows as `new_data` and one
-#' column for each main and interaction term requested, including the intercept.
-#' For multiclass classification, the number of output columns is multiplied by the number of levels in the outcome.
+#' @return A `list` with elements:
+#' - `m` ([`data.table`][data.table::data.table]): Components for each main effect and
+#' interaction term, representing the functional decomposition of the prediction.
+#' All components together with the intercept sum up
+#' to the prediction.
+#' For multiclass classification, the number of output columns is multiplied by
+#' the number of levels in the outcome.
+#' - `intercept` (`numeric(1)`): Expected value of the prediction.
+#' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
+#' by `predictors`.
+#'
 #' @export
 #' @importFrom hardhat forge
 #' @importFrom data.table as.data.table
@@ -38,21 +46,27 @@
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
-#' (components <- extract_components(rpfit, test))
+#' (components <- predict_components(rpfit, test))
 #'
 #' # sums to prediction
-#' cbind(rowSums(components$m), predict(rpfit, test))
+#' cbind(
+#'   m_sum = rowSums(components$m) + components$intercept,
+#'   prediction = predict(rpfit, test)
+#' )
 #'
 #' # Only get components with interactions of a lower degree, ignoring 3-way interactions
-#' extract_components(rpfit, test, max_interaction = 2)
+#' predict_components(rpfit, test, max_interaction = 2)
 #'
 #' # Only retrieve main effects
-#' (main_effects <- extract_components(rpfit, test, max_interaction = 1))
+#' (main_effects <- predict_components(rpfit, test, max_interaction = 1))
 #'
 #' # The difference is the combined contribution of interaction effects
-#' cbind(rowSums(main_effects$m), predict(rpfit, test))
+#' cbind(
+#'   m_sum = rowSums(main_effects$m) + main_effects$intercept,
+#'   prediction = predict(rpfit, test)
+#' )
 #'
-extract_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
+predict_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
 
   if (is.null(max_interaction)) {
     max_interaction <- object$params$max_interaction
@@ -87,11 +101,11 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
   })
 
   all_components <- do.call(cbind, args = all_components)
-  intercept <- extract_component(object, new_data_matrix, predictors = NULL)
-  all_components <- cbind(intercept, all_components)
+  intercept <- extract_component(object, new_data_matrix[, 1, drop = FALSE], predictors = NULL)
 
   ret <- list(
     m = data.table::as.data.table(all_components),
+    intercept = intercept[[1]],
     x = new_data[, predictors, with = FALSE]
   )
   class(ret) <- c("rpf_components", class(ret))
@@ -102,10 +116,10 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
 #' Internal function to extract a single component
 #'
 #' Extracts one component at a time, consisting of supplied `predictors`.
-#' Not fit for general use since the preprocessing of `new_data` is only done in `extract_components`
+#' Not fit for general use since the preprocessing of `new_data` is only done in `predict_components`
 #' to save on computing time for cases where many interactions/components are extracted.
 #'
-# @rdname extract_components
+# @rdname predict_components
 #' @noRd
 #' @keywords internal
 #' @return A n x 1 `matrix()`
@@ -117,7 +131,7 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
 #' set.seed(23)
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
-#' # Internal data preprocessing only done in extract_components to save time
+#' # Internal data preprocessing only done in predict_components to save time
 #' processed <- hardhat::forge(test, rpfit$blueprint)
 #' test <- randomPlantedForest:::preprocess_predictors_predict(rpfit, processed$predictors)
 #'

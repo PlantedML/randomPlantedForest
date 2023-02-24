@@ -17,7 +17,7 @@
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
 #' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
-#'   Set to `TRUE` to enable components extract with [`extract_components()`] are valid.
+#'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.
 #'   Can be achieved after fitting with [`purify()`].
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
@@ -127,7 +127,7 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
 }
 
 # Bridge: Calls rpf_impl() with processed input
-#
+#' @noRd
 #' @param processed Output of `hardhat::mold` from respective rpf methods
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,

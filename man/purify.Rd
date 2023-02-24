@@ -28,8 +28,8 @@ TODO: Explain what this does
 }
 \details{
 Unless \code{\link[=rpf]{rpf()}} is called with \code{purify = TRUE}, the forest has to be purified after fit
-to ensure the components extracted by \code{\link[=extract_components]{extract_components()}} are valid.
-\code{\link[=extract_components]{extract_components()}} will automatically purify a forest if \code{\link[=is_purified]{is_purified()}} reports \code{FALSE}.
+to ensure the components extracted by \code{\link[=predict_components]{predict_components()}} are valid.
+\code{\link[=predict_components]{predict_components()}} will automatically purify a forest if \code{\link[=is_purified]{is_purified()}} reports \code{FALSE}.
 }
 \examples{
 rpfit <- rpf(mpg ~., data = mtcars, max_interaction = 2, ntrees = 10)

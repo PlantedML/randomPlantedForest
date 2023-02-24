@@ -1,9 +1,9 @@
-test_that("extract_components returns correct structure", {
+test_that("predict_components returns correct structure", {
   rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2)
 
-  m <- extract_components(rp, mtcars)
+  m <- predict_components(rp, mtcars)
 
-  expect_named(m$m, c("intercept", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs",
+  expect_named(m$m, c("cyl", "disp", "hp", "drat", "wt", "qsec", "vs",
                     "am", "gear", "carb", "cyl:disp", "cyl:hp", "cyl:drat", "cyl:wt",
                     "cyl:qsec", "cyl:vs", "am:cyl", "cyl:gear", "carb:cyl", "disp:hp",
                     "disp:drat", "disp:wt", "disp:qsec", "disp:vs", "am:disp", "disp:gear",
@@ -18,68 +18,68 @@ test_that("extract_components returns correct structure", {
 
 })
 
-test_that("extract_components returns requested predictors, in order", {
+test_that("predict_components returns requested predictors, in order", {
   rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2)
 
-  m <- extract_components(rp, mtcars, predictors = c("cyl", "am", "vs"))
+  m <- predict_components(rp, mtcars, predictors = c("cyl", "am", "vs"))
 
-  expect_named(m$m, c("intercept", "cyl", "am", "vs", "am:cyl", "cyl:vs", "am:vs"))
+  expect_named(m$m, c("cyl", "am", "vs", "am:cyl", "cyl:vs", "am:vs"))
 
   expect_s3_class(m$m, "data.frame")
-  expect_length(m$m, 7)
+  expect_length(m$m, 6)
   expect_equal(nrow(mtcars), nrow(m$m))
 
 })
 
-test_that("extract_components purifies if needed", {
+test_that("predict_components purifies if needed", {
   rp <- rpf(mpg ~ ., data = mtcars[, c(1:4)], max_interaction = 2)
 
   expect_false(is_purified(rp))
 
-  extract_components(rp, mtcars)
+  predict_components(rp, mtcars)
 
   expect_true(is_purified(rp))
 })
 
 
-test_that("extract_components sums to prediction", {
+test_that("predict_components sums to prediction", {
   rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
-  m <- extract_components(rp, mtcars)
+  m <- predict_components(rp, mtcars)
 
   expect_equal(
     predict(rp, mtcars)[[1]],
-    rowSums(m$m)
+    rowSums(m$m) + m$intercept
   )
 
 })
 
-test_that("extract_components errors appropriately", {
+test_that("predict_components errors appropriately", {
   rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3)
 
   # Unknown predictors requested
-  expect_error(extract_components(rp, mtcars, predictors = c("x1", "x2")))
+  expect_error(predict_components(rp, mtcars, predictors = c("x1", "x2")))
 
   # Predictors not in fit on
-  expect_error(extract_components(rp, mtcars, predictors = c("cyl", "disp")))
+  expect_error(predict_components(rp, mtcars, predictors = c("cyl", "disp")))
 
   # new_data does not contain all original predictors
-  expect_error(extract_components(rp, mtcars[, c("cyl", "am")]))
+  expect_error(predict_components(rp, mtcars[, c("cyl", "am")]))
 
   # max_interaction higher than original fit
-  expect_error(extract_components(rp, mtcars, max_interaction = 30))
+  expect_error(predict_components(rp, mtcars, max_interaction = 30))
 
   # max_interaction implausible
-  expect_error(extract_components(rp, mtcars, max_interaction = -1))
+  expect_error(predict_components(rp, mtcars, max_interaction = -1))
 
   # predictors is wrong type
-  expect_error(extract_components(rp, mtcars, predictors = list("cyl")))
+  expect_error(predict_components(rp, mtcars, predictors = list("cyl")))
 })
 
 test_that("extract_component is consistent with predictor order", {
   rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
-  # Internal data preprocessing only done in extract_components to save time
+  # Internal data preprocessing only done in predict_components to save time
   processed <- hardhat::forge(mtcars, rp$blueprint)
   new_data <- preprocess_predictors_predict(rp, processed$predictors)
 
