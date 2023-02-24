@@ -76,7 +76,7 @@ test_that("predict_components errors appropriately", {
   expect_error(predict_components(rp, mtcars, predictors = list("cyl")))
 })
 
-test_that("extract_component is consistent with predictor order", {
+test_that(".predict_single_component is consistent with predictor order", {
   rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
   # Internal data preprocessing only done in predict_components to save time
@@ -84,20 +84,20 @@ test_that("extract_component is consistent with predictor order", {
   new_data <- preprocess_predictors_predict(rp, processed$predictors)
 
   expect_equal(
-    extract_component(rp, new_data, c("cyl", "am")),
-    extract_component(rp, new_data, c("am", "cyl"))
+    .predict_single_component(rp, new_data, c("cyl", "am")),
+    .predict_single_component(rp, new_data, c("am", "cyl"))
   )
 
   expect_equal(
     Reduce(expect_equal, list(
-      extract_component(rp, new_data, c("cyl", "am", "gear")),
-      extract_component(rp, new_data, c("gear", "am", "cyl")),
-      extract_component(rp, new_data, c("am", "cyl", "gear")),
-      extract_component(rp, new_data, c("gear", "cyl", "am")),
-      extract_component(rp, new_data, c("am", "gear", "cyl")),
-      extract_component(rp, new_data, c("cyl", "gear", "am"))
+      .predict_single_component(rp, new_data, c("cyl", "am", "gear")),
+      .predict_single_component(rp, new_data, c("gear", "am", "cyl")),
+      .predict_single_component(rp, new_data, c("am", "cyl", "gear")),
+      .predict_single_component(rp, new_data, c("gear", "cyl", "am")),
+      .predict_single_component(rp, new_data, c("am", "gear", "cyl")),
+      .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
     )),
-    extract_component(rp, new_data, c("cyl", "gear", "am"))
+    .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
   )
 
 })

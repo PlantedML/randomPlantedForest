@@ -1,6 +1,6 @@
 Package: randomPlantedForest
 Title: Random Planted Forest: A Directly Interpretable Tree Ensemble
-Version: 0.1.1
+Version: 0.2.0
 Authors@R: c(
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
     person("Munir", "Hiabu", role = "aut"),
@@ -26,13 +26,10 @@ Imports:
     utils
 Suggests: 
     covr,
-    ISLR2,
     knitr,
     mvtnorm,
-    patchwork,
     recipes,
     rmarkdown,
-    scico,
     testthat (>= 3.0.0)
 LinkingTo: 
     Rcpp

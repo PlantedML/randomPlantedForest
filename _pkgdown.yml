@@ -3,12 +3,12 @@ template:
   bootstrap: 5
 
 articles:
-- title: Showcases
-  navbar: ~
-  desc: |
-    Applications of Random Planted Forest using datasets as case-studies.
-  contents:
-  - articles/Bikesharing-Decomposition-Example
+# - title: Showcases
+#   navbar: ~
+#   desc: |
+#     Applications of Random Planted Forest using datasets as case-studies.
+#   contents:
+#   - articles/Bikesharing-Decomposition-Example
 - title: Regression Tests
   desc: |
     Ensuring that the current implementation still produces the expected results, given some stochasticity.
@@ -29,8 +29,6 @@ reference:
 - contents:
     - purify
     - predict_components
-    - starts_with("plot_")
-    - autoplot.rpf_components
 - text: -------
 - title: Utility functions
 - contents:

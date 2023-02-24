@@ -67,13 +67,17 @@
 #' )
 #'
 predict_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
+  checkmate::assert_class(object, classes = "rpf")
 
+  # if max_interaction is not provided, we use the max from the rpf model fit
   if (is.null(max_interaction)) {
     max_interaction <- object$params$max_interaction
   } else {
+    # Otherwise it has to be between 1 and the max from the model fit
     checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
   }
 
+  # Either use all predictors in the model or a subset of interest (for speed / compactness)
   if (is.null(predictors)) {
     predictors <- names(object$blueprint$ptypes$predictors)
   } else {
@@ -89,6 +93,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
   # Encode factors to (re-)ordered integers according to information saved during model fit
+  # Need matrix version for model predictions, and keep data.table version for return (for plotting)
   new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)
   data.table::setDT(new_data)
 
@@ -96,12 +101,17 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(max_interaction), function(i) {
     combinations <- utils::combn(predictors, i, simplify = FALSE)
-    components <- lapply(combinations, function(x) extract_component(object, new_data_matrix, x))
+    components <- lapply(combinations, function(x) {
+      .predict_single_component(object, new_data_matrix, x)
+      })
     do.call(cbind, args = components)
   })
 
   all_components <- do.call(cbind, args = all_components)
-  intercept <- extract_component(object, new_data_matrix[, 1, drop = FALSE], predictors = NULL)
+  # Get intercept (scalar), using only one row of x as input as we don't need it repeated
+  intercept <- .predict_single_component(
+    object, new_data_matrix[, 1, drop = FALSE], predictors = NULL
+  )
 
   ret <- list(
     m = data.table::as.data.table(all_components),
@@ -119,7 +129,6 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 #' Not fit for general use since the preprocessing of `new_data` is only done in `predict_components`
 #' to save on computing time for cases where many interactions/components are extracted.
 #'
-# @rdname predict_components
 #' @noRd
 #' @keywords internal
 #' @return A n x 1 `matrix()`
@@ -136,11 +145,11 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 #' test <- randomPlantedForest:::preprocess_predictors_predict(rpfit, processed$predictors)
 #'
 #' # Component for interaction term of two predictors
-#' randomPlantedForest:::extract_component(rpfit, test, predictors = c("cyl", "hp"))
+#' randomPlantedForest:::.predict_single_component(rpfit, test, predictors = c("cyl", "hp"))
 #'
 #' # Retrieving the intercept
-#' randomPlantedForest:::extract_component(rpfit, test, predictors = NULL)
-extract_component <- function(object, new_data, predictors = NULL) {
+#' randomPlantedForest:::.predict_single_component(rpfit, test, predictors = NULL)
+.predict_single_component <- function(object, new_data, predictors = NULL) {
 
   # Indices of selected predictors
   if (is.null(predictors)) {
@@ -148,7 +157,8 @@ extract_component <- function(object, new_data, predictors = NULL) {
     components <- -1
     out_names <- "intercept"
   } else {
-    # Indices of predictors need to be in ascending order such that new_data has columns in the correct order
+    # Indices of predictors need to be in ascending order,
+    # such that new_data has columns in the correct order.
     # Otherwise, predict_matrix will return wrong results
     components <- sort.int(match(predictors, colnames(new_data)))
     # subset new_data to contain only selected components
