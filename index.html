@@ -126,9 +126,9 @@
 <span><span class="co">#&gt; 4 20.78283 21.4</span></span>
 <span><span class="co">#&gt; 5 17.56310 18.7</span></span>
 <span><span class="co">#&gt; 6 18.71368 18.1</span></span></code></pre></div>
-<p>Prediction components can be accessed via <code>extract_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization.</p>
+<p>Prediction components can be accessed via <code>predict_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
+<code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">)</span></span>
 <span><span class="co">#&gt; List of 2</span></span>

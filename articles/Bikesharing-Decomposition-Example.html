@@ -189,19 +189,18 @@ is implemented as a separate step.</p>
 <span><span class="co">#&gt;           purify: FALSE</span></span>
 <span><span class="co">#&gt;               cv: FALSE</span></span></code></pre></div>
 <p>We select the predictors of interest and use
-<code><a href="../reference/extract_components.html">extract_components()</a></code> to retrieve all predictive components
+<code><a href="../reference/predict_components.html">predict_components()</a></code> to retrieve all predictive components
 that include them, from main effects to 3rd degree interactions. The
 resulting object also contains the original data as <code>x</code>,
 which we need for later visualization.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hr"</span>, <span class="st">"temp"</span>, <span class="st">"workingday"</span>, <span class="st">"hum"</span>, <span class="st">"weathersit"</span>, <span class="st">"season"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rp</span>, <span class="va">bike</span>, predictors <span class="op">=</span> <span class="va">vars</span><span class="op">)</span></span>
+<span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rp</span>, <span class="va">bike</span>, predictors <span class="op">=</span> <span class="va">vars</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># There's a lot of components...</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Classes 'data.table' and 'data.frame':   8644 obs. of  42 variables:</span></span>
-<span><span class="co">#&gt;  $ intercept                   : num  144 144 144 144 144 ...</span></span>
+<span><span class="co">#&gt; Classes 'data.table' and 'data.frame':   8644 obs. of  41 variables:</span></span>
 <span><span class="co">#&gt;  $ hr                          : num  -121 -121 -122 -123 -122 ...</span></span>
 <span><span class="co">#&gt;  $ temp                        : num  -34.9 -34.9 -34.9 -34.9 -34.9 ...</span></span>
 <span><span class="co">#&gt;  $ workingday                  : num  -1.06 -1.06 -1.06 -1.06 -1.06 ...</span></span>

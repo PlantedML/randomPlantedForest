@@ -70,7 +70,7 @@
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>components, object</dt>
 <dd><p>Predicted components of an <code><a href="rpf.html">rpf()</a></code> including the original data the model was fit on, as
-returned by <code><a href="extract_components.html">extract_components()</a></code></p></dd>
+returned by <code><a href="predict_components.html">predict_components()</a></code></p></dd>
 
 
 <dt>predictor, predictors</dt>
@@ -99,7 +99,7 @@ returned by <code><a href="extract_components.html">extract_components()</a></co
 <span class="r-in"><span><span class="co"># Fit forest, extract components</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">12</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span> <span class="op">+</span> <span class="va">drat</span> <span class="op">+</span> <span class="va">vs</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">25</span>, max_interaction <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="extract_components.html">extract_components</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">mtcars</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">mtcars</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Main effects ----</span></span></span>
 <span class="r-in"><span><span class="fu">plot_main_effect</span><span class="op">(</span><span class="va">components</span>, <span class="st">"wt"</span><span class="op">)</span></span></span>
