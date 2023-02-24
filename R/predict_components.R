@@ -118,7 +118,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     intercept = intercept[[1]],
     x = new_data[, predictors, with = FALSE]
   )
-  class(ret) <- c("rpf_components", class(ret))
+  class(ret) <- c("glex", "rpf_components", class(ret))
   ret
 
 }
