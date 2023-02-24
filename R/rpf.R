@@ -17,7 +17,7 @@
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
 #' @param parallel `[FALSE]`: Perform algorithm in parallel or serialized.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
-#'   Set to `TRUE` to enable components extract with [`extract_components()`] are valid.
+#'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.
 #'   Can be achieved after fitting with [`purify()`].
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For

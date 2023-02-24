@@ -68,13 +68,13 @@ predict(rpfit, new_data = mtcars) |>
 #> 6 18.71368 18.1
 ```
 
-Prediction components can be accessed via `extract_components`,
+Prediction components can be accessed via `predict_components`,
 including the intercept, main effects, and interactions up to a
 specified degree. The returned object also contains the original data as
 `x`, which is required for visualization.
 
 ``` r
-components <- extract_components(rpfit, new_data = mtcars) 
+components <- predict_components(rpfit, new_data = mtcars) 
 
 str(components)
 #> List of 2

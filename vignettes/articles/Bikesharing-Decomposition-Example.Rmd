@@ -83,14 +83,14 @@ rp <- rpf(
 purify(rp)
 ```
 
-We select the predictors of interest and use `extract_components()` to retrieve all predictive components that include them,
+We select the predictors of interest and use `predict_components()` to retrieve all predictive components that include them,
 from main effects to 3rd degree interactions.
 The resulting object also contains the original data as `x`, which we need for later visualization.
 
 ```{r extract-components, cache=TRUE, dependson="model-fit"}
 vars <- c("hr", "temp", "workingday", "hum", "weathersit", "season")
 
-components <- extract_components(rp, bike, predictors = vars)
+components <- predict_components(rp, bike, predictors = vars)
 
 # There's a lot of components...
 str(components$m)

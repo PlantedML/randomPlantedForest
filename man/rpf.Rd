@@ -110,7 +110,7 @@ this is equivalent to setting \code{max_interaction = 10}.}
 \item{parallel}{\verb{[FALSE]}: Perform algorithm in parallel or serialized.}
 
 \item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
-Set to \code{TRUE} to enable components extract with \code{\link[=extract_components]{extract_components()}} are valid.
+Set to \code{TRUE} to enable components extract with \code{\link[=predict_components]{predict_components()}} are valid.
 Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
 
 \item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}

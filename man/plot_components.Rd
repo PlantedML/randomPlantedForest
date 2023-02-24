@@ -17,7 +17,7 @@ plot_threeway_effects(components, predictors, ...)
 }
 \arguments{
 \item{components, object}{Predicted components of an \code{rpf()} including the original data the model was fit on, as
-returned by \code{extract_components()}}
+returned by \code{predict_components()}}
 
 \item{predictor, predictors}{\verb{[character]} vector of predictor names, e.g. \code{"x1"} to plot main effect of \code{x1}, and
 \code{c("x1", "x2")} to plot the interaction term \code{x1:x2}.}
@@ -39,7 +39,7 @@ mtcars$vs <- factor(mtcars$vs)
 # Fit forest, extract components
 set.seed(12)
 rpfit <- rpf(mpg ~ cyl + wt + hp + drat + vs, data = mtcars, ntrees = 25, max_interaction = 3)
-components <- extract_components(rpfit, mtcars)
+components <- predict_components(rpfit, mtcars)
 
 # Main effects ----
 plot_main_effect(components, "wt")
