@@ -1,5 +1,7 @@
 ---
 output: github_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -39,8 +41,6 @@ Model fitting uses a familiar interface:
 
 ```{r}
 library(randomPlantedForest)
-library(ggplot2)
-library(patchwork)
 
 mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
@@ -53,6 +53,7 @@ predict(rpfit, new_data = mtcars) |>
 
 Prediction components can be accessed via `predict_components`, including the intercept, main effects, and interactions up to a specified degree.
 The returned object also contains the original data as `x`, which is required for visualization.
+Alternative, the `glex` package can be used, but `glex(rpfit)` would yield the same result.
 
 ```{r}
 components <- predict_components(rpfit, new_data = mtcars) 
@@ -60,9 +61,15 @@ components <- predict_components(rpfit, new_data = mtcars)
 str(components)
 ```
 
-Various visualization options are available, e.g. for main and second-order interaction effects:
+Various visualization options are available vai `glex`, e.g. for main and second-order interaction effects:
 
 ```{r}
+# install glex if not available:
+if (!requireNamespace("glex")) remotes::install_github("PlantedML/glex")
+library(glex)
+library(ggplot2)
+library(patchwork) # For plot arrangement
+
 p1 <- autoplot(components, "wt")
 p2 <- autoplot(components, "hp")
 p3 <- autoplot(components, "cyl")
@@ -76,8 +83,8 @@ p4 <- autoplot(components, c("wt", "hp"))
 ```
 
 
-See the [Bikesharing: Decomposition Example][bikes] article for more examples.
+See the [Bikesharing decomposition][bikes] article for more examples.
 
 
 [arxiv1]: https://arxiv.org/abs/2012.14563
-[bikes]: http://plantedml.com/randomPlantedForest/articles/Bikesharing-Decomposition-Example.html
+[bikes]: https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html

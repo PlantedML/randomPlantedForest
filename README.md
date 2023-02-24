@@ -29,8 +29,6 @@ Model fitting uses a familiar interface:
 
 ``` r
 library(randomPlantedForest)
-library(ggplot2)
-library(patchwork)
 
 mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
@@ -71,34 +69,42 @@ predict(rpfit, new_data = mtcars) |>
 Prediction components can be accessed via `predict_components`,
 including the intercept, main effects, and interactions up to a
 specified degree. The returned object also contains the original data as
-`x`, which is required for visualization.
+`x`, which is required for visualization. Alternative, the `glex`
+package can be used, but `glex(rpfit)` would yield the same result.
 
 ``` r
 components <- predict_components(rpfit, new_data = mtcars) 
 
 str(components)
-#> List of 2
-#>  $ m:Classes 'data.table' and 'data.frame':  32 obs. of  7 variables:
-#>   ..$ intercept: num [1:32] 20.2 20.2 20.2 20.2 20.2 ...
-#>   ..$ cyl      : num [1:32] 0.477 0.477 1.343 0.477 -1.477 ...
-#>   ..$ wt       : num [1:32] 0.0623 0.0845 3.0677 -0.3823 -1.0544 ...
-#>   ..$ hp       : num [1:32] 0.373 0.373 0.629 0.373 -0.584 ...
-#>   ..$ cyl:wt   : num [1:32] -0.15403 -0.16567 -0.00392 -0.06926 0.14771 ...
-#>   ..$ cyl:hp   : num [1:32] 0.0429 0.0429 0.2779 0.0429 0.4573 ...
-#>   ..$ hp:wt    : num [1:32] 0.1049 0.0855 -0.0931 0.1623 -0.1054 ...
+#> List of 3
+#>  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:
+#>   ..$ cyl   : num [1:32] 0.477 0.477 1.343 0.477 -1.477 ...
+#>   ..$ wt    : num [1:32] 0.0623 0.0845 3.0677 -0.3823 -1.0544 ...
+#>   ..$ hp    : num [1:32] 0.373 0.373 0.629 0.373 -0.584 ...
+#>   ..$ cyl:wt: num [1:32] -0.15403 -0.16567 -0.00392 -0.06926 0.14771 ...
+#>   ..$ cyl:hp: num [1:32] 0.0429 0.0429 0.2779 0.0429 0.4573 ...
+#>   ..$ hp:wt : num [1:32] 0.1049 0.0855 -0.0931 0.1623 -0.1054 ...
 #>   ..- attr(*, ".internal.selfref")=<externalptr> 
-#>  $ x:Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:
+#>  $ intercept: num 20.2
+#>  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:
 #>   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...
 #>   ..$ wt : num [1:32] 2.62 2.88 2.32 3.21 3.44 ...
 #>   ..$ hp : num [1:32] 110 110 93 110 175 105 245 62 95 123 ...
 #>   ..- attr(*, ".internal.selfref")=<externalptr> 
-#>  - attr(*, "class")= chr [1:2] "rpf_components" "list"
+#>  - attr(*, "class")= chr [1:3] "glex" "rpf_components" "list"
 ```
 
-Various visualization options are available, e.g. for main and
-second-order interaction effects:
+Various visualization options are available vai `glex`, e.g. for main
+and second-order interaction effects:
 
 ``` r
+# install glex if not available:
+if (!requireNamespace("glex")) remotes::install_github("PlantedML/glex")
+#> Loading required namespace: glex
+library(glex)
+library(ggplot2)
+library(patchwork) # For plot arrangement
+
 p1 <- autoplot(components, "wt")
 p2 <- autoplot(components, "hp")
 p3 <- autoplot(components, "cyl")
@@ -113,6 +119,6 @@ p4 <- autoplot(components, c("wt", "hp"))
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
 
-See the [Bikesharing: Decomposition
-Example](http://plantedml.com/randomPlantedForest/articles/Bikesharing-Decomposition-Example.html)
+See the [Bikesharing
+decomposition](https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html)
 article for more examples.
