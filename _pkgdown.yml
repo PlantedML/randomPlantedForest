@@ -3,15 +3,10 @@ template:
   bootstrap: 5
 
 articles:
-# - title: Showcases
-#   navbar: ~
-#   desc: |
-#     Applications of Random Planted Forest using datasets as case-studies.
-#   contents:
-#   - articles/Bikesharing-Decomposition-Example
 - title: Regression Tests
   desc: |
-    Ensuring that the current implementation still produces the expected results, given some stochasticity.
+    Ensuring that the current implementation still produces the expected results,
+    given some stochasticity.
   contents:
   - test/Regression-Test-oldrpf
 
