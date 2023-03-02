@@ -31,6 +31,8 @@ the number of levels in the outcome.
 \item \code{intercept} (\code{numeric(1)}): Expected value of the prediction.
 \item \code{x} (\code{\link[data.table:data.table]{data.table}}): Copy of \code{new_data} containing predictors selected
 by \code{predictors}.
+\item \code{target_levels} (\code{character}): For multiclass classification only: Vector of target levels
+which can be used to disassemble \code{m}, as names include both term and target level.
 }
 }
 \description{

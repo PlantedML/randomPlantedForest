@@ -30,6 +30,8 @@
 #' - `intercept` (`numeric(1)`): Expected value of the prediction.
 #' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
 #' by `predictors`.
+#' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
+#' which can be used to disassemble `m`, as names include both term and target level.
 #'
 #' @export
 #' @importFrom hardhat forge
@@ -118,6 +120,13 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     intercept = intercept[[1]],
     x = new_data[, predictors, with = FALSE]
   )
+
+  # Get outcome levels for multiclass handling
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (length(outcome_levels) > 2) {
+    ret$target_levels <- outcome_levels
+  }
+
   class(ret) <- c("glex", "rpf_components", class(ret))
   ret
 
@@ -177,7 +186,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class
-    colnames(ret) <- paste0(out_names, "_", outcome_levels)
+    colnames(ret) <- paste0(out_names, "__class:", outcome_levels)
   } else {
     # Regression and binary classif: Single-column component
     colnames(ret) <- out_names
