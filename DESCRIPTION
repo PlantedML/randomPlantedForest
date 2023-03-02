@@ -1,6 +1,6 @@
 Package: randomPlantedForest
 Title: Random Planted Forest: A Directly Interpretable Tree Ensemble
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: c(
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
     person("Munir", "Hiabu", role = "aut"),
