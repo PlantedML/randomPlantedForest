@@ -48,7 +48,7 @@
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
-#' (components <- predict_components(rpfit, test))
+#' (components <- predict_components(rpfit, test, max_interaction = 2))
 #'
 #' # sums to prediction
 #' cbind(
@@ -127,9 +127,23 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     ret$target_levels <- outcome_levels
   }
 
+  # If max_interaction here is smaller than that of model fit, we calculate a remainder term
+  # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
+
+  if (max_interaction < object$params$max_interaction) {
+    pred <- predict(object, new_data = new_data, type = "numeric")
+
+    # handling differs if multiclass
+    if (length(outcome_levels) > 2) {
+      ret$remainder <- calc_remainders_multiclass(all_components, outcome_levels, pred, intercept)
+    } else {
+      # regression and binary classif: straight forward.
+      ret$remainder <- pred[[1]] - ret$intercept - rowSums(all_components)
+    }
+  }
+
   class(ret) <- c("glex", "rpf_components", class(ret))
   ret
-
 }
 
 #' Internal function to extract a single component

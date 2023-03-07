@@ -202,3 +202,61 @@ softmax <- function(x) {
   lse <- rowmax + log(rowSums(exp(x - rowmax)))
   exp(x - lse)
 }
+
+#' Get remainders where max_interaction requested in `predict_components` is smaller than
+#' `max_interaction` set in `rpf`.
+#' This is somewhat cumbersome unfortunately, and presumably will have to be partially
+#' repeated for other methods in `glex`
+#' @noRd
+#' @keywords internal
+#' @param m Components as calculated in `predict_components`
+#' @param levels Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
+#' @param pred Regular model predictions as returned by `predict.rpf`.
+#' @param intercept Intercept as stored in output of `predict_components`.
+calc_remainders_multiclass <- function(m, levels, pred, intercept) {
+  m <- data.table::as.data.table(m)
+  pred <- data.table::as.data.table(pred)
+  intercept <- data.table::as.data.table(intercept)
+
+  m[, ".id" := .I]
+  pred[, ".id" := .I]
+  intercept[, ".id" := .I]
+
+  split_names <- function(mn, split_string = "__class:", target_index = 2) {
+    vapply(mn, function(x) {
+      unlist(strsplit(x, split = split_string, fixed = TRUE))[[target_index]]
+    }, character(1), USE.NAMES = FALSE)
+  }
+
+  m_long <- data.table::melt(m, id.vars = ".id", value.name = "m",
+                             variable.name = "term", variable.factor = FALSE)
+
+  m_long[, class := split_names(term, split_string = "__class:", target_index = 2)]
+  m_sums <- m_long[, list(m_sum = sum(m)), by = c(".id", "class")]
+
+  # long format predictions for calculations
+  pred_long <- data.table::melt(pred, id.vars = ".id", value.name = "pred",
+                                variable.name = "class", variable.factor = FALSE)
+  pred_long[, class := split_names(class, split_string = ".pred_", target_index = 2)]
+
+
+  # Same game for intercept
+  intercept_long <- data.table::melt(intercept, id.vars = ".id", value.name = "intercept",
+                                variable.name = "class", variable.factor = FALSE)
+  intercept_long[, class := split_names(class, split_string = "__class:", target_index = 2)]
+
+  # merge pred with intercept
+  pred_long <- pred_long[intercept_long, on = c(".id", "class")]
+  # merge predictions with sum(m)
+  merged <- pred_long[m_sums, on = c(".id", "class")]
+  # remainder is prediction - sum(m) - intercept, can be positive or negative
+  merged[, remainder := pred - m_sum - intercept]
+  # Return one column per outcome class
+  merged_wide <- data.table::dcast(merged, .id  ~ class, value.var = "remainder")
+  # Remove intermediate id column
+  merged_wide[, ".id" := NULL]
+  # sort columns to original outcome level order, consistent with predict() order
+  data.table::setcolorder(merged_wide, levels)
+
+  merged_wide
+}
