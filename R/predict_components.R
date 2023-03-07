@@ -48,7 +48,7 @@
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
-#' (components <- predict_components(rpfit, test, max_interaction = 2))
+#' (components <- predict_components(rpfit, test))
 #'
 #' # sums to prediction
 #' cbind(
