@@ -214,6 +214,10 @@ softmax <- function(x) {
 #' @param pred Regular model predictions as returned by `predict.rpf`.
 #' @param intercept Intercept as stored in output of `predict_components`.
 calc_remainders_multiclass <- function(m, levels, pred, intercept) {
+
+  # data.table NSE warnings
+  term <- remainder <- m_sum <- NULL
+
   m <- data.table::as.data.table(m)
   pred <- data.table::as.data.table(pred)
   intercept <- data.table::as.data.table(intercept)

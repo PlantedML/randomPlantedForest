@@ -131,7 +131,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
 
   if (max_interaction < object$params$max_interaction) {
-    pred <- predict(object, new_data = new_data, type = "numeric")
+    pred <- predict.rpf(object, new_data = new_data, type = "numeric")
 
     # handling differs if multiclass
     if (length(outcome_levels) > 2) {
