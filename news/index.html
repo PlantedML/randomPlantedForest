@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1.9000</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -47,6 +47,10 @@
       <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.1.9000" id="randomplantedforest-0219000-development-version">randomPlantedForest 0.2.1.9000 (Development version)<a class="anchor" aria-label="anchor" href="#randomplantedforest-0219000-development-version"></a></h2>
+<ul><li>Add <code>remainder</code> term to <code>predict_components</code> output for case where <code>max_interaction</code> supplied is smaller than <code>max_interaction</code> in <code>rpf</code> fit. In that case, the <code>m</code> values don’t sum up to the global predictions, so we add a remainder to allow reconstruction of that property.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.1" id="randomplantedforest-021">randomPlantedForest 0.2.1<a class="anchor" aria-label="anchor" href="#randomplantedforest-021"></a></h2>
 <ul><li>Add <code>glex</code> class to output of <code><a href="../reference/predict_components.html">predict_components()</a></code>, for extended functionality available with <a href="https://github.com/PlantedML/glex" class="external-link"><code>glex</code></a>.</li>
