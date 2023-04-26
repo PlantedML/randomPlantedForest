@@ -299,11 +299,11 @@ struct Matrix{
   T& operator[](std::vector<int>& indices){
     if(indices.size() != dims.size()) throw std::invalid_argument("Invalid number of indices.");
     int index = 0;
-    for(int i=indices.size()-1; i>0; --i){
+    for(size_t i=indices.size()-1; i>0; --i){
       if(indices[i] >= dims[i]) throw std::invalid_argument("Index out of range.");
       int a = indices[i];
-      for(unsigned int d=0; d<dims.size(); ++d){
-        if(static_cast<int>(d) < i){
+      for(size_t d=0; d<dims.size(); ++d){
+        if(d < i){
           a *= dims[d];
         }
       }
@@ -861,12 +861,12 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
           std::iota(samples.begin(), samples.end(), 1);
         }else{ // randomly picked samples otherwise
           samples = std::vector<int>(split_try);
-          for(int i=0; i < static_cast<int>(samples.size()); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
+          for(size_t i=0; i < samples.size(); ++i) samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size );
           std::sort(samples.begin(), samples.end());
         }
 
         // go through samples
-        for(int sample_pos=0; sample_pos < static_cast<int>(samples.size()); ++sample_pos){
+        for(size_t sample_pos=0; sample_pos < samples.size(); ++sample_pos){
 
           // get samplepoint
           sample_point = unique_samples[samples[sample_pos]];
@@ -958,7 +958,7 @@ void RandomPlantedForest::set_data(const NumericMatrix& samples_Y, const Numeric
   double minVal, maxVal, currVal;
   for(int i=0; i<feature_size; ++i){
     minVal = maxVal = X[0][i];
-    for(int j=0; j < static_cast<int>(sample_size); ++j){
+    for(size_t j=0; j < sample_size; ++j){
       currVal = X[j][i];
       if(currVal<minVal) minVal = currVal;
       if(currVal>maxVal) maxVal = currVal;
@@ -1001,7 +1001,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
-    for(int i=0; i < static_cast<int>(sample_size); ++i){
+    for(size_t i=0; i < sample_size; ++i){
 
       sample_index = R::runif(0, sample_size - 1);
       samples_Y[i] = Y[sample_index];
