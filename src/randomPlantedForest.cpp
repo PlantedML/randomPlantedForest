@@ -2685,8 +2685,8 @@ void ClassificationRPF::logit_loss_3(rpf::Split& split){
   std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::max(delta, M); });
   std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::max(delta, M); });
 
-  std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = log(M); });
-  std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = log(M); });
+  std::for_each(M_s.begin(), M_s.end(), [&](double &M) { M = log(M); });
+  std::for_each(M_b.begin(), M_b.end(), [&](double &M) { M = log(M); });
 
   double M_sp = std::max(delta, split.M_sp);
   double M_bp = std::max(delta, split.M_bp);
@@ -3401,8 +3401,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = std::max(epsilon, M); });
         std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::max(epsilon, M); });
 
-        std::for_each(M_s.begin(), M_s.end(), [this](double &M) { M = log(M); });
-        std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = log(M); });
+        std::for_each(M_s.begin(), M_s.end(), [&](double &M) { M = log(M); });
+        std::for_each(M_b.begin(), M_b.end(), [&](double &M) { M = log(M); });
 
         double M_sp = std::max(epsilon, curr_split.M_sp);
         double M_bp = std::max(epsilon, curr_split.M_bp);
@@ -3529,8 +3529,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::for_each(sum_s.begin(), sum_s.end(), [this](double &S) { S = std::max(epsilon, S); });
         std::for_each(sum_b.begin(), sum_b.end(), [this](double &S) { S = std::max(epsilon, S); });
 
-        std::for_each(sum_s.begin(), sum_s.end(), [this](double &S) { S = log(S); });
-        std::for_each(sum_b.begin(), sum_b.end(), [this](double &S) { S = log(S); });
+        std::for_each(sum_s.begin(), sum_s.end(), [&](double &S) { S = log(S); });
+        std::for_each(sum_b.begin(), sum_b.end(), [&](double &S) { S = log(S); });
 
         double sum_sp = std::max(epsilon, curr_split.M_sp);
         double sum_bp = std::max(epsilon, curr_split.M_bp);
