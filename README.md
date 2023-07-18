@@ -69,8 +69,8 @@ predict(rpfit, new_data = mtcars) |>
 Prediction components can be accessed via `predict_components`,
 including the intercept, main effects, and interactions up to a
 specified degree. The returned object also contains the original data as
-`x`, which is required for visualization. Alternative, the `glex`
-package can be used, but `glex(rpfit)` would yield the same result.
+`x`, which is required for visualization. The `glex` package can be used
+as well: `glex(rpfit)` yields the same result.
 
 ``` r
 components <- predict_components(rpfit, new_data = mtcars) 
@@ -94,7 +94,7 @@ str(components)
 #>  - attr(*, "class")= chr [1:3] "glex" "rpf_components" "list"
 ```
 
-Various visualization options are available vai `glex`, e.g. for main
+Various visualization options are available via `glex`, e.g. for main
 and second-order interaction effects:
 
 ``` r
