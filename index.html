@@ -122,7 +122,7 @@
 <span><span class="co">#&gt; 4 20.78283 21.4</span></span>
 <span><span class="co">#&gt; 5 17.56310 18.7</span></span>
 <span><span class="co">#&gt; 6 18.71368 18.1</span></span></code></pre></div>
-<p>Prediction components can be accessed via <code>predict_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization. Alternative, the <code>glex</code> package can be used, but <code>glex(rpfit)</code> would yield the same result.</p>
+<p>Prediction components can be accessed via <code>predict_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization. The <code>glex</code> package can be used as well: <code>glex(rpfit)</code> yields the same result.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
 <span></span>
@@ -143,7 +143,7 @@
 <span><span class="co">#&gt;   ..$ hp : num [1:32] 110 110 93 110 175 105 245 62 95 123 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
 <span><span class="co">#&gt;  - attr(*, "class")= chr [1:3] "glex" "rpf_components" "list"</span></span></code></pre></div>
-<p>Various visualization options are available vai <code>glex</code>, e.g. for main and second-order interaction effects:</p>
+<p>Various visualization options are available via <code>glex</code>, e.g. for main and second-order interaction effects:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install glex if not available:</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"glex"</span><span class="op">)</span><span class="op">)</span> <span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PlantedML/glex"</span><span class="op">)</span></span>
