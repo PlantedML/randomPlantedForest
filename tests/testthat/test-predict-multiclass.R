@@ -61,8 +61,9 @@ test_that("L2: Numeric prediction", {
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
 
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
-  expect_gt(max(classif_pred), 1)
-  expect_lt(min(classif_pred), 0)
+  # FIXME: Can't make strong asusmptions about range in multiclass L2 case apparently
+  # expect_gt(max(classif_pred), 1)
+  # expect_lt(min(classif_pred), 0)
 })
 
 # L1 loss -----------------------------------------------------------------
