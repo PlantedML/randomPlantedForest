@@ -18,7 +18,7 @@ using namespace Rcpp;
 // Helper function to generate random number using R's RNG
 // this replaces the previous randWrapper and later use of std::random_shuffle,
 // as the latter is removed in C++17 and I couldn't figure out an easy replacement.
-int random_index(int n) { return static_cast<int>(R::runif(0, 1) * n); }
+int random_index(const int n) { return static_cast<int>(R::runif(0, 1) * n); }
 
 template <typename Iter>
 void shuffle_vector(Iter first, Iter last) {
@@ -29,15 +29,9 @@ void shuffle_vector(Iter first, Iter last) {
   }
 }
 
-// // [[Rcpp::export]]
-// NumericVector shuffle_R_vector(NumericVector input) {
-//   std::vector<int> vec = as<std::vector<int>>(input);
-//   shuffle_vector(vec.begin(), vec.end());
-//   return wrap(vec);
-// }
-
 // wrapper around R's RNG such that we get a uniform distribution over
 // [0,n) as required by the STL algorithm
+// This was used with std::random_shuffle which was removed in C++11
 // inline int randWrapper(const int n) { return floor(R::runif(0, 1) * n); }
 
 //  ----------------- functions for converting R and Cpp types -----------------
