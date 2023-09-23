@@ -193,12 +193,12 @@ Can be achieved after fitting with <code><a href="purify.html">purify()</a></cod
 
 <dt>loss</dt>
 <dd><p><code>["L2"]</code>: For regression, only <code>"L2"</code> is supported. For
-classification, <code>"L1"</code>, <code>"logit"</code> and "<code>exponential</code>" are also available.
-"<code>exponential</code>" yield similar results as "<code>logit</code>" while being significantly faster.</p></dd>
+classification, <code>"L1"</code>, <code>"logit"</code> and <code>"exponential"</code> are also available.
+<code>"exponential"</code> yields similar results as <code>"logit"</code> while being significantly faster.</p></dd>
 
 
 <dt>delta</dt>
-<dd><p><code>[0]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>.
+<dd><p><code>[0]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
 Proportion of class membership is truncated to be smaller 1-delta when calculating
 the loss to determine the optimal split.</p></dd>
 
