@@ -21,9 +21,9 @@
 #'   Can be achieved after fitting with [`purify()`].
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
-#'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
-#'   "`exponential`" yield similar results as "`logit`" while being significantly faster.
-#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`.
+#'   classification, `"L1"`, `"logit"` and `"exponential"` are also available.
+#'   `"exponential"` yields similar results as `"logit"` while being significantly faster.
+#' @param delta `[0]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Proportion of class membership is truncated to be smaller 1-delta when calculating
 #'   the loss to determine the optimal split.
 #' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`.

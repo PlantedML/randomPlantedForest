@@ -116,10 +116,10 @@ Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
 \item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}
 
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
-classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.
-"\code{exponential}" yield similar results as "\code{logit}" while being significantly faster.}
+classification, \code{"L1"}, \code{"logit"} and \code{"exponential"} are also available.
+\code{"exponential"} yields similar results as \code{"logit"} while being significantly faster.}
 
-\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
+\item{delta}{\verb{[0]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Proportion of class membership is truncated to be smaller 1-delta when calculating
 the loss to determine the optimal split.}
 
