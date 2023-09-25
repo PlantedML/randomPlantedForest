@@ -61,7 +61,8 @@ test_that("L2: Numeric prediction", {
   classif_pred <- predict(classif_fit, new_data = xdat, type = "numeric")
 
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
-  # FIXME: Can't make strong asusmptions about range in multiclass L2 case apparently
+  # FIXME: Can't make strong assumptions about range in multiclass L2 case apparently,
+  # better to ignore maybe as we explicitly don't make any guarantees in this case.
   # expect_gt(max(classif_pred), 1)
   # expect_lt(min(classif_pred), 0)
 })
@@ -78,7 +79,7 @@ test_that("L1: Probability prediction", {
 
   # Sanity check for multiclass probability predictions
   # First compare to 1 with epsilon tolerance, then count number of offending obs
-  # Wanted to avoid runing expect_ on each obs to avoid clutter in test output
+  # Wanted to avoid running expect_ on each obs to avoid clutter in test output
 
   classif_pred$sum <- rowSums(classif_pred)
 

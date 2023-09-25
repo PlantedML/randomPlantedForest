@@ -29,11 +29,18 @@ void shuffle_vector(Iter first, Iter last) {
   }
 }
 
+
+
 // wrapper around R's RNG such that we get a uniform distribution over
 // [0,n) as required by the STL algorithm
 // This was used with std::random_shuffle which was removed in C++11
 // inline int randWrapper(const int n) { return floor(R::runif(0, 1) * n); }
-
+//
+// void shuffle_vector(Iter first, Iter last) {
+//   std::random_shuffle(first, last, randWrapper);
+//
+//   return x;
+// }
 //  ----------------- functions for converting R and Cpp types -----------------
 
 
