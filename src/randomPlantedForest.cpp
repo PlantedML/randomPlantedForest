@@ -15,11 +15,32 @@
 
 using namespace Rcpp;
 
-//  ----------------- functions for converting R and Cpp types -----------------
+// Helper function to generate random number using R's RNG
+// this replaces the previous randWrapper and later use of std::random_shuffle,
+// as the latter is removed in C++17 and I couldn't figure out an easy replacement.
+int random_index(const int n) { return static_cast<int>(R::runif(0, 1) * n); }
+
+template <typename Iter>
+void shuffle_vector(Iter first, Iter last) {
+  int n = std::distance(first, last);
+  while (n > 1) {
+    int k = random_index(n--);
+    std::swap(*(first + n), *(first + k));
+  }
+}
 
 // wrapper around R's RNG such that we get a uniform distribution over
 // [0,n) as required by the STL algorithm
-inline int randWrapper(const int n) { return floor(R::runif(0,1)*n); }
+// This was used with std::random_shuffle which was removed in C++11
+// inline int randWrapper(const int n) { return floor(R::runif(0, 1) * n); }
+//
+// void shuffle_vector(Iter first, Iter last) {
+//   std::random_shuffle(first, last, randWrapper);
+//
+//   return x;
+// }
+//  ----------------- functions for converting R and Cpp types -----------------
+
 
 /**
  * \brief Convert the std container set of type int into an IntegerVector
@@ -808,7 +829,7 @@ rpf::Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<d
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
 
   if(!deterministic){
-    std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
+    shuffle_vector(split_candidates.begin(), split_candidates.end());  // shuffle for random order
   }
 
   // consider a fraction of possible splits
@@ -3102,7 +3123,8 @@ rpf::Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<dou
   std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
 
   if(!deterministic){
-    std::random_shuffle(split_candidates.begin(), split_candidates.end(), randWrapper); // shuffle for random order
+    shuffle_vector(split_candidates.begin(),
+                    split_candidates.end());  // shuffle for random order
   }
 
   // consider a fraction of possible splits
