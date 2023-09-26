@@ -30,3 +30,17 @@ test_that("Multiclass: Detection works", {
   expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })
+
+test_that("Remainder is calculcated correctly", {
+  classif_fit <- rpf(yfact ~ ., data = xdat, max_interaction = 3)
+
+  components <- predict_components(classif_fit, xdat, max_interaction = 2)
+
+  expect_s3_class(components$m, "data.frame")
+  expect_equal(nrow(components$m), nrow(components$remainder))
+  expect_equal(ncol(components$remainder), length(components$target_levels))
+  expect_named(components$remainder, components$target_levels)
+
+  # TODO: verify sum(m) + intercept == prediction
+  # Cumbersome structure of m does not help here.
+})

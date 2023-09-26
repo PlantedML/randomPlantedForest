@@ -1,6 +1,6 @@
 Package: randomPlantedForest
 Title: Random Planted Forest: A Directly Interpretable Tree Ensemble
-Version: 0.0.0.9000
+Version: 0.2.1.9000
 Authors@R: c(
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
     person("Munir", "Hiabu", role = "aut"),
@@ -13,30 +13,29 @@ Description: An implementation of the Random Planted Forest algorithm for
     directly interpretable tree ensembles based on a functional ANOVA
     decomposition.
 License: Apache License (>= 2)
-URL: https://github.com/PlantedML/randomPlantedForest
+URL: https://github.com/PlantedML/randomPlantedForest,
+    http://plantedml.com/randomPlantedForest/
 BugReports: https://github.com/PlantedML/randomPlantedForest/issues
-Imports: 
+Imports:
     checkmate,
     data.table,
     hardhat,
     methods,
     Rcpp,
     utils
-Suggests: 
-    covr,
-    ggplot2,
-    ISLR2,
+Suggests:
     knitr,
     mvtnorm,
-    patchwork,
     recipes,
     rmarkdown,
     testthat (>= 3.0.0)
-LinkingTo: 
+LinkingTo:
     Rcpp
+VignetteBuilder:
+    knitr
+Config/Needs/coverage: covr
+Config/Needs/website: patchwork, ggplot2
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-SystemRequirements: C++11
-VignetteBuilder: knitr

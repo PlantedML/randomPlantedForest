@@ -12,6 +12,7 @@ An implementation of the Random Planted Forest algorithm for directly interpreta
 Useful links:
 \itemize{
   \item \url{https://github.com/PlantedML/randomPlantedForest}
+  \item \url{http://plantedml.com/randomPlantedForest/}
   \item Report bugs at \url{https://github.com/PlantedML/randomPlantedForest/issues}
 }
 

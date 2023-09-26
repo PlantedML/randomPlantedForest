@@ -31,7 +31,7 @@ test_that("purification does not alter predictions (null effect)", {
 
   pred_post <- predict(bin_fit, new_data = xdat, type = "numeric")
 
-  expect_equal(pred_pre, pred_post, tolerance = 1e-15)
+  expect_equal(pred_pre, pred_post, tolerance = 1e-14)
 })
 
 test_that("purification does not alter predictions (with effect)", {

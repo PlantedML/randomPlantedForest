@@ -3,8 +3,8 @@
 #' TODO: Explain what this does
 #'
 #' Unless [`rpf()`] is called with `purify = TRUE`, the forest has to be purified after fit
-#' to ensure the components extracted by [`extract_components()`] are valid.
-#' [`extract_components()`] will automatically purify a forest if [`is_purified()`] reports `FALSE`.
+#' to ensure the components extracted by [`predict_components()`] are valid.
+#' [`predict_components()`] will automatically purify a forest if [`is_purified()`] reports `FALSE`.
 #'
 #' @param x And object of class `rpf`.
 #' @param ... (Unused)

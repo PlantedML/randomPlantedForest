@@ -1,12 +1,10 @@
 #' Random Planted Forest
 #'
-# FIXME: Parameters need describing
-#' @param x Feature matrix or `data.frame`.
+#' @param x,data Feature `matrix`, or `data.frame`, or [`recipe`][recipes::recipe].
 #' @param y Target vector for use with `x`.
 #'   The class of `y` (either `numeric` or [`factor`]) determines if regression
 #'   or classification will be performed.
 #' @param formula Formula specification, e.g. y ~ x1 + x2.
-#' @param data A `data.frame` for use with `formula`.
 #' @param max_interaction `[1]`: Maximum level of interaction determining maximum
 #'   number of split dimensions for a tree.
 #'   The default `1` corresponds to main effects only.
@@ -19,13 +17,13 @@
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
 #' @param nthreads `[1L]`: Number of threads used for ocmputation, defaulting to `1`, i.e. serial execution.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
-#'   Set to `TRUE` to enable components extract with [`extract_components()`] are valid.
+#'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.
 #'   Can be achieved after fitting with [`purify()`].
 #' @param cv `[FALSE]`: Determines if cross validation is performed.
 #' @param loss `["L2"]`: For regression, only `"L2"` is supported. For
-#'   classification, `"L1"`, `"logit"` and "`exponential`" are also available.
-#'   "`exponential`" yield similar results as "`logit`" while being significantly faster.
-#' @param delta `[0]`: Only used if loss = `"logit"` or `"exponential"`.
+#'   classification, `"L1"`, `"logit"` and `"exponential"` are also available.
+#'   `"exponential"` yields similar results as `"logit"` while being significantly faster.
+#' @param delta `[0]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Proportion of class membership is truncated to be smaller 1-delta when calculating
 #'   the loss to determine the optimal split.
 #' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`.
@@ -52,7 +50,8 @@ rpf <- function(x, ...) {
 }
 
 #' @export
-#' @rdname rpf
+#' @noRd
+# @rdname rpf
 rpf.default <- function(x, ...) {
   stop(
     "`rpf()` is not defined for a '", class(x)[1], "'.",
@@ -128,6 +127,8 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
 }
 
 # Bridge: Calls rpf_impl() with processed input
+#' @noRd
+#' @param processed Output of `hardhat::mold` from respective rpf methods
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        split_try = 10, t_try = 0.4, deterministic = FALSE,

@@ -2,7 +2,6 @@
 % Please edit documentation in R/rpf.R
 \name{rpf}
 \alias{rpf}
-\alias{rpf.default}
 \alias{rpf.data.frame}
 \alias{rpf.matrix}
 \alias{rpf.formula}
@@ -10,8 +9,6 @@
 \title{Random Planted Forest}
 \usage{
 rpf(x, ...)
-
-\method{rpf}{default}(x, ...)
 
 \method{rpf}{data.frame}(
   x,
@@ -86,7 +83,7 @@ rpf(x, ...)
 )
 }
 \arguments{
-\item{x}{Feature matrix or \code{data.frame}.}
+\item{x, data}{Feature \code{matrix}, or \code{data.frame}, or \code{\link[recipes:recipe]{recipe}}.}
 
 \item{...}{(Unused).}
 
@@ -113,16 +110,16 @@ this is equivalent to setting \code{max_interaction = 10}.}
 \item{nthreads}{\verb{[1L]}: Number of threads used for ocmputation, defaulting to \code{1}, i.e. serial execution.}
 
 \item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
-Set to \code{TRUE} to enable components extract with \code{\link[=extract_components]{extract_components()}} are valid.
+Set to \code{TRUE} to enable components extract with \code{\link[=predict_components]{predict_components()}} are valid.
 Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
 
 \item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}
 
 \item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
-classification, \code{"L1"}, \code{"logit"} and "\code{exponential}" are also available.
-"\code{exponential}" yield similar results as "\code{logit}" while being significantly faster.}
+classification, \code{"L1"}, \code{"logit"} and \code{"exponential"} are also available.
+\code{"exponential"} yields similar results as \code{"logit"} while being significantly faster.}
 
-\item{delta}{\verb{[0]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
+\item{delta}{\verb{[0]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Proportion of class membership is truncated to be smaller 1-delta when calculating
 the loss to determine the optimal split.}
 
@@ -131,8 +128,6 @@ Proportion of class membership is truncated to be smaller 1-epsilon when calcula
 the fit in a leaf.}
 
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
-
-\item{data}{A \code{data.frame} for use with \code{formula}.}
 }
 \value{
 Object of class \code{"rpf"} with model object contained in \verb{$fit}.

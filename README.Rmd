@@ -1,5 +1,7 @@
 ---
 output: github_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -12,6 +14,7 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 
+set.seed(1)
 ```
 
 # randomPlantedForest
@@ -39,6 +42,7 @@ Model fitting uses a familiar interface:
 ```{r}
 library(randomPlantedForest)
 
+mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
 rpfit
 
@@ -47,14 +51,40 @@ predict(rpfit, new_data = mtcars) |>
   head()
 ```
 
-Prediction components can be accessed via `extract_components`, including the intercept, main effects, and interactions up to a specified degree:
+Prediction components can be accessed via `predict_components`, including the intercept, main effects, and interactions up to a specified degree.
+The returned object also contains the original data as `x`, which is required for visualization.
+The `glex` package can be used as well: `glex(rpfit)` yields the same result.
 
 ```{r}
-m <- extract_components(rpfit, new_data = mtcars) 
+components <- predict_components(rpfit, new_data = mtcars) 
 
-str(m)
+str(components)
+```
+
+Various visualization options are available via `glex`, e.g. for main and second-order interaction effects:
+
+```{r}
+# install glex if not available:
+if (!requireNamespace("glex")) remotes::install_github("PlantedML/glex")
+library(glex)
+library(ggplot2)
+library(patchwork) # For plot arrangement
+
+p1 <- autoplot(components, "wt")
+p2 <- autoplot(components, "hp")
+p3 <- autoplot(components, "cyl")
+p4 <- autoplot(components, c("wt", "hp"))
+
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(
+    title = "Selected effects for mtcars",
+    caption = "(It's a tiny dataset but it has to fit in a README, okay?)"
+  )
 ```
 
 
+See the [Bikesharing decomposition][bikes] article for more examples.
+
 
 [arxiv1]: https://arxiv.org/abs/2012.14563
+[bikes]: https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html

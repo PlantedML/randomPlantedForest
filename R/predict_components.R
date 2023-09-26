@@ -20,9 +20,19 @@
 #'   Default will use the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
-#' @return A [`data.table`][data.table::data.table] with the same number of rows as `new_data` and one
-#' column for each main and interaction term requested, including the intercept.
-#' For multiclass classification, the number of output columns is multiplied by the number of levels in the outcome.
+#' @return A `list` with elements:
+#' - `m` ([`data.table`][data.table::data.table]): Components for each main effect and
+#' interaction term, representing the functional decomposition of the prediction.
+#' All components together with the intercept sum up
+#' to the prediction.
+#' For multiclass classification, the number of output columns is multiplied by
+#' the number of levels in the outcome.
+#' - `intercept` (`numeric(1)`): Expected value of the prediction.
+#' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
+#' by `predictors`.
+#' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
+#' which can be used to disassemble `m`, as names include both term and target level.
+#'
 #' @export
 #' @importFrom hardhat forge
 #' @importFrom data.table as.data.table
@@ -38,29 +48,38 @@
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
-#' (components <- extract_components(rpfit, test))
+#' (components <- predict_components(rpfit, test))
 #'
 #' # sums to prediction
-#' cbind(rowSums(components), predict(rpfit, test))
+#' cbind(
+#'   m_sum = rowSums(components$m) + components$intercept,
+#'   prediction = predict(rpfit, test)
+#' )
 #'
 #' # Only get components with interactions of a lower degree, ignoring 3-way interactions
-#' extract_components(rpfit, test, max_interaction = 2)
+#' predict_components(rpfit, test, max_interaction = 2)
 #'
 #' # Only retrieve main effects
-#' (main_effects <- extract_components(rpfit, test, max_interaction = 1))
+#' (main_effects <- predict_components(rpfit, test, max_interaction = 1))
 #'
 #' # The difference is the combined contribution of interaction effects
-#' cbind(rowSums(main_effects), predict(rpfit, test))
+#' cbind(
+#'   m_sum = rowSums(main_effects$m) + main_effects$intercept,
+#'   prediction = predict(rpfit, test)
+#' )
 #'
+predict_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
+  checkmate::assert_class(object, classes = "rpf")
 
-extract_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
-
+  # if max_interaction is not provided, we use the max from the rpf model fit
   if (is.null(max_interaction)) {
     max_interaction <- object$params$max_interaction
   } else {
+    # Otherwise it has to be between 1 and the max from the model fit
     checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
   }
 
+  # Either use all predictors in the model or a subset of interest (for speed / compactness)
   if (is.null(predictors)) {
     predictors <- names(object$blueprint$ptypes$predictors)
   } else {
@@ -76,30 +95,63 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
   # Encode factors to (re-)ordered integers according to information saved during model fit
-  new_data <- preprocess_predictors_predict(object, processed$predictors)
+  # Need matrix version for model predictions, and keep data.table version for return (for plotting)
+  new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)
+  data.table::setDT(new_data)
 
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
   all_components <- lapply(seq_len(max_interaction), function(i) {
     combinations <- utils::combn(predictors, i, simplify = FALSE)
-    components <- lapply(combinations, function(x) extract_component(object, new_data, x))
+    components <- lapply(combinations, function(x) {
+      .predict_single_component(object, new_data_matrix, x)
+      })
     do.call(cbind, args = components)
   })
 
   all_components <- do.call(cbind, args = all_components)
-  intercept <- extract_component(object, new_data, predictors = NULL)
-  all_components <- cbind(intercept, all_components)
+  # Get intercept (scalar), using only one row of x as input as we don't need it repeated
+  intercept <- .predict_single_component(
+    object, new_data_matrix[, 1, drop = FALSE], predictors = NULL
+  )
 
-  data.table::as.data.table(all_components)
+  ret <- list(
+    m = data.table::as.data.table(all_components),
+    intercept = intercept[[1]],
+    x = new_data[, predictors, with = FALSE]
+  )
+
+  # Get outcome levels for multiclass handling
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (length(outcome_levels) > 2) {
+    ret$target_levels <- outcome_levels
+  }
+
+  # If max_interaction here is smaller than that of model fit, we calculate a remainder term
+  # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
+
+  if (max_interaction < object$params$max_interaction) {
+    pred <- predict.rpf(object, new_data = new_data, type = "numeric")
+
+    # handling differs if multiclass
+    if (length(outcome_levels) > 2) {
+      ret$remainder <- calc_remainders_multiclass(all_components, outcome_levels, pred, intercept)
+    } else {
+      # regression and binary classif: straight forward.
+      ret$remainder <- pred[[1]] - ret$intercept - rowSums(all_components)
+    }
+  }
+
+  class(ret) <- c("glex", "rpf_components", class(ret))
+  ret
 }
 
 #' Internal function to extract a single component
 #'
 #' Extracts one component at a time, consisting of supplied `predictors`.
-#' Not fit for general use since the preprocessing of `new_data` is only done in `extract_components`
+#' Not fit for general use since the preprocessing of `new_data` is only done in `predict_components`
 #' to save on computing time for cases where many interactions/components are extracted.
 #'
-# @rdname extract_components
 #' @noRd
 #' @keywords internal
 #' @return A n x 1 `matrix()`
@@ -111,16 +163,16 @@ extract_components <- function(object, new_data, max_interaction = NULL, predict
 #' set.seed(23)
 #' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
 #'
-#' # Internal data preprocessing only done in extract_components to save time
+#' # Internal data preprocessing only done in predict_components to save time
 #' processed <- hardhat::forge(test, rpfit$blueprint)
 #' test <- randomPlantedForest:::preprocess_predictors_predict(rpfit, processed$predictors)
 #'
 #' # Component for interaction term of two predictors
-#' randomPlantedForest:::extract_component(rpfit, test, predictors = c("cyl", "hp"))
+#' randomPlantedForest:::.predict_single_component(rpfit, test, predictors = c("cyl", "hp"))
 #'
 #' # Retrieving the intercept
-#' randomPlantedForest:::extract_component(rpfit, test, predictors = NULL)
-extract_component <- function(object, new_data, predictors = NULL) {
+#' randomPlantedForest:::.predict_single_component(rpfit, test, predictors = NULL)
+.predict_single_component <- function(object, new_data, predictors = NULL) {
 
   # Indices of selected predictors
   if (is.null(predictors)) {
@@ -128,7 +180,8 @@ extract_component <- function(object, new_data, predictors = NULL) {
     components <- -1
     out_names <- "intercept"
   } else {
-    # Indices of predictors need to be in ascending order such that new_data has columns in the correct order
+    # Indices of predictors need to be in ascending order,
+    # such that new_data has columns in the correct order.
     # Otherwise, predict_matrix will return wrong results
     components <- sort.int(match(predictors, colnames(new_data)))
     # subset new_data to contain only selected components
@@ -147,7 +200,7 @@ extract_component <- function(object, new_data, predictors = NULL) {
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class
-    colnames(ret) <- paste0(out_names, "_", outcome_levels)
+    colnames(ret) <- paste0(out_names, "__class:", outcome_levels)
   } else {
     # Regression and binary classif: Single-column component
     colnames(ret) <- out_names
