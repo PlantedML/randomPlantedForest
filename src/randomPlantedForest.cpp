@@ -29,8 +29,6 @@ void shuffle_vector(Iter first, Iter last) {
   }
 }
 
-
-
 // wrapper around R's RNG such that we get a uniform distribution over
 // [0,n) as required by the STL algorithm
 // This was used with std::random_shuffle which was removed in C++11
