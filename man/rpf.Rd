@@ -107,7 +107,7 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
-\item{nthreads}{\verb{[1L]}: Number of threads used for ocmputation, defaulting to \code{1}, i.e. serial execution.}
+\item{nthreads}{\verb{[1L]}: Number of threads used for computation, defaulting to serial execution.}
 
 \item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
 Set to \code{TRUE} to enable components extract with \code{\link[=predict_components]{predict_components()}} are valid.

@@ -15,7 +15,7 @@
 #' @param split_try `[10]`: Number of split points to be considered when choosing a split candidate.
 #' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of viable split-candidates in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
-#' @param nthreads `[1L]`: Number of threads used for ocmputation, defaulting to `1`, i.e. serial execution.
+#' @param nthreads `[1L]`: Number of threads used for computation, defaulting to serial execution.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.
 #'   Can be achieved after fitting with [`purify()`].
