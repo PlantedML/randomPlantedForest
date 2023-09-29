@@ -19,7 +19,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  nthreads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -37,7 +37,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  nthreads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -55,7 +55,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  nthreads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -73,7 +73,7 @@ rpf(x, ...)
   split_try = 10,
   t_try = 0.4,
   deterministic = FALSE,
-  parallel = FALSE,
+  nthreads = 1,
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
@@ -107,7 +107,7 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
-\item{parallel}{\verb{[FALSE]}: Perform algorithm in parallel or serialized.}
+\item{nthreads}{\verb{[1L]}: Number of threads used for computation, defaulting to serial execution.}
 
 \item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
 Set to \code{TRUE} to enable components extract with \code{\link[=predict_components]{predict_components()}} are valid.

@@ -744,7 +744,8 @@ int sample_size = 0;                        /**< Number of samples of X */
 bool purify_forest = 0;                     /**< Whether the forest should be purified */
 bool purified = false;                      /**< Track if forest is currently purified */
 bool deterministic = false;                 /**< Choose whether approach deterministic or random */
-bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
+//bool parallelize = false;                   /**< Perform algorithm in parallel or serialized */
+int nthreads = 1;                           /**< Number threads used for parallelisation */
 bool cross_validate = false;                /**< Determines if cross validation is performed */
 std::vector<double> upper_bounds;
 std::vector<double> lower_bounds;
@@ -793,7 +794,7 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix& samples_Y, const N
     this->t_try = 0.4;
     this->purify_forest = 0;
     this->deterministic = 0;
-    this->parallelize = 0;
+    this->nthreads = 1;
     this->cross_validate = 0;
   }else{
     this->max_interaction = pars[0];
@@ -803,7 +804,7 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix& samples_Y, const N
     this->t_try = pars[4];
     this->purify_forest = pars[5];
     this->deterministic = pars[6];
-    this->parallelize = pars[7];
+    this->nthreads = pars[7];
     this->cross_validate = pars[8];
   }
 
@@ -1160,14 +1161,24 @@ void RandomPlantedForest::fit(){
   // initialize tree families
   this->tree_families = std::vector<TreeFamily>(n_trees);
 
-  // iterate over families of trees and modify
-  if(parallelize){
-    int n_threads = std::thread::hardware_concurrency() - 1;
-    for(int n = 0; n<n_trees; n+=n_threads){
-      if(n >= (n_trees - n_threads)) n_threads = n_trees % n_threads;
-      std::vector<std::thread> threads(n_threads);
-      for(int t=0; t<n_threads; ++t){
-        Rcout << (n + t) << "/" << n_trees << std::endl;
+  // Loop over number of tree families and dispatch threads in batches
+  // of nhreads at once
+  if(nthreads > 1){
+    if (nthreads > std::thread::hardware_concurrency()) {
+      Rcout << "Requested " << nthreads << " threads but only " <<
+        std::thread::hardware_concurrency() << " available" << std::endl;
+    }
+    // Create local thread count to not overwrite nthreads,
+    // would get reported wrongly by get_parameters()
+    unsigned int current_threads = nthreads;
+    for(int n = 0; n<n_trees; n+=current_threads){
+      if(n >= (n_trees - current_threads + 1)) {
+        current_threads = n_trees % current_threads;
+      }
+
+      std::vector<std::thread> threads(current_threads);
+      for(int t=0; t < current_threads; ++t){
+        // Rcout << "Dispatching thread " << (n + t + 1) << "/" << n_trees << std::endl;
         threads[t] = std::thread(&RandomPlantedForest::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
       for(auto& t: threads){
@@ -2446,7 +2457,7 @@ void RandomPlantedForest::print(){
 // print parameters of the model to the console
 void RandomPlantedForest::get_parameters(){
   Rcout << "Parameters: n_trees=" <<  n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try
-        << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", parallel=" << parallelize
+        << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", nthreads=" << nthreads
         << ", feature_size=" << feature_size << ", sample_size=" << sample_size << std::endl;
 }
 
@@ -2463,8 +2474,8 @@ void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values
   for(unsigned int i=0; i<keys.size(); ++i){
     if(keys[i] == "deterministic"){
       this->deterministic = values[i];
-    }else if(keys[i] == "parallel"){
-      this->parallelize = values[i];
+    }else if(keys[i] == "nthreads"){
+      this->nthreads = values[i];
     }else if(keys[i] == "purify"){
       this->purify_forest = values[i];
     }else if(keys[i] == "n_trees"){
@@ -3028,7 +3039,7 @@ void ClassificationRPF::exponential_loss_3(rpf::Split& split){
   if(std::isnan(split.min_sum)) split.min_sum = INF;
 }
 
-// constructor with parameters split_try, t_try, purify_forest, deterministic, parallelize
+// constructor with parameters split_try, t_try, purify_forest, deterministic, nthreads
 ClassificationRPF::ClassificationRPF(const NumericMatrix& samples_Y, const NumericMatrix& samples_X,
                                      const String loss, const NumericVector parameters)
   : RandomPlantedForest{}{
@@ -3082,7 +3093,7 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix& samples_Y, const Numer
       this->t_try = 0.4;
       this->purify_forest = 0;
       this->deterministic = 0;
-      this->parallelize = 0;
+      this->nthreads = 1;
       this->cross_validate = 0;
       this->delta = 0.1;
       this->epsilon = 0;
@@ -3094,7 +3105,7 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix& samples_Y, const Numer
       this->t_try = pars[4];
       this->purify_forest = pars[5];
       this->deterministic = pars[6];
-      this->parallelize = pars[7];
+      this->nthreads = pars[7];
       this->cross_validate = pars[8];
       this->delta = pars[9];
       this->epsilon = pars[10];
@@ -3666,13 +3677,24 @@ void ClassificationRPF::fit(){
   // initialize tree families
   this->tree_families = std::vector<TreeFamily>(n_trees);
 
-  // iterate over families of trees and modify
-  if(parallelize){
-    int n_threads = std::thread::hardware_concurrency() - 1;
-    for(int n = 0; n<n_trees; n+=n_threads){
-      if(n >= (n_trees - n_threads)) n_threads = n_trees % n_threads;
-      std::vector<std::thread> threads(n_threads);
-      for(int t=0; t<n_threads; ++t){
+  // Loop over number of tree families and dispatch threads in batches
+  // of nhreads at once
+  if(nthreads > 1){
+    if (nthreads > std::thread::hardware_concurrency()) {
+      Rcout << "Requested " << nthreads << " threads but only " <<
+        std::thread::hardware_concurrency() << " available" << std::endl;
+    }
+    // Create local thread count to not overwrite nthreads,
+    // would get reported wrongly by get_parameters()
+    unsigned int current_threads = nthreads;
+    for(int n = 0; n<n_trees; n+=current_threads){
+      if(n >= (n_trees - current_threads + 1)) {
+        current_threads = n_trees % current_threads;
+      }
+
+      std::vector<std::thread> threads(current_threads);
+      for(int t=0; t < current_threads; ++t){
+        // Rcout << "Dispatching thread " << (n + t + 1) << "/" << n_trees << std::endl;
         threads[t] = std::thread(&ClassificationRPF::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
       for(auto& t: threads){
@@ -3706,8 +3728,8 @@ void ClassificationRPF::set_parameters(StringVector keys, NumericVector values){
   for(unsigned int i=0; i<keys.size(); ++i){
     if(keys[i] == "deterministic"){
       this->deterministic = values[i];
-    }else if(keys[i] == "parallel"){
-      this->parallelize = values[i];
+    }else if(keys[i] == "nthreads"){
+      this->nthreads = values[i];
     }else if(keys[i] == "purify"){
       this->purify_forest = values[i];
     }else if(keys[i] == "n_trees"){
