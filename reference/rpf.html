@@ -66,7 +66,7 @@
 <span>  split_try <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  t_try <span class="op">=</span> <span class="fl">0.4</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
@@ -85,7 +85,7 @@
 <span>  split_try <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  t_try <span class="op">=</span> <span class="fl">0.4</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
@@ -104,7 +104,7 @@
 <span>  split_try <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  t_try <span class="op">=</span> <span class="fl">0.4</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
@@ -123,7 +123,7 @@
 <span>  split_try <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  t_try <span class="op">=</span> <span class="fl">0.4</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  parallel <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
@@ -177,8 +177,8 @@ this is equivalent to setting <code>max_interaction = 10</code>.</p></dd>
 <dd><p><code>[FALSE]</code>: Choose whether approach deterministic or random.</p></dd>
 
 
-<dt>parallel</dt>
-<dd><p><code>[FALSE]</code>: Perform algorithm in parallel or serialized.</p></dd>
+<dt>nthreads</dt>
+<dd><p><code>[1L]</code>: Number of threads used for computation, defaulting to serial execution.</p></dd>
 
 
 <dt>purify</dt>
