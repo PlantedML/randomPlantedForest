@@ -1,5 +1,6 @@
 # randomPlantedForest 0.2.1.9000 (Development version)
 
+* Allow features of type `logical`, which are now converted via `as.integer`.
 * The `parallel = TRUE|FALSE` argument in `rpf()` has been substituted by an `nthreads = 1L` argument, allowing for more flexible parallelization.
   The previous behavior only allowed for either no parallelization or using n-1 of n available cores. 
   The new implementation should be reasonably robust and the default behavior remains serial execution.

@@ -80,6 +80,12 @@ pca_order <- function(x, y) {
 preprocess_predictors_fit <- function(processed) {
   predictors <- as.data.table(processed$predictors)
 
+  # Convert logicals to binary integers
+  logical_cols <- names(which(sapply(predictors, is.logical)))
+  if (length(logical_cols) > 0) {
+    predictors[, (logical_cols) := lapply(.SD, as.integer), .SDcols = logical_cols]
+  }
+
   # Convert characters to factors
   char_cols <- names(which(sapply(predictors, is.character)))
   if (length(char_cols) > 0) {
@@ -113,6 +119,12 @@ preprocess_predictors_fit <- function(processed) {
 # Used in predict_rpf_bridge()
 preprocess_predictors_predict <- function(object, predictors) {
   predictors <- as.data.table(predictors)
+
+  # Convert logicals to binary integers
+  logical_cols <- names(which(sapply(predictors, is.logical)))
+  if (length(logical_cols) > 0) {
+    predictors[, (logical_cols) := lapply(.SD, as.integer), .SDcols = logical_cols]
+  }
 
   # Convert characters to factors
   char_cols <- names(which(sapply(predictors, is.character)))
@@ -152,7 +164,7 @@ preprocess_outcome <- function(processed, loss) {
 
   if (is_binary & is_integerish) {
     warning(paste(
-      "y is binary integer, assuming regression task.",
+      "y is a binary integer, assuming regression task.",
       "Recode y to a factor for classification."
     ))
   }
