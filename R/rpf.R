@@ -161,11 +161,12 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
   checkmate::assert_number(delta, lower = 0, upper = 1)
   checkmate::assert_number(epsilon, lower = 0, upper = 1)
 
-  # "median" is implemented but discarded
-  checkmate::assert_choice(
-    loss,
-    choices = c("L1", "L2", "logit", "exponential")
+  # "median" loss is implemented but discarded
+  loss_functions <- switch(outcomes$mode,
+    "regression" = "L2",
+    "classification" = c("L1", "L2", "logit", "exponential")
   )
+  checkmate::assert_choice(loss, choices = loss_functions)
 
   checkmate::assert_flag(deterministic)
   checkmate::assert_int(nthreads, lower = 1L)
