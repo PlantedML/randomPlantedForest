@@ -1,7 +1,4 @@
-citHeader("To cite randomPlantedForest in publications use:")
-
-citEntry(
-  entry    = "Article",
+bibentry(bibtype = "Article",
   title    = "Random Planted Forest: a directly interpretable tree ensemble",
   author   = "Hiabu, Munir and Mammen, Enno and Meyer, Joseph T.",
   journal  = "arXiv",
@@ -10,6 +7,6 @@ citEntry(
   url      = "https://arxiv.org/abs/2012.14563",
   textVersion = paste(
     "Hiabu et. al. (2020).",
-    "Random Planted Forest: a directly interpretable tree ensemble"
+    "Random Planted Forest: a directly interpretable tree ensemble. arXiv preprint arXiv:2012.14563 (2020)"
   )
 )
