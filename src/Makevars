@@ -1,0 +1,9 @@
+SOURCES=$(wildcard ./lib/*.cpp ./include/*.cpp)
+
+OBJECTS = $(SOURCES:.cpp=.o)
+
+PKG_CPPFLAGS=-I./include -I./lib
+
+all: $(SHLIB)
+
+clean: @rm -f $(OBJECTS)
