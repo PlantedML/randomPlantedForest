@@ -1,4 +1,4 @@
-SOURCES=$(wildcard ./lib/*.cpp ./include/*.cpp)
+SOURCES=$(wildcard ./lib/*.cpp ./*.cpp)
 
 OBJECTS = $(SOURCES:.cpp=.o)
 

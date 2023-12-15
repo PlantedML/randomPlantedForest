@@ -1,4 +1,3 @@
-
 #ifndef RPF_H
 #define RPF_H
 
@@ -56,8 +55,6 @@ protected:
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
                                         std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
-  virtual Split calcOptimalSplit2(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                         std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);                                   
 };
 
 #endif // RPF_HPP
