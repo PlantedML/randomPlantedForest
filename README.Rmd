@@ -22,18 +22,26 @@ set.seed(1)
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml)
 [![Codecov test coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
+[![randomPlantedForest status badge](https://plantedml.r-universe.dev/badges/randomPlantedForest)](https://plantedml.r-universe.dev/randomPlantedForest)
 <!-- badges: end -->
 
 `randomPlantedForest` implements "Random Planted Forest", a directly interpretable tree ensemble [(arxiv)][arxiv1].
 
 ## Installation
 
-You can install the development version of `randomPlantedForest` from [GitHub](https://github.com/) with:
+You can install the development version of `randomPlantedForest` from [GitHub](https://github.com/) with
 
 ```r
 # install.packages("remotes")
 remotes::install_github("PlantedML/randomPlantedForest")
 ```
+
+or from [r-universe][r-universe] with
+
+```r
+install.packages("randomPlantedForest", repos = "https://plantedml.r-universe.dev")
+```
+
 
 ## Example
 
@@ -88,3 +96,4 @@ See the [Bikesharing decomposition][bikes] article for more examples.
 
 [arxiv1]: https://arxiv.org/abs/2012.14563
 [bikes]: https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html
+[r-universe]: https://plantedml.r-universe.dev/packages

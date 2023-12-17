@@ -8,6 +8,8 @@
 [![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml)
 [![Codecov test
 coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
+[![randomPlantedForest status
+badge](https://plantedml.r-universe.dev/badges/randomPlantedForest)](https://plantedml.r-universe.dev/randomPlantedForest)
 <!-- badges: end -->
 
 `randomPlantedForest` implements “Random Planted Forest”, a directly
@@ -16,11 +18,17 @@ interpretable tree ensemble [(arxiv)](https://arxiv.org/abs/2012.14563).
 ## Installation
 
 You can install the development version of `randomPlantedForest` from
-[GitHub](https://github.com/) with:
+[GitHub](https://github.com/) with
 
 ``` r
 # install.packages("remotes")
 remotes::install_github("PlantedML/randomPlantedForest")
+```
+
+or from [r-universe](https://plantedml.r-universe.dev/packages) with
+
+``` r
+install.packages("randomPlantedForest", repos = "https://plantedml.r-universe.dev")
 ```
 
 ## Example
@@ -50,7 +58,7 @@ rpfit
 #>            delta: 0
 #>          epsilon: 0.1
 #>    deterministic: FALSE
-#>         parallel: FALSE
+#>         nthreads: 1
 #>           purify: FALSE
 #>               cv: FALSE
 
@@ -58,12 +66,12 @@ predict(rpfit, new_data = mtcars) |>
   cbind(mpg = mtcars$mpg) |>
   head()
 #>      .pred  mpg
-#> 1 21.08519 21.0
-#> 2 21.07633 21.0
-#> 3 25.39977 22.8
-#> 4 20.78283 21.4
-#> 5 17.56310 18.7
-#> 6 18.71368 18.1
+#> 1 20.81459 21.0
+#> 2 20.72354 21.0
+#> 3 26.04526 22.8
+#> 4 21.26845 21.4
+#> 5 18.45921 18.7
+#> 6 19.54406 18.1
 ```
 
 Prediction components can be accessed via `predict_components`,
@@ -78,12 +86,12 @@ components <- predict_components(rpfit, new_data = mtcars)
 str(components)
 #> List of 3
 #>  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:
-#>   ..$ cyl   : num [1:32] 0.477 0.477 1.343 0.477 -1.477 ...
-#>   ..$ wt    : num [1:32] 0.0623 0.0845 3.0677 -0.3823 -1.0544 ...
-#>   ..$ hp    : num [1:32] 0.373 0.373 0.629 0.373 -0.584 ...
-#>   ..$ cyl:wt: num [1:32] -0.15403 -0.16567 -0.00392 -0.06926 0.14771 ...
-#>   ..$ cyl:hp: num [1:32] 0.0429 0.0429 0.2779 0.0429 0.4573 ...
-#>   ..$ hp:wt : num [1:32] 0.1049 0.0855 -0.0931 0.1623 -0.1054 ...
+#>   ..$ cyl   : num [1:32] 0.445 0.445 0.863 0.445 -1.274 ...
+#>   ..$ wt    : num [1:32] -0.0615 -0.1421 2.3182 -0.0155 -0.3116 ...
+#>   ..$ hp    : num [1:32] 0.162 0.162 2.021 0.162 -0.941 ...
+#>   ..$ cyl:wt: num [1:32] 0.00389 0.00389 0.69586 0.17156 0.4615 ...
+#>   ..$ cyl:hp: num [1:32] 0.1453 0.1453 -0.0511 0.1453 0.1179 ...
+#>   ..$ hp:wt : num [1:32] -0.1264 -0.1367 -0.0487 0.1138 0.1596 ...
 #>   ..- attr(*, ".internal.selfref")=<externalptr> 
 #>  $ intercept: num 20.2
 #>  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:
