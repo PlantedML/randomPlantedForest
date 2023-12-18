@@ -10,8 +10,8 @@
     decomposition.">
 <title>Random Planted Forest: A Directly Interpretable Tree Ensemble • randomPlantedForest</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.2.2/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.2.2/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
+<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
 <!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Random Planted Forest: A Directly Interpretable Tree Ensemble">
 <meta property="og:description" content="An implementation of the Random Planted Forest algorithm for
@@ -76,16 +76,19 @@
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of <code>randomPlantedForest</code> from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
+<p>You can install the development version of <code>randomPlantedForest</code> from <a href="https://github.com/" class="external-link">GitHub</a> with</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PlantedML/randomPlantedForest"</span><span class="op">)</span></span></code></pre></div>
+<p>or from <a href="https://plantedml.r-universe.dev/packages" class="external-link">r-universe</a> with</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"randomPlantedForest"</span>, repos <span class="op">=</span> <span class="st">"https://plantedml.r-universe.dev"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h2>
 <p>Model fitting uses a familiar interface:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span><span class="op">)</span></span>
@@ -108,7 +111,7 @@
 <span><span class="co">#&gt;            delta: 0</span></span>
 <span><span class="co">#&gt;          epsilon: 0.1</span></span>
 <span><span class="co">#&gt;    deterministic: FALSE</span></span>
-<span><span class="co">#&gt;         parallel: FALSE</span></span>
+<span><span class="co">#&gt;         nthreads: 1</span></span>
 <span><span class="co">#&gt;           purify: FALSE</span></span>
 <span><span class="co">#&gt;               cv: FALSE</span></span>
 <span></span>
@@ -116,25 +119,25 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>mpg <span class="op">=</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      .pred  mpg</span></span>
-<span><span class="co">#&gt; 1 21.08519 21.0</span></span>
-<span><span class="co">#&gt; 2 21.07633 21.0</span></span>
-<span><span class="co">#&gt; 3 25.39977 22.8</span></span>
-<span><span class="co">#&gt; 4 20.78283 21.4</span></span>
-<span><span class="co">#&gt; 5 17.56310 18.7</span></span>
-<span><span class="co">#&gt; 6 18.71368 18.1</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 20.81459 21.0</span></span>
+<span><span class="co">#&gt; 2 20.72354 21.0</span></span>
+<span><span class="co">#&gt; 3 26.04526 22.8</span></span>
+<span><span class="co">#&gt; 4 21.26845 21.4</span></span>
+<span><span class="co">#&gt; 5 18.45921 18.7</span></span>
+<span><span class="co">#&gt; 6 19.54406 18.1</span></span></code></pre></div>
 <p>Prediction components can be accessed via <code>predict_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization. The <code>glex</code> package can be used as well: <code>glex(rpfit)</code> yields the same result.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">)</span></span>
 <span><span class="co">#&gt; List of 3</span></span>
 <span><span class="co">#&gt;  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:</span></span>
-<span><span class="co">#&gt;   ..$ cyl   : num [1:32] 0.477 0.477 1.343 0.477 -1.477 ...</span></span>
-<span><span class="co">#&gt;   ..$ wt    : num [1:32] 0.0623 0.0845 3.0677 -0.3823 -1.0544 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp    : num [1:32] 0.373 0.373 0.629 0.373 -0.584 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:wt: num [1:32] -0.15403 -0.16567 -0.00392 -0.06926 0.14771 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:hp: num [1:32] 0.0429 0.0429 0.2779 0.0429 0.4573 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp:wt : num [1:32] 0.1049 0.0855 -0.0931 0.1623 -0.1054 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl   : num [1:32] 0.445 0.445 0.863 0.445 -1.274 ...</span></span>
+<span><span class="co">#&gt;   ..$ wt    : num [1:32] -0.0615 -0.1421 2.3182 -0.0155 -0.3116 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp    : num [1:32] 0.162 0.162 2.021 0.162 -0.941 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:wt: num [1:32] 0.00389 0.00389 0.69586 0.17156 0.4615 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:hp: num [1:32] 0.1453 0.1453 -0.0511 0.1453 0.1179 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp:wt : num [1:32] -0.1264 -0.1367 -0.0487 0.1138 0.1596 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
 <span><span class="co">#&gt;  $ intercept: num 20.2</span></span>
 <span><span class="co">#&gt;  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:</span></span>
@@ -144,7 +147,7 @@
 <span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
 <span><span class="co">#&gt;  - attr(*, "class")= chr [1:3] "glex" "rpf_components" "list"</span></span></code></pre></div>
 <p>Various visualization options are available via <code>glex</code>, e.g. for main and second-order interaction effects:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install glex if not available:</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"glex"</span><span class="op">)</span><span class="op">)</span> <span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PlantedML/glex"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Loading required namespace: glex</span></span>
@@ -206,6 +209,7 @@
 <ul class="list-unstyled">
 <li><a href="https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master" class="external-link"><img src="https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg" alt="Codecov test coverage"></a></li>
+<li><a href="https://plantedml.r-universe.dev/randomPlantedForest" class="external-link"><img src="https://plantedml.r-universe.dev/badges/randomPlantedForest" alt="randomPlantedForest status badge"></a></li>
 </ul>
 </div>
 
