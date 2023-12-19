@@ -1,4 +1,4 @@
-SOURCES=$(wildcard ./lib/*.cpp ./*.cpp)
+SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp randomPlantedForest.cpp RcppExports.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
 
