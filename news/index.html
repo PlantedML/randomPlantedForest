@@ -49,7 +49,8 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.1.9000" id="randomplantedforest-0219000-development-version">randomPlantedForest 0.2.1.9000 (Development version)<a class="anchor" aria-label="anchor" href="#randomplantedforest-0219000-development-version"></a></h2>
-<ul><li>
+<ul><li>Internals in <code>src/</code> have been refactored into modular sub-files (<a href="https://github.com/PlantedML/randomPlantedForest/issues/53" class="external-link">#53</a>)</li>
+<li>
 <code><a href="../reference/rpf.html">rpf()</a></code> now errors if a regression target is combined with a <code>loss</code> other than <code>"L2"</code>.</li>
 <li>Allow features of type <code>logical</code>, which are now converted via <code>as.integer</code>.</li>
 <li>The <code>parallel = TRUE|FALSE</code> argument in <code><a href="../reference/rpf.html">rpf()</a></code> has been substituted by an <code>nthreads = 1L</code> argument, allowing for more flexible parallelization. The previous behavior only allowed for either no parallelization or using n-1 of n available cores. The new implementation should be reasonably robust and the default behavior remains serial execution.</li>
