@@ -1,5 +1,6 @@
 # randomPlantedForest 0.2.1.9000 (Development version)
 
+* Internals in `src/` have been refactored into modular sub-files (#53)
 * `rpf()` now errors if a regression target is combined with a `loss` other than `"L2"`.
 * Allow features of type `logical`, which are now converted via `as.integer`.
 * The `parallel = TRUE|FALSE` argument in `rpf()` has been substituted by an `nthreads = 1L` argument, allowing for more flexible parallelization.
