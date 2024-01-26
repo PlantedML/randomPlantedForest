@@ -343,22 +343,18 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim)
       { // consider all possible dimensions
 
-        // ignore dim if same as split coordinate or in dimensions of old tree
-        if (feature_dim == curr_split.split_coordinate || curr_split.tree_index->split_dims.count(feature_dim) > 0)
-          continue;
-
         // create union of split coord, feature dim and dimensions of old tree
         std::set<int> curr_dims = curr_split.tree_index->split_dims;
         curr_dims.insert(curr_split.split_coordinate);
         curr_dims.insert(feature_dim);
         curr_dims.erase(0);
 
-        // do not exceed maximum level of interaction
-        if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
-          continue;
-
         // skip if possible_split already exists
         if (possibleExists(feature_dim, possible_splits, curr_dims))
+          continue;
+
+        // do not exceed maximum level of interaction
+        if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
           continue;
 
         // check if resulting tree already exists in family
