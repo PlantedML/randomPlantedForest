@@ -47,13 +47,12 @@ convert_xgboost_rpf <- function(xg, x, y) {
   rpfit <- rpf(x = x, y = y, max_interaction = 0, ntrees = num_trees, splits = 1,
                purify = FALSE)
 
-  # xgboost adds 0.5 to prediction, but just once
-  rpfit$forest[[1]]$values[[1]][[1]] <- 0.5
-
   # Overwrite rpf trees
   for (t in seq_len(num_trees)) {
+    # xgboost adds 0.5 to prediction
+    rpfit$forest[[t]]$values[[1]][[1]] <- 0.5
     rpfit$forest[[t]]$variables[[2]] <- trees[Tree == t-1 & Feature_num > 0, sort(unique(Feature_num))]
-    rpfit$forest[[t]]$values[[2]] <- as.list(trees[Tree == t-1 & Feature == "Leaf", Quality])
+    rpfit$forest[[t]]$values[[2]] <- as.list(as.numeric(num_trees)*trees[Tree == t-1 & Feature == "Leaf", Quality])
 
     rpfit$forest[[t]]$intervals[[2]] <- rep(rpfit$forest[[t]]$intervals[[1]], length(rpfit$forest[[t]]$values[[2]]))
 
