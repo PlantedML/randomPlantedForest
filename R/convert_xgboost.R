@@ -1,5 +1,6 @@
 
 # Function to get leaf bounds from xgboost
+#FIXME: This seems to be the bottleneck, could do it in C++
 get_leaf_bounds <- function(trees, tree) {
   max_node <- trees[Tree == tree, max(Node)]
   num_nodes <- max_node + 1
