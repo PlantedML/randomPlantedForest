@@ -22,7 +22,8 @@ Imports:
     hardhat,
     methods,
     Rcpp,
-    utils
+    utils,
+    xgboost
 Suggests:
     knitr,
     mvtnorm,
