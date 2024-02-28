@@ -1,7 +1,7 @@
 
 # Function to get leaf bounds from xgboost
 #FIXME: This seems to be the bottleneck, could do it in C++
-get_leaf_bounds <- function(trees, tree) {
+get_leaf_bounds <- function(trees, tree,x) {
   max_node <- trees[Tree == tree, max(Node)]
   num_nodes <- max_node + 1
   lb <- matrix(-Inf, nrow = num_nodes, ncol = ncol(x))
@@ -58,7 +58,7 @@ convert_xgboost_rpf <- function(xg, x, y) {
     rpfit$forest[[t]]$intervals[[2]] <- rep(rpfit$forest[[t]]$intervals[[1]], length(rpfit$forest[[t]]$values[[2]]))
 
     # Get leaf bounds
-    leaf_bounds <- get_leaf_bounds(trees, t-1)
+    leaf_bounds <- get_leaf_bounds(trees, t-1,x)
     leaves <- trees[Tree == t-1 & Feature == "Leaf", Node+1]
     for (i in seq_along(leaves)) {
       rpfit$forest[[t]]$intervals[[2]][[i]][1, ] <- pmax(rpfit$forest[[t]]$intervals[[2]][[i]][1, ],
