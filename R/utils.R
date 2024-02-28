@@ -76,7 +76,7 @@ pca_order <- function(x, y) {
 # Sort factor predictors by outcome and re-encode as integer
 # save original factor levels for prediction step
 # Used in rpf_bridge()
-#' @importFrom data.table .SD ':=' as.data.table
+#' @importFrom data.table .SD as.data.table
 preprocess_predictors_fit <- function(processed) {
   predictors <- as.data.table(processed$predictors)
 

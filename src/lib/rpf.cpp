@@ -2088,3 +2088,54 @@ List RandomPlantedForest::get_model()
   }
   return (model);
 }
+
+// FIXME: Add checks for format of model argument
+void RandomPlantedForest::set_model(List& model) {
+
+  unsigned int n_families = model.size();
+
+  for (unsigned int i = 0; i < n_families; ++i) {
+    List family = model[i];
+    List variables = family["variables"];
+    List values = family["values"];
+    List intervals = family["intervals"];
+    unsigned int n_trees = variables.size();
+
+    TreeFamily& old_family = tree_families[i];
+
+    old_family.clear();
+
+    for (unsigned int j = 0; j < n_trees; ++j) {
+
+      // Variables
+      IntegerVector tree_variables = variables[j];
+      std::set<int> tree_variables_set(tree_variables.begin(), tree_variables.end());
+
+      // Values
+      std::vector<std::vector<double>> tree_values = values[j];
+      unsigned int n_leaves = tree_values.size();
+
+      // Intervals
+      std::vector<NumericMatrix> tree_intervals = intervals[j];
+
+      std::vector<Leaf> leaves;
+      for (unsigned int k = 0; k < n_leaves; ++k) {
+
+        Leaf temp;
+        temp.value = tree_values[k];
+
+        NumericMatrix leaf_intervals = tree_intervals[k];
+        std::vector<Interval> intervals(leaf_intervals.ncol());
+        for (int l = 0; l < feature_size; ++l) {
+          intervals[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
+        }
+
+        temp.intervals = intervals;
+        leaves.push_back(temp);
+      }
+
+      old_family.insert(std::make_pair(tree_variables_set, std::make_shared<DecisionTree>(DecisionTree(tree_variables_set, leaves))));
+
+    }
+  }
+}
