@@ -24,6 +24,7 @@ public:
   void get_parameters();
   void set_parameters(StringVector keys, NumericVector values);
   List get_model();
+  void set_model(List& model);
   virtual ~RandomPlantedForest(){};
   bool is_purified();
 
