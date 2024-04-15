@@ -8,7 +8,7 @@ The sum of all components equals the overall predicted value for an observation.
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
     
 
-    <nav class="navbar fixed-top navbar-light navbar-expand-lg bg-light"><div class="container">
+    <nav class="navbar fixed-top navbar-light navbar-expand-lg bg-light" data-bs-theme="light"><div class="container">
     
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
@@ -124,50 +124,53 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
 <span class="r-in"><span><span class="co"># Extract all components, including main effects and interaction terms up to `max_interaction`</span></span></span>
 <span class="r-in"><span><span class="op">(</span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu">predict_components</span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">test</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $m</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl      disp         hp    cyl:disp       cyl:hp     disp:hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3770452  2.603519  0.8918936  0.23153106 -0.267467990 -0.16388358</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.7695683 -1.465990 -0.1106307  0.01146022  0.006589163  0.23806033</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.7695683 -1.465990 -0.1106307  0.01146022  0.006589163  0.23806033</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.7695683 -1.334206 -0.3514101  0.01096113 -0.010321204  0.42309626</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3770452  4.125237  3.7886809  0.46853941 -0.002318937  0.94645152</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3770452  2.603519  3.7886809  0.23153106 -0.002318937  0.31230241</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3770452  4.125237  0.4823373  0.46853941 -0.205562593 -0.19865944</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.4832547  1.694664 -0.3514101 -0.16986248  0.127061572 -0.11840583</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3770452  2.603519  0.4516721  0.23153106 -0.200179679 -0.05174859</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     cyl:disp:hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  0.07242737</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.04685440</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.04685440</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4:  0.13144921</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.01982741</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6: -0.10343096</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7: -0.03536481</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8: -0.05597535</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9:  0.13144921</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.09596553</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11:  0.13144921</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  0.05100935</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl       disp         hp    cyl:disp      cyl:hp     disp:hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;num&gt;      &lt;num&gt;      &lt;num&gt;       &lt;num&gt;       &lt;num&gt;       &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3171056  2.4939663  1.1179246 -0.01482717 -0.04027828 -0.42825535</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.8481770 -1.1761913  0.2848618  0.09476257  0.06668192  0.01536748</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.8481770 -1.1761913  0.2848618  0.09476257  0.06668192  0.01536748</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.8481770 -1.3837212  0.1665770  0.09270936  0.08321648 -0.02961805</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3171056  4.6572097  3.3746638  0.93009887  0.30303006  0.04533263</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3171056  2.4939663  3.3746638 -0.01482717  0.30303006 -0.19752497</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3171056  4.6572097  1.1318509  0.93009887 -0.35303353 -0.10831095</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.6441787  0.6437832  0.1665770  0.13550304  0.09153429 -0.24911970</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3171056  2.4939663  0.4186601 -0.01482717 -0.04027828 -0.27031439</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      cyl:disp:hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1: -0.046862620</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2:  0.009109767</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3:  0.009109767</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4:  0.084106744</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5:  0.008909305</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  0.077872127</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  0.101920822</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  0.011412415</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9:  0.084106744</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.024506959</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11:  0.084106744</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12: -0.046862620</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $intercept</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.17863</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.2796</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $x</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     cyl  disp  hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:   4 120.1  97</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2:   8 318.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3:   8 304.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4:   8 350.0 245</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5:   8 400.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:   4  79.0  66</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:   4 120.3  91</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:   4  95.1 113</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9:   8 351.0 264</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10:   6 145.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11:   8 301.0 335</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:   4 121.0 109</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       cyl  disp    hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;num&gt; &lt;num&gt; &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:     4 120.1    97</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2:     8 318.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3:     8 304.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4:     8 350.0   245</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5:     8 400.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:     4  79.0    66</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:     4 120.3    91</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:     4  95.1   113</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9:     8 351.0   264</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10:     6 145.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11:     8 301.0   335</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:     4 121.0   109</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "glex"           "rpf_components" "list"          </span>
@@ -178,57 +181,60 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
 <span class="r-in"><span>  prediction <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       m_sum    .pred</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  24.92369 24.92369</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  18.04169 18.04169</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  18.04169 18.04169</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  14.90805 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  18.12735 18.12735</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  30.77883 30.77883</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  28.45402 28.45402</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  26.17159 26.17159</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  14.90805 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 20.78145 20.78145</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 14.90805 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 24.64148 24.64148</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  24.67837 24.67837</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  18.72601 18.72601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  18.72601 18.72601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  14.69731 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  18.36949 18.36949</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  30.98491 30.98491</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  27.65793 27.65793</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  27.86593 27.86593</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  14.69731 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 20.39919 20.39919</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 14.69731 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 24.13705 24.13705</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Only get components with interactions of a lower degree, ignoring 3-way interactions</span></span></span>
 <span class="r-in"><span><span class="fu">predict_components</span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">test</span>, max_interaction <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $m</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl      disp         hp    cyl:disp       cyl:hp     disp:hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3770452  2.603519  0.8918936  0.23153106 -0.267467990 -0.16388358</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.7695683 -1.465990 -0.1106307  0.01146022  0.006589163  0.23806033</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.7695683 -1.465990 -0.1106307  0.01146022  0.006589163  0.23806033</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.7695683 -1.334206 -0.3514101  0.01096113 -0.010321204  0.42309626</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3770452  4.125237  3.7886809  0.46853941 -0.002318937  0.94645152</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3770452  2.603519  3.7886809  0.23153106 -0.002318937  0.31230241</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3770452  4.125237  0.4823373  0.46853941 -0.205562593 -0.19865944</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.4832547  1.694664 -0.3514101 -0.16986248  0.127061572 -0.11840583</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.7695683 -1.465990 -2.8044495  0.01146022 -0.105503856 -0.26797812</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3770452  2.603519  0.4516721  0.23153106 -0.200179679 -0.05174859</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl       disp         hp    cyl:disp      cyl:hp     disp:hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;num&gt;      &lt;num&gt;      &lt;num&gt;       &lt;num&gt;       &lt;num&gt;       &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3171056  2.4939663  1.1179246 -0.01482717 -0.04027828 -0.42825535</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.8481770 -1.1761913  0.2848618  0.09476257  0.06668192  0.01536748</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.8481770 -1.1761913  0.2848618  0.09476257  0.06668192  0.01536748</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.8481770 -1.3837212  0.1665770  0.09270936  0.08321648 -0.02961805</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3171056  4.6572097  3.3746638  0.93009887  0.30303006  0.04533263</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3171056  2.4939663  3.3746638 -0.01482717  0.30303006 -0.19752497</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3171056  4.6572097  1.1318509  0.93009887 -0.35303353 -0.10831095</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.6441787  0.6437832  0.1665770  0.13550304  0.09153429 -0.24911970</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.8481770 -1.1761913 -3.4381764  0.09476257  0.06607252 -0.36467941</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3171056  2.4939663  0.4186601 -0.01482717 -0.04027828 -0.27031439</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $intercept</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.17863</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.2796</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $x</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     cyl  disp  hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:   4 120.1  97</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2:   8 318.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3:   8 304.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4:   8 350.0 245</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5:   8 400.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:   4  79.0  66</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:   4 120.3  91</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:   4  95.1 113</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9:   8 351.0 264</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10:   6 145.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11:   8 301.0 335</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:   4 121.0 109</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       cyl  disp    hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;num&gt; &lt;num&gt; &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:     4 120.1    97</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2:     8 318.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3:     8 304.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4:     8 350.0   245</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5:     8 400.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:     4  79.0    66</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:     4 120.3    91</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:     4  95.1   113</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9:     8 351.0   264</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10:     6 145.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11:     8 301.0   335</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:     4 121.0   109</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $remainder</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [1]  0.07242737 -0.04685440 -0.04685440  0.13144921 -0.01982741 -0.10343096</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [7] -0.03536481 -0.05597535  0.13144921 -0.09596553  0.13144921  0.05100935</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] -0.046862620  0.009109767  0.009109767  0.084106744  0.008909305</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [6]  0.077872127  0.101920822  0.011412415  0.084106744 -0.024506959</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [11]  0.084106744 -0.046862620</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "glex"           "rpf_components" "list"          </span>
@@ -236,42 +242,43 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
 <span class="r-in"><span><span class="co"># Only retrieve main effects</span></span></span>
 <span class="r-in"><span><span class="op">(</span><span class="va">main_effects</span> <span class="op">&lt;-</span> <span class="fu">predict_components</span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">test</span>, max_interaction <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $m</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl      disp         hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3770452  2.603519  0.8918936</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.7695683 -1.465990 -0.1106307</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.7695683 -1.465990 -0.1106307</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.7695683 -1.465990 -2.8044495</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.7695683 -1.334206 -0.3514101</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3770452  4.125237  3.7886809</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3770452  2.603519  3.7886809</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3770452  4.125237  0.4823373</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.7695683 -1.465990 -2.8044495</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.4832547  1.694664 -0.3514101</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.7695683 -1.465990 -2.8044495</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3770452  2.603519  0.4516721</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            cyl       disp         hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          &lt;num&gt;      &lt;num&gt;      &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:  1.3171056  2.4939663  1.1179246</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2: -0.8481770 -1.1761913  0.2848618</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3: -0.8481770 -1.1761913  0.2848618</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4: -0.8481770 -1.1761913 -3.4381764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5: -0.8481770 -1.3837212  0.1665770</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:  1.3171056  4.6572097  3.3746638</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:  1.3171056  2.4939663  3.3746638</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:  1.3171056  4.6572097  1.1318509</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9: -0.8481770 -1.1761913 -3.4381764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10: -0.6441787  0.6437832  0.1665770</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11: -0.8481770 -1.1761913 -3.4381764</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:  1.3171056  2.4939663  0.4186601</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $intercept</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.17863</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.2796</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $x</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     cyl  disp  hp</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  1:   4 120.1  97</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  2:   8 318.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  3:   8 304.0 150</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  4:   8 350.0 245</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  5:   8 400.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  6:   4  79.0  66</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  7:   4 120.3  91</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  8:   4  95.1 113</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  9:   8 351.0 264</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10:   6 145.0 175</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11:   8 301.0 335</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12:   4 121.0 109</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       cyl  disp    hp</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;num&gt; &lt;num&gt; &lt;num&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  1:     4 120.1    97</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  2:     8 318.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  3:     8 304.0   150</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  4:     8 350.0   245</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  5:     8 400.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  6:     4  79.0    66</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  7:     4 120.3    91</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  8:     4  95.1   113</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  9:     8 351.0   264</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10:     6 145.0   175</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11:     8 301.0   335</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12:     4 121.0   109</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $remainder</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] -0.127393139  0.209255317  0.209255317 -0.230572546  0.403908771</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [6]  1.309241020  0.506149728  0.008342022 -0.230572546 -0.257172269</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [11] -0.230572546  0.030612142</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] -0.53022343  0.18592174  0.18592174 -0.11973758  0.15521709  1.35633369</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [7]  0.19259874  0.48016681 -0.11973758 -0.04658934 -0.11973758 -0.37228247</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> attr(,"class")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "glex"           "rpf_components" "list"          </span>
@@ -282,18 +289,18 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
 <span class="r-in"><span>  prediction <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       m_sum    .pred</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  25.05109 24.92369</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  17.83244 18.04169</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  17.83244 18.04169</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  15.13862 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  17.72344 18.12735</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  29.46959 30.77883</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  27.94787 28.45402</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  26.16325 26.17159</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  15.13862 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 21.03863 20.78145</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 15.13862 14.90805</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 24.61086 24.64148</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  25.20859 24.67837</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  18.54009 18.72601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  18.54009 18.72601</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  14.81705 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  18.21428 18.36949</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  29.62858 30.98491</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  27.46533 27.65793</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  27.38576 27.86593</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  14.81705 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 20.44578 20.39919</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 14.81705 14.69731</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 24.50933 24.13705</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>
@@ -306,7 +313,7 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
 </div>
 
 <div class="pkgdown-footer-right">
-  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.7.</p>
+  <p></p><p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.8.</p>
 </div>
 
     </footer></div>
