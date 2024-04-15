@@ -952,16 +952,15 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           // create union of split coord, feature dim and dimensions of old tree
           std::set<int> curr_dims = curr_split.tree_index->split_dims;
           curr_dims.insert(curr_split.split_coordinate);
-          if (curr_dims.count(feature_dim) == 0)
-            curr_dims.insert(feature_dim);
+          curr_dims.insert(feature_dim);
           curr_dims.erase(0);
-
-          // do not exceed maximum level of interaction
-          if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
-            continue;
 
           // skip if possible_split already exists
           if (possibleExists(feature_dim, possible_splits, curr_dims))
+            continue;
+
+          // do not exceed maximum level of interaction
+          if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
             continue;
 
           // check if resulting tree already exists in family
