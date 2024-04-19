@@ -55,6 +55,8 @@ protected:
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
                                         std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
+
+  std::vector<std::vector<double>> get_lim_list(const TreeFamily &curr_family);
 };
 
 #endif // RPF_HPP
