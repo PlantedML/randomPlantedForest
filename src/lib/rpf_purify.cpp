@@ -266,12 +266,12 @@ void RandomPlantedForest::purify_3()
 
         double tot_sum = 0;
         grid = grids[tree_index_u];
-        while (!grid.nextPoint())
-        {
-          auto gridPoint = grid.getPoint();
-          //     Rcout << individuals[tree_index_u][gridPoint] << ", ";
-          tot_sum += individuals[tree_index_u][gridPoint];
-        }
+        // while (!grid.nextPoint())
+        // {
+        //   auto gridPoint = grid.getPoint();
+        //   //     Rcout << individuals[tree_index_u][gridPoint] << ", ";
+        //   tot_sum += individuals[tree_index_u][gridPoint];
+        // }
         // Rcout << "Total sum: " << tot_sum << std::endl;
         // Rcout << std::endl;
 
@@ -285,7 +285,6 @@ void RandomPlantedForest::purify_3()
 
         if (j_dims.size() == 0)
         {
-
           // grid = grids[tree_index_u];
           while (!grid.nextPoint())
           {
@@ -296,9 +295,11 @@ void RandomPlantedForest::purify_3()
             double curr_sum = individuals[tree_index_u][gridPoint_i];
             //     Rcout << ", Current Sum: " << curr_sum << std::endl;
             //     Rcout << std::endl << "         " << "i, j: ";
-            update += (curr_sum / tot_sum) * values_old[tree_index_t][gridPoint_i];
+            update += curr_sum * values_old[tree_index_t][gridPoint_i];
+            tot_sum += individuals[tree_index_u][gridPoint_i];
             //     Rcout << std::endl;
           }
+          update /= tot_sum;
 
           int tree_index_s = variables.size();
           for (auto tree_s = variables.rbegin(); tree_s != variables.rend(); ++tree_s)
