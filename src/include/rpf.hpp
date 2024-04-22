@@ -18,6 +18,7 @@ public:
   void purify_1();
   void purify_2();
   void purify_3();
+  void purify_no_extrapolation();
   void print();
   void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true);
