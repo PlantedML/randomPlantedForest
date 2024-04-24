@@ -74,3 +74,26 @@ convert_xgboost_rpf <- function(xg, x, y) {
   # Return manipulated rpf object
   rpfit
 }
+
+
+#' Clone rpf object
+#'
+#' @param to_clone rpf object
+#' @param x data used to train the xgboost model
+#' @param y target used to train the xgboost model
+#'
+#' @return rpf object
+#' @export
+clone <- function(to_clone, x, y) {
+  # create a dummy rpf
+  rpfit <- rpf(x = x, y = y, max_interaction = 0, ntrees = to_clone$params$ntrees, splits = 1,
+               purify = FALSE, loss = to_clone$params$loss)
+
+  subsetted <- to_clone$params[names(to_clone$params) != "loss"]
+  rpfit$fit$set_parameters(names(subsetted), unlist(subsetted))
+  # Also overwrite C++ forest
+  rpfit$fit$set_model(to_clone$forest)
+
+  # Return manipulated rpf object
+  rpfit
+}
