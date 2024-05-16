@@ -17,7 +17,9 @@ public:
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
   void purify_1();
   void purify_2();
+  void purify_22();
   void purify_3();
+  void purify_3_new();
   void purify_no_extrapolation();
   void print();
   void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
