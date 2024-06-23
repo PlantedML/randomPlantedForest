@@ -757,7 +757,8 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
           for (int &index : leaf_index)
             index = std::max(0, index);
 
-          total_res += tree.second->GridLeaves.values[leaf_index];
+          const auto to_add = tree.second->GridLeaves.values[leaf_index];
+          total_res += to_add;
         }
       }
     }
