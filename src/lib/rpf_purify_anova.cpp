@@ -427,16 +427,16 @@ void RandomPlantedForest::purify_2()
           int dim_idx = 0;
           for (int dim = 1; dim <= feature_size; ++dim) {
             const int gp = grid_point[dim_idx];
-            if (gp >= lim_list[dim-1].size()-1){
-              not_end_leaf = false;
-              break;
-            }
 
             double lower, upper;
             if (tree_dims.count(dim) == 0) {
               lower = lower_bounds[dim-1];
               upper = upper_bounds[dim-1];
             } else {
+              if (gp >= lim_list[dim-1].size()-1){
+                not_end_leaf = false;
+                break;
+              }
               lower = lim_list[dim-1][gp];
               upper = lim_list[dim-1][gp + 1];
               ++dim_idx;
