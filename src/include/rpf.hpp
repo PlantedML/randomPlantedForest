@@ -16,7 +16,7 @@ public:
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
   void purify_1();
-  void purify_2();
+  void purify_anova();
   void purify_22();
   void purify_3();
   void purify_3_new();
