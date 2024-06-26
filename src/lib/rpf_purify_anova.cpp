@@ -1,6 +1,6 @@
 #include "rpf.hpp"
 
-void RandomPlantedForest::purify_2()
+void RandomPlantedForest::purify_anova()
 {
 
   // go through all n_trees families
@@ -426,13 +426,13 @@ void RandomPlantedForest::purify_2()
           // initialize interval with split interval
           int dim_idx = 0;
           for (int dim = 1; dim <= feature_size; ++dim) {
-            const int gp = grid_point[dim_idx];
-
             double lower, upper;
+
             if (tree_dims.count(dim) == 0) {
               lower = lower_bounds[dim-1];
               upper = upper_bounds[dim-1];
             } else {
+              const int gp = grid_point[dim_idx]; 
               if (gp >= lim_list[dim-1].size()-1){
                 not_end_leaf = false;
                 break;
