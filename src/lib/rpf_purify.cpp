@@ -1235,3 +1235,8 @@ void RandomPlantedForest::purify_3_new()
 
   purified = true;
 }
+
+void RandomPlantedForest::purify_anova_and_marginalize() {
+  purify_anova();
+  purify_no_extrapolation_existing_grid();
+} 

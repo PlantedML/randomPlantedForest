@@ -20,6 +20,7 @@ public:
   void purify_22();
   void purify_3();
   void purify_3_new();
+  void purify_anova_and_marginalize();
   void purify_no_extrapolation();
   void purify_no_extrapolation_existing_grid();
   void print();
