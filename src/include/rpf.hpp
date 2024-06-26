@@ -53,6 +53,8 @@ protected:
   std::vector<double> lower_bounds;
   std::vector<TreeFamily> tree_families; /**<  random planted forest containing result */
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+  std::vector<double> predict_single_grid(const std::vector<double> &X, std::set<int> component_index);
+  std::vector<double> predict_single_no_grid(const std::vector<double> &X, std::set<int> component_index);
   void L2_loss(Split &split);
   virtual void fit();
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);

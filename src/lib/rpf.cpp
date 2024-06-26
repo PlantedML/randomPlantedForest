@@ -1,6 +1,5 @@
 #include "rpf.hpp"
 
-
 bool RandomPlantedForest::is_purified()
 {
   return purified;
@@ -619,207 +618,213 @@ void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, Num
 // predict single feature vector
 std::vector<double> RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index)
 {
+  // const auto& res_grid = predict_single_grid(X, component_index);
+  // const auto& res_no_grid = predict_single_no_grid(X, component_index);
 
+  return purified ? predict_single_grid(X, component_index) : predict_single_no_grid(X, component_index);
+  // return false ? res_grid: res_no_grid;
+}
+
+std::vector<double> RandomPlantedForest::predict_single_grid(const std::vector<double> &X, std::set<int> component_index)
+{
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-  if (!purified)
+  if (component_index == std::set<int>{-1})
   {
-    // consider all components
-    if (component_index == std::set<int>{0})
+    for (auto &tree_family : this->tree_families)
     {
-      for (auto &tree_family : this->tree_families)
+      for (auto &tree : tree_family)
       {
-        for (auto &tree : tree_family)
+        std::vector<int> leaf_index(tree.first.size(), -1);
+        // add value of null tree
+        if (tree.first == std::set<int>{0})
         {
-          for (auto &leaf : tree.second->leaves)
-          {
-            bool valid = true;
-            for (auto &dim : tree.first)
-            {
-              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)])
-               && (leaf.intervals[std::max(0, dim - 1)].second > X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
-              {
-                valid = false;
-              }
-            }
-            if (valid)
-            {
 
-              // Rcout << leaf.value[0] << "\n";
-              total_res += leaf.value;
-            }
-          }
+          // Rcout << tree.first.size() ;
+          leaf_index = std::vector<int>(tree.first.size(), 0);
+          total_res += tree.second->GridLeaves.values[leaf_index];
         }
       }
     }
-    else
-    { // choose components for prediction
-      for (auto &tree_family : this->tree_families)
+  }
+  else if (component_index == std::set<int>{0})
+  {
+    for (auto &tree_family : this->tree_families)
+    {
+      for (auto &tree : tree_family)
       {
-        for (auto &tree : tree_family)
+        std::vector<int> leaf_index(tree.first.size(), -1);
+
+        // add value of null tree
+        if (tree.first == std::set<int>{0})
         {
 
-          // only consider trees with same dimensions as component_index
-          if (tree.first != component_index)
-            continue;
+          // Rcout << tree.first.size() ;
+          leaf_index = std::vector<int>(tree.first.size(), 0);
+        }
+        else
+        {
 
-          std::vector<int> dims;
-          for (auto dim : tree.first)
+          // go through limits of grid
+          for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
           {
-            dims.push_back(dim);
-          }
+            // get dim at dim_index
+            int dim = 0;
+            {
+              auto dim_pnt = tree.first.begin();
+              std::advance(dim_pnt, dim_index);
+              dim = *dim_pnt;
+              --dim; // transform into index
+            }
 
-          for (auto &leaf : tree.second->leaves)
-          {
-            bool valid = true;
-            for (unsigned int i = 0; i < dims.size(); ++i)
+            auto bounds = tree.second->GridLeaves.lim_list[dim];
+            for (double bound : bounds)
             {
 
-              int dim = dims[i];
+              // check if sample in leaf at dimension
+              if (X[dim] < bound)
+                break; // changed
 
-              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[i] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) && (leaf.intervals[std::max(0, dim - 1)].second > X[i] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
-              {
-                valid = false;
-              }
+              // if no interval smaller, set to end of bounds, otherwise set to leaf index
+              leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
             }
-            if (valid)
-              total_res += leaf.value;
+          }
+        }
+
+        // if interval of first leaf smaller smaller
+        for (int &index : leaf_index)
+          index = std::max(0, index);
+
+        const std::vector<double> to_add = tree.second->GridLeaves.values[leaf_index];
+        // Rcout << "grid: " << to_add[0] << "\n";
+        total_res += to_add;
+      }
+    }
+  }
+  else
+  {
+
+    for (auto &tree_family : this->tree_families)
+    {
+      for (auto &tree : tree_family)
+      {
+
+        // only consider trees with same dimensions as component_index
+        if (tree.first != component_index)
+          continue;
+
+        std::vector<int> leaf_index(tree.first.size(), -1);
+
+        // add value of null tree
+        if (tree.first == std::set<int>{0})
+        {
+          leaf_index = std::vector<int>(tree.first.size(), 0);
+        }
+        else
+        {
+
+          // go through limits of grid
+          for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
+          {
+            // get dim at dim_index
+            int dim = 0;
+            {
+              auto dim_pnt = tree.first.begin();
+              std::advance(dim_pnt, dim_index);
+              dim = *dim_pnt;
+              --dim; // transform into index
+            }
+
+            auto bounds = tree.second->GridLeaves.lim_list[dim];
+            for (double bound : bounds)
+            {
+
+              // check if sample in leaf at dimension
+              if (X[dim_index] < bound)
+                break; // changed
+
+              // if no interval smaller, set to end of bounds, otherwise set to leaf index
+              leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
+            }
+          }
+        }
+
+        // if interval of first leaf smaller smaller
+        for (int &index : leaf_index)
+          index = std::max(0, index);
+
+        total_res += tree.second->GridLeaves.values[leaf_index];
+      }
+    }
+  }
+  return total_res / n_trees;
+}
+
+std::vector<double> RandomPlantedForest::predict_single_no_grid(const std::vector<double> &X, std::set<int> component_index)
+{
+  std::vector<double> total_res = std::vector<double>(value_size, 0);
+
+  if (component_index == std::set<int>{0})
+  {
+    for (auto &tree_family : this->tree_families)
+    {
+      for (auto &tree : tree_family)
+      {
+        for (auto &leaf : tree.second->leaves)
+        {
+          bool valid = true;
+          for (auto &dim : tree.first)
+          {
+            if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) && (leaf.intervals[std::max(0, dim - 1)].second > X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
+            {
+              valid = false;
+            }
+          }
+          if (valid)
+          {
+            // Rcout << "no grid: " << leaf.value[0] << "\n";
+            total_res += leaf.value;
           }
         }
       }
     }
   }
   else
-  {
-    if (component_index == std::set<int>{-1})
+  { // choose components for prediction
+    for (auto &tree_family : this->tree_families)
     {
-      for (auto &tree_family : this->tree_families)
+      for (auto &tree : tree_family)
       {
-        for (auto &tree : tree_family)
-        {
-          std::vector<int> leaf_index(tree.first.size(), -1);
-          // add value of null tree
-          if (tree.first == std::set<int>{0})
-          {
 
-            // Rcout << tree.first.size() ;
-            leaf_index = std::vector<int>(tree.first.size(), 0);
-            total_res += tree.second->GridLeaves.values[leaf_index];
-          }
+        // only consider trees with same dimensions as component_index
+        if (tree.first != component_index)
+          continue;
+
+        std::vector<int> dims;
+        for (auto dim : tree.first)
+        {
+          dims.push_back(dim);
         }
-      }
-    }
-    else if (component_index == std::set<int>{0})
-    {
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
+
+        for (auto &leaf : tree.second->leaves)
         {
-          std::vector<int> leaf_index(tree.first.size(), -1);
-
-          // add value of null tree
-          if (tree.first == std::set<int>{0})
+          bool valid = true;
+          for (unsigned int i = 0; i < dims.size(); ++i)
           {
 
-            // Rcout << tree.first.size() ;
-            leaf_index = std::vector<int>(tree.first.size(), 0);
-          }
-          else
-          {
+            int dim = dims[i];
 
-            // go through limits of grid
-            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
+            if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[i] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) && (leaf.intervals[std::max(0, dim - 1)].second > X[i] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
             {
-              // get dim at dim_index
-              int dim = 0;
-              {
-                auto dim_pnt = tree.first.begin();
-                std::advance(dim_pnt, dim_index);
-                dim = *dim_pnt;
-                --dim; // transform into index
-              }
-
-              auto bounds = tree.second->GridLeaves.lim_list[dim];
-              for (double bound : bounds)
-              {
-
-                // check if sample in leaf at dimension
-                if (X[dim] < bound)
-                  break; // changed
-
-                // if no interval smaller, set to end of bounds, otherwise set to leaf index
-                leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
-              }
+              valid = false;
             }
           }
-
-          // if interval of first leaf smaller smaller
-          for (int &index : leaf_index)
-            index = std::max(0, index);
-
-          const auto to_add = tree.second->GridLeaves.values[leaf_index];
-          total_res += to_add;
-        }
-      }
-    }
-    else
-    {
-
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
-
-          // only consider trees with same dimensions as component_index
-          if (tree.first != component_index)
-            continue;
-
-          std::vector<int> leaf_index(tree.first.size(), -1);
-
-          // add value of null tree
-          if (tree.first == std::set<int>{0})
-          {
-            leaf_index = std::vector<int>(tree.first.size(), 0);
-          }
-          else
-          {
-
-            // go through limits of grid
-            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
-            {
-              // get dim at dim_index
-              int dim = 0;
-              {
-                auto dim_pnt = tree.first.begin();
-                std::advance(dim_pnt, dim_index);
-                dim = *dim_pnt;
-                --dim; // transform into index
-              }
-
-              auto bounds = tree.second->GridLeaves.lim_list[dim];
-              for (double bound : bounds)
-              {
-
-                // check if sample in leaf at dimension
-                if (X[dim_index] < bound)
-                  break; // changed
-
-                // if no interval smaller, set to end of bounds, otherwise set to leaf index
-                leaf_index[dim_index] = std::min(leaf_index[dim_index] + 1, (int)bounds.size() - 2);
-              }
-            }
-          }
-
-          // if interval of first leaf smaller smaller
-          for (int &index : leaf_index)
-            index = std::max(0, index);
-
-          total_res += tree.second->GridLeaves.values[leaf_index];
+          if (valid)
+            total_res += leaf.value;
         }
       }
     }
   }
-
   return total_res / n_trees;
 }
 
