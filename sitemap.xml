@@ -1,48 +1,18 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/404.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/LICENSE.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/articles/index.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/articles/test/Regression-Test-oldrpf.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/authors.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/index.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/news/index.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/index.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/predict.rpf.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/predict_components.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/print.rpf.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/print.rpf_forest.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/purify.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/randomPlantedForest-package.html</loc>
-  </url>
-  <url>
-    <loc>http://plantedml.com/randomPlantedForest/reference/rpf.html</loc>
-  </url>
+<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
+<url><loc>http://plantedml.com/randomPlantedForest/404.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/LICENSE.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/articles/index.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/articles/test/Regression-Test-oldrpf.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/authors.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/index.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/news/index.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/index.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/predict.rpf.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/predict_components.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/print.rpf.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/print.rpf_forest.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/purify.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/randomPlantedForest-package.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/rpf.html</loc></url>
 </urlset>
+
