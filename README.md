@@ -7,7 +7,7 @@
 
 [![R-CMD-check](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml)
 [![Codecov test
-coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master)
+coverage](https://codecov.io/gh/PlantedML/randomPlantedForest/graph/badge.svg)](https://app.codecov.io/gh/PlantedML/randomPlantedForest)
 [![randomPlantedForest status
 badge](https://plantedml.r-universe.dev/badges/randomPlantedForest)](https://plantedml.r-universe.dev/randomPlantedForest)
 <!-- badges: end -->
@@ -66,12 +66,12 @@ predict(rpfit, new_data = mtcars) |>
   cbind(mpg = mtcars$mpg) |>
   head()
 #>      .pred  mpg
-#> 1 20.81459 21.0
-#> 2 20.72354 21.0
-#> 3 26.04526 22.8
-#> 4 21.26845 21.4
-#> 5 18.45921 18.7
-#> 6 19.54406 18.1
+#> 1 20.96451 21.0
+#> 2 21.06539 21.0
+#> 3 23.24140 22.8
+#> 4 21.17155 21.4
+#> 5 18.22740 18.7
+#> 6 18.76736 18.1
 ```
 
 Prediction components can be accessed via `predict_components`,
@@ -86,14 +86,14 @@ components <- predict_components(rpfit, new_data = mtcars)
 str(components)
 #> List of 3
 #>  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:
-#>   ..$ cyl   : num [1:32] 0.445 0.445 0.863 0.445 -1.274 ...
-#>   ..$ wt    : num [1:32] -0.0615 -0.1421 2.3182 -0.0155 -0.3116 ...
-#>   ..$ hp    : num [1:32] 0.162 0.162 2.021 0.162 -0.941 ...
-#>   ..$ cyl:wt: num [1:32] 0.00389 0.00389 0.69586 0.17156 0.4615 ...
-#>   ..$ cyl:hp: num [1:32] 0.1453 0.1453 -0.0511 0.1453 0.1179 ...
-#>   ..$ hp:wt : num [1:32] -0.1264 -0.1367 -0.0487 0.1138 0.1596 ...
+#>   ..$ cyl   : num [1:32] 0.224 0.224 0.873 0.224 -0.803 ...
+#>   ..$ wt    : num [1:32] 0.177 -0.102 1.229 -0.154 -0.863 ...
+#>   ..$ hp    : num [1:32] 1.253 1.253 1.559 1.253 -0.586 ...
+#>   ..$ cyl:wt: num [1:32] -0.0516 0.0326 -0.0978 0.0279 0.1207 ...
+#>   ..$ cyl:hp: num [1:32] -0.0549 -0.0549 0.1872 -0.0549 0.3816 ...
+#>   ..$ hp:wt : num [1:32] -0.5891 -0.2933 -0.5148 -0.1305 -0.0282 ...
 #>   ..- attr(*, ".internal.selfref")=<externalptr> 
-#>  $ intercept: num 20.2
+#>  $ intercept: num 20
 #>  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:
 #>   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...
 #>   ..$ wt : num [1:32] 2.62 2.88 2.32 3.21 3.44 ...
