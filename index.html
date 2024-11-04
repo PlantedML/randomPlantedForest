@@ -99,12 +99,12 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>mpg <span class="op">=</span> <span class="va">mtcars</span><span class="op">$</span><span class="va">mpg</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      .pred  mpg</span></span>
-<span><span class="co">#&gt; 1 20.81459 21.0</span></span>
-<span><span class="co">#&gt; 2 20.72354 21.0</span></span>
-<span><span class="co">#&gt; 3 26.04526 22.8</span></span>
-<span><span class="co">#&gt; 4 21.26845 21.4</span></span>
-<span><span class="co">#&gt; 5 18.45921 18.7</span></span>
-<span><span class="co">#&gt; 6 19.54406 18.1</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 20.96451 21.0</span></span>
+<span><span class="co">#&gt; 2 21.06539 21.0</span></span>
+<span><span class="co">#&gt; 3 23.24140 22.8</span></span>
+<span><span class="co">#&gt; 4 21.17155 21.4</span></span>
+<span><span class="co">#&gt; 5 18.22740 18.7</span></span>
+<span><span class="co">#&gt; 6 18.76736 18.1</span></span></code></pre></div>
 <p>Prediction components can be accessed via <code>predict_components</code>, including the intercept, main effects, and interactions up to a specified degree. The returned object also contains the original data as <code>x</code>, which is required for visualization. The <code>glex</code> package can be used as well: <code>glex(rpfit)</code> yields the same result.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span> </span>
@@ -112,14 +112,14 @@
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">components</span><span class="op">)</span></span>
 <span><span class="co">#&gt; List of 3</span></span>
 <span><span class="co">#&gt;  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:</span></span>
-<span><span class="co">#&gt;   ..$ cyl   : num [1:32] 0.445 0.445 0.863 0.445 -1.274 ...</span></span>
-<span><span class="co">#&gt;   ..$ wt    : num [1:32] -0.0615 -0.1421 2.3182 -0.0155 -0.3116 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp    : num [1:32] 0.162 0.162 2.021 0.162 -0.941 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:wt: num [1:32] 0.00389 0.00389 0.69586 0.17156 0.4615 ...</span></span>
-<span><span class="co">#&gt;   ..$ cyl:hp: num [1:32] 0.1453 0.1453 -0.0511 0.1453 0.1179 ...</span></span>
-<span><span class="co">#&gt;   ..$ hp:wt : num [1:32] -0.1264 -0.1367 -0.0487 0.1138 0.1596 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl   : num [1:32] 0.224 0.224 0.873 0.224 -0.803 ...</span></span>
+<span><span class="co">#&gt;   ..$ wt    : num [1:32] 0.177 -0.102 1.229 -0.154 -0.863 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp    : num [1:32] 1.253 1.253 1.559 1.253 -0.586 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:wt: num [1:32] -0.0516 0.0326 -0.0978 0.0279 0.1207 ...</span></span>
+<span><span class="co">#&gt;   ..$ cyl:hp: num [1:32] -0.0549 -0.0549 0.1872 -0.0549 0.3816 ...</span></span>
+<span><span class="co">#&gt;   ..$ hp:wt : num [1:32] -0.5891 -0.2933 -0.5148 -0.1305 -0.0282 ...</span></span>
 <span><span class="co">#&gt;   ..- attr(*, ".internal.selfref")=&lt;externalptr&gt; </span></span>
-<span><span class="co">#&gt;  $ intercept: num 20.2</span></span>
+<span><span class="co">#&gt;  $ intercept: num 20</span></span>
 <span><span class="co">#&gt;  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:</span></span>
 <span><span class="co">#&gt;   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...</span></span>
 <span><span class="co">#&gt;   ..$ wt : num [1:32] 2.62 2.88 2.32 3.21 3.44 ...</span></span>
@@ -188,7 +188,7 @@
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
 <li><a href="https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/PlantedML/randomPlantedForest/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
-<li><a href="https://app.codecov.io/gh/PlantedML/randomPlantedForest?branch=master" class="external-link"><img src="https://codecov.io/gh/PlantedML/randomPlantedForest/branch/master/graph/badge.svg" alt="Codecov test coverage"></a></li>
+<li><a href="https://app.codecov.io/gh/PlantedML/randomPlantedForest" class="external-link"><img src="https://codecov.io/gh/PlantedML/randomPlantedForest/graph/badge.svg" alt="Codecov test coverage"></a></li>
 <li><a href="https://plantedml.r-universe.dev/randomPlantedForest" class="external-link"><img src="https://plantedml.r-universe.dev/badges/randomPlantedForest" alt="randomPlantedForest status badge"></a></li>
 </ul>
 </div>
