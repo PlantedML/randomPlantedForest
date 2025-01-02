@@ -9,7 +9,6 @@
 #include <memory>
 #include <vector>
 #include <utility>
-#include <Rcpp.h>
 #include <thread>
 #include <assert.h>
 
@@ -109,18 +108,18 @@ namespace utils
     }
   };
 
-  std::vector<int> to_std_vec(Rcpp::IntegerVector rv);
-  std::vector<double> to_std_vec(Rcpp::NumericVector rv);
-  std::vector<std::vector<double>> to_std_vec(Rcpp::NumericMatrix rv);
-  std::set<int> to_std_set(Rcpp::NumericVector rv);
-  std::set<int> to_std_set(Rcpp::IntegerVector rv);
+  std::vector<int> to_std_vec(std::vector<int> rv);
+  std::vector<double> to_std_vec(std::vector<double> rv);
+  std::vector<std::vector<double>> to_std_vec(std::vector<std::vector<double>> rv);
+  std::set<int> to_std_set(std::vector<double> rv);
+  std::set<int> to_std_set(std::vector<int> rv);
 
   // functions for converting R and Cpp types
 
-  Rcpp::IntegerVector from_std_set(std::set<int> v);
-  Rcpp::IntegerVector from_std_vec(std::vector<int> v);
-  Rcpp::NumericVector from_std_vec(std::vector<double> v);
-  Rcpp::NumericMatrix from_std_vec(std::vector<std::vector<double>> v);
+  std::vector<int> from_std_set(std::set<int> v);
+  std::vector<int> from_std_vec(std::vector<int> v);
+  std::vector<double> from_std_vec(std::vector<double> v);
+  std::vector<std::vector<double>> from_std_vec(std::vector<std::vector<double>> v);
 
   //  ----------------- overload of vector operators -----------------
 

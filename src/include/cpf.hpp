@@ -1,6 +1,7 @@
 #ifndef CPF_H
 #define CPF_H
 
+#include <vector>
 #include "rpf.hpp"
 
 class ClassificationRPF : public RandomPlantedForest
@@ -8,9 +9,9 @@ class ClassificationRPF : public RandomPlantedForest
 
 public:
   using RandomPlantedForest::calcOptimalSplit;
-  ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                    const String loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0, 0.1});
-  void set_parameters(StringVector keys, NumericVector values);
+  ClassificationRPF(const std::vector<std::vector<double>> &samples_Y, const std::vector<std::vector<double>> &samples_X,
+                    const std::string loss = "L2", const std::vector<double> parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0, 0.1});
+  void set_parameters(std::vector<std::string> keys, std::vector<double> values);
   ~ClassificationRPF(){};
 
 private:
@@ -46,5 +47,6 @@ private:
   void exponential_loss_2(Split &split);
   void exponential_loss_3(Split &split);
 };
+
 
 #endif

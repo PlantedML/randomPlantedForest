@@ -2,6 +2,7 @@
 #define GRID_H
 
 #include "helper.hpp"
+#include <vector>
 
 using namespace utils;
 
