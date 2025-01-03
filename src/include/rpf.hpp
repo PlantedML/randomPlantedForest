@@ -3,8 +3,9 @@
 
 #include <vector>
 #include <stdexcept>
+#include <Rcpp.h>
 #include "trees.hpp"
-
+using namespace Rcpp;
 class RandomPlantedForest
 {
 
