@@ -1,4 +1,5 @@
 #include "rcpp_interface.hpp"
+#include "random_utils.hpp"
 
 // Helper to convert NumericMatrix to std::vector<std::vector<double>>
 static std::vector<std::vector<double>> toStd2D(const Rcpp::NumericMatrix &mat)
@@ -25,6 +26,7 @@ RcppRPF::RcppRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
     : RandomPlantedForest(toStd2D(samples_Y), toStd2D(samples_X),
                           toStd1D(parameters))
 {
+  utils::RandomGenerator::use_r_random();
 }
 
 NumericMatrix RcppRPF::predict_matrix(const NumericMatrix &X, const NumericVector components)
@@ -105,9 +107,9 @@ bool RcppRPF::is_purified()
 
 RcppCPF::RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                  const std::string loss, const NumericVector parameters)
-    : ClassificationRPF(toStd2D(samples_Y), toStd2D(samples_X), loss,
-                        toStd1D(parameters))
+    : ClassificationRPF(toStd2D(samples_Y), toStd2D(samples_X), loss, toStd1D(parameters))
 {
+  utils::RandomGenerator::use_r_random();
 }
 
 void RcppCPF::set_parameters(StringVector keys, NumericVector values)

@@ -147,10 +147,10 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double
           std::iota(samples.begin(), samples.end(), 1);
         }
         else
-        { // randomly picked samples otherwise
+        { // randomly picked samples using RandomGenerator
           samples = std::vector<int>(split_try);
           for (size_t i = 0; i < samples.size(); ++i)
-            samples[i] = rand() % (int)(unique_samples.size() - leaf_size);
+            samples[i] = utils::RandomGenerator::random_index((int)(unique_samples.size() - leaf_size));
           std::sort(samples.begin(), samples.end());
         }
 
@@ -319,12 +319,14 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
+    // Use our RandomGenerator for sampling with replacement
+    auto indices = utils::RandomGenerator::sample_with_replacement(
+        std::vector<size_t>(sample_size), sample_size);
+
     for (size_t i = 0; i < sample_size; ++i)
     {
-
-      sample_index = rand() % sample_size;
-      samples_Y[i] = Y[sample_index];
-      samples_X[i] = X[sample_index];
+      samples_Y[i] = Y[indices[i]];
+      samples_X[i] = X[indices[i]];
     }
   }
 

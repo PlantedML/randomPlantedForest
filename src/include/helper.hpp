@@ -11,6 +11,7 @@
 #include <utility>
 #include <thread>
 #include <assert.h>
+#include "random_utils.hpp"
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -100,12 +101,7 @@ namespace utils
   template <typename Iter>
   void shuffle_vector(Iter first, Iter last)
   {
-    int n = std::distance(first, last);
-    while (n > 1)
-    {
-      int k = random_index(n--);
-      std::swap(*(first + n), *(first + k));
-    }
+    RandomGenerator::shuffle(first, last);
   };
 
   std::vector<int> to_std_vec(std::vector<int> rv);

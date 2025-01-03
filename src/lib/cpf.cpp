@@ -769,10 +769,10 @@ Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>>
             std::iota(samples.begin(), samples.end(), 1);
           }
           else
-          { // randomly picked samples otherwise
+          { // randomly picked samples using RandomGenerator
             samples = std::vector<int>(split_try);
             for (size_t i = 0; i < samples.size(); ++i)
-              samples[i] = rand() % (int)(unique_samples.size() - leaf_size) + leaf_size;
+              samples[i] = utils::RandomGenerator::random_index((int)(unique_samples.size() - leaf_size)) + leaf_size;
             std::sort(samples.begin(), samples.end());
           }
 
