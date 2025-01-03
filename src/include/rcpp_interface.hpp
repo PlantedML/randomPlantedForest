@@ -7,7 +7,8 @@
 
 using namespace Rcpp;
 
-class RcppRPF : public RandomPlantedForest {
+class RcppRPF : public RandomPlantedForest
+{
 
 public:
   RcppRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
@@ -27,6 +28,14 @@ public:
 
 protected:
   double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
+};
+
+class RcppCPF : public ClassificationRPF, public RcppRPF
+{
+public:
+  RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+          const std::string loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0});
+  void set_parameters(StringVector keys, NumericVector values);
 };
 
 #endif // RCPP_INTERFACE_H

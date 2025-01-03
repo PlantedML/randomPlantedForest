@@ -107,3 +107,16 @@ bool RcppRPF::is_purified()
 {
   return RandomPlantedForest::is_purified();
 }
+
+RcppCPF::RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+                 const std::string loss, const NumericVector parameters)
+    : ClassificationRPF(toStd2D(samples_Y), toStd2D(samples_X), loss,
+                        toStd1D(parameters))
+{
+}
+
+void RcppCPF::set_parameters(StringVector keys, NumericVector values)
+{
+  ClassificationRPF::set_parameters(std::vector<std::string>(keys.begin(), keys.end()),
+                                    std::vector<double>(values.begin(), values.end()));
+}

@@ -1,4 +1,4 @@
-SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp randomPlantedForest.cpp RcppExports.cpp
+SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp lib/rcpp_interface.cpp randomPlantedForest.cpp RcppExports.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
 
