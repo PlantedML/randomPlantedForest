@@ -525,97 +525,96 @@ void RandomPlantedForest::fit()
   }
 }
 
-/*
-void RandomPlantedForest::cross_validation(int n_sets, const std::vector<int> &splits, const std::vector<double> &t_tries, const std::vector<int> &split_tries)
+void RandomPlantedForest::cross_validation(int n_sets, std::vector<int> splits, std::vector<double> t_tries, std::vector<int> split_tries)
 {
-
-   bool cv_tmp = this->cross_validate;
-   this->cross_validate = false;
-   if(deterministic) {
-   std::cout << "Note: Set model to non-deterministic. " << std::endl;
-   deterministic = false;
-   }
-   std::set<int> splits_vec = to_std_set(splits);
-   std::vector<int> split_tries_vec = to_std_vec(split_tries);
-   std::vector<double> t_tries_vec = to_std_vec(t_tries);
-   if(splits_vec.size()!=2) {std::cout << "Min and max needed for number of splits." << std::endl; return;}
-   // remember optimal parameter set and MSE
-   double  MSE_sum = 0, curr_MSE = 0, MSE_min = INF, optimal_split = INF, optimal_t_try = INF, optimal_split_try = INF;
-   int optimal_inter = 1;
-   std::vector<int> order(sample_size);
-   std::iota(order.begin(), order.end(), 0);
-   std::random_shuffle(order.begin(), order.end(), randWrapper);
-   double tmp = double(sample_size)/double(n_sets);
-   int set_size = round(tmp);
-   // remember original data samples
-   std::vector<std::vector<double>> X_original = from_std_vec(X);
-   std::vector<double> Y_original = from_std_vec(Y);
-   // set level of interactions
-   std::set<int> interactions{1};
-   if(feature_size >= 2){
-   interactions.insert(2);
-   interactions.insert(feature_size);
-   }
-   // go through all parameter combinations
-   for(int inter: interactions){
-   this->max_interaction = inter;
-   for(int splits=*splits_vec.begin(); splits<=*--splits_vec.end(); splits=ceil(splits*1.2)){
-   this->n_splits = splits;
-   for(auto t: t_tries){
-   this->t_try = t;
-   for(auto s: split_tries){
-   this->split_try = s;
-   // k-fold cross-validation: go over all possible combinations as test set
-   MSE_sum = 0;
-   for(int n_set=0; n_set<n_sets; ++n_set){
-   // split data into training and test sets
-   int test_size = set_size;
-   if(n_set == n_sets-1) test_size = order.size() - (n_sets-1) * set_size;
-   int train_size = order.size() - test_size, i = 0, j = 0;
-   std::vector<double> Y_train(train_size), Y_test_true(test_size), Y_test_predicted;
-   std::vector<std::vector<double>> X_train(train_size, feature_size), X_test(test_size, feature_size);
-   for(int index=0; index<order.size(); ++index){
-   if( (index >= (n_set * set_size)) && (index < ((n_set + 1) * set_size))){
-   Y_test_true[i] = Y_original[order[index]];
-   X_test(i, _ ) = X_original(order[index], _ );
-   ++i;
-   }else{
-   Y_train[j] = Y_original[order[index]];
-   X_train(j, _ ) = X_original(order[index], _ );
-   ++j;
-   }
-   }
-   // fit to training data
-   this->set_data(Y_train, X_train);
-   // predict with test set and determine mse
-   Y_test_predicted = this->predict_matrix(X_test);
-   MSE_sum += this->MSE(Y_test_predicted, Y_test_true);
-   }
-   // average
-   curr_MSE = MSE_sum / n_sets;
-   std::cout << inter << ", " << splits << ", " << t << ", " << s << ": MSE=" << curr_MSE << std::endl;
-   // update optimal
-   if(curr_MSE < MSE_min){
-   MSE_min = curr_MSE;
-   optimal_split = splits;
-   optimal_t_try = t;
-   optimal_split_try = s;
-   optimal_inter = inter;
-   }
-   }
-   }
-   }
-   }
-   // reset X&Y to original and fit with optimal pars
-   this->n_splits = optimal_split;
-   this->t_try = optimal_t_try;
-   this->split_try = optimal_split_try;
-   this->max_interaction = optimal_inter;
-   this->set_data(Y_original, X_original);
-   this->cross_validate = cv_tmp;
-   std::cout << "Optimal parameters: " << optimal_inter << ", " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
+  /*
+    bool cv_tmp = this->cross_validate;
+    this->cross_validate = false;
+    if(deterministic) {
+    std::cout << "Note: Set model to non-deterministic. " << std::endl;
+    deterministic = false;
+    }
+    std::set<int> splits_vec = to_std_set(splits);
+    std::vector<int> split_tries_vec = to_std_vec(split_tries);
+    std::vector<double> t_tries_vec = to_std_vec(t_tries);
+    if(splits_vec.size()!=2) {std::cout << "Min and max needed for number of splits." << std::endl; return;}
+    // remember optimal parameter set and MSE
+    double  MSE_sum = 0, curr_MSE = 0, MSE_min = INF, optimal_split = INF, optimal_t_try = INF, optimal_split_try = INF;
+    int optimal_inter = 1;
+    std::vector<int> order(sample_size);
+    std::iota(order.begin(), order.end(), 0);
+    std::random_shuffle(order.begin(), order.end(), randWrapper);
+    double tmp = double(sample_size)/double(n_sets);
+    int set_size = round(tmp);
+    // remember original data samples
+    std::vector<std::vector<double>> X_original = from_std_vec(X);
+    std::vector<double> Y_original = from_std_vec(Y);
+    // set level of interactions
+    std::set<int> interactions{1};
+    if(feature_size >= 2){
+    interactions.insert(2);
+    interactions.insert(feature_size);
+    }
+    // go through all parameter combinations
+    for(int inter: interactions){
+    this->max_interaction = inter;
+    for(int splits=*splits_vec.begin(); splits<=*--splits_vec.end(); splits=ceil(splits*1.2)){
+    this->n_splits = splits;
+    for(auto t: t_tries){
+    this->t_try = t;
+    for(auto s: split_tries){
+    this->split_try = s;
+    // k-fold cross-validation: go over all possible combinations as test set
+    MSE_sum = 0;
+    for(int n_set=0; n_set<n_sets; ++n_set){
+    // split data into training and test sets
+    int test_size = set_size;
+    if(n_set == n_sets-1) test_size = order.size() - (n_sets-1) * set_size;
+    int train_size = order.size() - test_size, i = 0, j = 0;
+    std::vector<double> Y_train(train_size), Y_test_true(test_size), Y_test_predicted;
+    std::vector<std::vector<double>> X_train(train_size, feature_size), X_test(test_size, feature_size);
+    for(int index=0; index<order.size(); ++index){
+    if( (index >= (n_set * set_size)) && (index < ((n_set + 1) * set_size))){
+    Y_test_true[i] = Y_original[order[index]];
+    X_test(i, _ ) = X_original(order[index], _ );
+    ++i;
+    }else{
+    Y_train[j] = Y_original[order[index]];
+    X_train(j, _ ) = X_original(order[index], _ );
+    ++j;
+    }
+    }
+    // fit to training data
+    this->set_data(Y_train, X_train);
+    // predict with test set and determine mse
+    Y_test_predicted = this->predict_matrix(X_test);
+    MSE_sum += this->MSE(Y_test_predicted, Y_test_true);
+    }
+    // average
+    curr_MSE = MSE_sum / n_sets;
+    std::cout << inter << ", " << splits << ", " << t << ", " << s << ": MSE=" << curr_MSE << std::endl;
+    // update optimal
+    if(curr_MSE < MSE_min){
+    MSE_min = curr_MSE;
+    optimal_split = splits;
+    optimal_t_try = t;
+    optimal_split_try = s;
+    optimal_inter = inter;
+    }
+    }
+    }
+    }
+    }
+    // reset X&Y to original and fit with optimal pars
+    this->n_splits = optimal_split;
+    this->t_try = optimal_t_try;
+    this->split_try = optimal_split_try;
+    this->max_interaction = optimal_inter;
+    this->set_data(Y_original, X_original);
+    this->cross_validate = cv_tmp;
+    std::cout << "Optimal parameters: " << optimal_inter << ", " << optimal_split << ", " << optimal_t_try << ", " << optimal_split_try << ": MSE=" << MSE_min << std::endl;
+ */
 }
-*/
 
 // predict single feature vector
 std::vector<double> RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index)
