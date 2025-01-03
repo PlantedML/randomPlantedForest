@@ -15,6 +15,7 @@ public:
   virtual NumericMatrix predict_vector(const NumericVector &X, const NumericVector components) = 0;
   virtual void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) = 0;
   virtual double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true) = 0;
+  virtual List get_model() = 0;
 };
 
 class RcppRPF : public RandomPlantedForest, public RcppInterface
@@ -29,10 +30,11 @@ public:
   void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) override;
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true) override;
   void set_parameters(StringVector keys, NumericVector values) override;
+  List get_model() override;
+
   void purify_3();
   void print();
   void get_parameters();
-  List get_model();
   bool is_purified();
 
 protected:
@@ -49,11 +51,11 @@ public:
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0}) override;
   void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) override;
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true) override;
+  List get_model() override;
 
   void purify_3();
   void print();
   void get_parameters();
-  List get_model();
   bool is_purified();
 };
 

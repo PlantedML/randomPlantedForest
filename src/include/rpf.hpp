@@ -3,9 +3,8 @@
 
 #include <vector>
 #include <stdexcept>
-#include <Rcpp.h>
 #include "trees.hpp"
-using namespace Rcpp;
+
 class RandomPlantedForest
 {
 
@@ -26,7 +25,6 @@ public:
   double MSE(const std::vector<std::vector<double>> &Y_predicted, const std::vector<std::vector<double>> &Y_true);
   void get_parameters();
   void set_parameters(std::vector<std::string> keys, std::vector<double> values);
-  List get_model();
   virtual ~RandomPlantedForest() {};
   bool is_purified();
 

@@ -21,6 +21,44 @@ static std::vector<double> toStd1D(const Rcpp::NumericVector &vec)
   return std::vector<double>(vec.begin(), vec.end());
 }
 
+// New helper function to convert tree families to R List
+static List treeFamiliesToRList(const std::vector<TreeFamily> &families, int feature_size)
+{
+  List model;
+  for (const auto &family : families)
+  {
+    List variables, family_values, family_intervals;
+    for (const auto &tree : family)
+    {
+      List tree_values;
+      List tree_intervals;
+      variables.push_back(from_std_set(tree.first));
+      for (const auto &leaf : tree.second->get_leaves())
+      {
+        NumericMatrix leaf_values;
+        for (const auto &val : leaf.value)
+        {
+          leaf_values.push_back(val);
+        }
+        tree_values.push_back(leaf_values);
+
+        NumericVector intervals;
+        for (const auto &interval : leaf.intervals)
+        {
+          intervals.push_back(interval.first);
+          intervals.push_back(interval.second);
+        }
+        NumericMatrix leaf_intervals(2, feature_size, intervals.begin());
+        tree_intervals.push_back(leaf_intervals);
+      }
+      family_intervals.push_back(tree_intervals);
+      family_values.push_back(tree_values);
+    }
+    model.push_back(List::create(Named("variables") = variables, _["values"] = family_values, _["intervals"] = family_intervals));
+  }
+  return model;
+}
+
 RcppRPF::RcppRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                  const NumericVector parameters)
     : RandomPlantedForest(toStd2D(samples_Y), toStd2D(samples_X),
@@ -97,7 +135,7 @@ void RcppRPF::get_parameters()
 
 List RcppRPF::get_model()
 {
-  return RandomPlantedForest::get_model();
+  return treeFamiliesToRList(tree_families, feature_size);
 }
 
 bool RcppRPF::is_purified()
@@ -175,7 +213,7 @@ void RcppCPF::get_parameters()
 
 List RcppCPF::get_model()
 {
-  return RandomPlantedForest::get_model();
+  return treeFamiliesToRList(tree_families, feature_size);
 }
 
 bool RcppCPF::is_purified()
