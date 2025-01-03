@@ -115,3 +115,68 @@ void RcppCPF::set_parameters(StringVector keys, NumericVector values)
   ClassificationRPF::set_parameters(std::vector<std::string>(keys.begin(), keys.end()),
                                     std::vector<double>(values.begin(), values.end()));
 }
+
+NumericMatrix RcppCPF::predict_matrix(const NumericMatrix &X, const NumericVector components)
+{
+  auto result = ClassificationRPF::predict_matrix(toStd2D(X), toStd1D(components));
+  NumericMatrix rResult(result.size(), result[0].size());
+  for (size_t i = 0; i < result.size(); ++i)
+  {
+    for (size_t j = 0; j < result[i].size(); ++j)
+    {
+      rResult(i, j) = result[i][j];
+    }
+  }
+  return rResult;
+}
+
+NumericMatrix RcppCPF::predict_vector(const NumericVector &X, const NumericVector components)
+{
+  auto result = ClassificationRPF::predict_vector(toStd1D(X), toStd1D(components));
+  NumericMatrix rResult(result.size(), result[0].size());
+  for (size_t i = 0; i < result.size(); ++i)
+  {
+    for (size_t j = 0; j < result[i].size(); ++j)
+    {
+      rResult(i, j) = result[i][j];
+    }
+  }
+  return rResult;
+}
+
+void RcppCPF::cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries)
+{
+  ClassificationRPF::cross_validation(n_sets, std::vector<int>(splits.begin(), splits.end()),
+                                      std::vector<double>(t_tries.begin(), t_tries.end()),
+                                      std::vector<int>(split_tries.begin(), split_tries.end()));
+}
+
+double RcppCPF::MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true)
+{
+  return ClassificationRPF::MSE(toStd2D(Y_predicted), toStd2D(Y_true));
+}
+
+void RcppCPF::purify_3()
+{
+  RandomPlantedForest::purify_3();
+}
+
+void RcppCPF::print()
+{
+  RandomPlantedForest::print();
+}
+
+void RcppCPF::get_parameters()
+{
+  RandomPlantedForest::get_parameters();
+}
+
+List RcppCPF::get_model()
+{
+  return RandomPlantedForest::get_model();
+}
+
+bool RcppCPF::is_purified()
+{
+  return RandomPlantedForest::is_purified();
+}

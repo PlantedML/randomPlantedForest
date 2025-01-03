@@ -21,7 +21,16 @@ RCPP_MODULE(mod_rpf)
         .method("is_purified", &RcppRPF::is_purified);
 
     class_<RcppCPF>("ClassificationRPF")
-        .derives<RcppRPF>("RandomPlantedForest")
         .constructor<const NumericMatrix, const NumericMatrix, const String, const NumericVector>()
-        .method("set_parameters", &RcppCPF::set_parameters);
+        .method("set_parameters", &RcppCPF::set_parameters)
+        .method("predict_matrix", &RcppCPF::predict_matrix)
+        .method("predict_vector", &RcppCPF::predict_vector)
+        .method("cross_validation", &RcppCPF::cross_validation)
+        .method("MSE", &RcppCPF::MSE)
+        .method("purify", &RcppCPF::purify_3)
+        .method("print", &RcppCPF::print)
+        .method("get_parameters", &RcppCPF::get_parameters)
+        .method("set_parameters", &RcppCPF::set_parameters)
+        .method("get_model", &RcppCPF::get_model)
+        .method("is_purified", &RcppCPF::is_purified);
 }
