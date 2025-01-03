@@ -27,11 +27,6 @@ RcppRPF::RcppRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
 {
 }
 
-void RcppRPF::set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
-{
-  RandomPlantedForest::set_data(toStd2D(samples_Y), toStd2D(samples_X));
-}
-
 NumericMatrix RcppRPF::predict_matrix(const NumericMatrix &X, const NumericVector components)
 {
   auto result = RandomPlantedForest::predict_matrix(toStd2D(X), toStd1D(components));

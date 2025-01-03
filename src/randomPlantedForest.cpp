@@ -9,7 +9,6 @@ RCPP_MODULE(mod_rpf)
 
     class_<RcppRPF>("RandomPlantedForest")
         .constructor<const NumericMatrix, const NumericMatrix, const NumericVector>()
-        .method("set_data", &RcppRPF::set_data)
         .method("cross_validation", &RcppRPF::cross_validation)
         .method("predict_matrix", &RcppRPF::predict_matrix)
         .method("predict_vector", &RcppRPF::predict_vector)
