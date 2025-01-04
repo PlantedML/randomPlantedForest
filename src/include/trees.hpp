@@ -3,6 +3,7 @@
 
 #include "helper.hpp"
 #include "grid.hpp"
+#include <vector>
 
 using namespace utils;
 using namespace grid;
