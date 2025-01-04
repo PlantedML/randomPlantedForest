@@ -65,6 +65,13 @@ RcppRPF::RcppRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                           toStd1D(parameters))
 {
   utils::RandomGenerator::use_r_random();
+
+  this->fit();
+
+  if (cross_validate)
+  {
+    RandomPlantedForest::cross_validation();
+  }
 }
 
 NumericMatrix RcppRPF::predict_matrix(const NumericMatrix &X, const NumericVector components)
@@ -148,6 +155,12 @@ RcppCPF::RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
     : ClassificationRPF(toStd2D(samples_Y), toStd2D(samples_X), loss, toStd1D(parameters))
 {
   utils::RandomGenerator::use_r_random();
+  RandomPlantedForest::fit();
+
+  if (cross_validate)
+  {
+    ClassificationRPF::cross_validation();
+  }
 }
 
 void RcppCPF::set_parameters(StringVector keys, NumericVector values)

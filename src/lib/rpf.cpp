@@ -279,13 +279,6 @@ void RandomPlantedForest::set_data(const std::vector<std::vector<double>> &sampl
     this->upper_bounds[i] = maxVal + 2 * eps; // to consider samples at max value
     this->lower_bounds[i] = minVal;
   }
-
-  this->fit();
-
-  if (cross_validate)
-  {
-    this->cross_validation();
-  }
 }
 
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
