@@ -319,9 +319,12 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
+    // Create a vector with values [0, 1, ..., sample_size-1]
+    std::vector<size_t> population(sample_size);
+    std::iota(population.begin(), population.end(), 0);
+
     // Use our RandomGenerator for sampling with replacement
-    auto indices = utils::RandomGenerator::sample_with_replacement(
-        std::vector<size_t>(sample_size), sample_size);
+    auto indices = utils::RandomGenerator::sample_with_replacement(population, sample_size);
 
     for (size_t i = 0; i < sample_size; ++i)
     {

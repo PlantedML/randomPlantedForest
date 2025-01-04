@@ -8,6 +8,8 @@
 #include <chrono>
 #include <Rcpp.h>
 
+using namespace Rcpp;
+
 namespace utils
 {
 
@@ -16,8 +18,6 @@ namespace utils
   {
   public:
     virtual ~RNGBackend() = default;
-    virtual void begin_rng() {} // Called before a sequence of random numbers
-    virtual void end_rng() {}   // Called after a sequence of random numbers
     virtual int random_int(int n) = 0;
     virtual double random_double() = 0;
   };
@@ -67,31 +67,17 @@ namespace utils
   // R random number generator backend
   class RcppRNGBackend : public RNGBackend
   {
-  private:
-    std::unique_ptr<Rcpp::RNGScope> rng_scope;
-
   public:
-    void begin_rng() override
-    {
-      if (!rng_scope)
-      {
-        rng_scope = std::make_unique<Rcpp::RNGScope>();
-      }
-    }
-
-    void end_rng() override
-    {
-      rng_scope.reset();
-    }
-
     int random_int(int n) override
     {
-      return static_cast<int>(unif_rand() * n);
+      RNGScope scope;
+      return static_cast<int>(R::runif(0, 1) * n);
     }
 
     double random_double() override
     {
-      return unif_rand();
+      RNGScope scope;
+      return R::runif(0, 1);
     }
   };
 
@@ -103,52 +89,15 @@ namespace utils
     static RcppRNGBackend rcpp_backend;
 
   public:
-    // RAII class to handle RNG state
-    class RNGScope
-    {
-    private:
-      RNGBackend *backend;
-
-    public:
-      RNGScope() : backend(RandomGenerator::backend)
-      {
-        backend->begin_rng();
-      }
-      ~RNGScope()
-      {
-        backend->end_rng();
-      }
-    };
-
-    // Switch to using R's RNG
-    static void use_r_random()
-    {
-      backend = &rcpp_backend;
-    }
-
-    // Switch to using C++ standard RNG
-    static void use_std_random()
-    {
-      backend = &std_backend;
-    }
-
-    // Initialize the standard generator with a seed
-    static void seed(uint32_t seed)
-    {
-      std_backend.seed(seed);
-    }
-
     // Generate random integer in range [0, n)
     static int random_index(int n)
     {
-      RNGScope scope;
       return backend->random_int(n);
     }
 
     // Generate random double in range [0, 1)
     static double random_double()
     {
-      RNGScope scope;
       return backend->random_double();
     }
 
@@ -156,7 +105,6 @@ namespace utils
     template <typename Iter>
     static void shuffle(Iter first, Iter last)
     {
-      RNGScope scope;
       auto n = std::distance(first, last);
       for (auto i = n - 1; i > 0; --i)
       {
@@ -168,14 +116,26 @@ namespace utils
     template <typename T>
     static std::vector<T> sample_with_replacement(const std::vector<T> &population, size_t n)
     {
-      RNGScope scope;
       std::vector<T> result;
       result.reserve(n);
       for (size_t i = 0; i < n; ++i)
       {
-        result.push_back(population[backend->random_int(population.size())]);
+        result.push_back(population[random_index(population.size())]);
       }
       return result;
+    }
+
+    // Switch to using R's RNG
+    static void use_r_random()
+    {
+      backend = &rcpp_backend;
+    }
+
+    // Switch to using C++ standard RNG
+    static void use_std_random(uint32_t seed = 42)
+    {
+      std_backend.seed(seed);
+      backend = &std_backend;
     }
   };
 
