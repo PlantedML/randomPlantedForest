@@ -5,6 +5,19 @@
 #include <stdexcept>
 #include "trees.hpp"
 
+struct RPFParams
+{
+  int max_interaction;
+  int n_trees;
+  int n_splits;
+  int split_try;
+  double t_try;
+  bool purify_forest;
+  bool deterministic;
+  int nthreads;
+  bool cross_validate;
+};
+
 class RandomPlantedForest
 {
 
@@ -23,8 +36,7 @@ public:
   void print();
   void cross_validation(int n_sets = 4, std::vector<int> splits = {5, 50}, std::vector<double> t_tries = {0.2, 0.5, 0.7, 0.9}, std::vector<int> split_tries = {1, 2, 5, 10});
   double MSE(const std::vector<std::vector<double>> &Y_predicted, const std::vector<std::vector<double>> &Y_true);
-  void get_parameters();
-  void set_parameters(std::vector<std::string> keys, std::vector<double> values);
+  RPFParams get_parameters();
   virtual ~RandomPlantedForest() {};
   bool is_purified();
 

@@ -29,22 +29,3 @@ test_that("Model structure is correct", {
   expect_true(inherits(mod, "list"))
   expect_equal(length(mod), ntrees) # length is number of trees
 })
-
-# Test parameter getting and setting
-test_that("Parameter getting and setting works", {
-  train <- mtcars[1:20, ]
-
-  set.seed(23)
-  rpfit <- rpf(mpg ~ ., data = train)
-
-  # could test if setting params work
-  rpfit$fit$set_parameters("n_trees", 60)
-  # FIXME: Cosmetic issue but should be addressed at some point
-  # This should be assignable instead of printing to stdout
-  # An R-vector or list would probably be ideal
-  params_captured <- capture.output(rpfit$fit$get_parameters())
-  expect_equal(
-    strsplit(params_captured, "(, )|(: )")[[1]][[2]],
-    "n_trees=60"
-  )
-})

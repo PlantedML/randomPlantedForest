@@ -1983,68 +1983,7 @@ void RandomPlantedForest::print()
   }
 }
 
-// print parameters of the model to the console
-void RandomPlantedForest::get_parameters()
+RPFParams RandomPlantedForest::get_parameters()
 {
-  std::cout << "Parameters: n_trees=" << n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try
-            << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", nthreads=" << nthreads
-            << ", feature_size=" << feature_size << ", sample_size=" << sample_size << std::endl;
-}
-
-/*  retrospectively change parameters of existing class object,
- updates the model, so far only single valued parameters supported,
- for replacing training data use 'set_data',
- note that changing cv does not trigger cross validation */
-void RandomPlantedForest::set_parameters(std::vector<std::string> keys, std::vector<double> values)
-{
-  if (keys.size() != values.size())
-  {
-    std::cout << "Size of input vectors is not the same. " << std::endl;
-    return;
-  }
-
-  for (unsigned int i = 0; i < keys.size(); ++i)
-  {
-    if (keys[i] == "deterministic")
-    {
-      this->deterministic = values[i];
-    }
-    else if (keys[i] == "nthreads")
-    {
-      this->nthreads = values[i];
-    }
-    else if (keys[i] == "purify")
-    {
-      this->purify_forest = values[i];
-    }
-    else if (keys[i] == "n_trees")
-    {
-      this->n_trees = values[i];
-    }
-    else if (keys[i] == "n_splits")
-    {
-      this->n_splits = values[i];
-    }
-    else if (keys[i] == "t_try")
-    {
-      this->t_try = values[i];
-    }
-    else if (keys[i] == "split_try")
-    {
-      this->split_try = values[i];
-    }
-    else if (keys[i] == "max_interaction")
-    {
-      this->max_interaction = values[i];
-    }
-    else if (keys[i] == "cv")
-    {
-      this->cross_validate = values[i];
-    }
-    else
-    {
-      std::cout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
-    }
-  }
-  this->fit();
+  return {max_interaction, n_trees, n_splits, split_try, t_try, purify_forest, deterministic, nthreads, cross_validate};
 }

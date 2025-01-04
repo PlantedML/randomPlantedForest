@@ -10,7 +10,6 @@ using namespace Rcpp;
 class RcppInterface
 {
 public:
-  virtual void set_parameters(StringVector keys, NumericVector values) = 0;
   virtual NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components) = 0;
   virtual NumericMatrix predict_vector(const NumericVector &X, const NumericVector components) = 0;
   virtual void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) = 0;
@@ -29,12 +28,11 @@ public:
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0}) override;
   void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) override;
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true) override;
-  void set_parameters(StringVector keys, NumericVector values) override;
   List get_model() override;
 
   void purify_3();
   void print();
-  void get_parameters();
+  List get_parameters();
   bool is_purified();
 
 protected:
@@ -46,7 +44,6 @@ class RcppCPF : public ClassificationRPF, public RcppInterface
 public:
   RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
           const std::string loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0});
-  void set_parameters(StringVector keys, NumericVector values) override;
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0}) override;
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0}) override;
   void cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries) override;
@@ -55,7 +52,7 @@ public:
 
   void purify_3();
   void print();
-  void get_parameters();
+  List get_parameters();
   bool is_purified();
 };
 

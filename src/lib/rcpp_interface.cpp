@@ -114,12 +114,6 @@ double RcppRPF::MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_tru
   return RandomPlantedForest::MSE(toStd2D(Y_predicted), toStd2D(Y_true));
 }
 
-void RcppRPF::set_parameters(StringVector keys, NumericVector values)
-{
-  RandomPlantedForest::set_parameters(std::vector<std::string>(keys.begin(), keys.end()),
-                                      std::vector<double>(values.begin(), values.end()));
-}
-
 double RcppRPF::MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true)
 {
   return RandomPlantedForest::MSE_vec(toStd1D(Y_predicted), toStd1D(Y_true));
@@ -135,9 +129,18 @@ void RcppRPF::print()
   RandomPlantedForest::print();
 }
 
-void RcppRPF::get_parameters()
+List RcppRPF::get_parameters()
 {
-  RandomPlantedForest::get_parameters();
+  RPFParams params = RandomPlantedForest::get_parameters();
+  return List::create(Named("max_interaction") = params.max_interaction,
+                      Named("n_trees") = params.n_trees,
+                      Named("n_splits") = params.n_splits,
+                      Named("split_try") = params.split_try,
+                      Named("t_try") = params.t_try,
+                      Named("purify_forest") = params.purify_forest,
+                      Named("deterministic") = params.deterministic,
+                      Named("nthreads") = params.nthreads,
+                      Named("cross_validate") = params.cross_validate);
 }
 
 List RcppRPF::get_model()
@@ -161,12 +164,6 @@ RcppCPF::RcppCPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
   {
     ClassificationRPF::cross_validation();
   }
-}
-
-void RcppCPF::set_parameters(StringVector keys, NumericVector values)
-{
-  ClassificationRPF::set_parameters(std::vector<std::string>(keys.begin(), keys.end()),
-                                    std::vector<double>(values.begin(), values.end()));
 }
 
 NumericMatrix RcppCPF::predict_matrix(const NumericMatrix &X, const NumericVector components)
@@ -219,9 +216,18 @@ void RcppCPF::print()
   RandomPlantedForest::print();
 }
 
-void RcppCPF::get_parameters()
+List RcppCPF::get_parameters()
 {
-  RandomPlantedForest::get_parameters();
+  CPFParams params = ClassificationRPF::get_parameters();
+  return List::create(Named("max_interaction") = params.max_interaction,
+                      Named("n_trees") = params.n_trees,
+                      Named("n_splits") = params.n_splits,
+                      Named("split_try") = params.split_try,
+                      Named("t_try") = params.t_try,
+                      Named("purify_forest") = params.purify_forest,
+                      Named("deterministic") = params.deterministic,
+                      Named("nthreads") = params.nthreads,
+                      Named("cross_validate") = params.cross_validate);
 }
 
 List RcppCPF::get_model()
