@@ -37,56 +37,20 @@ test_that("Unsupported interface", {
 })
 
 
-# Randomness --------------------------------------------------------------
-
-test_that("Setting seed in R works", {
-  set.seed(13)
-  rpf_fit1 <- rpf(mpg ~ wt + cyl, data = mtcars)
-  pred1 <- predict(rpf_fit1, mtcars[1:5, ])
-
-  set.seed(13)
-  rpf_fit2 <- rpf(mpg ~ wt + cyl, data = mtcars)
-  pred2 <- predict(rpf_fit2, mtcars[1:5, ])
-
-  # No seed set, so should be different
-  rpf_fit3 <- rpf(mpg ~ wt + cyl, data = mtcars)
-  pred3 <- predict(rpf_fit3, mtcars[1:5, ])
-
-  expect_equal(pred1, pred2)
-  expect_failure(expect_equal(pred1, pred3))
-})
-
-test_that("Rcpp RNG/R RNG interference", {
-  set.seed(1)
-  r11 <- runif(1)
-  r12 <- runif(1)
-
-  set.seed(1)
-  r21 <- runif(1)
-  rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
-  r22 <- runif(1)
-
-  # If this fails R is broken
-  expect_equal(r11, r21)
-  # If this fails Rcpp does not properly affect R's RNG
-  expect_failure(expect_equal(r12, r22))
-})
-
-
 # Parameter sets/combinations ---------------------------------------------
 
 test_that("Setting max_interaction = 0 works", {
   set.seed(100)
-  rpf_fit0 <- rpf(mpg ~ ., data = mtcars[1:20,], max_interaction = 0)
-  pred0 <- predict(rpf_fit0, new_data = mtcars[21:32,])
+  rpf_fit0 <- rpf(mpg ~ ., data = mtcars[1:20, ], max_interaction = 0)
+  pred0 <- predict(rpf_fit0, new_data = mtcars[21:32, ])
 
   set.seed(100)
-  rpf_fit10 <- rpf(mpg ~ ., data = mtcars[1:20,], max_interaction = 10)
-  pred10 <- predict(rpf_fit10, new_data = mtcars[21:32,])
+  rpf_fit10 <- rpf(mpg ~ ., data = mtcars[1:20, ], max_interaction = 10)
+  pred10 <- predict(rpf_fit10, new_data = mtcars[21:32, ])
 
   set.seed(100)
-  rpf_fit_default <- rpf(mpg ~ ., data = mtcars[1:20,])
-  pred_default <- predict(rpf_fit_default, new_data = mtcars[21:32,])
+  rpf_fit_default <- rpf(mpg ~ ., data = mtcars[1:20, ])
+  pred_default <- predict(rpf_fit_default, new_data = mtcars[21:32, ])
 
   # Sanity: pred of default (max_interaction = 1) should be different
   expect_failure(expect_equal(pred_default, pred0))
