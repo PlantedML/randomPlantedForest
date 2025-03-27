@@ -1,34 +1,47 @@
 #ifndef RPF_H
 #define RPF_H
 
+#include <vector>
+#include <stdexcept>
 #include "trees.hpp"
 
-using namespace Rcpp;
+struct RPFParams
+{
+  int max_interaction;
+  int n_trees;
+  int n_splits;
+  int split_try;
+  double t_try;
+  bool purify_forest;
+  bool deterministic;
+  int nthreads;
+  bool cross_validate;
+};
 
 class RandomPlantedForest
 {
 
 public:
-  RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0});
-  RandomPlantedForest(){};
-  void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
-  NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
-  NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
+  RandomPlantedForest(
+      const std::vector<std::vector<double>> &samples_Y,
+      const std::vector<std::vector<double>> &samples_X,
+      const std::vector<double> parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0});
+  RandomPlantedForest() {};
+  void set_data(const std::vector<std::vector<double>> &samples_Y, const std::vector<std::vector<double>> &samples_X);
+  std::vector<std::vector<double>> predict_matrix(const std::vector<std::vector<double>> &X, const std::vector<double> components = {0});
+  std::vector<std::vector<double>> predict_vector(const std::vector<double> &X, const std::vector<double> components = {0});
   void purify_1();
   void purify_2();
   void purify_3();
   void print();
-  void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
-  double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true);
-  void get_parameters();
-  void set_parameters(StringVector keys, NumericVector values);
-  List get_model();
-  virtual ~RandomPlantedForest(){};
+  void cross_validation(int n_sets = 4, std::vector<int> splits = {5, 50}, std::vector<double> t_tries = {0.2, 0.5, 0.7, 0.9}, std::vector<int> split_tries = {1, 2, 5, 10});
+  double MSE(const std::vector<std::vector<double>> &Y_predicted, const std::vector<std::vector<double>> &Y_true);
+  RPFParams get_parameters();
+  virtual ~RandomPlantedForest() {};
   bool is_purified();
 
 protected:
-  double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
+  double MSE_vec(const std::vector<double> &Y_predicted, const std::vector<double> &Y_true);
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */
   int max_interaction;                /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
@@ -54,7 +67,7 @@ protected:
   virtual void fit();
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                        std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
+                                 std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
 };
 
 #endif // RPF_HPP

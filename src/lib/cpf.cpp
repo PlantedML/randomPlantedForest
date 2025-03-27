@@ -1,13 +1,11 @@
-
 #include "cpf.hpp"
-
+#include <vector>
 
 // ----------------- rpf subclass for classification -----------------
 
 /**
  * \brief Create a prediction model based on Random Forests for classification data sets.
  */
-
 
 void ClassificationRPF::L1_loss(Split &split)
 {
@@ -587,16 +585,13 @@ void ClassificationRPF::exponential_loss_3(Split &split)
 }
 
 // constructor with parameters split_try, t_try, purify_forest, deterministic, nthreads
-ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                                     const String loss, const NumericVector parameters)
+ClassificationRPF::ClassificationRPF(const std::vector<std::vector<double>> &samples_Y, const std::vector<std::vector<double>> &samples_X,
+                                     const std::string loss, const std::vector<double> parameters)
     : RandomPlantedForest{}
 {
 
-  // Ensure correct Rcpp RNG state
-  Rcpp::RNGScope scope;
-
   // initialize class members
-  std::vector<double> pars = to_std_vec(parameters);
+  std::vector<double> pars = parameters;
   if (loss == "L1")
   {
     this->loss = LossType::L1;
@@ -649,13 +644,13 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
   }
   else
   {
-    Rcout << "Unkown loss function, set to default (L2)." << std::endl;
+    std::cout << "Unkown loss function, set to default (L2)." << std::endl;
     this->loss = LossType::L2;
     this->calcLoss = &ClassificationRPF::L2_loss;
   }
   if (pars.size() != 11)
   {
-    Rcout << "Wrong number of parameters - set to default." << std::endl;
+    std::cout << "Wrong number of parameters - set to default." << std::endl;
     this->max_interaction = 1;
     this->n_trees = 50;
     this->n_splits = 30;
@@ -774,10 +769,10 @@ Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>>
             std::iota(samples.begin(), samples.end(), 1);
           }
           else
-          { // randomly picked samples otherwise
+          { // randomly picked samples using RandomGenerator
             samples = std::vector<int>(split_try);
             for (size_t i = 0; i < samples.size(); ++i)
-              samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size);
+              samples[i] = utils::RandomGenerator::random_index((int)(unique_samples.size() - leaf_size)) + leaf_size;
             std::sort(samples.begin(), samples.end());
           }
 
@@ -899,7 +894,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     // bagging/subsampling
     for (size_t i = 0; i < sample_size; ++i)
     {
-      sample_index = R::runif(0, sample_size - 1);
+      sample_index = rand() % sample_size;
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
     }
@@ -1395,7 +1390,7 @@ void ClassificationRPF::fit()
   {
     if (nthreads > std::thread::hardware_concurrency())
     {
-      Rcout << "Requested " << nthreads << " threads but only " << std::thread::hardware_concurrency() << " available" << std::endl;
+      std::cout << "Requested " << nthreads << " threads but only " << std::thread::hardware_concurrency() << " available" << std::endl;
     }
     // Create local thread count to not overwrite nthreads,
     // would get reported wrongly by get_parameters()
@@ -1410,7 +1405,7 @@ void ClassificationRPF::fit()
       std::vector<std::thread> threads(current_threads);
       for (int t = 0; t < current_threads; ++t)
       {
-        // Rcout << "Dispatching thread " << (n + t + 1) << "/" << n_trees << std::endl;
+        // std::cout << "Dispatching thread " << (n + t + 1) << "/" << n_trees << std::endl;
         threads[t] = std::thread(&ClassificationRPF::create_tree_family, this, std::ref(initial_leaves), n + t);
       }
       for (auto &t : threads)
@@ -1439,100 +1434,7 @@ void ClassificationRPF::fit()
   }
 }
 
-/*  retrospectively change parameters of existing class object,
- updates the model, so far only single valued parameters supported,
- for replacing training data use 'set_data',
- note that changing cv does not trigger cross validation */
-void ClassificationRPF::set_parameters(StringVector keys, NumericVector values)
+CPFParams ClassificationRPF::get_parameters()
 {
-  if (keys.size() != values.size())
-  {
-    Rcout << "Size of input vectors is not the same. " << std::endl;
-    return;
-  }
-
-  for (unsigned int i = 0; i < keys.size(); ++i)
-  {
-    if (keys[i] == "deterministic")
-    {
-      this->deterministic = values[i];
-    }
-    else if (keys[i] == "nthreads")
-    {
-      this->nthreads = values[i];
-    }
-    else if (keys[i] == "purify")
-    {
-      this->purify_forest = values[i];
-    }
-    else if (keys[i] == "n_trees")
-    {
-      this->n_trees = values[i];
-    }
-    else if (keys[i] == "n_splits")
-    {
-      this->n_splits = values[i];
-    }
-    else if (keys[i] == "t_try")
-    {
-      this->t_try = values[i];
-    }
-    else if (keys[i] == "split_try")
-    {
-      this->split_try = values[i];
-    }
-    else if (keys[i] == "max_interaction")
-    {
-      this->max_interaction = values[i];
-    }
-    else if (keys[i] == "cv")
-    {
-      this->cross_validate = values[i];
-    }
-    else if (keys[i] == "loss")
-    {
-      if (keys[i] == "L1")
-      {
-        this->loss = LossType::L1;
-        this->calcLoss = &ClassificationRPF::L1_loss;
-      }
-      else if (keys[i] == "L2")
-      {
-        this->loss = LossType::L2;
-        this->calcLoss = &ClassificationRPF::L2_loss;
-      }
-      else if (keys[i] == "median")
-      {
-        this->loss = LossType::median;
-        this->calcLoss = &ClassificationRPF::median_loss;
-      }
-      else if (keys[i] == "logit")
-      {
-        this->loss = LossType::logit;
-        this->calcLoss = &ClassificationRPF::logit_loss;
-      }
-      else if (keys[i] == "exponential")
-      {
-        this->loss = LossType::exponential;
-        this->calcLoss = &ClassificationRPF::exponential_loss;
-      }
-      else
-      {
-        Rcout << "Unkown loss function." << std::endl;
-      }
-    }
-    else if (keys[i] == "delta")
-    {
-      this->delta = values[i];
-    }
-    else if (keys[i] == "epsilon")
-    {
-      this->epsilon = values[i];
-    }
-    else
-    {
-      Rcout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
-    }
-  }
-  this->fit();
+  return {max_interaction, n_trees, n_splits, split_try, t_try, purify_forest, deterministic, nthreads, cross_validate, loss};
 }

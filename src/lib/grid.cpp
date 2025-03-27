@@ -1,4 +1,6 @@
 #include "grid.hpp"
+#include <vector>
+#include <iostream>
 
 using namespace grid;
 
