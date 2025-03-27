@@ -59,7 +59,7 @@ namespace utils
       if (n_entries != entries.size())
         throw std::invalid_argument("Invalid matrix size.");
     }
-    T &operator[](std::vector<int> &indices)
+    T &operator[](const std::vector<int>& indices)
     {
       if (indices.size() != dims.size())
         throw std::invalid_argument("Invalid number of indices.");

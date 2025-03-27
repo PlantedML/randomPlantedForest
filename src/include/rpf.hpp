@@ -16,8 +16,13 @@ public:
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
   void purify_1();
-  void purify_2();
+  void purify_anova();
+  void purify_22();
   void purify_3();
+  void purify_3_new();
+  void purify_anova_and_marginalize();
+  void purify_no_extrapolation();
+  void purify_no_extrapolation_existing_grid();
   void print();
   void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true);
@@ -50,11 +55,15 @@ protected:
   std::vector<double> lower_bounds;
   std::vector<TreeFamily> tree_families; /**<  random planted forest containing result */
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+  std::vector<double> predict_single_grid(const std::vector<double> &X, std::set<int> component_index);
+  std::vector<double> predict_single_no_grid(const std::vector<double> &X, std::set<int> component_index);
   void L2_loss(Split &split);
   virtual void fit();
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
                                         std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
+
+  std::vector<std::vector<double>> get_lim_list(const TreeFamily &curr_family);
 };
 
 #endif // RPF_HPP
