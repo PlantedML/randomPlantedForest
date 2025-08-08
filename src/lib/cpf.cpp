@@ -714,10 +714,12 @@ Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>>
   std::vector<double> unique_samples;
   int k;
   unsigned int n = 0;
-  double leaf_size, sample_point;
+  double leaf_size;
 
   // sample possible splits
-  unsigned int n_candidates = ceil(t_try * possible_splits.size()); // number of candidates that will be considered
+  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(t_try * possible_splits.size()));
+  unsigned int upper = std::min<size_t>(max_candidates_, possible_splits.size());
+  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));  
   std::vector<size_t> split_candidates;
 
       // 1) Build weights = exp(-decay_rate * age)
