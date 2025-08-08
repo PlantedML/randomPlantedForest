@@ -10,7 +10,7 @@ class RandomPlantedForest
 
 public:
   RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0});
+                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50,1});
   RandomPlantedForest(){};
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
@@ -26,7 +26,7 @@ public:
   List get_model();
   virtual ~RandomPlantedForest(){};
   bool is_purified();
-
+  
 protected:
   double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
@@ -53,8 +53,30 @@ protected:
   void L2_loss(Split &split);
   virtual void fit();
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
-  virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                        std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family);
+  struct SplitCandidate;
+  // overload possibleExists for your vector of SplitCandidate
+  static bool possibleExists(
+    int dim,
+    const std::vector<SplitCandidate>& possible_splits,
+    const std::set<int>& resulting_dims
+  );
+  virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y,
+                                 const std::vector<std::vector<double>> &X,
+                                 std::vector<SplitCandidate> &possible_splits,
+                                 TreeFamily &curr_family);
+  // exponential‐decay rate for split age
+  double split_decay_rate_;
+  size_t max_candidates_;
+  // track each split candidate and how long it’s sat unchosen
+  struct SplitCandidate {
+  int dim;
+  std::shared_ptr<DecisionTree> tree;
+  double age;
+  // single ctor with default age
+  SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a = 0.0)
+    : dim(d), tree(std::move(t)), age(a) {}
+  };
+  bool delete_leaves;
 };
 
 #endif // RPF_HPP
