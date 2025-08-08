@@ -1,4 +1,23 @@
 #include "rpf.hpp"
+#include <cmath>
+#include <numeric>
+#include <limits>
+#include <algorithm>  // for std::min, std::max
+#include <random>
+
+
+bool RandomPlantedForest::possibleExists(
+    int dim,
+    const std::vector<SplitCandidate>& possible_splits,
+    const std::set<int>& resulting_dims)
+{
+  for (const auto& c : possible_splits) {
+    if (c.dim == dim && c.tree->split_dims == resulting_dims)
+      return true;
+  }
+  return false;
+}
+
 
 
 bool RandomPlantedForest::is_purified()
@@ -31,21 +50,12 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
 
   // initialize class members
   std::vector<double> pars = to_std_vec(parameters);
-  if (pars.size() != 9)
+  if (pars.size() != 12)
   {
-    Rcout << "Wrong number of parameters - set to default." << std::endl;
-    this->max_interaction = 1;
-    this->n_trees = 50;
-    this->n_splits = 30;
-    this->split_try = 10;
-    this->t_try = 0.4;
-    this->purify_forest = 0;
-    this->deterministic = 0;
-    this->nthreads = 1;
-    this->cross_validate = 0;
+    Rcpp::stop("RandomPlantedForest requires 12 parameters, got %d", pars.size());
   }
   else
-  {
+  { 
     this->max_interaction = pars[0];
     this->n_trees = pars[1];
     this->n_splits = pars[2];
@@ -55,6 +65,10 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
     this->deterministic = pars[6];
     this->nthreads = pars[7];
     this->cross_validate = pars[8];
+    this->split_decay_rate_ = pars[9];
+    this->max_candidates_   = static_cast<size_t>(pars[10]);
+    this->delete_leaves   = pars[11];
+
   }
 
   // set data and data related members
@@ -63,177 +77,223 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
 
 // determine optimal split
 Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                            std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family)
+                                            std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family)
 {
 
   Split curr_split, min_split;
+  min_split.min_sum = std::numeric_limits<double>::infinity();
   curr_split.Y = &Y;
   std::set<int> tree_dims;
   std::vector<double> unique_samples;
-  int k;
-  unsigned int n = 0;
-  double leaf_size, sample_point;
+  double leaf_size;
 
-  // sample possible splits
-  unsigned int n_candidates = ceil(t_try * possible_splits.size()); // number of candidates that will be considered
-  std::vector<int> split_candidates(possible_splits.size());
-  std::iota(split_candidates.begin(), split_candidates.end(), 0); // consecutive indices of possible candidates
 
-  if (!deterministic)
-  {
-    shuffle_vector(split_candidates.begin(), split_candidates.end()); // shuffle for random order
+  // raw count based on t_try
+  unsigned int raw_candidates = static_cast<unsigned int>(
+     std::ceil(t_try * possible_splits.size()));
+  // never try more than available splits or max_candidates_
+  unsigned int upper = std::min<size_t>(
+     max_candidates_, possible_splits.size());
+  // clamp into [1, upper]
+  unsigned int n_candidates = std::max<unsigned int>(
+     1u, std::min<unsigned int>(raw_candidates, upper));
+
+
+  // 1) Build weights = exp(-decay_rate * age)
+  std::vector<double> weights(possible_splits.size());
+  for (size_t i = 0; i < possible_splits.size(); ++i) {
+    weights[i] = std::exp(-split_decay_rate_ * possible_splits[i].age);
   }
 
-  // consider a fraction of possible splits
-  while (n < n_candidates)
-  {
+  // 2) Sample n_candidates indices without replacement
+    // 2) Sample n_candidates indices without replacement via discrete_distribution
+  std::vector<size_t> sample_idxs;
+  sample_idxs.reserve(n_candidates);
 
-    if (possible_splits.empty())
-      break;
-    if (split_candidates[n] >= 0 && (size_t)split_candidates[n] >= possible_splits.size())
-      continue;
+  if (!deterministic) {
+    // set up RNG and discrete distribution over our weights
+    std::mt19937 gen(std::random_device{}());
+    std::discrete_distribution<size_t> dist(weights.begin(), weights.end());
+    std::vector<bool> used(possible_splits.size(), false);
 
-    auto candidate = possible_splits.begin();
-    std::advance(candidate, split_candidates[n]); // get random split candidate without replacement
-    k = candidate->first - 1;                     // split dim of current candidate, converted to index starting at 0
-    leaf_size = n_leaves[k];
+    // draw until we have n_candidates _distinct_ indices
+    while (sample_idxs.size() < n_candidates) {
+      size_t idx = dist(gen);
+      if (!used[idx]) {
+        used[idx] = true;
+        sample_idxs.push_back(idx);
+      }
+    }
+  } else {
+    // deterministically take the first n_candidates indices:
+    for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
+      sample_idxs.push_back(i);
+  }
+
+  // 3) Evaluate each sampled candidate
+  int best_idx = -1;
+  for (size_t idx : sample_idxs) {
+    // reproduce exactly your old body, but with `idx` in place of `n`:
+    auto candidate_it = possible_splits.begin();
+    std::advance(candidate_it, idx);
+    int k         = candidate_it->dim - 1;
+    leaf_size     = n_leaves[k];
 
     // Test if splitting in the current tree w.r.t. the coordinate "k" is an element of candidate tree
-    tree_dims = candidate->second->split_dims;
+    tree_dims = candidate_it->tree->split_dims;
     tree_dims.erase(k + 1);
     tree_dims.erase(0);
 
     std::vector<std::shared_ptr<DecisionTree>> curr_trees;
-    if (tree_dims.size() == 0)
-      curr_trees.push_back(curr_family[std::set<int>{0}]);
+    if (tree_dims.empty())
+      curr_trees.push_back(curr_family[{0}]);
     if (curr_family.find(tree_dims) != curr_family.end())
       curr_trees.push_back(curr_family[tree_dims]);
-    if (curr_family.find(candidate->second->split_dims) != curr_family.end())
-      curr_trees.push_back(curr_family[candidate->second->split_dims]);
+    if (curr_family.find(candidate_it->tree->split_dims) != curr_family.end())
+      curr_trees.push_back(curr_family[candidate_it->tree->split_dims]);
 
-    // go through all trees in current family
-    for (auto &curr_tree : curr_trees)
-    {
+    for (auto &curr_tree : curr_trees) {
+      if (curr_tree->leaves.empty()) continue;
+          // new: exactly split_try random (leaf, cut‐point) trials per tree
+    for (size_t trial = 0; trial < split_try; ++trial) {
+        // 1) pick a random leaf
+        int leaf_idx = static_cast<int>(R::runif(0, curr_tree->leaves.size()));
+        auto &leaf = curr_tree->leaves[leaf_idx];
 
-      // skip if tree has no leaves
-      if (curr_tree->leaves.size() == 0)
-        continue;
+        // 2) collect unique feature values within that leaf
+        std::vector<double> unique_samples(leaf.individuals.size());
+        for (size_t i = 0; i < leaf.individuals.size(); ++i)
+            unique_samples[i] = X[leaf.individuals[i]][k];
+        std::sort(unique_samples.begin(), unique_samples.end());
+        unique_samples.erase(
+          std::unique(unique_samples.begin(), unique_samples.end()),
+          unique_samples.end()
+        );
 
-      // go through all leaves of current tree
-      for (auto &leaf : curr_tree->leaves)
-      {
-
-        std::vector<double> tot_sum(value_size, 0);
-
-        // extract sample points according to individuals from X and Y
-        unique_samples = std::vector<double>(leaf.individuals.size());
-        for (unsigned int i = 0; i < leaf.individuals.size(); ++i)
-        {
-          unique_samples[i] = X[leaf.individuals[i]][k];
+        // if too few distinct values, retry this trial
+        if (unique_samples.size() < 2 * leaf_size) {
+            --trial;
+            continue;
         }
+
+        // 3) pick one random cut‐point in [leaf_size, n - leaf_size)
+        int s_idx = static_cast<int>(
+            R::runif(leaf_size, unique_samples.size() - leaf_size)
+        );
+        double sample_point = unique_samples[s_idx];
+
+        // 4) partition and compute L2 loss
+        curr_split.I_s.clear();
+        curr_split.I_b.clear();
+        curr_split.I_s.reserve(leaf.individuals.size());
+        curr_split.I_b.reserve(leaf.individuals.size());
+        curr_split.sum_s.assign(value_size, 0);
+        curr_split.sum_b.assign(value_size, 0);
+
+        for (int ind : leaf.individuals) {
+            if (X[ind][k] < sample_point) {
+                curr_split.I_s.push_back(ind);
+                curr_split.sum_s += Y[ind];
+            } else {
+                curr_split.I_b.push_back(ind);
+                curr_split.sum_b += Y[ind];
+            }
+        }
+
+        L2_loss(curr_split);
+
+        // 5) update best split if improved
+        if (curr_split.min_sum < min_split.min_sum) {
+            min_split = curr_split;
+            min_split.tree_index       = curr_tree;
+            min_split.leaf_index       = &leaf;
+            min_split.split_coordinate = k + 1;
+            min_split.split_point      = sample_point;
+            best_idx                   = idx;
+        }
+    }
+
+
+/*       for (auto &leaf : curr_tree->leaves) {
+        std::vector<double> tot_sum(value_size, 0);
+        unique_samples.resize(leaf.individuals.size());
+        for (size_t i = 0; i < leaf.individuals.size(); ++i)
+          unique_samples[i] = X[leaf.individuals[i]][k];
         std::sort(unique_samples.begin(), unique_samples.end());
         unique_samples.erase(std::unique(unique_samples.begin(), unique_samples.end()), unique_samples.end());
+        if (unique_samples.size() < 2 * leaf_size) continue;
 
-        // check if number of sample points is within limit
-        if (unique_samples.size() < 2 * leaf_size)
-          continue;
-
-        // consider split_try-number of samples
         std::vector<int> samples;
-        if (deterministic)
-        { // sequential samples if deterministic
-          samples = std::vector<int>(std::min((int)unique_samples.size() - 1, 9));
+        if (deterministic) {
+          samples.resize(std::min((int)unique_samples.size() - 1, 9));
           std::iota(samples.begin(), samples.end(), 1);
-        }
-        else
-        { // randomly picked samples otherwise
-          samples = std::vector<int>(split_try);
+        } else {
+          samples.resize(split_try);
           for (size_t i = 0; i < samples.size(); ++i)
             samples[i] = R::runif(leaf_size, unique_samples.size() - leaf_size);
           std::sort(samples.begin(), samples.end());
         }
 
-        // go through samples
-        for (size_t sample_pos = 0; sample_pos < samples.size(); ++sample_pos)
-        {
+        for (size_t si = 0; si < samples.size(); ++si) {
+          sample_point = unique_samples[samples[si]];
+          curr_split.I_s.clear();  curr_split.I_b.clear();
+          curr_split.I_s.reserve(leaf.individuals.size());
+          curr_split.I_b.reserve(leaf.individuals.size());
+          curr_split.M_s.assign(value_size, 0);
+          curr_split.M_b.assign(value_size, 0);
 
-          // get samplepoint
-          sample_point = unique_samples[samples[sample_pos]];
-
-          // clear current split
-          {
-            curr_split.I_s.clear();
-            curr_split.I_b.clear();
-            curr_split.I_s.reserve(leaf.individuals.size());
-            curr_split.I_b.reserve(leaf.individuals.size());
-            curr_split.M_s = std::vector<double>(value_size, 0);
-            curr_split.M_b = std::vector<double>(value_size, 0);
-          }
-
-          // get samples greater/smaller than samplepoint
-          if (sample_pos == 0)
-          {
-            curr_split.sum_s = std::vector<double>(value_size, 0);
-            curr_split.sum_b = std::vector<double>(value_size, 0);
-
-            for (int individual : leaf.individuals)
-            {
-              if (X[individual][k] < sample_point)
-              {
-                curr_split.I_s.push_back(individual);
-                curr_split.sum_s += Y[individual];
-              }
-              else
-              {
-                curr_split.I_b.push_back(individual);
-                curr_split.sum_b += Y[individual];
+          if (si == 0) {
+            curr_split.sum_s.assign(value_size, 0);
+            curr_split.sum_b.assign(value_size, 0);
+            for (int ind : leaf.individuals) {
+              if (X[ind][k] < sample_point) {
+                curr_split.I_s.push_back(ind);
+                curr_split.sum_s += Y[ind];
+              } else {
+                curr_split.I_b.push_back(ind);
+                curr_split.sum_b += Y[ind];
               }
             }
-
             tot_sum = curr_split.sum_s + curr_split.sum_b;
-          }
-          else
-          {
-
-            for (int individual : leaf.individuals)
-            {
-              if (X[individual][k] < sample_point)
-              {
-                if (X[individual][k] >= unique_samples[samples[sample_pos - 1]])
-                {
-                  curr_split.sum_s += Y[individual];
-                }
-                curr_split.I_s.push_back(individual);
-              }
-              else
-              {
-                curr_split.I_b.push_back(individual);
+          } else {
+            for (int ind : leaf.individuals) {
+              if (X[ind][k] < sample_point) {
+                if (X[ind][k] >= unique_samples[samples[si - 1]])
+                  curr_split.sum_s += Y[ind];
+                curr_split.I_s.push_back(ind);
+              } else {
+                curr_split.I_b.push_back(ind);
               }
             }
-
             curr_split.sum_b = tot_sum - curr_split.sum_s;
           }
 
-          // accumulate squared mean and get mean
           L2_loss(curr_split);
 
-          // update split if squared sum is smaller
-          if (curr_split.min_sum < min_split.min_sum)
-          {
+          if (curr_split.min_sum < min_split.min_sum) {
             min_split = curr_split;
-            min_split.tree_index = curr_tree;
-            min_split.leaf_index = &leaf;
+            min_split.tree_index       = curr_tree;
+            min_split.leaf_index       = &leaf;
             min_split.split_coordinate = k + 1;
-            min_split.split_point = sample_point;
+            min_split.split_point      = sample_point;
+            best_idx                   = idx; 
           }
         }
-      }
+      } */
     }
-
-    ++n;
   }
 
+
+  // 4) Age update: only sampled splits age; chosen resets to zero
+for (size_t idx : sample_idxs) {
+  if ((int)idx != best_idx)
+    possible_splits[idx].age += 1.0;
+  else
+    possible_splits[idx].age = 0.0;
+}
+
   return min_split;
+
 }
 
 void RandomPlantedForest::set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
@@ -293,12 +353,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   TreeFamily curr_family;
   curr_family.insert(std::make_pair(std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves)))); // save tree with one leaf in the beginning
   // store possible splits in map with splitting variable as key and pointer to resulting tree
-  std::multimap<int, std::shared_ptr<DecisionTree>> possible_splits;
-  for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim)
-  {
-    // add pointer to resulting tree with split dimension as key
-    curr_family.insert(std::make_pair(std::set<int>{feature_dim}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{feature_dim}))));
-    possible_splits.insert(std::make_pair(feature_dim, curr_family[std::set<int>{feature_dim}]));
+  std::vector<SplitCandidate> possible_splits;
+  for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+    auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
+    curr_family.insert({{feature_dim}, treePtr});
+    possible_splits.emplace_back(feature_dim, treePtr);
   }
 
   // sample data points with replacement
@@ -334,7 +393,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
     // find optimal split
     curr_split = calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family);
-
+    
     // continue only if we get a significant result
     if (!std::isinf(curr_split.min_sum))
     {
@@ -363,12 +422,13 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         // update possible_splits if not already existing
         if (found_tree)
         { // if yes add pointer
-          possible_splits.insert(std::make_pair(feature_dim, found_tree));
+          possible_splits.emplace_back(feature_dim, found_tree);
         }
         else
         { // if not create new tree
           curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
-          possible_splits.insert(std::make_pair(feature_dim, curr_family[curr_dims]));
+          possible_splits.emplace_back(feature_dim, curr_family[curr_dims]);
+          
         }
       }
 
@@ -413,7 +473,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       std::shared_ptr<DecisionTree> found_tree = treeExists(resulting_dims, curr_family);
 
       // determine which tree is modified
-      if (curr_split.tree_index->split_dims.count(curr_split.split_coordinate))
+      if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate))&& delete_leaves)
       { // if split variable is already in tree to be split
         // change values
         {
@@ -423,8 +483,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         *curr_split.leaf_index = leaf_b;                 // replace old interval
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
       }
-      else
-      {                                       // otherwise
+      else // we keep the parent leaf and create two new children
+      {                                       
         found_tree->leaves.push_back(leaf_s); // append new leaves
         found_tree->leaves.push_back(leaf_b);
       }
@@ -1986,6 +2046,7 @@ void RandomPlantedForest::print()
 void RandomPlantedForest::get_parameters()
 {
   Rcout << "Parameters: n_trees=" << n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try
+        << ", split_decay_rate=" << split_decay_rate_<< ", max_candidates="  << max_candidates_
         << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", nthreads=" << nthreads
         << ", feature_size=" << feature_size << ", sample_size=" << sample_size << std::endl;
 }
@@ -2040,10 +2101,19 @@ void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values
     {
       this->cross_validate = values[i];
     }
+    else if (keys[i] == "split_decay_rate")
+    {
+      this->split_decay_rate_ = values[i];
+    }
+    else if (keys[i] == "max_candidates")
+    {
+      this->max_candidates_ = static_cast<size_t>(values[i]);
+    } 
     else
     {
       Rcout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
     }
+
   }
   this->fit();
 }

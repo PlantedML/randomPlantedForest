@@ -9,7 +9,7 @@ class ClassificationRPF : public RandomPlantedForest
 public:
   using RandomPlantedForest::calcOptimalSplit;
   ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                    const String loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0, 0.1});
+                    const String loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 0, 0.1, 50,1});
   void set_parameters(StringVector keys, NumericVector values);
   ~ClassificationRPF(){};
 
@@ -33,9 +33,12 @@ private:
   void (ClassificationRPF::*calcLoss)(Split &);
   void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
   void fit() override;
-  Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                         std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, TreeFamily &curr_family,
-                         std::vector<std::vector<double>> &weights);
+  Split calcOptimalSplit(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<SplitCandidate>& possible_splits,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights) ;
   void L1_loss(Split &split);
   void median_loss(Split &split);
   void logit_loss(Split &split);
