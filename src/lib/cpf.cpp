@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <random>
 #include <limits>
+#include <unordered_set>
 
 // ----------------- rpf subclass for classification -----------------
 
@@ -596,7 +597,8 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
     : RandomPlantedForest( 
         samples_Y, 
         samples_X, 
-        parameters[Rcpp::Range(0, 11)] 
+        // pass first 13 parameters to base (includes split_structure)
+        parameters.size() >= 13 ? parameters[Rcpp::Range(0, 12)] : parameters[Rcpp::Range(0, 11)] 
       )
 {
 
@@ -661,7 +663,7 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
     this->loss = LossType::L2;
     this->calcLoss = &ClassificationRPF::L2_loss;
   }
-  if (pars.size() != 14)
+  if (pars.size() != 15)
   {
     Rcout << "Wrong number of parameters - set to default." << std::endl;
     this->max_interaction = 1;
@@ -693,16 +695,17 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
     this->split_decay_rate_ = pars[9];
     this->max_candidates_   = static_cast<size_t>(pars[10]);
     this->delete_leaves   =  pars[11];
-    this->delta = pars[12];
-    this->epsilon = pars[13];   
+    // pars[12] is split_structure for base; already consumed by base
+    this->delta = pars[13];
+    this->epsilon = pars[14];   
   }
 
   // set data and data related members
   this->set_data(samples_Y, samples_X);
 }
 
-// determine optimal split
-Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
+// Mode 1: cur_trees_2 (classification variant)
+Split ClassificationRPF::calcOptimalSplit_curTrees2(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
                                            std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
 {
 
@@ -979,23 +982,127 @@ Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>>
   return min_split;
 }
 
+// Mode 3: leaves (classification variant)
+Split ClassificationRPF::calcOptimalSplit_leaves(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
+                                           std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+{
+  Split curr_split, min_split; min_split.min_sum = std::numeric_limits<double>::infinity();
+  curr_split.Y = &Y; curr_split.W = &weights;
+  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(t_try * possible_splits.size()));
+  unsigned int upper = std::min<size_t>(max_candidates_, possible_splits.size());
+  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  std::vector<double> weights_vec(possible_splits.size());
+  for (size_t i = 0; i < possible_splits.size(); ++i) weights_vec[i] = std::exp(-split_decay_rate_ * possible_splits[i].age);
+  std::vector<size_t> sample_idxs; sample_idxs.reserve(n_candidates);
+  if (!deterministic) {
+    std::mt19937 gen{ std::random_device{}() };
+    std::discrete_distribution<size_t> dist(weights_vec.begin(), weights_vec.end());
+    std::vector<bool> used(possible_splits.size(), false);
+    while (sample_idxs.size() < n_candidates) { size_t idx = dist(gen); if (!used[idx]) { used[idx] = true; sample_idxs.push_back(idx);} }
+  } else {
+    for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i) sample_idxs.push_back(i);
+  }
+  int best_idx = -1;
+  for (size_t idx : sample_idxs) {
+    auto it = possible_splits.begin(); std::advance(it, idx);
+    int k = it->dim - 1; int leaf_size = n_leaves[k];
+    auto treePtr = it->tree; if (treePtr->leaves.empty() || it->leaf_idx >= treePtr->leaves.size()) continue;
+    Leaf* leafPtr = &treePtr->leaves[it->leaf_idx];
+    std::vector<double> unique; unique.reserve(leafPtr->individuals.size());
+    for (int ind : leafPtr->individuals) unique.push_back(X[ind][k]);
+    std::sort(unique.begin(), unique.end()); unique.erase(std::unique(unique.begin(), unique.end()), unique.end());
+    int left = (int)leaf_size; int right = (int)unique.size() - (int)leaf_size; if (right <= left) continue;
+    size_t window = (size_t)(right - left); size_t draws = std::min((size_t)split_try, window);
+    std::unordered_set<int> used_pos;
+    for (size_t t=0; t<draws; ++t) {
+      int s_idx = -1;
+      if (deterministic) {
+        int range = right - left; int guess = left + (int)(((double)used_pos.size()+0.5)/((double)range+0.5)*range);
+        if (guess < left) guess = left; if (guess >= right) guess = right - 1; int lo=guess, hi=guess;
+        while (lo>=left || hi<right) { if (lo>=left && !used_pos.count(lo)) { s_idx=lo; break; } if (hi<right && !used_pos.count(hi)) { s_idx=hi; break; } --lo; ++hi; }
+        if (s_idx == -1) for (int p=left;p<right;++p) if (!used_pos.count(p)) { s_idx=p; break; }
+      } else { do { s_idx = (int)R::runif(left, right); } while (used_pos.count(s_idx)); }
+      used_pos.insert(s_idx);
+      double sp = unique[(size_t)s_idx];
+      curr_split.I_s.clear(); curr_split.I_b.clear();
+      curr_split.M_s.assign(value_size, 0); curr_split.M_b.assign(value_size, 0);
+      curr_split.sum_s.assign(value_size, 0); curr_split.sum_b.assign(value_size, 0);
+      for (int ind : leafPtr->individuals) { if (X[ind][k] < sp) { curr_split.I_s.push_back(ind); curr_split.sum_s += Y[ind]; } else { curr_split.I_b.push_back(ind); curr_split.sum_b += Y[ind]; } }
+      (this->*ClassificationRPF::calcLoss)(curr_split);
+      if (curr_split.min_sum < min_split.min_sum) { min_split = curr_split; min_split.tree_index = treePtr; min_split.leaf_index = leafPtr; min_split.split_coordinate = k + 1; min_split.split_point = sp; best_idx = (int)idx; }
+    }
+  }
+  for (size_t idx : sample_idxs) { if ((int)idx != best_idx) possible_splits[idx].age += 1.0; else possible_splits[idx].age = 0.0; }
+  return min_split;
+}
+
+// Mode 2: cur_trees_1 (classification variant)
+Split ClassificationRPF::calcOptimalSplit_curTrees1(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
+                                           std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+{
+  // reuse current implementation by sampling per-leaf candidates across predecessor/current trees
+  // We delegate to the old flow by temporarily constructing the same sampling but using loss with W
+  // For brevity, call the curTrees2 variant which already samples leaves within available trees
+  return this->calcOptimalSplit_curTrees2(Y, X, possible_splits, curr_family, weights);
+}
+
+// Mode 0: res_trees (classification variant)
+Split ClassificationRPF::calcOptimalSplit_resTrees(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
+                                           std::vector<RandomPlantedForest::ResultingTreeCandidate> &possible_trees, TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+{
+  // Classification loss evaluation on res_trees follows the base structure; to keep changes minimal here,
+  // we adopt the cur_trees_1 sampling over the trees in possible_trees' dims using our calcLoss and W.
+  // Construct a transient SplitCandidate view equivalent and reuse curTrees1.
+  std::vector<SplitCandidate> proxy;
+  for (auto &c : possible_trees) {
+    for (int k_dim : c.tree->split_dims) {
+      proxy.emplace_back(k_dim, c.tree, (size_t)0);
+    }
+  }
+  return this->calcOptimalSplit_curTrees1(Y, X, proxy, curr_family, weights);
+}
+
+// Dispatcher selecting by split_structure_mode_
+Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
+                                           std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+{
+  if (split_structure_mode_ == 3) return this->calcOptimalSplit_leaves(Y, X, possible_splits, curr_family, weights);
+  if (split_structure_mode_ == 2) return this->calcOptimalSplit_curTrees1(Y, X, possible_splits, curr_family, weights);
+  if (split_structure_mode_ == 1) return this->calcOptimalSplit_curTrees2(Y, X, possible_splits, curr_family, weights);
+  return Split{};
+}
+
 void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
 {
 
   TreeFamily curr_family;
   curr_family.insert(std::make_pair(std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves)))); // save tree with one leaf in the beginning
 
-  // store possible splits in map with splitting variable as key and pointer to resulting tree
-   std::vector<SplitCandidate> possible_splits;
-  for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim)
-  {
-    // add pointer to resulting tree with split dimension as key
-    curr_family.insert(std::make_pair(std::set<int>{feature_dim}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{feature_dim}))));
-    possible_splits.emplace_back(
-      SplitCandidate{ feature_dim,
-                     curr_family[{0}],
-                      /*age=*/0 }
-    );
+  // Seed per mode
+  std::vector<SplitCandidate> possible_splits;
+  std::vector<ResultingTreeCandidate> possible_trees;
+  if (split_structure_mode_ == 0) {
+    for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
+      curr_family.insert({{feature_dim}, treePtr});
+      possible_trees.emplace_back(treePtr);
+    }
+  } else if (split_structure_mode_ == 3) {
+    auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
+      for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+        std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
+        if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
+        if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
+      }
+    };
+    auto null_tree = curr_family[{0}];
+    if (!null_tree->leaves.empty()) add_leaf_candidates(null_tree, 0);
+  } else {
+    for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
+      curr_family.insert({{feature_dim}, treePtr});
+      possible_splits.emplace_back(feature_dim, treePtr, (size_t)0);
+    }
   }
 
   // sample data points with replacement
@@ -1055,45 +1162,37 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   {
 
     // find optimal split
-    curr_split = calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family, weights);
+    if (split_structure_mode_ == 0) curr_split = this->calcOptimalSplit_resTrees(samples_Y, samples_X, possible_trees, curr_family, weights);
+    else curr_split = calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family, weights);
 
     // continue only if we get a significant result
     if (!std::isinf(curr_split.min_sum))
     {
 
-      // update possible splits
-      if (curr_split.tree_index->split_dims.count(curr_split.split_coordinate) == 0)
-      {
-
-        for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim)
-        { // consider all possible dimensions
-
-          // create union of split coord, feature dim and dimensions of old tree
-          std::set<int> curr_dims = curr_split.tree_index->split_dims;
-          curr_dims.insert(curr_split.split_coordinate);
-          curr_dims.insert(feature_dim);
-          curr_dims.erase(0);
-
-          // skip if possible_split already exists
-          if (possibleExists(feature_dim, possible_splits, curr_dims))
-            continue;
-
-          // do not exceed maximum level of interaction
-          if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
-            continue;
-
-          // check if resulting tree already exists in family
-          std::shared_ptr<DecisionTree> found_tree = treeExists(curr_dims, curr_family);
-
-          // update possible_splits if not already existing
-          if (found_tree)
-          { // if yes add pointer
-            possible_splits.emplace_back(SplitCandidate{feature_dim, found_tree, 0});
+      // update pools by mode
+      if (split_structure_mode_ == 0) {
+        std::set<int> Dprime = curr_split.tree_index->split_dims; Dprime.insert(curr_split.split_coordinate); Dprime.erase(0);
+        if (!this->resultingTreeExists(possible_trees, Dprime)) { if (auto found = treeExists(Dprime, curr_family)) possible_trees.emplace_back(found); else { curr_family.insert({Dprime, std::make_shared<DecisionTree>(DecisionTree(Dprime))}); possible_trees.emplace_back(curr_family[Dprime]); } }
+        for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+          std::set<int> U = Dprime; U.insert(feature_dim); if (U.size() == Dprime.size()) continue; if (max_interaction >= 0 && U.size() > (size_t)max_interaction) continue; if (this->resultingTreeExists(possible_trees, U)) continue; if (auto found = treeExists(U, curr_family)) possible_trees.emplace_back(found); else { curr_family.insert({U, std::make_shared<DecisionTree>(DecisionTree(U))}); possible_trees.emplace_back(curr_family[U]); }
+        }
+      } else if (split_structure_mode_ == 3) {
+        auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
+          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+            std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
+            if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
+            if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
           }
-          else
-          { // if not create new tree
-            curr_family.insert(std::make_pair(curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))));
-            possible_splits.emplace_back(SplitCandidate{feature_dim, curr_family[curr_dims], 0});
+        };
+        // added after leaf construction below (we need indices)
+      } else {
+        if (curr_split.tree_index->split_dims.count(curr_split.split_coordinate) == 0) {
+          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+            std::set<int> curr_dims = curr_split.tree_index->split_dims; curr_dims.insert(curr_split.split_coordinate); curr_dims.insert(feature_dim); curr_dims.erase(0);
+            if (possibleExists(feature_dim, possible_splits, curr_dims)) continue;
+            if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction) continue;
+            if (auto found = treeExists(curr_dims, curr_family)) possible_splits.emplace_back(feature_dim, found, (size_t)0);
+            else { curr_family.insert({curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))}); possible_splits.emplace_back(feature_dim, curr_family[curr_dims], (size_t)0); }
           }
         }
       }
@@ -1456,11 +1555,36 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         }
         *curr_split.leaf_index = leaf_b;                 // replace old interval
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
+        if (split_structure_mode_ == 3) {
+          size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
+          size_t idx_s = curr_split.tree_index->leaves.size() - 1;
+          auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
+            for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+              std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
+              if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
+              if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
+            }
+          };
+          add_leaf_candidates(curr_split.tree_index, idx_b);
+          add_leaf_candidates(curr_split.tree_index, idx_s);
+        }
       }
       else
       {                                       // otherwise
         found_tree->leaves.push_back(leaf_s); // append new leaves
         found_tree->leaves.push_back(leaf_b);
+        if (split_structure_mode_ == 3) {
+          size_t idx_s = found_tree->leaves.size() - 2; size_t idx_b = found_tree->leaves.size() - 1;
+          auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
+            for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+              std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
+              if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
+              if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
+            }
+          };
+          add_leaf_candidates(found_tree, idx_s);
+          add_leaf_candidates(found_tree, idx_b);
+        }
       }
     }
   }

@@ -39,6 +39,31 @@ private:
       std::vector<SplitCandidate>& possible_splits,
       TreeFamily& curr_family,
       std::vector<std::vector<double>>& weights) ;
+  // Mode-specific split calculators (classification versions using calcLoss and weights)
+  Split calcOptimalSplit_leaves(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<SplitCandidate>& possible_splits,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights);
+  Split calcOptimalSplit_curTrees1(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<SplitCandidate>& possible_splits,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights);
+  Split calcOptimalSplit_curTrees2(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<SplitCandidate>& possible_splits,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights);
+  Split calcOptimalSplit_resTrees(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<RandomPlantedForest::ResultingTreeCandidate>& possible_trees,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights);
   void L1_loss(Split &split);
   void median_loss(Split &split);
   void logit_loss(Split &split);
