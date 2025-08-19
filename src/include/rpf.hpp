@@ -49,6 +49,8 @@ protected:
   std::vector<double> upper_bounds;
   std::vector<double> lower_bounds;
   std::vector<TreeFamily> tree_families; /**<  random planted forest containing result */
+  // Seeds generated on the main thread from R's RNG, one per tree family
+  std::vector<unsigned long long> tree_seeds_;
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
   void L2_loss(Split &split);
   virtual void fit();
@@ -86,6 +88,8 @@ protected:
   // exponential‐decay rate for split age
   double split_decay_rate_;
   size_t max_candidates_;
+  // LRU cap for per-leaf per-feature caches
+  size_t leaf_feature_cache_cap_ = 64;
   // track each split candidate and how long it’s sat unchosen
   struct SplitCandidate {
     int dim;
@@ -98,13 +102,29 @@ protected:
     SplitCandidate(int d, std::shared_ptr<DecisionTree> t, size_t li, double a=0.0)
       : dim(d), tree(std::move(t)), leaf_idx(li), age(a) {}
   };
-  // Which split structure to use (0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves)
+  // Which split structure to use (0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist)
   int split_structure_mode_ = 3;
+  
+  // Histogram mode buffers
+  size_t num_bins_ = 64; // total number of global bins per feature (smaller default for speed)
+  // For each feature k in [0, feature_size), store K-1 cut points (ascending)
+  std::vector<std::vector<double>> feature_cut_points_;
+  // For each feature k, per-sample bin id in [0, K-1]
+  std::vector<std::vector<int>> sample_bin_id_;
+  // For the current bootstrapped working set (per-family), cache per-feature bin ids
+  // Moved to thread-local storage in implementation to avoid races under multithreading
+  // std::vector<std::vector<int>> working_bin_id_;
   
   bool leafCandidateExists(const std::vector<SplitCandidate>&,
                            const std::shared_ptr<DecisionTree>&,
                            size_t leaf_idx, int dim);
   bool delete_leaves;
+
+  // Mode 4: histogram-binned split evaluation
+  Split calcOptimalSplit_hist(const std::vector<std::vector<double>> &Y,
+                              const std::vector<std::vector<double>> &X,
+                              std::vector<SplitCandidate> &possible_splits,
+                              TreeFamily &curr_family);
 };
 
 #endif // RPF_HPP

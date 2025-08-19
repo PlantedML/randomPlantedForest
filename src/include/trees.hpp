@@ -3,6 +3,7 @@
 
 #include "helper.hpp"
 #include "grid.hpp"
+#include <unordered_map>
 
 using namespace utils;
 using namespace grid;
@@ -13,6 +14,17 @@ struct Leaf
   std::vector<int> individuals;    /**< considered samples for each leaf */
   std::vector<double> value;       /**< residual */
   std::vector<Interval> intervals; /**< min/max for each feature of the interval */
+  // Cache: for each feature dimension store a stable order of indices into `individuals`
+  // sorted by the feature value. This order is reusable across evaluations.
+  std::unordered_map<int, std::vector<size_t>> order_cache;
+  // Cache: base prefix sums of Y along the cached order for each feature (value_size x m)
+  std::unordered_map<int, std::vector<std::vector<double>>> prefix_cache;
+  // Cache: base totals per value dimension for each feature
+  std::unordered_map<int, std::vector<double>> total_cache;
+  // Cache: sorted feature values along order for lower_bound
+  std::unordered_map<int, std::vector<double>> sorted_vals_cache;
+  // Cache recency order (for simple LRU eviction across feature caches)
+  std::vector<int> cache_order;
 };
 
 /**

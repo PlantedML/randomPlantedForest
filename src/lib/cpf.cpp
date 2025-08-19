@@ -1633,16 +1633,21 @@ void ClassificationRPF::fit()
   this->tree_families = std::vector<TreeFamily>(n_trees);
 
   // Loop over number of tree families and dispatch threads in batches
-  // of nhreads at once
-  if (nthreads > 1)
+  // of nhreads at once. Note: R RNG used in sampling is not thread-safe.
+  unsigned int threads_to_use = static_cast<unsigned int>(nthreads);
+  if (threads_to_use > 1 && !deterministic) {
+    Rcout << "Non-deterministic mode with >1 threads is not supported (R RNG not thread-safe). Falling back to 1 thread.\n";
+    threads_to_use = 1;
+  }
+  if (threads_to_use > 1)
   {
-    if (nthreads > std::thread::hardware_concurrency())
+    if (threads_to_use > std::thread::hardware_concurrency())
     {
-      Rcout << "Requested " << nthreads << " threads but only " << std::thread::hardware_concurrency() << " available" << std::endl;
+      Rcout << "Requested " << threads_to_use << " threads but only " << std::thread::hardware_concurrency() << " available" << std::endl;
     }
     // Create local thread count to not overwrite nthreads,
     // would get reported wrongly by get_parameters()
-    unsigned int current_threads = nthreads;
+    unsigned int current_threads = threads_to_use;
     for (int n = 0; n < n_trees; n += current_threads)
     {
       if (n >= (n_trees - current_threads + 1))
