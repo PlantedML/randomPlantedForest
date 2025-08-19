@@ -10,7 +10,7 @@ class RandomPlantedForest
 
 public:
   RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50,1});
+                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50, 1, 3});
   RandomPlantedForest(){};
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
@@ -60,6 +60,25 @@ protected:
     const std::vector<SplitCandidate>& possible_splits,
     const std::set<int>& resulting_dims
   );
+  // helpers for different split-structure modes
+  Split calcOptimalSplit_leaves(const std::vector<std::vector<double>> &Y,
+                                const std::vector<std::vector<double>> &X,
+                                std::vector<SplitCandidate> &possible_splits,
+                                TreeFamily &curr_family);
+  Split calcOptimalSplit_curTrees2(const std::vector<std::vector<double>> &Y,
+                                   const std::vector<std::vector<double>> &X,
+                                   std::vector<SplitCandidate> &possible_splits,
+                                   TreeFamily &curr_family);
+  Split calcOptimalSplit_curTrees1(const std::vector<std::vector<double>> &Y,
+                                   const std::vector<std::vector<double>> &X,
+                                   std::vector<SplitCandidate> &possible_splits,
+                                   TreeFamily &curr_family);
+  struct ResultingTreeCandidate { std::shared_ptr<DecisionTree> tree; double age = 0.0; ResultingTreeCandidate() = default; explicit ResultingTreeCandidate(std::shared_ptr<DecisionTree> t):tree(std::move(t)){} };
+  bool resultingTreeExists(const std::vector<ResultingTreeCandidate>& pool, const std::set<int>& dims);
+  Split calcOptimalSplit_resTrees(const std::vector<std::vector<double>> &Y,
+                                  const std::vector<std::vector<double>> &X,
+                                  std::vector<ResultingTreeCandidate> &possible_trees,
+                                  TreeFamily &curr_family);
   virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y,
                                  const std::vector<std::vector<double>> &X,
                                  std::vector<SplitCandidate> &possible_splits,
@@ -69,13 +88,22 @@ protected:
   size_t max_candidates_;
   // track each split candidate and how long it’s sat unchosen
   struct SplitCandidate {
-  int dim;
-  std::shared_ptr<DecisionTree> tree;
-  double age;
-  // single ctor with default age
-  SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a = 0.0)
-    : dim(d), tree(std::move(t)), age(a) {}
+    int dim;
+    std::shared_ptr<DecisionTree> tree;
+    size_t leaf_idx;
+    double age = 0.0;
+    // legacy ctor without leaf index (defaults to 0) — keep but prefer the 4-arg form from callers
+    explicit SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a=0.0)
+      : dim(d), tree(std::move(t)), leaf_idx(0), age(a) {}
+    SplitCandidate(int d, std::shared_ptr<DecisionTree> t, size_t li, double a=0.0)
+      : dim(d), tree(std::move(t)), leaf_idx(li), age(a) {}
   };
+  // Which split structure to use (0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves)
+  int split_structure_mode_ = 3;
+  
+  bool leafCandidateExists(const std::vector<SplitCandidate>&,
+                           const std::shared_ptr<DecisionTree>&,
+                           size_t leaf_idx, int dim);
   bool delete_leaves;
 };
 
