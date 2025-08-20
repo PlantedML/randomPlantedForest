@@ -45,6 +45,8 @@ public:
   void purify_1();
   void purify_2();
   void purify_3();
+  // Process a single family (internal helper; used by the public purify_3())
+  void purify_3(TreeFamily &curr_family);
   // Human-readable dump of forest structure to R console.
   void print();
   // Legacy coarse CV over a few parameters; mainly for internal experiments.
