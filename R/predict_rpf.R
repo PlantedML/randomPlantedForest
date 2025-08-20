@@ -108,24 +108,27 @@ predict_rpf_prob <- function(object, new_data, ...) {
       pred_prob <- 1 / (1 + exp(-pred_raw))
     } else if (object$params$loss %in% c("L1", "L2")) {
       # Truncate probabilities at [0,1] for L1/L2 loss
-      pred_prob <- apply(pred_raw, 2, function(col) pmax(0, pmin(1, col)))
+      pred_prob <- pmax(0, pmin(1, pred_raw))
     }
 
-    # Binary classif yields n x 1 prediction matrix, append complementary class prob
+    # Ensure a plain numeric vector in binary case
+    pred_prob <- as.numeric(pred_prob)
+    # Binary classif yields two columns ordered by outcome levels
     pred_prob <- cbind(1 - pred_prob, pred_prob)
 
   } else { # Multiclass
 
     if (object$params$loss %in% c("logit", "exponential")) {
-      # FIXME:
-      # softmax() defined in utils.R, should be identical to logit^-1 for
-      # binary case but not properly tested yet
+      # softmax for multi-class
       pred_prob <- softmax(pred_raw)
     } else if (object$params$loss %in% c("L1", "L2")) {
-      # Truncate probabilities at [0,1] for L1/L2 loss
-      pred_prob <- apply(pred_raw, 2, function(col) pmax(0, pmin(1, col)))
-      # Normalise such that sum of class probs is always 1
-      pred_prob <- pred_prob/rowSums(pred_prob)
+      # Clamp to [0,1] and renormalize rows
+      pred_prob <- pmin(1, pmax(0, pred_raw))
+      # pmin/pmax drop dimensions; restore matrix shape explicitly
+      dim(pred_prob) <- dim(pred_raw)
+      rs <- rowSums(pred_prob)
+      rs[!is.finite(rs) | rs <= 0] <- 1
+      pred_prob <- pred_prob / rs
     }
   }
 
@@ -140,7 +143,7 @@ predict_rpf_class <- function(object, new_data, ...) {
   pred_prob <- predict_rpf_prob(object, new_data, 0, ...)
 
   # For each instance, class with higher probability
-  pred_class <- factor(outcome_levels[max.col(pred_prob)], levels = outcome_levels)
+  pred_class <- factor(outcome_levels[max.col(as.matrix(pred_prob))], levels = outcome_levels)
   out <- hardhat::spruce_class(pred_class)
 
   out

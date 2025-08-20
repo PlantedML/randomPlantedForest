@@ -1,4 +1,4 @@
-SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp randomPlantedForest.cpp RcppExports.cpp
+SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp lib/internal_utils.cpp lib/splits_leaves.cpp lib/splits_cur_trees_2.cpp lib/splits_cur_trees_1.cpp lib/splits_res_trees.cpp lib/predict.cpp lib/training.cpp lib/purify.cpp lib/losses_l1_l2_median.cpp lib/losses_logit.cpp lib/losses_exponential.cpp randomPlantedForest.cpp RcppExports.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
 

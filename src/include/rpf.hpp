@@ -1,3 +1,23 @@
+// Public API for the Random Planted Forest (regression base). This header
+// declares the externally visible training, prediction, and model-introspection
+// methods used from R via the Rcpp module in `src/randomPlantedForest.cpp`.
+//
+// Key entry points:
+// - ctor(Y, X, parameters): construct and fit a model (calls set_data + fit)
+// - set_data(Y, X): load data (no training) and initialize bounds
+// - fit(): build tree families according to split_structure_mode_
+// - predict_matrix/predict_vector(): batch/single predictions
+// - purify_1/2/3(): optional post-processing to orthogonalize components
+// - cross_validation(): coarse k-fold search over a few parameters (legacy)
+// - get_parameters()/set_parameters(): inspect or update configuration
+// - get_model(): export current forest (for R printing/plotting)
+// - is_purified(): flag indicating whether purify_* was applied last
+//
+// Implementation notes:
+// - Training orchestrated in `lib/training.cpp`
+// - Prediction logic in `lib/predict.cpp`
+// - Split calculators in `lib/splits_*.cpp`
+// - Utilities (RNG, sampling, caching) in `lib/internal_utils.cpp`
 #ifndef RPF_H
 #define RPF_H
 
@@ -9,20 +29,32 @@ class RandomPlantedForest
 {
 
 public:
+  // Construct and fit a random planted forest on Y ~ X with configuration in
+  // `parameters` (see R docs for positional mapping; last value selects
+  // split-structure mode). Calls set_data() then fit().
   RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                       const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50, 1, 3});
   RandomPlantedForest(){};
+  // Load or replace data without fitting; computes bounds and resets state.
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
+  // Predict for a matrix or a single vector. `components = {0}` means the full
+  // model; otherwise a set of component indices to evaluate (expert mode).
   NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
+  // Optional post-processing to redistribute effects across component orders.
   void purify_1();
   void purify_2();
   void purify_3();
+  // Human-readable dump of forest structure to R console.
   void print();
+  // Legacy coarse CV over a few parameters; mainly for internal experiments.
   void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
+  // Mean-squared error helper for matrix outputs.
   double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true);
+  // Inspect/update configuration; `set_parameters` may trigger a refit.
   void get_parameters();
   void set_parameters(StringVector keys, NumericVector values);
+  // Export a list representation of the current forest for printing/plotting.
   List get_model();
   virtual ~RandomPlantedForest(){};
   bool is_purified();

@@ -3,7 +3,6 @@
 
 #include "helper.hpp"
 #include "grid.hpp"
-#include <unordered_map>
 
 using namespace utils;
 using namespace grid;
