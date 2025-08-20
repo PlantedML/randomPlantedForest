@@ -58,6 +58,13 @@ private:
       std::vector<SplitCandidate>& possible_splits,
       TreeFamily& curr_family,
       std::vector<std::vector<double>>& weights);
+  // Mode 4: histogram-binned (classification variant)
+  Split calcOptimalSplit_hist(
+      const std::vector<std::vector<double>>& Y,
+      const std::vector<std::vector<double>>& X,
+      std::vector<SplitCandidate>& possible_splits,
+      TreeFamily& curr_family,
+      std::vector<std::vector<double>>& weights);
   Split calcOptimalSplit_resTrees(
       const std::vector<std::vector<double>>& Y,
       const std::vector<std::vector<double>>& X,

@@ -1,4 +1,5 @@
 #include "helper.hpp"
+#include "internal_utils.hpp"
 
 using namespace Rcpp;
 
@@ -7,7 +8,7 @@ namespace utils {
 // Helper function to generate random number using R's RNG
 // this replaces the previous randWrapper and later use of std::random_shuffle,
 // as the latter is removed in C++17 and I couldn't figure out an easy replacement.
-int random_index(const int n) { return static_cast<int>(R::runif(0, 1) * n); }
+int random_index(const int n) { return static_cast<int>(rpf_utils::rng_runif01() * n); }
 
 //  ----------------- functions for converting R and Cpp types -----------------
 

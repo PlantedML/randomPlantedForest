@@ -15,6 +15,11 @@
 #' @param split_try `[10]`: Number of split points to be considered when choosing a split candidate.
 #' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of viable split-candidates in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
+#' @param split_decay_rate `[0.1]`: Exponential decay factor for aging split-candidates.
+#' @param max_candidates `[50]`: Maximum number of split-candidates sampled per iteration.
+#' @param delete_leaves `[TRUE]`: Whether to delete a parent leaf when splitting along an existing dimension.
+#' @param split_structure `c("res_trees","cur_trees_2","cur_trees_1","leaves","hist")`:
+#'   Strategy for structuring the split search.
 #' @param nthreads `[1L]`: Number of threads used for computation, defaulting to serial execution.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.

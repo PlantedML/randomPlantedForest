@@ -87,7 +87,10 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   }
 
   # Check if forest is purified, if not we do that now
-  if (!is_purified(object)) purify(object)
+  if (!is_purified(object)) {
+    # purify returns the object; ensure we mutate it in place for subsequent calls
+    object$fit$purify()
+  }
 
   # If max_interaction is greater than number of predictors requested we need to adjust that
   max_interaction <- min(max_interaction, length(predictors))
