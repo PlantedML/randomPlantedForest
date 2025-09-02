@@ -708,14 +708,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           std::set<int> U = Dprime; U.insert(feature_dim); if (U.size() == Dprime.size()) continue; if (max_interaction >= 0 && U.size() > (size_t)max_interaction) continue; if (this->resultingTreeExists(possible_trees, U)) continue; if (auto found = treeExists(U, curr_family)) possible_trees.emplace_back(found); else { curr_family.insert({U, std::make_shared<DecisionTree>(DecisionTree(U))}); possible_trees.emplace_back(curr_family[U]); }
         }
       } else if (split_structure_mode_ == 3 || split_structure_mode_ == 4) {
-        auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
-          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-            std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
-            if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
-            if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
-          }
-        };
-        // added after leaf construction below (we need indices)
+        // Leaf-level candidates are added after leaf construction below (we need indices)
       } else {
         if (curr_split.tree_index->split_dims.count(curr_split.split_coordinate) == 0) {
           for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
@@ -1089,32 +1082,46 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         if (split_structure_mode_ == 3) {
           size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
           size_t idx_s = curr_split.tree_index->leaves.size() - 1;
-          auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
-            for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-              std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
-              if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
-              if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
+          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+            std::set<int> res_dims_b = curr_split.tree_index->split_dims; res_dims_b.insert(feature_dim); res_dims_b.erase(0);
+            if (max_interaction < 0 || res_dims_b.size() <= (size_t)max_interaction) {
+              if (!this->leafCandidateExists(possible_splits, curr_split.tree_index, idx_b, feature_dim)) {
+                possible_splits.emplace_back(feature_dim, curr_split.tree_index, idx_b);
+              }
             }
-          };
-          add_leaf_candidates(curr_split.tree_index, idx_b);
-          add_leaf_candidates(curr_split.tree_index, idx_s);
+            std::set<int> res_dims_s = curr_split.tree_index->split_dims; res_dims_s.insert(feature_dim); res_dims_s.erase(0);
+            if (max_interaction < 0 || res_dims_s.size() <= (size_t)max_interaction) {
+              if (!this->leafCandidateExists(possible_splits, curr_split.tree_index, idx_s, feature_dim)) {
+                possible_splits.emplace_back(feature_dim, curr_split.tree_index, idx_s);
+              }
+            }
+          }
         }
       }
       else
       {                                       // otherwise
+        if (!found_tree) {
+          curr_family.insert({resulting_dims, std::make_shared<DecisionTree>(DecisionTree(resulting_dims))});
+          found_tree = curr_family[resulting_dims];
+        }
         found_tree->leaves.push_back(leaf_s); // append new leaves
         found_tree->leaves.push_back(leaf_b);
         if (split_structure_mode_ == 3) {
           size_t idx_s = found_tree->leaves.size() - 2; size_t idx_b = found_tree->leaves.size() - 1;
-          auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree>& T, size_t li) {
-            for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-              std::set<int> res_dims = T->split_dims; res_dims.insert(feature_dim); res_dims.erase(0);
-              if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction) continue;
-              if (!this->leafCandidateExists(possible_splits, T, li, feature_dim)) possible_splits.emplace_back(feature_dim, T, li);
+          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+            std::set<int> res_dims_s = found_tree->split_dims; res_dims_s.insert(feature_dim); res_dims_s.erase(0);
+            if (max_interaction < 0 || res_dims_s.size() <= (size_t)max_interaction) {
+              if (!this->leafCandidateExists(possible_splits, found_tree, idx_s, feature_dim)) {
+                possible_splits.emplace_back(feature_dim, found_tree, idx_s);
+              }
             }
-          };
-          add_leaf_candidates(found_tree, idx_s);
-          add_leaf_candidates(found_tree, idx_b);
+            std::set<int> res_dims_b = found_tree->split_dims; res_dims_b.insert(feature_dim); res_dims_b.erase(0);
+            if (max_interaction < 0 || res_dims_b.size() <= (size_t)max_interaction) {
+              if (!this->leafCandidateExists(possible_splits, found_tree, idx_b, feature_dim)) {
+                possible_splits.emplace_back(feature_dim, found_tree, idx_b);
+              }
+            }
+          }
         }
       }
     }

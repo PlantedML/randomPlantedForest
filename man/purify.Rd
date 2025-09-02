@@ -11,7 +11,7 @@ purify(x, ...)
 
 \method{purify}{default}(x, ...)
 
-\method{purify}{rpf}(x, ...)
+\method{purify}{rpf}(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL)
 
 is_purified(x)
 }
@@ -19,12 +19,23 @@ is_purified(x)
 \item{x}{And object of class \code{rpf}.}
 
 \item{...}{(Unused)}
+
+\item{maxp_interaction}{integer or NULL: Only compute/store purified components
+up to this interaction order. Higher-order purified trees are zeroed (not
+computed) but still implicitly influence lower orders during purification.
+If NULL, purify all orders (default behavior).}
+
+\item{mode}{integer(1): Purification algorithm mode. 1 = legacy grid path
+used by \code{fit$fit$purify()}; 2 = fast exact KD-tree based path. Defaults to 2.}
+
+\item{nthreads}{integer or NULL: number of threads to use. If NULL, defaults
+to min of the object's configured \code{nthreads} and available threads.}
 }
 \value{
 Invisibly: The \code{\link{rpf}} object.
 }
 \description{
-TODO: Explain what this does
+Purifies an rpf object.
 }
 \details{
 Unless \code{\link[=rpf]{rpf()}} is called with \code{purify = TRUE}, the forest has to be purified after fit

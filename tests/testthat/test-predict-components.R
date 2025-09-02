@@ -81,7 +81,7 @@ test_that(".predict_single_component is consistent with predictor order", {
 
   # Internal data preprocessing only done in predict_components to save time
   processed <- hardhat::forge(mtcars, rp$blueprint)
-  new_data <- randomPlantedForest:::preprocess_predictors_predict(rp, processed$predictors)
+  new_data <- randomPlantedForest::preprocess_predictors_predict(rp, processed$predictors)
   
   expect_equal(
     .predict_single_component(rp, new_data, c("cyl", "am")),

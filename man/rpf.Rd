@@ -18,6 +18,9 @@ rpf(x, ...)
   splits = 30,
   split_try = 10,
   t_try = 0.4,
+  split_decay_rate = 0.1,
+  max_candidates = 50,
+  delete_leaves = TRUE,
   deterministic = FALSE,
   nthreads = 1,
   purify = FALSE,
@@ -25,6 +28,7 @@ rpf(x, ...)
   loss = "L2",
   delta = 0,
   epsilon = 0.1,
+  split_structure = "leaves",
   ...
 )
 
@@ -36,6 +40,9 @@ rpf(x, ...)
   splits = 30,
   split_try = 10,
   t_try = 0.4,
+  split_decay_rate = 0.1,
+  max_candidates = 50,
+  delete_leaves = TRUE,
   deterministic = FALSE,
   nthreads = 1,
   purify = FALSE,
@@ -43,6 +50,7 @@ rpf(x, ...)
   loss = "L2",
   delta = 0,
   epsilon = 0.1,
+  split_structure = "leaves",
   ...
 )
 
@@ -54,6 +62,9 @@ rpf(x, ...)
   splits = 30,
   split_try = 10,
   t_try = 0.4,
+  split_decay_rate = 0.1,
+  max_candidates = 50,
+  delete_leaves = TRUE,
   deterministic = FALSE,
   nthreads = 1,
   purify = FALSE,
@@ -61,6 +72,7 @@ rpf(x, ...)
   loss = "L2",
   delta = 0,
   epsilon = 0.1,
+  split_structure = "leaves",
   ...
 )
 
@@ -72,6 +84,9 @@ rpf(x, ...)
   splits = 30,
   split_try = 10,
   t_try = 0.4,
+  split_decay_rate = 0.1,
+  max_candidates = 50,
+  delete_leaves = TRUE,
   deterministic = FALSE,
   nthreads = 1,
   purify = FALSE,
@@ -79,6 +94,7 @@ rpf(x, ...)
   loss = "L2",
   delta = 0,
   epsilon = 0.1,
+  split_structure = "leaves",
   ...
 )
 }
@@ -105,6 +121,12 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of viable split-candidates in each round.}
 
+\item{split_decay_rate}{\verb{[0.1]}:  Exponential decay factor λ for aging split-candidates.  A candidate’s weight is \verb{exp(−λ * age)}.}
+
+\item{max_candidates}{\verb{[50]}:  Maximum number of split‐candidates to sample at each node (will be clamped to \verb{[1, #possible_splits]}).}
+
+\item{delete_leaves}{\verb{[1]}:  Whether parents should be deleted if split is an existing coordinate}
+
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
 \item{nthreads}{\verb{[1L]}: Number of threads used for computation, defaulting to serial execution.}
@@ -127,6 +149,8 @@ the loss to determine the optimal split.}
 Proportion of class membership is truncated to be smaller 1-epsilon when calculating
 the fit in a leaf.}
 
+\item{split_structure}{\verb{["leaves"]}: Defines the structure of a possible split and how to choose split_candidates. Can be one of "leaves", "hist", "cur_trees_1", "cur_trees_2", or "res_trees". Further details are given below.}
+
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
 }
 \value{
@@ -134,6 +158,37 @@ Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 }
 \description{
 Random Planted Forest
+}
+\details{
+\subsection{splits}{
+The number of \code{splits} is the main tuning parameter affecting the accuracy of predictions.
+}
+\subsection{split_structure}{
+The \code{split_structure} argument controls how split candidates are constructed and sampled.
+In each round, a \code{t_try} fraction (capped by \code{max_candidates}) is drawn
+from the pool of all possible splits with weights \code{exp(-split_decay_rate * age)}.
+
+\describe{
+\item{leaves}{Split candidates are (leaf, split-dimension) pairs. For each sampled
+candidate, \code{split_try} thresholds are drawn uniformly from the valid range within
+that leaf and evaluated to choose the best split.}
+
+\item{cur_trees_1}{Split candidates are (current-tree, split-dimension) pairs. For each
+sampled candidate, perform \code{split_try} evaluations. Each evaluation samples a leaf
+from the set of valid current trees (with probability proportional to its number of
+available thresholds) and then uniformly samples a single threshold within that leaf.}
+
+\item{cur_trees_2}{Split candidates are (current-tree, split-dimension) pairs. For each
+sampled candidate, iterate through every
+valid leaf. Within each leaf, sample \code{split_try} thresholds uniformly and
+evaluate them.}
+
+\item{res_trees}{Split candidates are resulting trees. For each sampled candidate, run
+\code{split_try} evaluations by sampling a (split-dimension, leaf) pair from all valid
+pairs (with probability proportional to its number of available thresholds), then
+uniformly sampling one threshold within that pair.}
+}
+}
 }
 \examples{
 # Regression with x and y

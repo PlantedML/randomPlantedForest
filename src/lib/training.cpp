@@ -90,7 +90,8 @@ void RandomPlantedForest::fit()
 
   if (purify_forest)
   {
-    this->purify_3();
+    // Default: cap=0 (uncapped), nthreads=0 (auto; min(object nthreads, available)), mode=2 (fast exact)
+    this->purify(0, 0, 2);
   }
   else
   {

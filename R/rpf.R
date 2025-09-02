@@ -15,11 +15,10 @@
 #' @param split_try `[10]`: Number of split points to be considered when choosing a split candidate.
 #' @param t_try `[0.4]`: A value in (0,1] specifying the proportion of viable split-candidates in each round.
 #' @param deterministic `[FALSE]`: Choose whether approach deterministic or random.
-#' @param split_decay_rate `[0.1]`: Exponential decay factor for aging split-candidates.
-#' @param max_candidates `[50]`: Maximum number of split-candidates sampled per iteration.
+#' @param split_decay_rate `[0.1]`: Exponential decay factor for aging split-candidates. Possible splits are initiated with age=0. Whenever a possible split becomes a split_candidate (i.e. it has been drawn when drawing max(max_candidates , t_try * possible options ) times) it ages by +1. The age of the single split-candidate with minimal loss is reset to zero. Split_candidates are sampled from Possible_splits with weight exp(-split_decay_rate_ * age).  A high split_decay_rate means faster aging. split_decay_rate=0 results in no aging and uniform sampling.
+#' @param max_candidates `[50]`: Maximum number of split-candidates sampled per iteration. Number of split_candidates in each round is given  by max(max_candidates , t_try * possible options).
 #' @param delete_leaves `[TRUE]`: Whether to delete a parent leaf when splitting along an existing dimension.
-#' @param split_structure `c("res_trees","cur_trees_2","cur_trees_1","leaves","hist")`:
-#'   Strategy for structuring the split search.
+#' @param split_structure `["leaves"]`: Defines the structure of a possible split and how to choose split_candidates. Can be one of "leaves", "hist", "cur_trees_1", "cur_trees_2", or "res_trees". Further details are given below.
 #' @param nthreads `[1L]`: Number of threads used for computation, defaulting to serial execution.
 #' @param purify `[FALSE]`: Whether the forest should be purified.
 #'   Set to `TRUE` to enable components extract with [`predict_components()`] are valid.
@@ -46,6 +45,37 @@
 #' @importFrom hardhat default_xy_blueprint
 #' @importFrom hardhat default_formula_blueprint
 #' @importFrom hardhat default_recipe_blueprint
+#'
+#' @details
+#' \subsection{splits}{
+#' The number of `splits` is the main tuning parameter affecting the accuracy of predictions.
+#' }
+#' \subsection{split_structure}{
+#' The `split_structure` argument controls how split candidates are constructed and sampled.
+#' In each round, a `t_try` fraction (capped by `max_candidates`) is drawn
+#' from the pool of all possible splits with weights `exp(-split_decay_rate * age)`.
+#'
+#' \describe{
+#'   \item{leaves}{Split candidates are (leaf, split-dimension) pairs. For each sampled
+#'   candidate, `split_try` thresholds are drawn uniformly from the valid range within
+#'   that leaf and evaluated to choose the best split.}
+#'
+#'   \item{cur_trees_1}{Split candidates are (current-tree, split-dimension) pairs. For each
+#'   sampled candidate, perform `split_try` evaluations. Each evaluation samples a leaf
+#'   from the set of valid current trees (with probability proportional to its number of
+#'   available thresholds) and then uniformly samples a single threshold within that leaf.}
+#'
+#'   \item{cur_trees_2}{Split candidates are (current-tree, split-dimension) pairs. For each
+#'   sampled candidate, iterate through every
+#'   valid leaf. Within each leaf, sample `split_try` thresholds uniformly and
+#'   evaluate them.}
+#'
+#'   \item{res_trees}{Split candidates are resulting trees. For each sampled candidate, run
+#'   `split_try` evaluations by sampling a (split-dimension, leaf) pair from all valid
+#'   pairs (with probability proportional to its number of available thresholds), then
+#'   uniformly sampling one threshold within that pair.}
+#' }
+#' }
 #'
 #' @examples
 #' # Regression with x and y
@@ -76,8 +106,8 @@ rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                            deterministic = FALSE,
                            nthreads = 1, purify = FALSE, cv = FALSE,
                            loss = "L2", delta = 0, epsilon = 0.1,
-                           split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist"), ...) {
-  split_structure <- match.arg(split_structure)
+                           split_structure = "leaves", ...) {
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
@@ -98,8 +128,8 @@ rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist"), ...) {
-  split_structure <- match.arg(split_structure)
+                       split_structure = "leaves", ...) {
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
@@ -119,8 +149,8 @@ rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits 
                         deterministic = FALSE,
                         nthreads = 1, purify = FALSE, cv = FALSE,
                         loss = "L2", delta = 0, epsilon = 0.1,
-                        split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist"), ...) {
-  split_structure <- match.arg(split_structure)
+                        split_structure = "leaves", ...) {
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
   rpf_bridge(
@@ -141,8 +171,8 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist"), ...) {
-  split_structure <- match.arg(split_structure)
+                       split_structure = "leaves", ...) {
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
   rpf_bridge(
@@ -164,8 +194,8 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist")) {
-  split_structure <- match.arg(split_structure)
+                       split_structure = "leaves") {
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
   outcomes <- preprocess_outcome(processed, loss)
@@ -263,11 +293,11 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"),
                      max_interaction = 1, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4,
                      deterministic = FALSE, nthreads = 1, purify = FALSE, cv = FALSE, split_decay_rate = 0.1, max_candidates = 50, delete_leaves = TRUE,
                      loss = "L2", delta = 0, epsilon = 0.1,
-                     split_structure = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist")) {
+                     split_structure = "leaves") {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   mode <- match.arg(mode)
-  split_structure <- match.arg(split_structure)
+  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   # map split_structure string to numeric mode for C++
   split_mode <- switch(split_structure,
     res_trees = 0L,
