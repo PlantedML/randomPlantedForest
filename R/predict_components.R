@@ -88,8 +88,10 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   # Check if forest is purified, if not we do that now
   if (!is_purified(object)) {
-    # purify returns the object; ensure we mutate it in place for subsequent calls
-    object$fit$purify()
+    # Purify using default policy: mode=2 (fast exact),
+    # maxp_interaction=0 (uncapped),
+    # nthreads defaults to min(training nthreads, available cores)
+    object$fit$purify_threads(0L, 0L, 2L)
   }
 
   # If max_interaction is greater than number of predictors requested we need to adjust that

@@ -14,11 +14,9 @@
 // Use utilities via namespace alias
 using namespace rpf_utils;
 
-namespace {
-  // Thread-local cache for histogram mode per working set (per tree-family build)
-  // Avoids races on the class member when building families in parallel
-  thread_local std::vector<std::vector<int>> tls_working_bin_id;
-}
+// Thread-local cache for histogram mode per working set (per tree-family build)
+// Avoids races on the class member when building families in parallel
+thread_local std::vector<std::vector<int>> tls_working_bin_id;
 
 // Utilities shared across modes
 bool RandomPlantedForest::possibleExists(
@@ -111,111 +109,7 @@ bool RandomPlantedForest::resultingTreeExists(const std::vector<RandomPlantedFor
 
 // Mode 0: res_trees moved to lib/splits_res_trees.cpp
 
-// Mode 4: histogram-binned evaluation (per-leaf candidates like mode 3)
-Split RandomPlantedForest::calcOptimalSplit_hist(const std::vector<std::vector<double>> &Y,
-                                                 const std::vector<std::vector<double>> &X,
-                                                 std::vector<SplitCandidate> &possible_splits,
-                                                 TreeFamily &curr_family)
-{
-  Split min_split; min_split.min_sum = std::numeric_limits<double>::infinity();
-  if (possible_splits.empty()) return min_split;
-
-  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
-  unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
-  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
-  std::vector<double> weights(possible_splits.size());
-  for (size_t i = 0; i < possible_splits.size(); ++i) weights[i] = std::exp(-this->split_decay_rate_ * possible_splits[i].age);
-  std::vector<size_t> sample_idxs = this->deterministic ? std::vector<size_t>() : sample_weighted_indices_filtered(weights, n_candidates);
-  if (this->deterministic) { for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i) sample_idxs.push_back(i); }
-
-  // Use per-feature effective bin count based on actual cut count for stability
-  int best_idx = -1;
-  for (size_t idx : sample_idxs) {
-    auto it = possible_splits.begin(); std::advance(it, idx);
-    if (!it->tree || it->leaf_idx >= it->tree->leaves.size()) continue;
-    const int k_dim = it->dim; // 1-based
-    const int k = k_dim - 1;
-    Leaf* leafPtr = &it->tree->leaves[it->leaf_idx];
-    const int leaf_min = this->n_leaves[k];
-    const size_t m = leafPtr->individuals.size();
-    if (m == 0) continue;
-
-    // Build histogram for this leaf and feature k using cached working bin ids
-    const auto &cuts_k = (k >= 0 && k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
-    size_t Kf = cuts_k.size() + 1; if (Kf < 2) continue; // cannot split without at least 2 bins
-    std::vector<int> cnt(Kf, 0);
-    std::vector<std::vector<double>> sum(Kf, std::vector<double>(this->value_size, 0.0));
-    const bool have_cached = (split_structure_mode_ == 4) && ((size_t)k < tls_working_bin_id.size());
-    if (have_cached) {
-      const std::vector<int> &bin_k = tls_working_bin_id[(size_t)k];
-      for (int ind : leafPtr->individuals) {
-        int b = bin_k[(size_t)ind];
-        cnt[(size_t)b] += 1;
-        for (size_t p = 0; p < this->value_size; ++p) sum[(size_t)b][p] += Y[ind][p];
-      }
-    } else {
-      for (int ind : leafPtr->individuals) {
-        double v = X[ind][k];
-        int b = 0;
-        if (!cuts_k.empty()) {
-          auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), v);
-          b = (int)std::distance(cuts_k.begin(), itb);
-          if (b < 0) b = 0; if ((size_t)b >= Kf) b = (int)Kf - 1;
-        }
-        cnt[(size_t)b] += 1;
-        for (size_t p = 0; p < this->value_size; ++p) sum[(size_t)b][p] += Y[ind][p];
-      }
-    }
-
-    // Single sweep over bin boundaries, no extra prefix storage
-    const int total_n = (int)m;
-    std::vector<double> total_sum(this->value_size, 0.0);
-    for (size_t b = 0; b < Kf; ++b) {
-      for (size_t p = 0; p < this->value_size; ++p) total_sum[p] += sum[b][p];
-    }
-    int left_n = 0;
-    std::vector<double> left_sum(this->value_size, 0.0);
-    for (size_t b_left = 0; b_left + 1 <= Kf - 1; ++b_left) {
-      // Move boundary after bin b_left: left includes bins [0..b_left]
-      left_n += cnt[b_left];
-      for (size_t p = 0; p < this->value_size; ++p) left_sum[p] += sum[b_left][p];
-      int right_n = total_n - left_n;
-      if (left_n < leaf_min || right_n < leaf_min) continue;
-      double loss = 0.0;
-      for (size_t p = 0; p < this->value_size; ++p) {
-        double ls = left_sum[p];
-        double rs = total_sum[p] - ls;
-        loss -= (ls * ls) / (double)left_n;
-        loss -= (rs * rs) / (double)right_n;
-      }
-      if (loss < min_split.min_sum) {
-        min_split.min_sum = loss;
-        min_split.tree_index = it->tree;
-        min_split.leaf_index = leafPtr;
-        min_split.split_coordinate = k + 1;
-        // Boundary index is b_left+1 in terms of bins on the right side
-        double sp = 0.0;
-        if (k >= 0 && k < (int)feature_cut_points_.size() && !feature_cut_points_[k].empty()) {
-          const auto &cuts = feature_cut_points_[k];
-          size_t cp_idx = (size_t)std::min<size_t>(b_left, cuts.size() - 1);
-          sp = cuts[cp_idx];
-        } else {
-          sp = 0.5 * (leafPtr->intervals[k].first + leafPtr->intervals[k].second);
-        }
-        min_split.split_point = sp;
-        best_idx = (int)idx;
-        // Store sums for this boundary
-        min_split.sum_s.assign(this->value_size, 0.0);
-        min_split.sum_b.assign(this->value_size, 0.0);
-        for (size_t p = 0; p < this->value_size; ++p) { min_split.sum_s[p] = left_sum[p]; min_split.sum_b[p] = total_sum[p] - left_sum[p]; }
-      }
-    }
-  }
-
-  rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
-  finalize_split_from_sums(min_split, X, this->value_size);
-  return min_split;
-}
+// moved to lib/splits_hist.cpp
 
 // Dispatcher used by create_tree_family
 Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double>> &Y,

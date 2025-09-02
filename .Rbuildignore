@@ -17,3 +17,7 @@
 ^doc$
 ^Meta$
 ^.vscode$
+^\.DS_Store$
+^SomeFile\.diff$
+^src/.*\.(o|so|a)$
+^src/lib/.*\.(o|so|a)$

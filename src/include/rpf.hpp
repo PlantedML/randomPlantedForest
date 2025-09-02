@@ -44,9 +44,10 @@ public:
   // Optional post-processing to redistribute effects across component orders.
   void purify_1();
   void purify_2();
-  void purify_3();
-  // Process a single family (internal helper; used by the public purify_3())
-  void purify_3(TreeFamily &curr_family);
+  // Unified purifier: mode 1 = grid path, mode 2 = fast exact (KD-tree)
+  void purify(int maxp_interaction, int nthreads, int mode);
+  // Unified entry with explicit threading control
+  void purify_fast_exact(int maxp_interaction, int nthreads);
   // Human-readable dump of forest structure to R console.
   void print();
   // Legacy coarse CV over a few parameters; mainly for internal experiments.
@@ -62,6 +63,10 @@ public:
   bool is_purified();
   
 protected:
+  // Internal per-family worker (grid-based mode 1)
+  void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
+  // Internal per-family worker for fast exact purifier (mode 2)
+  void purify_fast_exact_family(TreeFamily &curr_family, int maxp_interaction);
   double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */

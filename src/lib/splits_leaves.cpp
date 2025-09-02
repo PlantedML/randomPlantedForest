@@ -25,7 +25,8 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(const std::vector<std::vector
   if (this->deterministic) { for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i) sample_idxs.push_back(i); }
 
   int best_idx = -1;
-  for (size_t idx : sample_idxs) {
+  for (size_t s = 0; s < sample_idxs.size(); ++s) {
+    size_t idx = sample_idxs[s];
     auto it = possible_splits.begin(); std::advance(it, idx);
     int k = it->dim - 1;
     if (!it->tree || it->leaf_idx >= it->tree->leaves.size()) continue;
@@ -33,26 +34,56 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(const std::vector<std::vector
 
     const int leaf_size = this->n_leaves[k];
     const size_t m = leafPtr->individuals.size();
-    if (m == 0) continue;
+    if (m == 0 || m < static_cast<size_t>(2 * leaf_size)) continue;
 
     std::vector<size_t> order; std::vector<double> sorted_vals;
     ensure_order_and_sorted_vals_for_leaf(X, *leafPtr, k, order, sorted_vals);
-    std::vector<double> unique = compute_unique_sorted_values(sorted_vals);
+
+    // Build unique values and the first position of each unique value in sorted_vals
+    std::vector<double> unique; unique.reserve(sorted_vals.size());
+    std::vector<size_t> first_pos; first_pos.reserve(sorted_vals.size());
+    if (!sorted_vals.empty()) {
+      unique.push_back(sorted_vals[0]);
+      first_pos.push_back(0);
+      for (size_t i = 1; i < sorted_vals.size(); ++i) {
+        if (sorted_vals[i] != unique.back()) {
+          unique.push_back(sorted_vals[i]);
+          first_pos.push_back(i);
+        }
+      }
+    }
 
     if (unique.size() < 2 * static_cast<size_t>(leaf_size)) continue;
 
-    std::vector<int> samples;
-    int left = leaf_size; int right = (int)unique.size() - leaf_size;
-    samples = this->deterministic ? compute_even_spread_indices(left, right, (size_t)this->split_try)
-                                  : sample_unique_ints_uniform_R(left, right, (size_t)this->split_try);
+    const int U = static_cast<int>(unique.size());
 
+    // Sample GAP indices between adjacent unique values.
+    // Valid gap indices are [1, U-1], further constrained by leaf_size on both sides.
+    const int min_gap_ui = std::max(1, leaf_size);
+    const int max_gap_ui = std::max(min_gap_ui, U - leaf_size); // inclusive
+    if (max_gap_ui < min_gap_ui) continue;
+    const int right_exclusive = max_gap_ui + 1; // make sampler half-open [min_gap_ui, right_exclusive)
+
+    std::vector<int> samples = this->deterministic
+            ? compute_even_spread_indices(min_gap_ui, right_exclusive, (size_t)this->split_try)
+            : sample_unique_ints_uniform_R(min_gap_ui, right_exclusive, (size_t)this->split_try);
+
+    // Build prefix sums once per candidate evaluation
     std::vector<std::vector<double>> prefix; // [p][i]
     std::vector<double> total;               // [p]
     build_prefix_and_total_given_order(Y, *leafPtr, order, this->value_size, prefix, total);
 
     for (size_t si = 0; si < samples.size(); ++si) {
-      const double sp = unique[samples[si]];
-      const size_t pos = static_cast<size_t>(std::lower_bound(sorted_vals.begin(), sorted_vals.end(), sp) - sorted_vals.begin());
+      const size_t ui = static_cast<size_t>(samples[si]);
+      if (ui == 0 || ui >= static_cast<size_t>(U)) continue;
+
+      const double sp_left = unique[ui - 1];
+      const double sp_right = unique[ui];
+      const double sp = 0.5 * (sp_left + sp_right);
+
+      // For sp between unique[ui-1] and unique[ui], the first index >= sp
+      // equals the first position of unique[ui] in sorted_vals.
+      const size_t pos = first_pos[ui];
       if (pos == 0 || pos >= m) continue;
       if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size)) continue;
 

@@ -65,6 +65,11 @@ inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_
 
 } // namespace rpf_utils
 
+// Thread-local working-set bin cache used by histogram split mode (mode 4).
+// Declared here so multiple translation units (e.g., rpf.cpp and splits_hist.cpp)
+// can share the same cache during a tree-family build.
+extern thread_local std::vector<std::vector<int>> tls_working_bin_id;
+
 #endif // INTERNAL_UTILS_HPP
 
 
