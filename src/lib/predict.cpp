@@ -30,7 +30,10 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
             }
             if (valid)
             {
-              total_res += leaf.value;
+              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p)
+              {
+                total_res[p] += leaf.value[p];
+              }
             }
           }
         }
@@ -65,7 +68,12 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
               }
             }
             if (valid)
-              total_res += leaf.value;
+            {
+              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p)
+              {
+                total_res[p] += leaf.value[p];
+              }
+            }
           }
         }
       }
@@ -83,7 +91,12 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
           if (tree.first == std::set<int>{0})
           {
             leaf_index = std::vector<int>(tree.first.size(), 0);
-            total_res += tree.second->GridLeaves.values[leaf_index];
+            
+            const auto &vals = tree.second->GridLeaves.values[leaf_index];
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
+            {
+              total_res[p] += vals[p];
+            }
           }
         }
       }
@@ -108,7 +121,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 auto dim_pnt = tree.first.begin();
                 std::advance(dim_pnt, dim_index);
                 dim = *dim_pnt;
-                --dim;
+                --dim; // convert to 0-based original feature index
               }
               auto &bounds = tree.second->GridLeaves.lim_list[dim];
               if (bounds.size() < 2)
@@ -116,13 +129,20 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 leaf_index[dim_index] = 0;
                 continue;
               }
+              // Use the original feature index into X, not the position within the tree's dim set
               auto it = std::upper_bound(bounds.begin(), bounds.end(), X[dim]);
               int c = static_cast<int>(std::distance(bounds.begin(), it));
               leaf_index[dim_index] = std::min(std::max(0, c - 1), (int)bounds.size() - 2);
             }
           }
           for (int &index : leaf_index) index = std::max(0, index);
-          total_res += tree.second->GridLeaves.values[leaf_index];
+          {
+            const auto &vals = tree.second->GridLeaves.values[leaf_index];
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
+            {
+              total_res[p] += vals[p];
+            }
+          }
         }
       }
     }
@@ -148,7 +168,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 auto dim_pnt = tree.first.begin();
                 std::advance(dim_pnt, dim_index);
                 dim = *dim_pnt;
-                --dim;
+                --dim; // 0-based original feature index for bounds lookup only
               }
               auto &bounds = tree.second->GridLeaves.lim_list[dim];
               if (bounds.size() < 2)
@@ -156,13 +176,21 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 leaf_index[dim_index] = 0;
                 continue;
               }
+              // For component-specific prediction, X contains only the selected dims in ascending order.
+              // Use the position within the selected dims (dim_index) to read the value.
               auto it = std::upper_bound(bounds.begin(), bounds.end(), X[dim_index]);
               int c = static_cast<int>(std::distance(bounds.begin(), it));
               leaf_index[dim_index] = std::min(std::max(0, c - 1), (int)bounds.size() - 2);
             }
           }
           for (int &index : leaf_index) index = std::max(0, index);
-          total_res += tree.second->GridLeaves.values[leaf_index];
+          {
+            const auto &vals = tree.second->GridLeaves.values[leaf_index];
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
+            {
+              total_res[p] += vals[p];
+            }
+          }
         }
       }
     }

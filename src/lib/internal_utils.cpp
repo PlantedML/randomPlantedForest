@@ -13,6 +13,29 @@ namespace {
 }
 
 namespace rpf_utils {
+void fenwick_add(std::vector<double> &bit, size_t idx1, double delta)
+{
+  // bit is 1-based; idx1 in [1, bit.size()]
+  size_t n = bit.size();
+  while (idx1 <= n) { bit[idx1 - 1] += delta; idx1 += idx1 & (~idx1 + 1); }
+}
+
+size_t fenwick_find_by_prefix(const std::vector<double> &bit, double target)
+{
+  // Return smallest i such that sum(i) >= target; 1-based index
+  size_t n = bit.size();
+  size_t idx = 0; double sum = 0.0;
+  // Largest power of two <= n
+  size_t step = 1ULL << (63 - __builtin_clzll((unsigned long long)std::max<size_t>(1, n)));
+  while (step) {
+    size_t next = idx + step; if (next <= n) {
+      double val = bit[next - 1];
+      if (sum + val < target) { sum += val; idx = next; }
+    }
+    step >>= 1;
+  }
+  return std::min(n, idx + 1);
+}
 
 std::mt19937_64* swap_tls_rng(std::mt19937_64* new_ptr)
 {

@@ -68,19 +68,33 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(const std::vector<std::vec
     for (auto &curr_tree : curr_trees) {
       if (curr_tree->leaves.empty()) continue;
       for (auto &leaf : curr_tree->leaves) {
+        // Reuse cached order and sorted values
         std::vector<size_t> order_cf; std::vector<double> sorted_vals_cf;
         ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order_cf, sorted_vals_cf);
-        std::vector<double> unique_samples = compute_unique_sorted_values(sorted_vals_cf);
-        if (unique_samples.size() < 2 * static_cast<size_t>(leaf_size)) continue;
+        // Unique count & values caching
+        std::vector<double> *unique_ptr = nullptr;
+        size_t unique_count = 0;
+        if (leaf.unique_count_cache.count(k)) {
+          unique_count = leaf.unique_count_cache[k];
+          if (unique_count != 0 && leaf.unique_vals_cache.count(k)) unique_ptr = &leaf.unique_vals_cache[k];
+        }
+        if (!unique_ptr) {
+          auto uniques = compute_unique_sorted_values(sorted_vals_cf);
+          unique_count = uniques.size();
+          leaf.unique_count_cache[k] = unique_count;
+          leaf.unique_vals_cache[k] = std::move(uniques);
+          unique_ptr = &leaf.unique_vals_cache[k];
+        }
+        if (unique_count < 2 * static_cast<size_t>(leaf_size)) continue;
 
         const size_t m = leaf.individuals.size();
         std::vector<int> samples;
         if (this->deterministic) {
-          int maxp = std::min<int>((int)unique_samples.size() - 1, 9);
+          int maxp = std::min<int>((int)unique_count - 1, 9);
           samples.resize(maxp); std::iota(samples.begin(), samples.end(), 1);
         } else {
           samples.resize(this->split_try);
-          for (size_t i = 0; i < samples.size(); ++i) samples[i] = rng_randint(leaf_size, (int)unique_samples.size() - leaf_size);
+          for (size_t i = 0; i < samples.size(); ++i) samples[i] = rng_randint(leaf_size, (int)unique_count - leaf_size);
           std::sort(samples.begin(), samples.end());
         }
         const bool single_eval = (samples.size() == 1);
@@ -89,7 +103,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(const std::vector<std::vec
         if (!single_eval) build_prefix_and_total_given_order(Y, leaf, order_cf, this->value_size, prefix_cf, total_cf);
 
         for (size_t si = 0; si < samples.size(); ++si) {
-          const double sp = unique_samples[samples[si]];
+          const double sp = (*unique_ptr)[samples[si]];
           size_t pos = static_cast<size_t>(std::lower_bound(sorted_vals_cf.begin(), sorted_vals_cf.end(), sp) - sorted_vals_cf.begin());
           if (pos == 0 || pos >= m) continue;
           if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size)) continue;
