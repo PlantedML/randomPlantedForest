@@ -54,6 +54,10 @@ std::vector<size_t> sample_weighted_indices_filtered(
 std::vector<int> compute_even_spread_indices(int left_inclusive, int right_exclusive, size_t max_draws);
 std::vector<int> sample_unique_ints_uniform_R(int left_inclusive, int right_exclusive, size_t k);
 
+// Fenwick helpers used by cur_trees_1 sampling cache
+void fenwick_add(std::vector<double> &bit, size_t idx1, double delta);
+size_t fenwick_find_by_prefix(const std::vector<double> &bit, double target);
+
 // Aging helper must be header (templated)
 template <typename CandidateT>
 inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_idx, std::vector<CandidateT> &pool)
