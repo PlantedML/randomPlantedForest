@@ -240,10 +240,40 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
+    // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
-      if (curr_family[key]->leaves.size() == 0) { curr_family.erase(key); continue; }
-      for (auto &leaf : curr_family[key]->leaves) leaf.individuals.clear();
+      auto itTree = curr_family.find(key);
+      if (itTree == curr_family.end()) continue;
+      auto &treePtr = itTree->second;
+      if (treePtr->leaves.size() == 0) { curr_family.erase(itTree); continue; }
+      for (auto &leaf : treePtr->leaves) {
+        // Individuals are not used after training; caches are training-only
+        leaf.individuals.clear();
+        leaf.individuals.shrink_to_fit();
+        // Free per-leaf caches decisively
+        {
+          std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
+          std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
+          std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
+          std::unordered_map<int, size_t>()          .swap(leaf.unique_count_cache);
+        }
+        // Keep intervals and value but release spare capacity
+        leaf.intervals.shrink_to_fit();
+        leaf.value.shrink_to_fit();
+      }
+      // Clear per-dimension sampling caches (used only during training)
+      for (auto &v : treePtr->fenwick_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+      treePtr->fenwick_by_dim_v.clear();
+      treePtr->fenwick_by_dim_v.shrink_to_fit();
+      for (auto &v : treePtr->leaf_weights_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+      treePtr->leaf_weights_by_dim_v.clear();
+      treePtr->leaf_weights_by_dim_v.shrink_to_fit();
+      treePtr->weights_total_by_dim_v.clear();
+      treePtr->weights_total_by_dim_v.shrink_to_fit();
+      treePtr->weights_epoch_by_dim_v.clear();
+      treePtr->weights_epoch_by_dim_v.shrink_to_fit();
+      treePtr->leaves.shrink_to_fit();
     }
     tree_families[n] = curr_family; return;
   }
@@ -358,12 +388,38 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         }
       }
     }
+    // Release histogram working buffers (thread-local) if used
+    tls_working_bin_id.clear();
+    tls_working_bin_id.shrink_to_fit();
+
+    // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
       auto itTree = curr_family.find(key);
       if (itTree == curr_family.end()) continue;
-      if (itTree->second->leaves.size() == 0) { curr_family.erase(itTree); continue; }
-      for (auto &leaf : itTree->second->leaves) leaf.individuals.clear();
+      auto &treePtr = itTree->second;
+      if (treePtr->leaves.size() == 0) { curr_family.erase(itTree); continue; }
+      for (auto &leaf : treePtr->leaves) {
+        leaf.individuals.clear();
+        leaf.individuals.shrink_to_fit();
+        std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
+        std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
+        std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
+        std::unordered_map<int, size_t>()          .swap(leaf.unique_count_cache);
+        leaf.intervals.shrink_to_fit();
+        leaf.value.shrink_to_fit();
+      }
+      for (auto &v : treePtr->fenwick_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+      treePtr->fenwick_by_dim_v.clear();
+      treePtr->fenwick_by_dim_v.shrink_to_fit();
+      for (auto &v : treePtr->leaf_weights_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+      treePtr->leaf_weights_by_dim_v.clear();
+      treePtr->leaf_weights_by_dim_v.shrink_to_fit();
+      treePtr->weights_total_by_dim_v.clear();
+      treePtr->weights_total_by_dim_v.shrink_to_fit();
+      treePtr->weights_epoch_by_dim_v.clear();
+      treePtr->weights_epoch_by_dim_v.shrink_to_fit();
+      treePtr->leaves.shrink_to_fit();
     }
     tree_families[n] = curr_family; return;
   }
@@ -465,8 +521,35 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
 
+  // Final memory cleanup: drop training-only buffers and shrink containers
   auto keys = getKeys(curr_family);
-  for (auto &key : keys) { if (curr_family[key]->leaves.size() == 0) { curr_family.erase(key); continue; } for (auto &leaf : curr_family[key]->leaves) leaf.individuals.clear(); }
+  for (auto &key : keys) {
+    auto itTree = curr_family.find(key);
+    if (itTree == curr_family.end()) continue;
+    auto &treePtr = itTree->second;
+    if (treePtr->leaves.size() == 0) { curr_family.erase(itTree); continue; }
+    for (auto &leaf : treePtr->leaves) {
+      leaf.individuals.clear();
+      leaf.individuals.shrink_to_fit();
+      std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
+      std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
+      std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
+      std::unordered_map<int, size_t>()          .swap(leaf.unique_count_cache);
+      leaf.intervals.shrink_to_fit();
+      leaf.value.shrink_to_fit();
+    }
+    for (auto &v : treePtr->fenwick_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+    treePtr->fenwick_by_dim_v.clear();
+    treePtr->fenwick_by_dim_v.shrink_to_fit();
+    for (auto &v : treePtr->leaf_weights_by_dim_v) { v.clear(); v.shrink_to_fit(); }
+    treePtr->leaf_weights_by_dim_v.clear();
+    treePtr->leaf_weights_by_dim_v.shrink_to_fit();
+    treePtr->weights_total_by_dim_v.clear();
+    treePtr->weights_total_by_dim_v.shrink_to_fit();
+    treePtr->weights_epoch_by_dim_v.clear();
+    treePtr->weights_epoch_by_dim_v.shrink_to_fit();
+    treePtr->leaves.shrink_to_fit();
+  }
   tree_families[n] = curr_family;
 }
 

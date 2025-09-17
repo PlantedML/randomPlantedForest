@@ -71,8 +71,20 @@ std::vector<double> to_std_vec(Rcpp::NumericVector rv) {
 }
 
 std::vector<std::vector<double>> to_std_vec(Rcpp::NumericMatrix rv) {
-  std::vector<std::vector<double>> X;
-  for(int i=0; i<rv.rows(); i++) X.push_back(to_std_vec(rv(i, _ )));
+  // Efficient, allocation-minimal copy:
+  // - Avoids per-row temporary NumericVector creation
+  // - Copies column-major R memory into row-major nested vectors
+  const int rows = rv.nrow();
+  const int cols = rv.ncol();
+  std::vector<std::vector<double>> X((size_t)rows, std::vector<double>((size_t)cols));
+  if (rows == 0 || cols == 0) return X;
+  const double *data = rv.begin(); // column-major, column stride = rows
+  for (int j = 0; j < cols; ++j) {
+    const double *colptr = data + (size_t)j * (size_t)rows;
+    for (int i = 0; i < rows; ++i) {
+      X[(size_t)i][(size_t)j] = colptr[(size_t)i];
+    }
+  }
   return X;
 }
 
