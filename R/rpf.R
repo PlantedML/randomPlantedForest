@@ -106,7 +106,7 @@ rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                            deterministic = FALSE,
                            nthreads = 1, purify = FALSE, cv = FALSE,
                            loss = "L2", delta = 0, epsilon = 0.1,
-                           split_structure = "leaves", ...) {
+                           split_structure = "leaves", export_forest = FALSE, ...) {
   split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
@@ -115,7 +115,7 @@ rpf.data.frame <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
     split_try, t_try, split_decay_rate, max_candidates, delete_leaves, deterministic,
     nthreads, purify, cv,
     loss, delta, epsilon,
-    split_structure = split_structure
+    split_structure = split_structure, export_forest = export_forest
   )
 }
 
@@ -128,7 +128,7 @@ rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = "leaves", ...) {
+                       split_structure = "leaves", export_forest = FALSE, ...) {
   split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
@@ -137,7 +137,7 @@ rpf.matrix <- function(x, y, max_interaction = 1, ntrees = 50, splits = 30,
     split_try, t_try, split_decay_rate, max_candidates, delete_leaves, deterministic,
     nthreads, purify, cv,
     loss, delta, epsilon,
-    split_structure = split_structure
+    split_structure = split_structure, export_forest = export_forest
   )}
 
 # Formula method
@@ -149,7 +149,7 @@ rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits 
                         deterministic = FALSE,
                         nthreads = 1, purify = FALSE, cv = FALSE,
                         loss = "L2", delta = 0, epsilon = 0.1,
-                        split_structure = "leaves", ...) {
+                        split_structure = "leaves", export_forest = FALSE, ...) {
   split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
@@ -158,7 +158,7 @@ rpf.formula <- function(formula, data, max_interaction = 1, ntrees = 50, splits 
     split_try, t_try, split_decay_rate, max_candidates, delete_leaves, deterministic,
     nthreads, purify, cv,
     loss, delta, epsilon,
-    split_structure = split_structure
+    split_structure = split_structure, export_forest = export_forest
   )
 }
 
@@ -171,7 +171,7 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = "leaves", ...) {
+                       split_structure = "leaves", export_forest = FALSE, ...) {
   split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
@@ -180,7 +180,7 @@ rpf.recipe <- function(x, data, max_interaction = 1, ntrees = 50, splits = 30,
     split_try, t_try, split_decay_rate, max_candidates, delete_leaves, deterministic,
     nthreads, purify, cv,
     loss, delta, epsilon,
-    split_structure = split_structure
+    split_structure = split_structure, export_forest = export_forest
   )
 }
 
@@ -194,7 +194,7 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
                        deterministic = FALSE,
                        nthreads = 1, purify = FALSE, cv = FALSE,
                        loss = "L2", delta = 0, epsilon = 0.1,
-                       split_structure = "leaves") {
+                       split_structure = "leaves", export_forest = FALSE) {
   split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
@@ -251,8 +251,12 @@ rpf_bridge <- function(processed, max_interaction = 1, ntrees = 50, splits = 30,
     split_structure = split_structure
   )
 
-  forest <- fit$get_model()
-  class(forest) <- "rpf_forest"
+  # Optionally export a compact R list representation of the forest.
+  forest <- NULL
+  if (isTRUE(export_forest)) {
+    forest <- fit$get_model()
+    class(forest) <- "rpf_forest"
+  }
 
   new_rpf(
     fit = fit,
