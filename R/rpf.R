@@ -33,9 +33,9 @@
 #' @param epsilon `[0.1]`: Only used if loss = `"logit"` or `"exponential"`.
 #'   Proportion of class membership is truncated to be smaller 1-epsilon when calculating
 #'   the fit in a leaf.
-#' @param split_decay_rate `[0.1]`:  Exponential decay factor λ for aging split-candidates.  A candidate’s weight is `exp(−λ * age)`. 
-#' @param max_candidates `[50]`:  Maximum number of split‐candidates to sample at each node (will be clamped to `[1, #possible_splits]`).
-#' @param delete_leaves `[1]`:  Whether parents should be deleted if split is an existing coordinate
+#' @param export_forest `[FALSE]`: Whether to store the flattened forest in the
+#'   returned object as `$forest`. If `FALSE`, `$forest` is `NULL`, reducing
+#'   memory use of the returned object.
 #' @param ... (Unused).
 #'
 #' @return Object of class `"rpf"` with model object contained in `$fit`.

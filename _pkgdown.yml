@@ -29,4 +29,5 @@ reference:
 - contents:
   - starts_with("print.")
   - starts_with("str.")
+  - preprocess_predictors_predict
 
