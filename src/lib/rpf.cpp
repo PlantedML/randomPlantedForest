@@ -132,6 +132,54 @@ List RandomPlantedForest::get_data()
   return List::create(Named("X") = from_std_vec(X), Named("Y") = from_std_vec(Y));
 }
 
+List RandomPlantedForest::get_bounds()
+{
+  return List::create(Named("lower") = from_std_vec(lower_bounds),
+                      Named("upper") = from_std_vec(upper_bounds));
+}
+
+List RandomPlantedForest::get_shape()
+{
+  return List::create(Named("feature_size") = feature_size,
+                      Named("value_size") = (int)value_size,
+                      Named("sample_size") = (int)sample_size);
+}
+
+void RandomPlantedForest::set_model(List &model)
+{
+  size_t n_families = model.size();
+  tree_families = std::vector<TreeFamily>(n_families);
+  for (size_t i = 0; i < n_families; ++i) {
+    List family = model[i];
+    List variables = family["variables"];
+    List values = family["values"];
+    List intervals = family["intervals"];
+    size_t n_trees_fam = variables.size();
+    for (size_t j = 0; j < n_trees_fam; ++j) {
+      IntegerVector tree_variables = variables[j];
+      std::set<int> dims(tree_variables.begin(), tree_variables.end());
+      List tree_values = values[j];
+      List tree_intervals = intervals[j];
+      size_t n_leaves = tree_values.size();
+      std::vector<Leaf> leaves(n_leaves);
+      for (size_t k = 0; k < n_leaves; ++k) {
+        // get_model() builds leaf_values via push_back() onto a default-constructed
+        // NumericMatrix, which yields a plain vector without matrix dims - read it
+        // back as a vector rather than casting to NumericMatrix.
+        leaves[k].value = as<std::vector<double>>(tree_values[k]);
+        NumericMatrix leaf_intervals = tree_intervals[k];
+        std::vector<Interval> ivs(feature_size);
+        for (int l = 0; l < feature_size; ++l)
+          ivs[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
+        leaves[k].intervals = ivs;
+      }
+      tree_families[i].insert(
+          std::make_pair(dims, std::make_shared<DecisionTree>(DecisionTree(dims, leaves))));
+    }
+  }
+  purified = false;
+}
+
 // --------------- calcOptimalSplit per mode ---------------
 
 // Mode 3: leaves implementation moved to lib/splits_leaves.cpp

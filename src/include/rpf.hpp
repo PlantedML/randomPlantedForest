@@ -45,6 +45,11 @@ public:
   void set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   // Export training data (for rpf_marshal(include_data = TRUE)).
   List get_data();
+  // Export bounds/shape metadata (for rpf_marshal()).
+  List get_bounds();
+  List get_shape();
+  // Restore tree structure from get_model()'s output (serialization path).
+  void set_model(List &model);
   // Load or replace data without fitting; computes bounds and resets state.
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   // Predict for a matrix or a single vector. `components = {0}` means the full
