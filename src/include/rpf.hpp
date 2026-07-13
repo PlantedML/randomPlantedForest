@@ -35,6 +35,16 @@ public:
   RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                       const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50, 1, 3});
   RandomPlantedForest(){};
+  // Params-only constructor: parses configuration but loads no data and does
+  // not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
+  RandomPlantedForest(const NumericVector parameters);
+  // Restore shape metadata without training data (serialization path).
+  void set_shape(int feature_size_in, int value_size_in, int sample_size_in,
+                 const NumericVector lower, const NumericVector upper);
+  // Store training data without fitting and without recomputing bounds.
+  void set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
+  // Export training data (for rpf_marshal(include_data = TRUE)).
+  List get_data();
   // Load or replace data without fitting; computes bounds and resets state.
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   // Predict for a matrix or a single vector. `components = {0}` means the full
@@ -63,6 +73,8 @@ public:
   bool is_purified();
   
 protected:
+  // Parse the flat parameter vector shared by both constructors.
+  void parse_parameters(const std::vector<double> &pars);
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
   // Internal per-family worker for fast exact purifier (mode 2)

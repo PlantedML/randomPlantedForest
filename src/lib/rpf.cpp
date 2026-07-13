@@ -64,6 +64,24 @@ void RandomPlantedForest::L2_loss(Split &split)
   }
 }
 
+void RandomPlantedForest::parse_parameters(const std::vector<double> &pars)
+{
+  this->max_interaction = pars[0];
+  this->n_trees = pars[1];
+  this->n_splits = pars[2];
+  this->split_try = pars[3];
+  this->t_try = pars[4];
+  this->purify_forest = pars[5];
+  this->deterministic = pars[6];
+  this->nthreads = pars[7];
+  this->cross_validate = pars[8];
+  this->split_decay_rate_ = pars[9];
+  this->max_candidates_   = static_cast<size_t>(pars[10]);
+  this->delete_leaves   = (pars[11] != 0);
+  // map: 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist
+  this->split_structure_mode_ = (pars.size() >= 13) ? static_cast<int>(pars[12]) : 3;
+}
+
 // constructor (parsing includes split_structure)
 RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                                          const NumericVector parameters)
@@ -76,22 +94,42 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
   }
   else
   {
-    this->max_interaction = pars[0];
-    this->n_trees = pars[1];
-    this->n_splits = pars[2];
-    this->split_try = pars[3];
-    this->t_try = pars[4];
-    this->purify_forest = pars[5];
-    this->deterministic = pars[6];
-    this->nthreads = pars[7];
-    this->cross_validate = pars[8];
-    this->split_decay_rate_ = pars[9];
-    this->max_candidates_   = static_cast<size_t>(pars[10]);
-    this->delete_leaves   = (pars[11] != 0);
-    // map: 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist
-    this->split_structure_mode_ = (pars.size() >= 13) ? static_cast<int>(pars[12]) : 3;
+    parse_parameters(pars);
   }
   this->set_data(samples_Y, samples_X);
+}
+
+// Params-only constructor: parses configuration but loads no data and does
+// not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
+RandomPlantedForest::RandomPlantedForest(const NumericVector parameters)
+{
+  std::vector<double> pars = to_std_vec(parameters);
+  if (pars.size() != 12 && pars.size() != 13)
+    Rcpp::stop("RandomPlantedForest requires 12 or 13 parameters, got %d", pars.size());
+  parse_parameters(pars);
+}
+
+void RandomPlantedForest::set_shape(int feature_size_in, int value_size_in, int sample_size_in,
+                                    const NumericVector lower, const NumericVector upper)
+{
+  this->feature_size = feature_size_in;
+  this->value_size = value_size_in;
+  this->sample_size = sample_size_in;
+  this->lower_bounds = to_std_vec(lower);
+  this->upper_bounds = to_std_vec(upper);
+  this->n_leaves = std::vector<int>(feature_size, 1);
+}
+
+void RandomPlantedForest::set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
+{
+  this->Y = to_std_vec(samples_Y);
+  this->X = to_std_vec(samples_X);
+  this->sample_size = X.size();
+}
+
+List RandomPlantedForest::get_data()
+{
+  return List::create(Named("X") = from_std_vec(X), Named("Y") = from_std_vec(Y));
 }
 
 // --------------- calcOptimalSplit per mode ---------------
