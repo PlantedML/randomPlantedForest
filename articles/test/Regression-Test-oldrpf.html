@@ -7,8 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Regression Test: oldrpf • randomPlantedForest</title>
 <script src="../../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../../deps/headroom-0.11.0/headroom.min.js"></script><script src="../../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../../deps/search-1.0.0/fuse.min.js"></script><script src="../../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../../pkgdown.js"></script><meta property="og:title" content="Regression Test: oldrpf">
 </head>
@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,7 +53,7 @@
 
       <h1>Regression Test: oldrpf</h1>
             
-            <h4 data-toc-skip class="date">2025-03-21 16:58:26 UTC</h4>
+            <h4 data-toc-skip class="date">2026-07-13 21:17:50 UTC</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/vignettes/test/Regression-Test-oldrpf.Rmd" class="external-link"><code>vignettes/test/Regression-Test-oldrpf.Rmd</code></a></small>
       <div class="d-none name"><code>Regression-Test-oldrpf.Rmd</code></div>
@@ -69,7 +69,7 @@ referred to as <code>oldrpf</code>.</p>
 </h2>
 <p>Only supports <code>loss = "L2"</code> and parameters
 <code>epsilon</code> and <code>delta</code> are not applicable.</p>
-<p><img src="Regression-Test-oldrpf_files/figure-html/regression-1.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/regression-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -82,8 +82,8 @@ referred to as <code>oldrpf</code>.</p>
 <td align="left">regr</td>
 <td align="left">L2</td>
 <td align="right">0.1867</td>
-<td align="right">0.15026</td>
-<td align="right">0.08828</td>
+<td align="right">0.18369</td>
+<td align="right">0.07184</td>
 </tr></tbody>
 </table>
 </div>
@@ -93,7 +93,7 @@ referred to as <code>oldrpf</code>.</p>
 <div class="section level3">
 <h3 id="l1-loss">L1 Loss<a class="anchor" aria-label="anchor" href="#l1-loss"></a>
 </h3>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L1-1.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L1-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -105,16 +105,16 @@ referred to as <code>oldrpf</code>.</p>
 <tbody><tr class="odd">
 <td align="left">classif</td>
 <td align="left">L1</td>
-<td align="right">0.08032</td>
-<td align="right">0.08601</td>
-<td align="right">0.00467</td>
+<td align="right">0.08063</td>
+<td align="right">0.08598</td>
+<td align="right">0.00502</td>
 </tr></tbody>
 </table>
 </div>
 <div class="section level3">
 <h3 id="l2-loss">L2 Loss<a class="anchor" aria-label="anchor" href="#l2-loss"></a>
 </h3>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L2-1.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-L2-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -126,16 +126,16 @@ referred to as <code>oldrpf</code>.</p>
 <tbody><tr class="odd">
 <td align="left">classif</td>
 <td align="left">L2</td>
-<td align="right">0.08782</td>
-<td align="right">0.08863</td>
-<td align="right">0.00421</td>
+<td align="right">0.09227</td>
+<td align="right">0.09132</td>
+<td align="right">0.00336</td>
 </tr></tbody>
 </table>
 </div>
 <div class="section level3">
 <h3 id="logit-loss">Logit Loss<a class="anchor" aria-label="anchor" href="#logit-loss"></a>
 </h3>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-logit-1.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-logit-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -147,16 +147,16 @@ referred to as <code>oldrpf</code>.</p>
 <tbody><tr class="odd">
 <td align="left">classif</td>
 <td align="left">logit</td>
-<td align="right">0.08545</td>
-<td align="right">0.0859</td>
-<td align="right">0.0027</td>
+<td align="right">0.08893</td>
+<td align="right">0.09096</td>
+<td align="right">0.00257</td>
 </tr></tbody>
 </table>
 </div>
 <div class="section level3">
 <h3 id="exponential-loss">Exponential Loss<a class="anchor" aria-label="anchor" href="#exponential-loss"></a>
 </h3>
-<p><img src="Regression-Test-oldrpf_files/figure-html/classif-exponential-1.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/classif-exponential-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 <table class="table">
 <thead><tr class="header">
 <th align="left">method</th>
@@ -168,9 +168,9 @@ referred to as <code>oldrpf</code>.</p>
 <tbody><tr class="odd">
 <td align="left">classif</td>
 <td align="left">exponential</td>
-<td align="right">0.0786</td>
-<td align="right">0.07484</td>
-<td align="right">0.00411</td>
+<td align="right">0.08266</td>
+<td align="right">0.07963</td>
+<td align="right">0.00375</td>
 </tr></tbody>
 </table>
 </div>
@@ -191,40 +191,40 @@ referred to as <code>oldrpf</code>.</p>
 <td align="left">regr</td>
 <td align="left">L2</td>
 <td align="right">0.18670</td>
-<td align="right">0.15026</td>
-<td align="right">0.08828</td>
+<td align="right">0.18369</td>
+<td align="right">0.07184</td>
 </tr>
 <tr class="even">
 <td align="left">classif</td>
 <td align="left">L1</td>
-<td align="right">0.08032</td>
-<td align="right">0.08601</td>
-<td align="right">0.00467</td>
+<td align="right">0.08063</td>
+<td align="right">0.08598</td>
+<td align="right">0.00502</td>
 </tr>
 <tr class="odd">
 <td align="left">classif</td>
 <td align="left">L2</td>
-<td align="right">0.08782</td>
-<td align="right">0.08863</td>
-<td align="right">0.00421</td>
+<td align="right">0.09227</td>
+<td align="right">0.09132</td>
+<td align="right">0.00336</td>
 </tr>
 <tr class="even">
 <td align="left">classif</td>
 <td align="left">logit</td>
-<td align="right">0.08545</td>
-<td align="right">0.08590</td>
-<td align="right">0.00270</td>
+<td align="right">0.08893</td>
+<td align="right">0.09096</td>
+<td align="right">0.00257</td>
 </tr>
 <tr class="odd">
 <td align="left">classif</td>
 <td align="left">exponential</td>
-<td align="right">0.07860</td>
-<td align="right">0.07484</td>
-<td align="right">0.00411</td>
+<td align="right">0.08266</td>
+<td align="right">0.07963</td>
+<td align="right">0.00375</td>
 </tr>
 </tbody>
 </table>
-<p><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-1.png" width="960" style="display: block; margin: auto;"><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-2.png" width="960" style="display: block; margin: auto;"></p>
+<p><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-1.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"><img src="Regression-Test-oldrpf_files/figure-html/comp-preds-plot-2.png" class="r-plt" alt="" width="960" style="display: block; margin: auto;"></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -237,7 +237,7 @@ referred to as <code>oldrpf</code>.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>
