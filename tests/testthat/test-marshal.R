@@ -91,3 +91,21 @@ test_that("marshaled blob contains no external pointers", {
   }
   expect_false(has_extptr(unclass(blob)))
 })
+
+test_that("include_data = TRUE allows purify after restore", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, max_interaction = 2)
+
+  restored <- rpf_unmarshal(rpf_marshal(fit, include_data = TRUE))
+  purify(restored)
+
+  # restored shares the identical forest and training data with fit,
+  # so purifying each independently must give identical predictions
+  purify(fit)
+  expect_identical(predict(restored, mtcars), predict(fit, mtcars))
+})
+
+test_that("purify on a data-free restored forest errors informatively", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  restored <- rpf_unmarshal(rpf_marshal(fit))
+  expect_error(purify(restored), "include_data")
+})

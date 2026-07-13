@@ -383,6 +383,10 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
 // Unified purifier entry: mode 1 = grid path, mode 2 = fast exact path
 void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int mode)
 {
+  if (sample_size == 0 || X.empty())
+    Rcpp::stop("Cannot purify: no training data available. If this forest was "
+               "restored with rpf_unmarshal(), marshal it with include_data = TRUE.");
+
   // Determine threads: if user provided >0, use it; otherwise default to
   // min(object-configured nthreads, hardware concurrency)
   unsigned int threads_to_use = 0;
