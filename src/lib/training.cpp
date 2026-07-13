@@ -1,6 +1,10 @@
 // Training orchestration split out from rpf.cpp. Builds tree families,
 // manages bootstrapping and threading, and handles optional purification.
 #include "rpf.hpp"
+#include <cstdio>
+#include <cstdlib>
+namespace { const bool rpf_dbg_enabled = std::getenv("RPF_DEBUG") != nullptr; }
+#define RPF_DBG(...) do { if (rpf_dbg_enabled) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while(0)
 #include "internal_utils.hpp"
 
 using namespace rpf_utils;
@@ -52,16 +56,21 @@ void RandomPlantedForest::fit()
       {
         int tree_index = start + i;
         threads[(size_t)i] = std::thread([this, &initial_leaves](int tree_index_inner){
+          RPF_DBG("[thr %d] enter\n", tree_index_inner);
           std::mt19937_64 rng_local;
           std::mt19937_64* prev_ptr = rpf_utils::swap_tls_rng(nullptr);
+          RPF_DBG("[thr %d] tls swapped\n", tree_index_inner);
           if (!tree_seeds_.empty() && (size_t)tree_index_inner < tree_seeds_.size()) {
             rng_local.seed(tree_seeds_[(size_t)tree_index_inner]);
           } else {
             rng_local.seed(88172645463393265ULL ^ (unsigned long long)tree_index_inner);
           }
           rpf_utils::swap_tls_rng(&rng_local);
+          RPF_DBG("[thr %d] rng seeded, calling create_tree_family\n", tree_index_inner);
           this->create_tree_family(initial_leaves, (size_t)tree_index_inner);
+          RPF_DBG("[thr %d] create_tree_family returned\n", tree_index_inner);
           rpf_utils::swap_tls_rng(prev_ptr);
+          RPF_DBG("[thr %d] exit\n", tree_index_inner);
         }, tree_index);
       }
       for (auto &th : threads)

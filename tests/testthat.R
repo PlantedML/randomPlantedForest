@@ -10,23 +10,19 @@ matrix_script <- tempfile(fileext = ".R")
 writeLines(c(
   "args <- commandArgs(TRUE)",
   "cfg <- as.integer(args[[1]])",
+  "Sys.setenv(RPF_DEBUG = '1')",
   "library(randomPlantedForest)",
   "step <- function(s) { cat('STEP', s, '\\n'); flush(stdout()) }",
   "fit_once <- function(nt, ...) { set.seed(13); rpf(mpg ~ wt + cyl, data = mtcars, nthreads = nt, ...) }",
-  "if (cfg == 1) { step('fit1'); f <- fit_once(2); step('pred1'); p <- predict(f, mtcars[1:5, ]); step('fit2'); f2 <- fit_once(2); step('pred2'); p2 <- predict(f2, mtcars[1:5, ]); step('done') }",
-  "if (cfg == 2) { step('fit1'); f <- fit_once(2, ntrees = 2); step('done') }",
-  "if (cfg == 3) { step('fit1'); f <- fit_once(2, ntrees = 1); step('done') }",
-  "if (cfg == 4) { step('fit1'); f <- fit_once(1); step('fit2'); f2 <- fit_once(1); step('done') }",
-  "if (cfg == 5) { step('fit1'); f <- fit_once(2, deterministic = TRUE); step('done') }",
-  "if (cfg == 6) { step('fit1'); f <- fit_once(2, purify = TRUE); step('done') }",
-  "if (cfg == 7) { step('fit1'); f <- fit_once(4); step('done') }",
-  "if (cfg == 8) { step('fit1'); f <- fit_once(2, ntrees = 200); step('done') }",
+  "if (cfg == 1) { step('fit ntrees=1 nthreads=2'); f <- fit_once(2, ntrees = 1); step('done') }",
+  "if (cfg == 2) { step('fit serial'); f <- fit_once(1); step('purify mode2 nthreads=2'); purify(f, mode = 2L, nthreads = 2L); step('done') }",
+  "if (cfg == 3) { step('fit serial'); f <- fit_once(1); step('purify mode1 nthreads=2'); purify(f, mode = 1L, nthreads = 2L); step('done') }",
   "quit(status = 0, save = 'no')"
 ), matrix_script)
 
 rscript0 <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
 cat("\n===== CRASH MATRIX =====\n")
-for (cfg in 1:8) {
+for (cfg in 1:3) {
   cat("----- config", cfg, "-----\n"); flush(stdout())
   st <- suppressWarnings(system2(rscript0, c(matrix_script, cfg)))
   cat("----- config", cfg, "exit status:", st, "-----\n"); flush(stdout())

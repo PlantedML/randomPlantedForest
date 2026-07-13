@@ -1,4 +1,8 @@
 #include "rpf.hpp"
+#include <cstdio>
+#include <cstdlib>
+namespace { const bool rpf_dbg_enabled = std::getenv("RPF_DEBUG") != nullptr; }
+#define RPF_DBG(...) do { if (rpf_dbg_enabled) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while(0)
 #include <cmath>
 #include <numeric>
 #include <limits>
@@ -189,9 +193,10 @@ void RandomPlantedForest::set_data(const NumericMatrix &samples_Y, const Numeric
 
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
 {
-  
+  RPF_DBG("[ctf %zu] enter\n", n);
   TreeFamily curr_family;
   curr_family.insert({std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves))});
+  RPF_DBG("[ctf %zu] null tree inserted\n", n);
 
   // res_trees uses a separate pool
   if (split_structure_mode_ == 0) {
@@ -320,12 +325,13 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
+    RPF_DBG("[ctf %zu] bootstrap done\n", n);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
-      
+      RPF_DBG("[ctf %zu] split %d begin\n", n, split_count);
       if (split_structure_mode_ == 4) curr_split = this->calcOptimalSplit_hist(samples_Y, samples_X, possible_splits, curr_family);
       else curr_split = this->calcOptimalSplit_leaves(samples_Y, samples_X, possible_splits, curr_family);
-      
+      RPF_DBG("[ctf %zu] split %d chosen\n", n, split_count);
       if (!std::isinf(curr_split.min_sum)) {
         
         // Mutate residuals (restore old behavior)
@@ -388,10 +394,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         }
       }
     }
+    RPF_DBG("[ctf %zu] split loop done\n", n);
     // Release histogram working buffers (thread-local) if used
     tls_working_bin_id.clear();
     tls_working_bin_id.shrink_to_fit();
-
+    RPF_DBG("[ctf %zu] tls buffers cleared\n", n);
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
@@ -421,7 +428,10 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       treePtr->weights_epoch_by_dim_v.shrink_to_fit();
       treePtr->leaves.shrink_to_fit();
     }
-    tree_families[n] = curr_family; return;
+    RPF_DBG("[ctf %zu] cleanup done, assigning family\n", n);
+    tree_families[n] = curr_family;
+    RPF_DBG("[ctf %zu] family assigned, returning\n", n);
+    return;
   }
 
   // cur_trees_1 and cur_trees_2: initialize with {j} trees
