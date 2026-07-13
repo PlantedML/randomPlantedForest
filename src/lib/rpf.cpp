@@ -18,9 +18,10 @@ namespace { const bool rpf_dbg_enabled = std::getenv("RPF_DEBUG") != nullptr; }
 // Use utilities via namespace alias
 using namespace rpf_utils;
 
-// Thread-local cache for histogram mode per working set (per tree-family build)
-// Avoids races on the class member when building families in parallel
-thread_local std::vector<std::vector<int>> tls_working_bin_id;
+// Thread-local pointer to the histogram-mode working-set bin cache (see
+// internal_utils.hpp for why this must be a trivially-destructible pointer
+// and not a thread_local std::vector).
+thread_local std::vector<std::vector<int>>* tls_working_bin_id_ptr = nullptr;
 
 // Utilities shared across modes
 bool RandomPlantedForest::possibleExists(
@@ -307,22 +308,25 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
     
 
-    // In histogram mode, cache per-feature bin ids for the working (bootstrapped) dataset
+    // In histogram mode, cache per-feature bin ids for the working (bootstrapped) dataset.
+    // The buffer lives on this function's stack; TLS only holds a pointer to it.
+    std::vector<std::vector<int>> working_bin_id;
     if (split_structure_mode_ == 4) {
-      tls_working_bin_id.assign((size_t)feature_size, std::vector<int>(sample_size, 0));
+      working_bin_id.assign((size_t)feature_size, std::vector<int>(sample_size, 0));
       for (int k = 0; k < feature_size; ++k) {
         // Reuse global precomputed bin ids via bootstrap index mapping
         if (!feature_cut_points_.empty() && (size_t)k < sample_bin_id_.size()) {
-          for (size_t i = 0; i < sample_size; ++i) tls_working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
+          for (size_t i = 0; i < sample_size; ++i) working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
         } else {
           // Fallback: compute on-the-fly (should be rare if cuts are available)
           const auto &cuts_k = (k >= 0 && k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
           for (size_t i = 0; i < sample_size; ++i) {
             int bin = 0; if (!cuts_k.empty()) { auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), samples_X[i][k]); bin = (int)std::distance(cuts_k.begin(), itb); }
-            tls_working_bin_id[k][i] = bin;
+            working_bin_id[k][i] = bin;
           }
         }
       }
+      tls_working_bin_id_ptr = &working_bin_id;
     }
 
     RPF_DBG("[ctf %zu] bootstrap done\n", n);
@@ -395,9 +399,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
     RPF_DBG("[ctf %zu] split loop done\n", n);
-    // Release histogram working buffers (thread-local) if used
-    tls_working_bin_id.clear();
-    tls_working_bin_id.shrink_to_fit();
+    // Detach the histogram working buffer; the stack-owned vector frees itself.
+    tls_working_bin_id_ptr = nullptr;
     RPF_DBG("[ctf %zu] tls buffers cleared\n", n);
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
