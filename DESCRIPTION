@@ -24,6 +24,7 @@ Imports:
     Rcpp,
     utils
 Suggests:
+    bundle,
     knitr,
     mvtnorm,
     recipes,
