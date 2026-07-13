@@ -162,11 +162,11 @@ ClassificationRPF::ClassificationRPF(const String loss, const NumericVector para
                                   : NumericVector(parameters[Rcpp::Range(0, 11)]))
 {
   std::vector<double> pars = to_std_vec(parameters);
+  if (pars.size() != 15)
+    Rcpp::stop("ClassificationRPF requires 15 parameters, got %d", (int)pars.size());
   set_loss_function(loss);
-  if (pars.size() == 15) {
-    this->delta = pars[13];
-    this->epsilon = pars[14];
-  }
+  this->delta = pars[13];
+  this->epsilon = pars[14];
 }
 
 // Mode 1: cur_trees_2 (classification variant)

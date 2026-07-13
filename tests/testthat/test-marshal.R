@@ -9,6 +9,8 @@ test_that("params-only constructors create empty, unfitted objects", {
 
   cfit <- new(ClassificationRPF, "L2", c(pars, 0, 0.1))
   expect_length(cfit$get_model(), 0)
+
+  expect_error(new(ClassificationRPF, "L2", pars), "15 parameters")
 })
 
 test_that("get_data returns training data from a fitted forest", {
