@@ -22,6 +22,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
   \item Joseph Theo Meyer
   \item Munir Hiabu
   \item Maike Spankus

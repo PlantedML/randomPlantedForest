@@ -29,6 +29,7 @@ rpf(x, ...)
   delta = 0,
   epsilon = 0.1,
   split_structure = "leaves",
+  export_forest = FALSE,
   ...
 )
 
@@ -51,6 +52,7 @@ rpf(x, ...)
   delta = 0,
   epsilon = 0.1,
   split_structure = "leaves",
+  export_forest = FALSE,
   ...
 )
 
@@ -73,6 +75,7 @@ rpf(x, ...)
   delta = 0,
   epsilon = 0.1,
   split_structure = "leaves",
+  export_forest = FALSE,
   ...
 )
 
@@ -95,6 +98,7 @@ rpf(x, ...)
   delta = 0,
   epsilon = 0.1,
   split_structure = "leaves",
+  export_forest = FALSE,
   ...
 )
 }
@@ -121,11 +125,11 @@ this is equivalent to setting \code{max_interaction = 10}.}
 
 \item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of viable split-candidates in each round.}
 
-\item{split_decay_rate}{\verb{[0.1]}:  Exponential decay factor λ for aging split-candidates.  A candidate’s weight is \verb{exp(−λ * age)}.}
+\item{split_decay_rate}{\verb{[0.1]}: Exponential decay factor for aging split-candidates. Possible splits are initiated with age=0. Whenever a possible split becomes a split_candidate (i.e. it has been drawn when drawing max(max_candidates , t_try * possible options ) times) it ages by +1. The age of the single split-candidate with minimal loss is reset to zero. Split_candidates are sampled from Possible_splits with weight exp(-split_decay_rate_ * age).  A high split_decay_rate means faster aging. split_decay_rate=0 results in no aging and uniform sampling.}
 
-\item{max_candidates}{\verb{[50]}:  Maximum number of split‐candidates to sample at each node (will be clamped to \verb{[1, #possible_splits]}).}
+\item{max_candidates}{\verb{[50]}: Maximum number of split-candidates sampled per iteration. Number of split_candidates in each round is given  by max(max_candidates , t_try * possible options).}
 
-\item{delete_leaves}{\verb{[1]}:  Whether parents should be deleted if split is an existing coordinate}
+\item{delete_leaves}{\verb{[TRUE]}: Whether to delete a parent leaf when splitting along an existing dimension.}
 
 \item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
 
@@ -150,6 +154,10 @@ Proportion of class membership is truncated to be smaller 1-epsilon when calcula
 the fit in a leaf.}
 
 \item{split_structure}{\verb{["leaves"]}: Defines the structure of a possible split and how to choose split_candidates. Can be one of "leaves", "hist", "cur_trees_1", "cur_trees_2", or "res_trees". Further details are given below.}
+
+\item{export_forest}{\verb{[FALSE]}: Whether to store the flattened forest in the
+returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, reducing
+memory use of the returned object.}
 
 \item{formula}{Formula specification, e.g. y ~ x1 + x2.}
 }
