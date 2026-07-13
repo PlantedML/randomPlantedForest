@@ -180,6 +180,70 @@ void RandomPlantedForest::set_model(List &model)
   purified = false;
 }
 
+List RandomPlantedForest::get_grid_leaves()
+{
+  List families;
+  for (auto &family : tree_families) {
+    List trees;
+    List fam_lim_list;
+    bool lim_captured = false;
+    for (auto &tree : family) {
+      if (!lim_captured) {
+        // lim_list is identical for every tree in a family; store once
+        List ll;
+        for (auto &v : tree.second->GridLeaves.lim_list) ll.push_back(from_std_vec(v));
+        fam_lim_list = ll;
+        lim_captured = true;
+      }
+      auto &vals = tree.second->GridLeaves.values;
+      const auto &flat = vals.flat();
+      NumericMatrix vmat(flat.size(), value_size);
+      for (size_t e = 0; e < flat.size(); ++e)
+        for (size_t p = 0; p < value_size && p < flat[e].size(); ++p)
+          vmat(e, p) = flat[e][p];
+      trees.push_back(List::create(
+          Named("variables") = from_std_set(tree.first),
+          Named("dims") = from_std_vec(vals.dims),
+          Named("values") = vmat));
+    }
+    families.push_back(List::create(Named("lim_list") = fam_lim_list,
+                                    Named("trees") = trees));
+  }
+  return families;
+}
+
+void RandomPlantedForest::set_grid_leaves(List &grid)
+{
+  if ((size_t)grid.size() != tree_families.size())
+    Rcpp::stop("Grid data does not match the number of tree families.");
+  for (size_t i = 0; i < tree_families.size(); ++i) {
+    List family = grid[i];
+    List fam_lim_list = family["lim_list"];
+    std::vector<std::vector<double>> lim_list;
+    for (int l = 0; l < fam_lim_list.size(); ++l)
+      lim_list.push_back(to_std_vec(NumericVector(fam_lim_list[l])));
+    List trees = family["trees"];
+    for (int j = 0; j < trees.size(); ++j) {
+      List tr = trees[j];
+      IntegerVector vars = tr["variables"];
+      std::set<int> dims_set(vars.begin(), vars.end());
+      auto it = tree_families[i].find(dims_set);
+      if (it == tree_families[i].end())
+        Rcpp::stop("Grid data references a tree not present in the forest.");
+      std::vector<int> mdims = to_std_vec(IntegerVector(tr["dims"]));
+      NumericMatrix vmat = tr["values"];
+      utils::Matrix<std::vector<double>> values(mdims, std::vector<double>(value_size, 0));
+      auto &flat = values.flat();
+      for (size_t e = 0; e < flat.size() && e < (size_t)vmat.nrow(); ++e)
+        for (size_t p = 0; p < value_size; ++p)
+          flat[e][p] = vmat(e, p);
+      it->second->GridLeaves.values = values;
+      it->second->GridLeaves.lim_list = lim_list;
+    }
+  }
+  purified = true;
+}
+
 // --------------- calcOptimalSplit per mode ---------------
 
 // Mode 3: leaves implementation moved to lib/splits_leaves.cpp

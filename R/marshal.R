@@ -33,7 +33,7 @@ rpf_marshal <- function(x, include_data = FALSE) {
     bounds = x$fit$get_bounds(),
     dims = x$fit$get_shape(),
     purified = x$fit$is_purified(),
-    grid = NULL,
+    grid = if (x$fit$is_purified()) x$fit$get_grid_leaves(),
     data = if (include_data) x$fit$get_data()
   )
 
@@ -69,6 +69,9 @@ rpf_unmarshal <- function(blob) {
     fit$set_training_data(as.matrix(state$data$Y), as.matrix(state$data$X))
   }
   fit$set_model(state$model)
+  if (state$purified) {
+    fit$set_grid_leaves(state$grid)
+  }
 
   out <- blob
   out$fit_state <- NULL

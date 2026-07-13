@@ -26,6 +26,8 @@ RCPP_MODULE(mod_rpf)
       .method("print", &RandomPlantedForest::print)
       .method("set_parameters", &RandomPlantedForest::set_parameters)
       .method("get_model", &RandomPlantedForest::get_model)
+      .method("get_grid_leaves", &RandomPlantedForest::get_grid_leaves)
+      .method("set_grid_leaves", &RandomPlantedForest::set_grid_leaves)
       .method("is_purified", &RandomPlantedForest::is_purified);
 
   class_<ClassificationRPF>("ClassificationRPF")

@@ -62,6 +62,21 @@ test_that("multiclass round-trip, no data", {
   )
 })
 
+test_that("purified regression round-trip without data", {
+  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 2)
+  purify(fit)
+  comp_before <- predict_components(fit, mtcars)
+  restored <- expect_roundtrip(fit, mtcars)
+  expect_true(is_purified(restored))
+  expect_identical(predict_components(restored, mtcars), comp_before)
+})
+
+test_that("purified multiclass round-trip without data", {
+  fit <- rpf(Species ~ ., data = iris, ntrees = 10, loss = "L2")
+  purify(fit)
+  expect_roundtrip(fit, iris)
+})
+
 test_that("marshaled blob contains no external pointers", {
   fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   blob <- rpf_marshal(fit)

@@ -50,6 +50,10 @@ public:
   List get_shape();
   // Restore tree structure from get_model()'s output (serialization path).
   void set_model(List &model);
+  // Export per-tree GridLeaves (purified leaf grid) for serialization.
+  List get_grid_leaves();
+  // Restore per-tree GridLeaves from get_grid_leaves()'s output; sets purified = true.
+  void set_grid_leaves(List &grid);
   // Load or replace data without fitting; computes bounds and resets state.
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   // Predict for a matrix or a single vector. `components = {0}` means the full
