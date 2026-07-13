@@ -57,4 +57,3 @@ test_that("Warn for y = 0,1", {
     regexp = "^Only predict type 'numeric' supported for regression"
   )
 })
-

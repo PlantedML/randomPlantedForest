@@ -41,7 +41,8 @@ test_that("L2: Probability prediction", {
   classif_pred$sum <- rowSums(classif_pred)
 
   expect_equal(
-    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps),
+    0,
     label = "Sum of predicted class probabilities exceeds 1",
     info = "Shown: Number of observations with out of bounds prediction"
   )
@@ -84,7 +85,8 @@ test_that("L1: Probability prediction", {
   classif_pred$sum <- rowSums(classif_pred)
 
   expect_equal(
-    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps),
+    0,
     label = "Sum of predicted class probabilities exceeds 1",
     info = "Shown: Number of observations with out of bounds prediction"
   )
@@ -126,7 +128,8 @@ test_that("logit: Probability prediction", {
   classif_pred$sum <- rowSums(classif_pred)
 
   expect_equal(
-    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps),
+    0,
     label = "Sum of predicted class probabilities exceeds 1",
     info = "Shown: Number of observations with out of bounds prediction"
   )
@@ -167,7 +170,8 @@ test_that("exponential: Probability prediction", {
   classif_pred$sum <- rowSums(classif_pred)
 
   expect_equal(
-    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps), 0,
+    sum(classif_pred$sum > 1 + 10 * .Machine$double.eps),
+    0,
     label = "Sum of predicted class probabilities exceeds 1",
     info = "Shown: Number of observations with out of bounds prediction"
   )

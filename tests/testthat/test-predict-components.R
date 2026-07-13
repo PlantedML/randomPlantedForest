@@ -3,19 +3,69 @@ test_that("predict_components returns correct structure", {
 
   m <- predict_components(rp, mtcars)
 
-  expect_named(m$m, c("cyl", "disp", "hp", "drat", "wt", "qsec", "vs",
-                    "am", "gear", "carb", "cyl:disp", "cyl:hp", "cyl:drat", "cyl:wt",
-                    "cyl:qsec", "cyl:vs", "am:cyl", "cyl:gear", "carb:cyl", "disp:hp",
-                    "disp:drat", "disp:wt", "disp:qsec", "disp:vs", "am:disp", "disp:gear",
-                    "carb:disp", "drat:hp", "hp:wt", "hp:qsec", "hp:vs", "am:hp",
-                    "gear:hp", "carb:hp", "drat:wt", "drat:qsec", "drat:vs", "am:drat",
-                    "drat:gear", "carb:drat", "qsec:wt", "vs:wt", "am:wt", "gear:wt",
-                    "carb:wt", "qsec:vs", "am:qsec", "gear:qsec", "carb:qsec", "am:vs",
-                    "gear:vs", "carb:vs", "am:gear", "am:carb", "carb:gear"))
+  expect_named(
+    m$m,
+    c(
+      "cyl",
+      "disp",
+      "hp",
+      "drat",
+      "wt",
+      "qsec",
+      "vs",
+      "am",
+      "gear",
+      "carb",
+      "cyl:disp",
+      "cyl:hp",
+      "cyl:drat",
+      "cyl:wt",
+      "cyl:qsec",
+      "cyl:vs",
+      "am:cyl",
+      "cyl:gear",
+      "carb:cyl",
+      "disp:hp",
+      "disp:drat",
+      "disp:wt",
+      "disp:qsec",
+      "disp:vs",
+      "am:disp",
+      "disp:gear",
+      "carb:disp",
+      "drat:hp",
+      "hp:wt",
+      "hp:qsec",
+      "hp:vs",
+      "am:hp",
+      "gear:hp",
+      "carb:hp",
+      "drat:wt",
+      "drat:qsec",
+      "drat:vs",
+      "am:drat",
+      "drat:gear",
+      "carb:drat",
+      "qsec:wt",
+      "vs:wt",
+      "am:wt",
+      "gear:wt",
+      "carb:wt",
+      "qsec:vs",
+      "am:qsec",
+      "gear:qsec",
+      "carb:qsec",
+      "am:vs",
+      "gear:vs",
+      "carb:vs",
+      "am:gear",
+      "am:carb",
+      "carb:gear"
+    )
+  )
 
   expect_s3_class(m$m, "data.frame")
   expect_equal(nrow(mtcars), nrow(m$m))
-
 })
 
 test_that("predict_components returns requested predictors, in order", {
@@ -28,7 +78,6 @@ test_that("predict_components returns requested predictors, in order", {
   expect_s3_class(m$m, "data.frame")
   expect_length(m$m, 6)
   expect_equal(nrow(mtcars), nrow(m$m))
-
 })
 
 test_that("predict_components purifies if needed", {
@@ -51,7 +100,6 @@ test_that("predict_components sums to prediction", {
     predict(rp, mtcars)[[1]],
     rowSums(m$m) + m$intercept
   )
-
 })
 
 test_that("predict_components errors appropriately", {
@@ -89,15 +137,17 @@ test_that(".predict_single_component is consistent with predictor order", {
   )
 
   expect_equal(
-    Reduce(expect_equal, list(
-      .predict_single_component(rp, new_data, c("cyl", "am", "gear")),
-      .predict_single_component(rp, new_data, c("gear", "am", "cyl")),
-      .predict_single_component(rp, new_data, c("am", "cyl", "gear")),
-      .predict_single_component(rp, new_data, c("gear", "cyl", "am")),
-      .predict_single_component(rp, new_data, c("am", "gear", "cyl")),
-      .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
-    )),
+    Reduce(
+      expect_equal,
+      list(
+        .predict_single_component(rp, new_data, c("cyl", "am", "gear")),
+        .predict_single_component(rp, new_data, c("gear", "am", "cyl")),
+        .predict_single_component(rp, new_data, c("am", "cyl", "gear")),
+        .predict_single_component(rp, new_data, c("gear", "cyl", "am")),
+        .predict_single_component(rp, new_data, c("am", "gear", "cyl")),
+        .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
+      )
+    ),
     .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
   )
-
 })

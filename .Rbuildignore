@@ -21,3 +21,5 @@
 ^SomeFile\.diff$
 ^src/.*\.(o|so|a)$
 ^src/lib/.*\.(o|so|a)$
+^[.]?air[.]toml$
+^\.vscode$

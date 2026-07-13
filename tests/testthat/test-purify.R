@@ -35,8 +35,8 @@ test_that("purification does not alter predictions (null effect)", {
 })
 
 test_that("purification does not alter predictions (with effect)", {
-  train <-  mtcars[1:20, 1:4]
-  test <-  mtcars[21:32, 1:4]
+  train <- mtcars[1:20, 1:4]
+  test <- mtcars[21:32, 1:4]
 
   set.seed(23)
   rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)

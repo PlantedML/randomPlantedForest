@@ -110,14 +110,16 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     combinations <- utils::combn(predictors, i, simplify = FALSE)
     components <- lapply(combinations, function(x) {
       .predict_single_component(object, new_data_matrix, x)
-      })
+    })
     do.call(cbind, args = components)
   })
 
   all_components <- do.call(cbind, args = all_components)
   # Get intercept (scalar), using only one row of x as input as we don't need it repeated
   intercept <- .predict_single_component(
-    object, new_data_matrix[, 1, drop = FALSE], predictors = NULL
+    object,
+    new_data_matrix[, 1, drop = FALSE],
+    predictors = NULL
   )
 
   ret <- list(
@@ -178,7 +180,6 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 #' # Retrieving the intercept
 #' randomPlantedForest:::.predict_single_component(rpfit, test, predictors = NULL)
 .predict_single_component <- function(object, new_data, predictors = NULL) {
-
   # Indices of selected predictors
   if (is.null(predictors)) {
     # Intercept is retrieved by passing -1 to predict_matrix() as a special case
@@ -213,5 +214,3 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   ret
 }
-
-

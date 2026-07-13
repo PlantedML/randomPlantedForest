@@ -10,7 +10,7 @@
 #' @examples
 #' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
 print.rpf <- function(x, ...) {
-  model_formula <- sub("\\s\\+ 0$", "" , deparse(x$blueprint$formula))
+  model_formula <- sub("\\s\\+ 0$", "", deparse(x$blueprint$formula))
   mode <- switch(x$mode, regression = "Regression", classification = "Classification")
 
   cat("--", mode, "Random Planted Forest --\n\n")
@@ -26,7 +26,7 @@ print.rpf <- function(x, ...) {
     "0" = "all possible interactions.\n",
     "1" = "main effects only.\n",
     paste0(maxint, "-degree interactions.\n")
-   )
+  )
 
   cat("Formula:", model_formula, "\n")
   cat("Fit using", p, "predictors and", degree)
@@ -59,7 +59,7 @@ print.rpf <- function(x, ...) {
 #' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
-print.rpf_forest <- function(x, ...)  {
+print.rpf_forest <- function(x, ...) {
   cat(sprintf("<rpf_forest> of %i trees\n", length(x)))
   invisible(x)
 }

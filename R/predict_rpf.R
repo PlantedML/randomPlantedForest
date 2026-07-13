@@ -29,10 +29,7 @@
 #' # Regression with L2 loss
 #' rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
 #' predict(rpfit, mtcars[, c("cyl", "wt")])
-predict.rpf <- function(object, new_data,
-                        type = ifelse(object$mode == "regression", "numeric", "prob"),
-                        ...) {
-
+predict.rpf <- function(object, new_data, type = ifelse(object$mode == "regression", "numeric", "prob"), ...) {
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
 
@@ -54,7 +51,9 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
       warning(
         paste0(
           "Only predict type 'numeric' supported for regression, ",
-          "but type is set to '", type, "'. Setting type to 'numeric'."
+          "but type is set to '",
+          type,
+          "'. Setting type to 'numeric'."
         )
       )
     }
@@ -66,7 +65,8 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
     }
   }
 
-  switch(type,
+  switch(
+    type,
     numeric = predict_rpf_numeric(object, predictors, ...),
     class = predict_rpf_class(object, predictors, ...),
     prob = predict_rpf_prob(object, predictors, ...)
@@ -101,7 +101,8 @@ predict_rpf_prob <- function(object, new_data, ...) {
 
   pred_raw <- object$fit$predict_matrix(new_data, 0)
 
-  if (length(outcome_levels) == 2) { # Binary outcome
+  if (length(outcome_levels) == 2) {
+    # Binary outcome
 
     if (object$params$loss %in% c("logit", "exponential")) {
       # logit^-1 transformation for logit/exp loss
@@ -115,8 +116,8 @@ predict_rpf_prob <- function(object, new_data, ...) {
     pred_prob <- as.numeric(pred_prob)
     # Binary classif yields two columns ordered by outcome levels
     pred_prob <- cbind(1 - pred_prob, pred_prob)
-
-  } else { # Multiclass
+  } else {
+    # Multiclass
 
     if (object$params$loss %in% c("logit", "exponential")) {
       # softmax for multi-class

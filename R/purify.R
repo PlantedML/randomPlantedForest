@@ -23,7 +23,9 @@ purify <- function(x, ...) {
 #' @rdname purify
 purify.default <- function(x, ...) {
   stop(
-    "`purify()` is not defined for a '", class(x)[1], "'.",
+    "`purify()` is not defined for a '",
+    class(x)[1],
+    "'.",
     call. = FALSE
   )
 }
@@ -42,13 +44,19 @@ purify.default <- function(x, ...) {
 purify.rpf <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL) {
   checkmate::assert_class(x, "rpf")
   checkmate::assert_int(mode, lower = 1, upper = 2)
-  if (!is.null(nthreads)) checkmate::assert_int(nthreads, lower = 1)
+  if (!is.null(nthreads)) {
+    checkmate::assert_int(nthreads, lower = 1)
+  }
   if (is.null(maxp_interaction)) {
     # Default: exact cut points, full interaction order
     x$fit$purify_threads(0L, as.integer(if (is.null(nthreads)) 0L else nthreads), as.integer(mode))
   } else {
     checkmate::assert_int(maxp_interaction, lower = 1)
-    x$fit$purify_threads(as.integer(maxp_interaction), as.integer(if (is.null(nthreads)) 0L else nthreads), as.integer(mode))
+    x$fit$purify_threads(
+      as.integer(maxp_interaction),
+      as.integer(if (is.null(nthreads)) 0L else nthreads),
+      as.integer(mode)
+    )
   }
   x
 }
@@ -60,5 +68,3 @@ is_purified <- function(x) {
   checkmate::assert_class(x, "rpf")
   x$fit$is_purified()
 }
-
-

@@ -95,10 +95,14 @@ preprocess_predictors_fit <- function(processed) {
   # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
   factor_cols <- names(which(sapply(predictors, is.factor)))
   if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := lapply(
-      .SD, order_factor_by_response,
-      y = processed$outcomes[[1]]
-    ), .SDcols = factor_cols]
+    predictors[,
+      (factor_cols) := lapply(
+        .SD,
+        order_factor_by_response,
+        y = processed$outcomes[[1]]
+      ),
+      .SDcols = factor_cols
+    ]
   }
 
   # Save re-ordered factor levels
@@ -153,10 +157,15 @@ preprocess_predictors_predict <- function(object, predictors) {
   # Re-order factor levels according to saved order
   factor_cols <- names(object$factor_levels)
   if (length(factor_cols) > 0) {
-    predictors[, (factor_cols) := Map(
-      factor, .SD, object$factor_levels,
-      ordered = TRUE
-    ), .SDcols = factor_cols]
+    predictors[,
+      (factor_cols) := Map(
+        factor,
+        .SD,
+        object$factor_levels,
+        ordered = TRUE
+      ),
+      .SDcols = factor_cols
+    ]
   }
 
   # Convert factors to integer and data to matrix
@@ -195,7 +204,8 @@ preprocess_outcome <- function(processed, loss) {
       outcomes <- as.integer(outcomes) - 1L
       # rpf_impl expects Y to be a matrix
       outcomes <- as.matrix(outcomes, ncol = 1)
-    } else { # Multiclass
+    } else {
+      # Multiclass
       # One-hot encoding
       outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
       colnames(outcomes_mat) <- levels(outcomes)
@@ -207,7 +217,6 @@ preprocess_outcome <- function(processed, loss) {
     if (loss == "exponential") {
       outcomes[outcomes == 0] <- -1
     }
-
   } else if (is_numeric) {
     mode <- "regression"
     # rpf_impl expects Y to be a matrix
@@ -244,7 +253,6 @@ softmax <- function(x) {
 #' @param pred Regular model predictions as returned by `predict.rpf`.
 #' @param intercept Intercept as stored in output of `predict_components`.
 calc_remainders_multiclass <- function(m, levels, pred, intercept) {
-
   # data.table NSE warnings
   term <- remainder <- m_sum <- NULL
 
@@ -257,26 +265,39 @@ calc_remainders_multiclass <- function(m, levels, pred, intercept) {
   intercept[, ".id" := .I]
 
   split_names <- function(mn, split_string = "__class:", target_index = 2) {
-    vapply(mn, function(x) {
-      unlist(strsplit(x, split = split_string, fixed = TRUE))[[target_index]]
-    }, character(1), USE.NAMES = FALSE)
+    vapply(
+      mn,
+      function(x) {
+        unlist(strsplit(x, split = split_string, fixed = TRUE))[[target_index]]
+      },
+      character(1),
+      USE.NAMES = FALSE
+    )
   }
 
-  m_long <- data.table::melt(m, id.vars = ".id", value.name = "m",
-                             variable.name = "term", variable.factor = FALSE)
+  m_long <- data.table::melt(m, id.vars = ".id", value.name = "m", variable.name = "term", variable.factor = FALSE)
 
   m_long[, class := split_names(term, split_string = "__class:", target_index = 2)]
   m_sums <- m_long[, list(m_sum = sum(m)), by = c(".id", "class")]
 
   # long format predictions for calculations
-  pred_long <- data.table::melt(pred, id.vars = ".id", value.name = "pred",
-                                variable.name = "class", variable.factor = FALSE)
+  pred_long <- data.table::melt(
+    pred,
+    id.vars = ".id",
+    value.name = "pred",
+    variable.name = "class",
+    variable.factor = FALSE
+  )
   pred_long[, class := split_names(class, split_string = ".pred_", target_index = 2)]
 
-
   # Same game for intercept
-  intercept_long <- data.table::melt(intercept, id.vars = ".id", value.name = "intercept",
-                                variable.name = "class", variable.factor = FALSE)
+  intercept_long <- data.table::melt(
+    intercept,
+    id.vars = ".id",
+    value.name = "intercept",
+    variable.name = "class",
+    variable.factor = FALSE
+  )
   intercept_long[, class := split_names(class, split_string = "__class:", target_index = 2)]
 
   # merge pred with intercept
@@ -286,7 +307,7 @@ calc_remainders_multiclass <- function(m, levels, pred, intercept) {
   # remainder is prediction - sum(m) - intercept, can be positive or negative
   merged[, remainder := pred - m_sum - intercept]
   # Return one column per outcome class
-  merged_wide <- data.table::dcast(merged, .id  ~ class, value.var = "remainder")
+  merged_wide <- data.table::dcast(merged, .id ~ class, value.var = "remainder")
   # Remove intermediate id column
   merged_wide[, ".id" := NULL]
   # sort columns to original outcome level order, consistent with predict() order

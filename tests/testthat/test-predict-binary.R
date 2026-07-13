@@ -31,7 +31,8 @@ test_that("Predictions are not constant: L1", {
 
   # unique predictions should be different than all 0 or 1
   expect_failure(expect_equal(
-    sort(unique(bin_pred[[1]])), c(0, 1)
+    sort(unique(bin_pred[[1]])),
+    c(0, 1)
   ))
 })
 
@@ -44,7 +45,8 @@ test_that("Predictions are not constant: L2", {
 
   # unique predictions should be different than all 0 or 1
   expect_failure(expect_equal(
-    sort(unique(bin_pred[[1]])), c(0, 1)
+    sort(unique(bin_pred[[1]])),
+    c(0, 1)
   ))
 })
 
@@ -57,7 +59,8 @@ test_that("Predictions are not constant: logit", {
 
   # unique predictions should be different than all 0 or 1
   expect_failure(expect_equal(
-    sort(unique(bin_pred[[1]])), c(0, 1)
+    sort(unique(bin_pred[[1]])),
+    c(0, 1)
   ))
 })
 
@@ -70,7 +73,8 @@ test_that("Predictions are not constant: exponential", {
 
   # unique predictions should be different than all 0 or 1
   expect_failure(expect_equal(
-    sort(unique(bin_pred[[1]])), c(0, 1)
+    sort(unique(bin_pred[[1]])),
+    c(0, 1)
   ))
 })
 
@@ -207,4 +211,3 @@ test_that("prob and classif yield same result", {
 
   expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
 })
-
