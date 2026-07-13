@@ -16,7 +16,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/PlantedML/randomPlantedForest/blob/master/inst/CITATION)
+[`inst/CITATION`](https://github.com/PlantedML/randomPlantedForest/blob/v0.3.0/inst/CITATION)
 
 Hiabu et. al. (2020). Random Planted Forest: a directly interpretable
 tree ensemble. arXiv preprint arXiv:2012.14563 (2020)
