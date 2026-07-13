@@ -35,7 +35,7 @@ VignetteBuilder:
     knitr
 Config/Needs/coverage: covr
 Config/Needs/website: patchwork, ggplot2
+Config/roxygen2/version: 8.0.0
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.0.0
