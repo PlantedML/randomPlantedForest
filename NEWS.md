@@ -1,4 +1,35 @@
-# randomPlantedForest 0.2.1.9000 (Development version)
+# randomPlantedForest 0.3.0
+
+## Major changes (#61)
+
+* New `rpf()` arguments controlling split-candidate sampling:
+  * `split_structure = "leaves"`: Defines what a split candidate is and how candidates are drawn.
+    One of `"leaves"` (default), `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`, or `"res_trees"`; see `?rpf` for details.
+  * `max_candidates = 50`: Maximum number of split candidates sampled per iteration.
+  * `split_decay_rate = 0.1`: Exponential aging of repeatedly drawn but unchosen split candidates.
+    `split_decay_rate = 0` corresponds to no aging and uniform sampling.
+  * `delete_leaves = TRUE`: Whether a parent leaf is deleted when splitting along an existing dimension.
+* **Fitting results change**: The new candidate-sampling defaults and a reworked internal RNG
+  mean that fits are not reproducible against previous versions, even with the same seed.
+  Install an older commit if exact reproduction of previous results is required.
+* Seeded fits are now reproducible regardless of `nthreads`: per-tree seeds are drawn from R's RNG,
+  so `set.seed()` gives identical forests for serial and multithreaded fits.
+* Substantial speedups in fitting (cached per-leaf orderings, prefix sums) and reduced memory use
+  (training-only buffers are released after each tree family is built).
+* `purify()` gains arguments:
+  * `mode = 2`: Purification algorithm; `2` is a new fast exact method, `1` is the legacy grid-based path.
+  * `nthreads = NULL`: Purification is now multithreaded, defaulting to the fit's `nthreads` setting.
+  * `maxp_interaction = NULL`: Optionally only compute purified components up to this interaction order.
+* New `rpf()` argument `export_forest = FALSE`: The flattened forest is no longer stored in the
+  fitted object by default, so `rpf_object$forest` is `NULL` unless `export_forest = TRUE`.
+  This reduces object size; `predict()`, `purify()`, and `predict_components()` are unaffected.
+* `preprocess_predictors_predict()` is now exported.
+* Fixed a memory bug in the legacy purification path where the grid was sized one element too large,
+  causing out-of-bounds reads (crashes on Windows, silently wrong purification results elsewhere).
+* Fixed a crash on Windows when fitting with `nthreads > 1`, caused by a `thread_local` buffer
+  with a non-trivial destructor being destroyed at thread exit.
+
+## Other changes
 
 * Internals in `src/` have been refactored into modular sub-files (#53)
 * `rpf()` now errors if a regression target is combined with a `loss` other than `"L2"`.
