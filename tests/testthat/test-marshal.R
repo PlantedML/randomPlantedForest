@@ -109,3 +109,15 @@ test_that("purify on a data-free restored forest errors informatively", {
   restored <- rpf_unmarshal(rpf_marshal(fit))
   expect_error(purify(restored), "include_data")
 })
+
+test_that("restored-without-marshal rpf gives actionable error", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  tmp <- tempfile(fileext = ".rds")
+  saveRDS(fit, tmp)
+  zombie <- readRDS(tmp)
+  expect_false(rpf_is_valid(zombie))
+  expect_error(predict(zombie, mtcars), "rpf_marshal")
+  expect_error(purify(zombie), "rpf_marshal")
+  expect_error(predict_components(zombie, mtcars), "rpf_marshal")
+  expect_true(rpf_is_valid(fit))
+})

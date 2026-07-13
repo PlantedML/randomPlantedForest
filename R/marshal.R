@@ -79,3 +79,28 @@ rpf_unmarshal <- function(blob) {
   fields <- out[setdiff(names(out), c("fit", "blueprint"))]
   do.call(new_rpf, c(list(fit = fit, blueprint = blob$blueprint), fields))
 }
+
+#' Check whether an rpf object's C++ forest is still alive
+#'
+#' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
+#' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable.
+#' @param x An object of class `rpf`.
+#' @return `TRUE` if the underlying model can be used, `FALSE` otherwise.
+#' @export
+rpf_is_valid <- function(x) {
+  checkmate::assert_class(x, "rpf")
+  !inherits(try(x$fit$is_purified(), silent = TRUE), "try-error")
+}
+
+check_rpf_alive <- function(x) {
+  if (!rpf_is_valid(x)) {
+    stop(
+      "The C++ forest behind this rpf object is gone - most likely it was ",
+      "saved with saveRDS() and restored with readRDS().\n",
+      "Use blob <- rpf_marshal(x) before saving and rpf_unmarshal(blob) ",
+      "after loading. See ?rpf_marshal.",
+      call. = FALSE
+    )
+  }
+  invisible(x)
+}

@@ -30,6 +30,7 @@
 #' rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
 #' predict(rpfit, mtcars[, c("cyl", "wt")])
 predict.rpf <- function(object, new_data, type = ifelse(object$mode == "regression", "numeric", "prob"), ...) {
+  check_rpf_alive(object)
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
 
