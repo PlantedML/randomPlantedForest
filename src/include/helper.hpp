@@ -59,28 +59,26 @@ namespace utils
       if (n_entries != entries.size())
         throw std::invalid_argument("Invalid matrix size.");
     }
-    T &operator[](std::vector<int> &indices)
+    T &operator[](const std::vector<int> &indices)
     {
       if (indices.size() != dims.size())
-        throw std::invalid_argument("Invalid number of indices.");
-      int index = 0;
-      for (size_t i = indices.size() - 1; i > 0; --i)
+        throw std::invalid_argument("Matrix: invalid number of indices.");
+      // Column-major layout: first index varies fastest. Unlike the previous
+      // version, every dimension (including 0) is bounds-checked and the flat
+      // index guard uses >=, so a one-past-the-end access throws instead of
+      // silently reading/writing out of bounds.
+      size_t index = 0, stride = 1;
+      for (size_t i = 0; i < indices.size(); ++i)
       {
-        if (indices[i] >= dims[i])
-          throw std::invalid_argument("Index out of range.");
-        int a = indices[i];
-        for (size_t d = 0; d < dims.size(); ++d)
-        {
-          if (d < i)
-          {
-            a *= dims[d];
-          }
-        }
-        index += a;
+        if (indices[i] < 0 || indices[i] >= dims[i])
+          throw std::invalid_argument(
+              "Matrix: index " + std::to_string(indices[i]) + " out of range [0," +
+              std::to_string(dims[i]) + ") in dimension " + std::to_string(i));
+        index += static_cast<size_t>(indices[i]) * stride;
+        stride *= static_cast<size_t>(dims[i]);
       }
-      index += indices[0];
-      if (index > n_entries || index < 0)
-        throw std::invalid_argument("Index out of range.");
+      if (index >= n_entries)
+        throw std::invalid_argument("Matrix: flat index out of range.");
       return entries[index];
     }
     std::vector<int> dims;
