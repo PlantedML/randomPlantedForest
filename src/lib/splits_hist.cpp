@@ -38,9 +38,9 @@ Split RandomPlantedForest::calcOptimalSplit_hist(const std::vector<std::vector<d
     size_t Kf = cuts_k.size() + 1; if (Kf < 2) continue; // cannot split without at least 2 bins
     std::vector<int> cnt(Kf, 0);
     std::vector<std::vector<double>> sum(Kf, std::vector<double>(this->value_size, 0.0));
-    const bool have_cached = ((size_t)k < tls_working_bin_id.size());
+    const bool have_cached = (tls_working_bin_id_ptr != nullptr && (size_t)k < tls_working_bin_id_ptr->size());
     if (have_cached) {
-      const std::vector<int> &bin_k = tls_working_bin_id[(size_t)k];
+      const std::vector<int> &bin_k = (*tls_working_bin_id_ptr)[(size_t)k];
       for (int ind : leafPtr->individuals) {
         int b = bin_k[(size_t)ind];
         cnt[(size_t)b] += 1;
