@@ -30,4 +30,7 @@ reference:
   - starts_with("print.")
   - starts_with("str.")
   - preprocess_predictors_predict
+  - rpf_marshal
+  - rpf_is_valid
+  - bundle.rpf
 

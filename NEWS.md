@@ -1,3 +1,14 @@
+# randomPlantedForest 0.3.0.9000
+
+* New `rpf_marshal()` / `rpf_unmarshal()` serialize a fitted forest to a plain
+  R list and back, making `saveRDS()`-based storage of rpf models possible (#52).
+  Purified forests restore their purified state directly; training data is only
+  embedded with `include_data = TRUE` (required to `purify()` after restoring).
+* New `rpf_is_valid()` checks whether an rpf object's internal model is usable;
+  `predict()`, `purify()` and `predict_components()` now give an actionable
+  error for rpf objects restored via `readRDS()` without marshaling.
+* New `bundle::bundle()` method for rpf models wrapping the marshaling API.
+
 # randomPlantedForest 0.3.0
 
 ## Major changes (#61)
