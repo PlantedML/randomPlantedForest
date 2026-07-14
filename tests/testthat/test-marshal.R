@@ -87,6 +87,9 @@ test_that("marshaled blob contains no external pointers", {
     if (typeof(x) == "externalptr") {
       return(TRUE)
     }
+    # unclass so classed list-likes (e.g. package_version, whose `[[` returns
+    # another package_version) recurse over their raw contents and terminate
+    x <- unclass(x)
     if (is.list(x)) {
       return(any(vapply(x, has_extptr, logical(1))))
     }
@@ -128,4 +131,51 @@ test_that("restored-without-marshal rpf gives actionable error", {
 
 test_that("rpf_unmarshal errors on malformed blob missing fit_state", {
   expect_error(rpf_unmarshal(structure(list(), class = "rpf_marshaled")), "Unsupported")
+})
+
+test_that("corrupt blobs error instead of reading out of bounds", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+
+  # Interval matrix narrower than feature_size
+  blob <- rpf_marshal(fit)
+  blob$fit_state$model[[1]]$intervals[[1]][[1]] <- matrix(0, nrow = 2, ncol = 1)
+  expect_error(rpf_unmarshal(blob), "interval matrix")
+
+  # Purified grid: values matrix with wrong dimensions
+  pfit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  purify(pfit)
+  # trees[[1]] is the null tree whose 1x1 values matrix is legitimately tiny;
+  # corrupt a real component tree instead
+  pblob <- rpf_marshal(pfit)
+  pblob$fit_state$grid[[1]]$trees[[2]]$values <- matrix(0, nrow = 1, ncol = 1)
+  expect_error(rpf_unmarshal(pblob), "values matrix")
+
+  # Purified grid: non-positive grid dimension
+  pblob2 <- rpf_marshal(pfit)
+  pblob2$fit_state$grid[[1]]$trees[[2]]$dims <- -1L
+  expect_error(rpf_unmarshal(pblob2), "non-positive")
+
+  # Training data with wrong number of feature columns
+  dblob <- rpf_marshal(fit, include_data = TRUE)
+  dblob$fit_state$data$X <- dblob$fit_state$data$X[, 1, drop = FALSE]
+  expect_error(rpf_unmarshal(dblob), "columns")
+})
+
+test_that("exported forest is rebuilt instead of duplicated in the blob", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5, export_forest = TRUE)
+  blob <- rpf_marshal(fit)
+  expect_null(blob$forest)
+  restored <- rpf_unmarshal(blob)
+  expect_s3_class(restored$forest, "rpf_forest")
+  expect_identical(restored$forest, fit$forest)
+})
+
+test_that("blob records package version and warns when saved with a newer one", {
+  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  blob <- rpf_marshal(fit)
+  expect_identical(blob$fit_state$pkg_version, utils::packageVersion("randomPlantedForest"))
+
+  blob$fit_state$pkg_version <- package_version("999.0.0")
+  expect_warning(restored <- rpf_unmarshal(blob), "999.0.0")
+  expect_identical(predict(restored, mtcars), predict(fit, mtcars))
 })

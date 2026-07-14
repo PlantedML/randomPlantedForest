@@ -31,16 +31,20 @@ rpf_marshal <- function(x, include_data = FALSE) {
   purified <- x$fit$is_purified()
   fit_state <- list(
     version = 1L,
+    pkg_version = utils::packageVersion("randomPlantedForest"),
     model = x$fit$get_model(),
     bounds = x$fit$get_bounds(),
     dims = x$fit$get_shape(),
     purified = purified,
     grid = if (purified) x$fit$get_grid_leaves(),
-    data = if (include_data) x$fit$get_data()
+    data = if (include_data) x$fit$get_data(),
+    # $forest (export_forest = TRUE) duplicates $model; rebuilt on unmarshal
+    had_forest = !is.null(x$forest)
   )
 
   out <- unclass(x)
   out$fit <- NULL
+  out$forest <- NULL
   out$fit_state <- fit_state
   structure(out, class = "rpf_marshaled")
 }
@@ -52,6 +56,14 @@ rpf_unmarshal <- function(blob) {
   state <- blob$fit_state
   if (!identical(state$version, 1L)) {
     stop("Unsupported rpf_marshaled version: ", state$version)
+  }
+  installed <- utils::packageVersion("randomPlantedForest")
+  if (!is.null(state$pkg_version) && state$pkg_version > installed) {
+    warning(
+      "This model was marshaled with randomPlantedForest ", state$pkg_version,
+      " but version ", installed, " is installed. Restoring may not be reliable.",
+      call. = FALSE
+    )
   }
 
   pars <- rpf_param_vector(blob$params, blob$mode)
@@ -75,11 +87,17 @@ rpf_unmarshal <- function(blob) {
     fit$set_grid_leaves(state$grid)
   }
 
+  forest <- NULL
+  if (isTRUE(state$had_forest)) {
+    forest <- fit$get_model()
+    class(forest) <- "rpf_forest"
+  }
+
   out <- blob
   out$fit_state <- NULL
   out <- unclass(out)
-  fields <- out[setdiff(names(out), c("fit", "blueprint"))]
-  do.call(new_rpf, c(list(fit = fit, blueprint = blob$blueprint), fields))
+  fields <- out[setdiff(names(out), c("fit", "blueprint", "forest"))]
+  do.call(new_rpf, c(list(fit = fit, blueprint = blob$blueprint, forest = forest), fields))
 }
 
 #' Check whether an rpf object's C++ forest is still alive

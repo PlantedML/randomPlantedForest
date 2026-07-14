@@ -122,6 +122,15 @@ void RandomPlantedForest::set_shape(int feature_size_in, int value_size_in, int 
 
 void RandomPlantedForest::set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
 {
+  // Restore path only: bounds are NOT recomputed (they come from the blob via
+  // set_shape), but shapes must be consistent with the restored forest so the
+  // purify path cannot read out of bounds.
+  if (samples_X.ncol() != feature_size)
+    Rcpp::stop("Corrupt training data: X has %d columns, expected %d.",
+               samples_X.ncol(), feature_size);
+  if (samples_X.nrow() != samples_Y.nrow())
+    Rcpp::stop("Corrupt training data: X has %d rows but Y has %d.",
+               samples_X.nrow(), samples_Y.nrow());
   this->Y = to_std_vec(samples_Y);
   this->X = to_std_vec(samples_X);
   this->sample_size = X.size();
@@ -168,6 +177,9 @@ void RandomPlantedForest::set_model(List &model)
         // back as a vector rather than casting to NumericMatrix.
         leaves[k].value = as<std::vector<double>>(tree_values[k]);
         NumericMatrix leaf_intervals = tree_intervals[k];
+        if (leaf_intervals.nrow() < 2 || leaf_intervals.ncol() < feature_size)
+          Rcpp::stop("Corrupt model data: leaf interval matrix has dimensions %dx%d, expected 2x%d.",
+                     leaf_intervals.nrow(), leaf_intervals.ncol(), feature_size);
         std::vector<Interval> ivs(feature_size);
         for (int l = 0; l < feature_size; ++l)
           ivs[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
@@ -231,10 +243,16 @@ void RandomPlantedForest::set_grid_leaves(List &grid)
       if (it == tree_families[i].end())
         Rcpp::stop("Grid data references a tree not present in the forest.");
       std::vector<int> mdims = to_std_vec(IntegerVector(tr["dims"]));
+      for (int d : mdims)
+        if (d <= 0)
+          Rcpp::stop("Corrupt grid data: non-positive grid dimension %d.", d);
       NumericMatrix vmat = tr["values"];
       utils::Matrix<std::vector<double>> values(mdims, std::vector<double>(value_size, 0));
       auto &flat = values.flat();
-      for (size_t e = 0; e < flat.size() && e < (size_t)vmat.nrow(); ++e)
+      if ((size_t)vmat.nrow() != flat.size() || (size_t)vmat.ncol() != value_size)
+        Rcpp::stop("Corrupt grid data: values matrix has dimensions %dx%d, expected %dx%d.",
+                   vmat.nrow(), vmat.ncol(), (int)flat.size(), (int)value_size);
+      for (size_t e = 0; e < flat.size(); ++e)
         for (size_t p = 0; p < value_size; ++p)
           flat[e][p] = vmat(e, p);
       it->second->GridLeaves.values = values;

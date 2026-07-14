@@ -4,6 +4,9 @@
   R list and back, making `saveRDS()`-based storage of rpf models possible (#52).
   Purified forests restore their purified state directly; training data is only
   embedded with `include_data = TRUE` (required to `purify()` after restoring).
+  Blobs record the blob format version and the package version they were
+  created with; restoring under an older package than the one that saved the
+  model warns. Malformed or corrupt blobs error instead of reading out of bounds.
 * New `rpf_is_valid()` checks whether an rpf object's internal model is usable;
   `predict()`, `purify()` and `predict_components()` now give an actionable
   error for rpf objects restored via `readRDS()` without marshaling.
