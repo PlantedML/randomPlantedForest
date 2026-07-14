@@ -83,6 +83,9 @@ namespace utils
         throw std::invalid_argument("Index out of range.");
       return entries[index];
     }
+    // Flat storage access for serialization (column-major, first index fastest)
+    std::vector<T> &flat() { return entries; }
+    const std::vector<T> &flat() const { return entries; }
     std::vector<int> dims;
     size_t n_entries = 1;
 

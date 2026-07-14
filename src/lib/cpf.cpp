@@ -34,22 +34,10 @@ using namespace rpf_utils;
 
 // loss moved to lib/losses_*.cpp
 
-// constructor with parameters split_try, t_try, purify_forest, deterministic, nthreads
-ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                                     const String loss, const NumericVector parameters)
-    : RandomPlantedForest( 
-        samples_Y, 
-        samples_X, 
-        // pass first 13 parameters to base (includes split_structure)
-        parameters.size() >= 13 ? parameters[Rcpp::Range(0, 12)] : parameters[Rcpp::Range(0, 11)] 
-      )
+// Maps a loss-name string to `loss` and `calcLoss` (verbatim move of the
+// former inline if/else chain from the data-fitting constructor).
+void ClassificationRPF::set_loss_function(const String &loss)
 {
-
-  // Ensure correct Rcpp RNG state
-  Rcpp::RNGScope scope;
-
-  // initialize class members
-  std::vector<double> pars = to_std_vec(parameters);
   if (loss == "L1")
   {
     this->loss = LossType::L1;
@@ -106,6 +94,25 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
     this->loss = LossType::L2;
     this->calcLoss = &ClassificationRPF::L2_loss;
   }
+}
+
+// constructor with parameters split_try, t_try, purify_forest, deterministic, nthreads
+ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
+                                     const String loss, const NumericVector parameters)
+    : RandomPlantedForest(
+        samples_Y,
+        samples_X,
+        // pass first 13 parameters to base (includes split_structure)
+        parameters.size() >= 13 ? parameters[Rcpp::Range(0, 12)] : parameters[Rcpp::Range(0, 11)]
+      )
+{
+
+  // Ensure correct Rcpp RNG state
+  Rcpp::RNGScope scope;
+
+  // initialize class members
+  std::vector<double> pars = to_std_vec(parameters);
+  set_loss_function(loss);
   if (pars.size() != 15)
   {
     Rcout << "Wrong number of parameters - set to default." << std::endl;
@@ -145,6 +152,21 @@ ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const Numer
 
   // set data and data related members
   this->set_data(samples_Y, samples_X);
+}
+
+// Params-only constructor: parses configuration and loss but loads no data
+// and does not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
+ClassificationRPF::ClassificationRPF(const String loss, const NumericVector parameters)
+    : RandomPlantedForest(
+          parameters.size() >= 13 ? NumericVector(parameters[Rcpp::Range(0, 12)])
+                                  : NumericVector(parameters[Rcpp::Range(0, 11)]))
+{
+  std::vector<double> pars = to_std_vec(parameters);
+  if (pars.size() != 15)
+    Rcpp::stop("ClassificationRPF requires 15 parameters, got %d", (int)pars.size());
+  set_loss_function(loss);
+  this->delta = pars[13];
+  this->epsilon = pars[14];
 }
 
 // Mode 1: cur_trees_2 (classification variant)

@@ -64,6 +64,24 @@ void RandomPlantedForest::L2_loss(Split &split)
   }
 }
 
+void RandomPlantedForest::parse_parameters(const std::vector<double> &pars)
+{
+  this->max_interaction = pars[0];
+  this->n_trees = pars[1];
+  this->n_splits = pars[2];
+  this->split_try = pars[3];
+  this->t_try = pars[4];
+  this->purify_forest = pars[5];
+  this->deterministic = pars[6];
+  this->nthreads = pars[7];
+  this->cross_validate = pars[8];
+  this->split_decay_rate_ = pars[9];
+  this->max_candidates_   = static_cast<size_t>(pars[10]);
+  this->delete_leaves   = (pars[11] != 0);
+  // map: 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist
+  this->split_structure_mode_ = (pars.size() >= 13) ? static_cast<int>(pars[12]) : 3;
+}
+
 // constructor (parsing includes split_structure)
 RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
                                          const NumericVector parameters)
@@ -76,22 +94,172 @@ RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const N
   }
   else
   {
-    this->max_interaction = pars[0];
-    this->n_trees = pars[1];
-    this->n_splits = pars[2];
-    this->split_try = pars[3];
-    this->t_try = pars[4];
-    this->purify_forest = pars[5];
-    this->deterministic = pars[6];
-    this->nthreads = pars[7];
-    this->cross_validate = pars[8];
-    this->split_decay_rate_ = pars[9];
-    this->max_candidates_   = static_cast<size_t>(pars[10]);
-    this->delete_leaves   = (pars[11] != 0);
-    // map: 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist
-    this->split_structure_mode_ = (pars.size() >= 13) ? static_cast<int>(pars[12]) : 3;
+    parse_parameters(pars);
   }
   this->set_data(samples_Y, samples_X);
+}
+
+// Params-only constructor: parses configuration but loads no data and does
+// not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
+RandomPlantedForest::RandomPlantedForest(const NumericVector parameters)
+{
+  std::vector<double> pars = to_std_vec(parameters);
+  if (pars.size() != 12 && pars.size() != 13)
+    Rcpp::stop("RandomPlantedForest requires 12 or 13 parameters, got %d", pars.size());
+  parse_parameters(pars);
+}
+
+void RandomPlantedForest::set_shape(int feature_size_in, int value_size_in, int sample_size_in,
+                                    const NumericVector lower, const NumericVector upper)
+{
+  this->feature_size = feature_size_in;
+  this->value_size = value_size_in;
+  this->sample_size = sample_size_in;
+  this->lower_bounds = to_std_vec(lower);
+  this->upper_bounds = to_std_vec(upper);
+  this->n_leaves = std::vector<int>(feature_size, 1);
+}
+
+void RandomPlantedForest::set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
+{
+  // Restore path only: bounds are NOT recomputed (they come from the blob via
+  // set_shape), but shapes must be consistent with the restored forest so the
+  // purify path cannot read out of bounds.
+  if (samples_X.ncol() != feature_size)
+    Rcpp::stop("Corrupt training data: X has %d columns, expected %d.",
+               samples_X.ncol(), feature_size);
+  if (samples_X.nrow() != samples_Y.nrow())
+    Rcpp::stop("Corrupt training data: X has %d rows but Y has %d.",
+               samples_X.nrow(), samples_Y.nrow());
+  this->Y = to_std_vec(samples_Y);
+  this->X = to_std_vec(samples_X);
+  this->sample_size = X.size();
+}
+
+List RandomPlantedForest::get_data()
+{
+  return List::create(Named("X") = from_std_vec(X), Named("Y") = from_std_vec(Y));
+}
+
+List RandomPlantedForest::get_bounds()
+{
+  return List::create(Named("lower") = from_std_vec(lower_bounds),
+                      Named("upper") = from_std_vec(upper_bounds));
+}
+
+List RandomPlantedForest::get_shape()
+{
+  return List::create(Named("feature_size") = feature_size,
+                      Named("value_size") = (int)value_size,
+                      Named("sample_size") = (int)sample_size);
+}
+
+void RandomPlantedForest::set_model(List &model)
+{
+  size_t n_families = model.size();
+  tree_families = std::vector<TreeFamily>(n_families);
+  for (size_t i = 0; i < n_families; ++i) {
+    List family = model[i];
+    List variables = family["variables"];
+    List values = family["values"];
+    List intervals = family["intervals"];
+    size_t n_trees_fam = variables.size();
+    for (size_t j = 0; j < n_trees_fam; ++j) {
+      IntegerVector tree_variables = variables[j];
+      std::set<int> dims(tree_variables.begin(), tree_variables.end());
+      List tree_values = values[j];
+      List tree_intervals = intervals[j];
+      size_t n_leaves = tree_values.size();
+      std::vector<Leaf> leaves(n_leaves);
+      for (size_t k = 0; k < n_leaves; ++k) {
+        // get_model() builds leaf_values via push_back() onto a default-constructed
+        // NumericMatrix, which yields a plain vector without matrix dims - read it
+        // back as a vector rather than casting to NumericMatrix.
+        leaves[k].value = as<std::vector<double>>(tree_values[k]);
+        NumericMatrix leaf_intervals = tree_intervals[k];
+        if (leaf_intervals.nrow() < 2 || leaf_intervals.ncol() < feature_size)
+          Rcpp::stop("Corrupt model data: leaf interval matrix has dimensions %dx%d, expected 2x%d.",
+                     leaf_intervals.nrow(), leaf_intervals.ncol(), feature_size);
+        std::vector<Interval> ivs(feature_size);
+        for (int l = 0; l < feature_size; ++l)
+          ivs[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
+        leaves[k].intervals = ivs;
+      }
+      tree_families[i].insert(
+          std::make_pair(dims, std::make_shared<DecisionTree>(DecisionTree(dims, leaves))));
+    }
+  }
+  purified = false;
+}
+
+List RandomPlantedForest::get_grid_leaves()
+{
+  List families;
+  for (auto &family : tree_families) {
+    List trees;
+    List fam_lim_list;
+    bool lim_captured = false;
+    for (auto &tree : family) {
+      if (!lim_captured) {
+        // lim_list is identical for every tree in a family; store once
+        List ll;
+        for (auto &v : tree.second->GridLeaves.lim_list) ll.push_back(from_std_vec(v));
+        fam_lim_list = ll;
+        lim_captured = true;
+      }
+      auto &vals = tree.second->GridLeaves.values;
+      const auto &flat = vals.flat();
+      NumericMatrix vmat(flat.size(), value_size);
+      for (size_t e = 0; e < flat.size(); ++e)
+        for (size_t p = 0; p < value_size && p < flat[e].size(); ++p)
+          vmat(e, p) = flat[e][p];
+      trees.push_back(List::create(
+          Named("variables") = from_std_set(tree.first),
+          Named("dims") = from_std_vec(vals.dims),
+          Named("values") = vmat));
+    }
+    families.push_back(List::create(Named("lim_list") = fam_lim_list,
+                                    Named("trees") = trees));
+  }
+  return families;
+}
+
+void RandomPlantedForest::set_grid_leaves(List &grid)
+{
+  if ((size_t)grid.size() != tree_families.size())
+    Rcpp::stop("Grid data does not match the number of tree families.");
+  for (size_t i = 0; i < tree_families.size(); ++i) {
+    List family = grid[i];
+    List fam_lim_list = family["lim_list"];
+    std::vector<std::vector<double>> lim_list;
+    for (int l = 0; l < fam_lim_list.size(); ++l)
+      lim_list.push_back(to_std_vec(NumericVector(fam_lim_list[l])));
+    List trees = family["trees"];
+    for (int j = 0; j < trees.size(); ++j) {
+      List tr = trees[j];
+      IntegerVector vars = tr["variables"];
+      std::set<int> dims_set(vars.begin(), vars.end());
+      auto it = tree_families[i].find(dims_set);
+      if (it == tree_families[i].end())
+        Rcpp::stop("Grid data references a tree not present in the forest.");
+      std::vector<int> mdims = to_std_vec(IntegerVector(tr["dims"]));
+      for (int d : mdims)
+        if (d <= 0)
+          Rcpp::stop("Corrupt grid data: non-positive grid dimension %d.", d);
+      NumericMatrix vmat = tr["values"];
+      utils::Matrix<std::vector<double>> values(mdims, std::vector<double>(value_size, 0));
+      auto &flat = values.flat();
+      if ((size_t)vmat.nrow() != flat.size() || (size_t)vmat.ncol() != value_size)
+        Rcpp::stop("Corrupt grid data: values matrix has dimensions %dx%d, expected %dx%d.",
+                   vmat.nrow(), vmat.ncol(), (int)flat.size(), (int)value_size);
+      for (size_t e = 0; e < flat.size(); ++e)
+        for (size_t p = 0; p < value_size; ++p)
+          flat[e][p] = vmat(e, p);
+      it->second->GridLeaves.values = values;
+      it->second->GridLeaves.lim_list = lim_list;
+    }
+  }
+  purified = true;
 }
 
 // --------------- calcOptimalSplit per mode ---------------

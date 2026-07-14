@@ -371,26 +371,30 @@ rpf_bridge <- function(
   checkmate::assert_flag(delete_leaves)
   checkmate::assert_choice(split_structure, choices = c("res_trees", "cur_trees_2", "cur_trees_1", "leaves", "hist"))
 
-  fit <- rpf_impl(
-    Y = outcomes$outcomes,
-    X = predictors$predictors_matrix,
-    mode = outcomes$mode,
-    max_interaction = max_interaction,
+  params <- list(
+    loss = loss,
     ntrees = ntrees,
+    max_interaction = max_interaction,
     splits = splits,
     split_try = split_try,
     t_try = t_try,
     split_decay_rate = split_decay_rate,
     max_candidates = max_candidates,
     delete_leaves = delete_leaves,
+    split_structure = split_structure,
+    delta = delta,
+    epsilon = epsilon,
     deterministic = deterministic,
     nthreads = nthreads,
     purify = purify,
-    cv = cv,
-    loss = loss,
-    delta = delta,
-    epsilon = epsilon,
-    split_structure = split_structure
+    cv = cv
+  )
+
+  fit <- rpf_impl(
+    Y = outcomes$outcomes,
+    X = predictors$predictors_matrix,
+    mode = outcomes$mode,
+    params = params
   )
 
   # Optionally export a compact R list representation of the forest.
@@ -405,24 +409,7 @@ rpf_bridge <- function(
     blueprint = processed$blueprint,
     mode = outcomes$mode,
     factor_levels = predictors$factor_levels,
-    params = list(
-      loss = loss, # FIXME: Dedup, requires changes in tests and predict
-      ntrees = ntrees,
-      max_interaction = max_interaction,
-      splits = splits,
-      split_try = split_try,
-      t_try = t_try,
-      split_decay_rate = split_decay_rate,
-      max_candidates = max_candidates,
-      delete_leaves = delete_leaves,
-      split_structure = split_structure,
-      delta = delta,
-      epsilon = epsilon,
-      deterministic = deterministic,
-      nthreads = nthreads,
-      purify = purify,
-      cv = cv
-    ),
+    params = params,
     forest = forest
   )
 }
@@ -437,80 +424,49 @@ new_rpf <- function(fit, blueprint, ...) {
   )
 }
 
+# Assemble the positional parameter vector for the C++ constructors.
+# 13 elements for regression, 15 (+ delta, epsilon) for classification.
+rpf_param_vector <- function(params, mode) {
+  split_mode <- switch(
+    params$split_structure,
+    res_trees = 0L,
+    cur_trees_2 = 1L,
+    cur_trees_1 = 2L,
+    leaves = 3L,
+    hist = 4L
+  )
+  base <- c(
+    params$max_interaction,
+    params$ntrees,
+    params$splits,
+    params$split_try,
+    params$t_try,
+    params$purify,
+    params$deterministic,
+    params$nthreads,
+    params$cv,
+    params$split_decay_rate,
+    params$max_candidates,
+    params$delete_leaves,
+    split_mode
+  )
+  if (mode == "classification") {
+    base <- c(base, params$delta, params$epsilon)
+  }
+  base
+}
+
 # Main fitting function and interface to C++ implementation
-rpf_impl <- function(
-  Y,
-  X,
-  mode = c("regression", "classification"),
-  max_interaction = 1,
-  ntrees = 50,
-  splits = 30,
-  split_try = 10,
-  t_try = 0.4,
-  deterministic = FALSE,
-  nthreads = 1,
-  purify = FALSE,
-  cv = FALSE,
-  split_decay_rate = 0.1,
-  max_candidates = 50,
-  delete_leaves = TRUE,
-  loss = "L2",
-  delta = 0,
-  epsilon = 0.1,
-  split_structure = "leaves"
-) {
+rpf_impl <- function(Y, X, mode = c("regression", "classification"), params) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   mode <- match.arg(mode)
-  split_structure <- match.arg(split_structure, c("leaves", "res_trees", "cur_trees_2", "cur_trees_1", "hist"))
-  # map split_structure string to numeric mode for C++
-  split_mode <- switch(split_structure, res_trees = 0L, cur_trees_2 = 1L, cur_trees_1 = 2L, leaves = 3L, hist = 4L)
+  pars <- rpf_param_vector(params, mode)
 
   if (mode == "classification") {
-    fit <- new(
-      ClassificationRPF,
-      Y,
-      X,
-      loss,
-      c(
-        max_interaction,
-        ntrees,
-        splits,
-        split_try,
-        t_try,
-        purify,
-        deterministic,
-        nthreads,
-        cv,
-        split_decay_rate,
-        max_candidates,
-        delete_leaves,
-        split_mode,
-        delta,
-        epsilon
-      )
-    )
-  } else if (mode == "regression") {
-    fit <- new(
-      RandomPlantedForest,
-      Y,
-      X,
-      c(
-        max_interaction,
-        ntrees,
-        splits,
-        split_try,
-        t_try,
-        purify,
-        deterministic,
-        nthreads,
-        cv,
-        split_decay_rate,
-        max_candidates,
-        delete_leaves,
-        split_mode
-      )
-    )
+    fit <- new(ClassificationRPF, Y, X, params$loss, pars)
+  } else {
+    fit <- new(RandomPlantedForest, Y, X, pars)
   }
 
   fit

@@ -70,6 +70,7 @@
 #'
 predict_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
   checkmate::assert_class(object, classes = "rpf")
+  check_rpf_alive(object)
 
   # if max_interaction is not provided, we use the max from the rpf model fit
   if (is.null(max_interaction)) {

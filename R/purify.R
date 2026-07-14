@@ -43,6 +43,7 @@ purify.default <- function(x, ...) {
 #' @importFrom utils capture.output
 purify.rpf <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL) {
   checkmate::assert_class(x, "rpf")
+  check_rpf_alive(x)
   checkmate::assert_int(mode, lower = 1, upper = 2)
   if (!is.null(nthreads)) {
     checkmate::assert_int(nthreads, lower = 1)
@@ -66,5 +67,6 @@ purify.rpf <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NU
 #' @rdname purify
 is_purified <- function(x) {
   checkmate::assert_class(x, "rpf")
+  check_rpf_alive(x)
   x$fit$is_purified()
 }
