@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,9 +30,15 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/v0.3.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.0.9000" id="randomplantedforest-0309000">randomPlantedForest 0.3.0.9000<a class="anchor" aria-label="anchor" href="#randomplantedforest-0309000"></a></h2>
+<ul><li>New <code><a href="../reference/rpf_marshal.html">rpf_marshal()</a></code> / <code><a href="../reference/rpf_marshal.html">rpf_unmarshal()</a></code> serialize a fitted forest to a plain R list and back, making <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code>-based storage of rpf models possible (<a href="https://github.com/PlantedML/randomPlantedForest/issues/52" class="external-link">#52</a>). Purified forests restore their purified state directly; training data is only embedded with <code>include_data = TRUE</code> (required to <code><a href="../reference/purify.html">purify()</a></code> after restoring). Blobs record the blob format version and the package version they were created with; restoring under an older package than the one that saved the model warns. Malformed or corrupt blobs error instead of reading out of bounds.</li>
+<li>New <code><a href="../reference/rpf_is_valid.html">rpf_is_valid()</a></code> checks whether an rpf object’s internal model is usable; <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>, <code><a href="../reference/purify.html">purify()</a></code> and <code><a href="../reference/predict_components.html">predict_components()</a></code> now give an actionable error for rpf objects restored via <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code> without marshaling.</li>
+<li>New <code><a href="https://rstudio.github.io/bundle/reference/bundle.html" class="external-link">bundle::bundle()</a></code> method for rpf models wrapping the marshaling API.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.0" id="randomplantedforest-030">randomPlantedForest 0.3.0<a class="anchor" aria-label="anchor" href="#randomplantedforest-030"></a></h2>
 <div class="section level3">

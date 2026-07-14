@@ -1,5 +1,35 @@
 # Changelog
 
+## randomPlantedForest 0.3.0.9000
+
+- New
+  [`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+  /
+  [`rpf_unmarshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+  serialize a fitted forest to a plain R list and back, making
+  [`saveRDS()`](https://rdrr.io/r/base/readRDS.html)-based storage of
+  rpf models possible
+  ([\#52](https://github.com/PlantedML/randomPlantedForest/issues/52)).
+  Purified forests restore their purified state directly; training data
+  is only embedded with `include_data = TRUE` (required to
+  [`purify()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
+  after restoring). Blobs record the blob format version and the package
+  version they were created with; restoring under an older package than
+  the one that saved the model warns. Malformed or corrupt blobs error
+  instead of reading out of bounds.
+- New
+  [`rpf_is_valid()`](http://plantedml.com/randomPlantedForest/reference/rpf_is_valid.md)
+  checks whether an rpf object’s internal model is usable;
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`purify()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
+  and
+  [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
+  now give an actionable error for rpf objects restored via
+  [`readRDS()`](https://rdrr.io/r/base/readRDS.html) without marshaling.
+- New
+  [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)
+  method for rpf models wrapping the marshaling API.
+
 ## randomPlantedForest 0.3.0
 
 ### Major changes ([\#61](https://github.com/PlantedML/randomPlantedForest/issues/61))

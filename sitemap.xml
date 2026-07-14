@@ -6,6 +6,7 @@
 <url><loc>http://plantedml.com/randomPlantedForest/authors.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/index.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/news/index.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/bundle.rpf.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/reference/index.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/reference/predict.rpf.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/reference/predict_components.html</loc></url>
@@ -15,5 +16,7 @@
 <url><loc>http://plantedml.com/randomPlantedForest/reference/purify.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/reference/randomPlantedForest-package.html</loc></url>
 <url><loc>http://plantedml.com/randomPlantedForest/reference/rpf.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/rpf_is_valid.html</loc></url>
+<url><loc>http://plantedml.com/randomPlantedForest/reference/rpf_marshal.html</loc></url>
 </urlset>
 
