@@ -26,14 +26,16 @@
 rpf_marshal <- function(x, include_data = FALSE) {
   checkmate::assert_class(x, "rpf")
   checkmate::assert_flag(include_data)
+  check_rpf_alive(x)
 
+  purified <- x$fit$is_purified()
   fit_state <- list(
     version = 1L,
     model = x$fit$get_model(),
     bounds = x$fit$get_bounds(),
     dims = x$fit$get_shape(),
-    purified = x$fit$is_purified(),
-    grid = if (x$fit$is_purified()) x$fit$get_grid_leaves(),
+    purified = purified,
+    grid = if (purified) x$fit$get_grid_leaves(),
     data = if (include_data) x$fit$get_data()
   )
 
@@ -48,7 +50,7 @@ rpf_marshal <- function(x, include_data = FALSE) {
 rpf_unmarshal <- function(blob) {
   checkmate::assert_class(blob, "rpf_marshaled")
   state <- blob$fit_state
-  if (state$version != 1L) {
+  if (!identical(state$version, 1L)) {
     stop("Unsupported rpf_marshaled version: ", state$version)
   }
 

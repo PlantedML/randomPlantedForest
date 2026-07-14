@@ -67,5 +67,6 @@ purify.rpf <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NU
 #' @rdname purify
 is_purified <- function(x) {
   checkmate::assert_class(x, "rpf")
+  check_rpf_alive(x)
   x$fit$is_purified()
 }

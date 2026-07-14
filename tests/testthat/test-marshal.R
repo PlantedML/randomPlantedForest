@@ -74,7 +74,10 @@ test_that("purified regression round-trip without data", {
 test_that("purified multiclass round-trip without data", {
   fit <- rpf(Species ~ ., data = iris, ntrees = 10, loss = "L2")
   purify(fit)
-  expect_roundtrip(fit, iris)
+  comp_before <- predict_components(fit, iris)
+  restored <- expect_roundtrip(fit, iris)
+  expect_true(is_purified(restored))
+  expect_identical(predict_components(restored, iris), comp_before)
 })
 
 test_that("marshaled blob contains no external pointers", {
@@ -119,5 +122,10 @@ test_that("restored-without-marshal rpf gives actionable error", {
   expect_error(predict(zombie, mtcars), "rpf_marshal")
   expect_error(purify(zombie), "rpf_marshal")
   expect_error(predict_components(zombie, mtcars), "rpf_marshal")
+  expect_error(rpf_marshal(zombie), "readRDS")
   expect_true(rpf_is_valid(fit))
+})
+
+test_that("rpf_unmarshal errors on malformed blob missing fit_state", {
+  expect_error(rpf_unmarshal(structure(list(), class = "rpf_marshaled")), "Unsupported")
 })
