@@ -26,7 +26,7 @@ rpf(x, ...)
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -49,7 +49,7 @@ rpf(x, ...)
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -72,7 +72,7 @@ rpf(x, ...)
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -95,7 +95,7 @@ rpf(x, ...)
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -145,13 +145,17 @@ Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
 classification, \code{"L1"}, \code{"logit"} and \code{"exponential"} are also available.
 \code{"exponential"} yields similar results as \code{"logit"} while being significantly faster.}
 
-\item{delta}{\verb{[0]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
-Proportion of class membership is truncated to be smaller 1-delta when calculating
-the loss to determine the optimal split.}
+\item{delta}{\verb{[0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
+Proportion of class membership is truncated to be within \verb{[delta, 1-delta]}
+when calculating the loss to determine the optimal split. Should be positive
+for \code{"logit"}: with \code{delta = 0}, nodes containing only a single class produce
+an infinite loss and the corresponding splits are always rejected.}
 
 \item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
-Proportion of class membership is truncated to be smaller 1-epsilon when calculating
-the fit in a leaf.}
+Proportion of class membership is truncated to be within \verb{[epsilon, 1-epsilon]}
+when calculating the fit in a leaf. Unlike \code{delta} (a numerical guard for the
+split criterion), this caps the magnitude of individual leaf updates and acts
+as regularization: smaller values permit larger per-leaf jumps on the link scale.}
 
 \item{split_structure}{\verb{["leaves"]}: Defines the structure of a possible split and how to choose split_candidates. Can be one of "leaves", "hist", "cur_trees_1", "cur_trees_2", or "res_trees". Further details are given below.}
 

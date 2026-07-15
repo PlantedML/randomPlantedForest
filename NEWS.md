@@ -1,5 +1,20 @@
 # randomPlantedForest 0.3.0.9000
 
+* Fixed multiclass classification with `loss = "logit"`, which effectively never
+  split and predicted near-uniform class probabilities (#40). The C++ logit loss
+  is a reference-class multinomial formulation expecting `K-1` indicator columns,
+  but the R wrapper passed a full `K`-column one-hot matrix, pinning the implicit
+  reference-class probability to zero. Multiclass logit outcomes are now encoded
+  with the first factor level as reference class:
+  * `predict(type = "prob")` reconstructs all `K` class probabilities from the
+    `K-1` logits; rows sum to 1 exactly.
+  * `predict(type = "numeric"/"link")` now returns `K-1` columns named after the
+    non-reference levels (previously `K` columns).
+  * `predict_components()` on multiclass logit fits returns per-class components
+    for the `K-1` non-reference levels; `target_levels` reflects this.
+* The default for `delta` changed from 0 to 0.001. With `delta = 0`, splits
+  producing single-class nodes have infinite logit loss and are always rejected,
+  which also degraded binary logit fits.
 * New `rpf_marshal()` / `rpf_unmarshal()` serialize a fitted forest to a plain
   R list and back, making `saveRDS()`-based storage of rpf models possible (#52).
   Purified forests restore their purified state directly; training data is only

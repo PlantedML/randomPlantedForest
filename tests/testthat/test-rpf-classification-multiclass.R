@@ -31,6 +31,20 @@ test_that("Multiclass: Detection works", {
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })
 
+# Multiclass logit learns signal (#40) -------------------------------------
+test_that("Multiclass logit learns signal (#40)", {
+  set.seed(42)
+  n <- 400
+  dat <- data.frame(x1 = runif(n), x2 = runif(n))
+  dat$y <- factor(ifelse(dat$x1 > 0.5, "a", ifelse(dat$x2 > 0.5, "b", "c")))
+  idx <- sample(n, 280)
+
+  fit <- rpf(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 50, max_interaction = 2)
+  pred <- predict(fit, dat[-idx, ], type = "class")
+
+  expect_gt(mean(pred$.pred_class == dat$y[-idx]), 0.85)
+})
+
 test_that("Remainder is calculcated correctly", {
   classif_fit <- rpf(yfact ~ ., data = xdat, max_interaction = 3)
 
