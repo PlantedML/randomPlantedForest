@@ -59,7 +59,7 @@
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  split_structure <span class="op">=</span> <span class="st">"leaves"</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -83,7 +83,7 @@
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  split_structure <span class="op">=</span> <span class="st">"leaves"</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -107,7 +107,7 @@
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  split_structure <span class="op">=</span> <span class="st">"leaves"</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -131,7 +131,7 @@
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  loss <span class="op">=</span> <span class="st">"L2"</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  split_structure <span class="op">=</span> <span class="st">"leaves"</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -218,15 +218,19 @@ classification, <code>"L1"</code>, <code>"logit"</code> and <code>"exponential"<
 
 
 <dt id="arg-delta">delta<a class="anchor" aria-label="anchor" href="#arg-delta"></a></dt>
-<dd><p><code>[0]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
-Proportion of class membership is truncated to be smaller 1-delta when calculating
-the loss to determine the optimal split.</p></dd>
+<dd><p><code>[0.001]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
+Proportion of class membership is truncated to be within <code>[delta, 1-delta]</code>
+when calculating the loss to determine the optimal split. Should be positive
+for <code>"logit"</code>: with <code>delta = 0</code>, nodes containing only a single class produce
+an infinite loss and the corresponding splits are always rejected.</p></dd>
 
 
 <dt id="arg-epsilon">epsilon<a class="anchor" aria-label="anchor" href="#arg-epsilon"></a></dt>
 <dd><p><code>[0.1]</code>: Only used if loss = <code>"logit"</code> or <code>"exponential"</code>.
-Proportion of class membership is truncated to be smaller 1-epsilon when calculating
-the fit in a leaf.</p></dd>
+Proportion of class membership is truncated to be within <code>[epsilon, 1-epsilon]</code>
+when calculating the fit in a leaf. Unlike <code>delta</code> (a numerical guard for the
+split criterion), this caps the magnitude of individual leaf updates and acts
+as regularization: smaller values permit larger per-leaf jumps on the link scale.</p></dd>
 
 
 <dt id="arg-split-structure">split_structure<a class="anchor" aria-label="anchor" href="#arg-split-structure"></a></dt>

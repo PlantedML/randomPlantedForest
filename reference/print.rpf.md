@@ -49,7 +49,7 @@ rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
 #>    max_candidates: 50
 #>     delete_leaves: TRUE
 #>   split_structure: leaves
-#>             delta: 0
+#>             delta: 0.001
 #>           epsilon: 0.1
 #>     deterministic: FALSE
 #>          nthreads: 1

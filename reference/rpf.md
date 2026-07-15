@@ -24,7 +24,7 @@ rpf(
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -48,7 +48,7 @@ rpf(
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -72,7 +72,7 @@ rpf(
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -96,7 +96,7 @@ rpf(
   purify = FALSE,
   cv = FALSE,
   loss = "L2",
-  delta = 0,
+  delta = 0.001,
   epsilon = 0.1,
   split_structure = "leaves",
   export_forest = FALSE,
@@ -198,15 +198,21 @@ rpf(
 
 - delta:
 
-  `[0]`: Only used if `loss` is `"logit"` or `"exponential"`. Proportion
-  of class membership is truncated to be smaller 1-delta when
-  calculating the loss to determine the optimal split.
+  `[0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
+  Proportion of class membership is truncated to be within
+  `[delta, 1-delta]` when calculating the loss to determine the optimal
+  split. Should be positive for `"logit"`: with `delta = 0`, nodes
+  containing only a single class produce an infinite loss and the
+  corresponding splits are always rejected.
 
 - epsilon:
 
   `[0.1]`: Only used if loss = `"logit"` or `"exponential"`. Proportion
-  of class membership is truncated to be smaller 1-epsilon when
-  calculating the fit in a leaf.
+  of class membership is truncated to be within `[epsilon, 1-epsilon]`
+  when calculating the fit in a leaf. Unlike `delta` (a numerical guard
+  for the split criterion), this caps the magnitude of individual leaf
+  updates and acts as regularization: smaller values permit larger
+  per-leaf jumps on the link scale.
 
 - split_structure:
 
