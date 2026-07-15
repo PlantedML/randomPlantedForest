@@ -210,6 +210,15 @@ preprocess_outcome <- function(processed, loss) {
       outcomes_mat <- stats::model.matrix(~ -1 + outcomes)
       colnames(outcomes_mat) <- levels(outcomes)
 
+      if (loss == "logit") {
+        # The C++ logit loss is a reference-class multinomial formulation:
+        # it models K-1 logits and treats 1 - rowSums(Y) as the implicit
+        # reference class (first factor level), so it needs K-1 indicator
+        # columns. Full one-hot pins the reference-class probability to
+        # zero and no split ever improves the loss (#40).
+        outcomes_mat <- outcomes_mat[, -1, drop = FALSE]
+      }
+
       outcomes <- outcomes_mat
     }
 
@@ -252,6 +261,16 @@ softmax <- function(x) {
 #' @param levels Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
 #' @param pred Regular model predictions as returned by `predict.rpf`.
 #' @param intercept Intercept as stored in output of `predict_components`.
+# Outcome levels represented by columns of the C++ prediction matrix.
+# Multiclass logit uses reference-class encoding: the first level has no column.
+model_outcome_levels <- function(object) {
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (object$params$loss == "logit" && length(outcome_levels) > 2) {
+    outcome_levels <- outcome_levels[-1]
+  }
+  outcome_levels
+}
+
 calc_remainders_multiclass <- function(m, levels, pred, intercept) {
   # data.table NSE warnings
   term <- remainder <- m_sum <- NULL

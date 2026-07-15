@@ -86,8 +86,8 @@ predict_rpf_numeric <- function(object, new_data, ...) {
   } else {
     # multiclass case for 'link' type: get prediction matrix, clean up
     # via spruce_prob, but no transformation
-    outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
-    out <- hardhat::spruce_prob(outcome_levels, pred)
+    # Multiclass logit: one logit per non-reference level
+    out <- hardhat::spruce_prob(model_outcome_levels(object), pred)
   }
 
   out
@@ -120,7 +120,14 @@ predict_rpf_prob <- function(object, new_data, ...) {
   } else {
     # Multiclass
 
-    if (object$params$loss %in% c("logit", "exponential")) {
+    if (object$params$loss == "logit") {
+      # Raw predictions are K-1 logits relative to the reference class
+      # (first outcome level), so p_ref = 1 / (1 + sum(exp(W))) and
+      # p_k = exp(W_k) * p_ref. Rows sum to 1 by construction.
+      exp_raw <- exp(pred_raw)
+      denom <- 1 + rowSums(exp_raw)
+      pred_prob <- cbind(1 / denom, exp_raw / denom)
+    } else if (object$params$loss == "exponential") {
       # softmax for multi-class
       pred_prob <- softmax(pred_raw)
     } else if (object$params$loss %in% c("L1", "L2")) {

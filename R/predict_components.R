@@ -130,9 +130,11 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   )
 
   # Get outcome levels for multiclass handling
+  # (model levels: multiclass logit has no column for the reference level)
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  model_levels <- model_outcome_levels(object)
   if (length(outcome_levels) > 2) {
-    ret$target_levels <- outcome_levels
+    ret$target_levels <- model_levels
   }
 
   # If max_interaction here is smaller than that of model fit, we calculate a remainder term
@@ -143,7 +145,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
     # handling differs if multiclass
     if (length(outcome_levels) > 2) {
-      ret$remainder <- calc_remainders_multiclass(all_components, outcome_levels, pred, intercept)
+      ret$remainder <- calc_remainders_multiclass(all_components, model_levels, pred, intercept)
     } else {
       # regression and binary classif: straight forward.
       ret$remainder <- pred[[1]] - ret$intercept - rowSums(all_components)
@@ -207,7 +209,8 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class
-    colnames(ret) <- paste0(out_names, "__class:", outcome_levels)
+    # (model levels: multiclass logit has no column for the reference level)
+    colnames(ret) <- paste0(out_names, "__class:", model_outcome_levels(object))
   } else {
     # Regression and binary classif: Single-column component
     colnames(ret) <- out_names

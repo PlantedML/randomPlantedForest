@@ -150,7 +150,23 @@ test_that("logit: Numeric/link prediction", {
   classif_pred_lnk <- predict(classif_fit, new_data = xdat, type = "link")
 
   expect_identical(classif_pred, classif_pred_lnk)
-  expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
+  # Reference-class encoding: raw predictions are K-1 logits relative to the
+  # first factor level, so the reference level has no link column
+  expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact) - 1))
+  expect_named(classif_pred, paste0(".pred_", levels(xdat$yfact)[-1]))
+})
+
+test_that("logit: prob is consistent with link", {
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
+
+  pred_link <- as.matrix(predict(classif_fit, new_data = xdat, type = "link"))
+  pred_prob <- as.matrix(predict(classif_fit, new_data = xdat, type = "prob"))
+
+  denom <- 1 + rowSums(exp(pred_link))
+  expected <- cbind(1 / denom, exp(pred_link) / denom)
+
+  expect_equal(unname(pred_prob), unname(expected))
+  expect_equal(rowSums(pred_prob), rep(1, nrow(xdat)))
 })
 
 # exponential loss --------------------------------------------------------
@@ -193,6 +209,15 @@ test_that("exponential: Numeric/link prediction", {
 
   expect_identical(classif_pred, classif_pred_lnk)
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
+})
+
+test_that("logit: predict_components uses non-reference levels", {
+  classif_fit <- rpf(yfact ~ ., data = xdat, loss = "logit", max_interaction = 2)
+
+  components <- predict_components(classif_fit, xdat, max_interaction = 1)
+
+  expect_identical(components$target_levels, levels(xdat$yfact)[-1])
+  expect_named(components$remainder, levels(xdat$yfact)[-1])
 })
 
 # Classif and prob agree with each other ----------------------------------
