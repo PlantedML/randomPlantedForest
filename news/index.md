@@ -1,25 +1,13 @@
 # Changelog
 
-## randomPlantedForest 0.3.0.9000
+## randomPlantedForest 0.4.0
 
-- Fixed multiclass classification with `loss = "logit"`, which
-  effectively never split and predicted near-uniform class probabilities
-  ([\#40](https://github.com/PlantedML/randomPlantedForest/issues/40)).
-  The C++ logit loss is a reference-class multinomial formulation
-  expecting `K-1` indicator columns, but the R wrapper passed a full
-  `K`-column one-hot matrix, pinning the implicit reference-class
-  probability to zero. Multiclass logit outcomes are now encoded with
-  the first factor level as reference class:
-  - `predict(type = "prob")` reconstructs all `K` class probabilities
-    from the `K-1` logits; rows sum to 1 exactly.
-  - `predict(type = "numeric"/"link")` now returns `K-1` columns named
-    after the non-reference levels (previously `K` columns).
-  - [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
-    on multiclass logit fits returns per-class components for the `K-1`
-    non-reference levels; `target_levels` reflects this.
-- The default for `delta` changed from 0 to 0.001. With `delta = 0`,
-  splits producing single-class nodes have infinite logit loss and are
-  always rejected, which also degraded binary logit fits.
+It is now possible to serialize and de-serialize an `rpf` object via
+marshalling, meaning a fitted model can be saved to disk or dispatched
+to a worker process for parallelization or encapsulation, as is done in
+`mlr3`. This also re-opens the door for the `mlr3extralearners` wrapper,
+which was removed due to the lack of serialization support.
+
 - New
   [`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   /
@@ -37,16 +25,40 @@
   instead of reading out of bounds.
 - New
   [`rpf_is_valid()`](http://plantedml.com/randomPlantedForest/reference/rpf_is_valid.md)
-  checks whether an rpf object’s internal model is usable;
+  checks whether an rpf object’s internal model is usable,
   [`predict()`](https://rdrr.io/r/stats/predict.html),
   [`purify()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
   and
   [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
-  now give an actionable error for rpf objects restored via
+  now give an actionable error for `rpf` objects restored via
   [`readRDS()`](https://rdrr.io/r/base/readRDS.html) without marshaling.
 - New
   [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)
   method for rpf models wrapping the marshaling API.
+
+### Behavior changes
+
+- The default for `delta` changed from 0 to 0.001. With `delta = 0`,
+  splits producing single-class nodes have infinite logit loss and are
+  always rejected, which also degraded binary logit fits.
+
+### Fixes and improvements
+
+- Fixed multiclass classification with `loss = "logit"`, which
+  effectively never split and predicted near-uniform class probabilities
+  ([\#40](https://github.com/PlantedML/randomPlantedForest/issues/40)).
+  The C++ logit loss is a reference-class multinomial formulation
+  expecting `K-1` indicator columns, but the R wrapper passed a full
+  `K`-column one-hot matrix, pinning the implicit reference-class
+  probability to zero. Multiclass logit outcomes are now encoded with
+  the first factor level as reference class:
+  - `predict(type = "prob")` reconstructs all `K` class probabilities
+    from the `K-1` logits; rows sum to 1 exactly.
+  - `predict(type = "numeric"/"link")` now returns `K-1` columns named
+    after the non-reference levels (previously `K` columns).
+  - [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
+    on multiclass logit fits returns per-class components for the `K-1`
+    non-reference levels; `target_levels` reflects this.
 
 ## randomPlantedForest 0.3.0
 

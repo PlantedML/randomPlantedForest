@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,10 +80,13 @@ additional interpretation similar to the linear predictor in a <code><a href="ht
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>For regression: A <code><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tbl</a></code> with column <code>.pred</code> with
 the same number of rows as <code>new_data</code>.</p>
-<p>For classification: A <code><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tbl</a></code> with one column for each
-level in <code>y</code> containing class probabilities if <code>type = "prob"</code>.
-For <code>type = "class"</code>, one column <code>.pred</code> with class predictions is returned.
-For <code>type = "numeric"</code> or <code>"link"</code>, one column <code>.pred</code> with raw predictions.</p>
+<p>For classification: A <code><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tbl</a></code> with one column <code>.pred_&lt;level&gt;</code>
+for each level in <code>y</code> containing class probabilities if <code>type = "prob"</code>.
+For <code>type = "class"</code>, one column <code>.pred_class</code> with class predictions is returned.
+For <code>type = "numeric"</code> or <code>"link"</code>, raw predictions are returned: one column
+<code>.pred</code> for binary outcomes, and one column <code>.pred_&lt;level&gt;</code> per level for
+multiclass outcomes. With <code>loss = "logit"</code>, the first level is the reference
+class and has no column, so <code>K - 1</code> columns are returned for <code>K</code> levels.</p>
     </div>
 
     <div class="section level2">
