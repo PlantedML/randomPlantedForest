@@ -21,28 +21,36 @@ export(rpf_is_valid)
 export(rpf_marshal)
 export(rpf_unmarshal)
 import(checkmate)
-importFrom(Rcpp,loadModule)
-importFrom(Rcpp,sourceCpp)
-importFrom(data.table,":=")
-importFrom(data.table,':=')
-importFrom(data.table,.BY)
-importFrom(data.table,.EACHI)
-importFrom(data.table,.GRP)
-importFrom(data.table,.I)
-importFrom(data.table,.N)
-importFrom(data.table,.NGRP)
-importFrom(data.table,.SD)
-importFrom(data.table,as.data.table)
-importFrom(data.table,data.table)
-importFrom(hardhat,default_formula_blueprint)
-importFrom(hardhat,default_recipe_blueprint)
-importFrom(hardhat,default_xy_blueprint)
-importFrom(hardhat,forge)
-importFrom(hardhat,mold)
-importFrom(hardhat,validate_outcomes_are_univariate)
-importFrom(hardhat,validate_prediction_size)
+importFrom(Rcpp,
+  loadModule,
+  sourceCpp
+)
+importFrom(data.table,
+  ":=",
+  ':=',
+  .BY,
+  .EACHI,
+  .GRP,
+  .I,
+  .N,
+  .NGRP,
+  .SD,
+  as.data.table,
+  data.table
+)
+importFrom(hardhat,
+  default_formula_blueprint,
+  default_recipe_blueprint,
+  default_xy_blueprint,
+  forge,
+  mold,
+  validate_outcomes_are_univariate,
+  validate_prediction_size
+)
 importFrom(methods,new)
 importFrom(stats,model.matrix)
-importFrom(utils,capture.output)
-importFrom(utils,combn)
+importFrom(utils,
+  capture.output,
+  combn
+)
 useDynLib(randomPlantedForest, .registration = TRUE)
