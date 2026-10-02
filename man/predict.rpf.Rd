@@ -33,10 +33,13 @@ additional interpretation similar to the linear predictor in a \code{\link{glm}}
 For regression: A \code{\link[tibble:tibble]{tbl}} with column \code{.pred} with
 the same number of rows as \code{new_data}.
 
-For classification: A \code{\link[tibble:tibble]{tbl}} with one column for each
-level in \code{y} containing class probabilities if \code{type = "prob"}.
-For \code{type = "class"}, one column \code{.pred} with class predictions is returned.
-For \code{type = "numeric"} or \code{"link"}, one column \code{.pred} with raw predictions.
+For classification: A \code{\link[tibble:tibble]{tbl}} with one column \verb{.pred_<level>}
+for each level in \code{y} containing class probabilities if \code{type = "prob"}.
+For \code{type = "class"}, one column \code{.pred_class} with class predictions is returned.
+For \code{type = "numeric"} or \code{"link"}, raw predictions are returned: one column
+\code{.pred} for binary outcomes, and one column \verb{.pred_<level>} per level for
+multiclass outcomes. With \code{loss = "logit"}, the first level is the reference
+class and has no column, so \code{K - 1} columns are returned for \code{K} levels.
 }
 \description{
 Random Planted Forest Predictions

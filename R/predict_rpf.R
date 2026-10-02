@@ -17,10 +17,13 @@
 #' @return For regression: A [`tbl`][tibble::tibble] with column `.pred` with
 #' the same number of rows as `new_data`.
 #'
-#' For classification: A [`tbl`][tibble::tibble] with one column for each
-#' level in `y` containing class probabilities if `type = "prob"`.
-#' For `type = "class"`, one column `.pred` with class predictions is returned.
-#' For `type = "numeric"` or `"link"`, one column `.pred` with raw predictions.
+#' For classification: A [`tbl`][tibble::tibble] with one column `.pred_<level>`
+#' for each level in `y` containing class probabilities if `type = "prob"`.
+#' For `type = "class"`, one column `.pred_class` with class predictions is returned.
+#' For `type = "numeric"` or `"link"`, raw predictions are returned: one column
+#' `.pred` for binary outcomes, and one column `.pred_<level>` per level for
+#' multiclass outcomes. With `loss = "logit"`, the first level is the reference
+#' class and has no column, so `K - 1` columns are returned for `K` levels.
 #'
 #' @export
 #' @importFrom hardhat forge validate_prediction_size
