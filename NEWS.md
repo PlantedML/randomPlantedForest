@@ -1,4 +1,30 @@
-# randomPlantedForest 0.3.0.9000
+# randomPlantedForest 0.4.0
+
+It is now possible to serialize and de-serialize an `rpf` object via marshalling,
+meaning a fitted model can be saved to disk or dispatched to a worker process for 
+parallelization or encapsulation, as is done in `mlr3`. This also re-opens the door 
+for the `mlr3extralearners` wrapper, which was removed due to the lack of 
+serialization support.
+
+* New `rpf_marshal()` / `rpf_unmarshal()` serialize a fitted forest to a plain
+  R list and back, making `saveRDS()`-based storage of rpf models possible (#52).
+  Purified forests restore their purified state directly; training data is only
+  embedded with `include_data = TRUE` (required to `purify()` after restoring).
+  Blobs record the blob format version and the package version they were
+  created with; restoring under an older package than the one that saved the
+  model warns. Malformed or corrupt blobs error instead of reading out of bounds.
+* New `rpf_is_valid()` checks whether an rpf object's internal model is usable,
+  `predict()`, `purify()` and `predict_components()` now give an actionable
+  error for `rpf` objects restored via `readRDS()` without marshaling.
+* New `bundle::bundle()` method for rpf models wrapping the marshaling API.
+
+## Behavior changes
+
+* The default for `delta` changed from 0 to 0.001. With `delta = 0`, splits
+  producing single-class nodes have infinite logit loss and are always rejected,
+  which also degraded binary logit fits.
+
+## Fixes and improvements
 
 * Fixed multiclass classification with `loss = "logit"`, which effectively never
   split and predicted near-uniform class probabilities (#40). The C++ logit loss
@@ -12,20 +38,6 @@
     non-reference levels (previously `K` columns).
   * `predict_components()` on multiclass logit fits returns per-class components
     for the `K-1` non-reference levels; `target_levels` reflects this.
-* The default for `delta` changed from 0 to 0.001. With `delta = 0`, splits
-  producing single-class nodes have infinite logit loss and are always rejected,
-  which also degraded binary logit fits.
-* New `rpf_marshal()` / `rpf_unmarshal()` serialize a fitted forest to a plain
-  R list and back, making `saveRDS()`-based storage of rpf models possible (#52).
-  Purified forests restore their purified state directly; training data is only
-  embedded with `include_data = TRUE` (required to `purify()` after restoring).
-  Blobs record the blob format version and the package version they were
-  created with; restoring under an older package than the one that saved the
-  model warns. Malformed or corrupt blobs error instead of reading out of bounds.
-* New `rpf_is_valid()` checks whether an rpf object's internal model is usable;
-  `predict()`, `purify()` and `predict_components()` now give an actionable
-  error for rpf objects restored via `readRDS()` without marshaling.
-* New `bundle::bundle()` method for rpf models wrapping the marshaling API.
 
 # randomPlantedForest 0.3.0
 
