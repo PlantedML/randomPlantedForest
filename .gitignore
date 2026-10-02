@@ -2,6 +2,7 @@
 html/
 latex/
 attic/
+README.html
 
 # Created by https://www.toptal.com/developers/gitignore/api/r
 # Edit at https://www.toptal.com/developers/gitignore?templates=r
@@ -67,3 +68,4 @@ attic/vignettes/.gitignore
 attic/vignettes/randomPlantedForest.Rmd
 attic/vignettes/test/C-Code.cpp
 attic/vignettes/test/Regression-Test-oldrpf.Rmd
+README.html
