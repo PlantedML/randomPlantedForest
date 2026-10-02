@@ -1,6 +1,7 @@
 # ignore doxygen generated data
 html/
 latex/
+attic/
 
 # Created by https://www.toptal.com/developers/gitignore/api/r
 # Edit at https://www.toptal.com/developers/gitignore?templates=r
@@ -47,3 +48,22 @@ inst/doc
 /doc/
 /Meta/
 /.vscode/
+attic/bench-powerset.R
+attic/bench-predict_components.R
+attic/components-testing.R
+attic/components.R
+attic/perf-sanity.R
+attic/reprex-threading-seeding.R
+attic/sanity-multiclass.R
+attic/scratch.R
+attic/scratchpad-llms.R
+attic/serialize-rpf.R
+attic/shuffle_debug.cpp
+attic/test-rand.R
+attic/testing-predict-components.R
+attic/threading-test.R
+attic/tune-bikeshare-xgb-rpf.R
+attic/vignettes/.gitignore
+attic/vignettes/randomPlantedForest.Rmd
+attic/vignettes/test/C-Code.cpp
+attic/vignettes/test/Regression-Test-oldrpf.Rmd
