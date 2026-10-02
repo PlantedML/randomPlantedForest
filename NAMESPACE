@@ -27,7 +27,6 @@ importFrom(Rcpp,
 )
 importFrom(data.table,
   ":=",
-  ':=',
   .BY,
   .EACHI,
   .GRP,

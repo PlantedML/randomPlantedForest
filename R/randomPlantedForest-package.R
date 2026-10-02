@@ -11,7 +11,7 @@
 #' @importFrom data.table .N
 #' @importFrom data.table .NGRP
 #' @importFrom data.table .SD
-#' @importFrom data.table data.table
+#' @importFrom data.table data.table as.data.table
 #' @importFrom Rcpp loadModule
 #' @importFrom Rcpp sourceCpp
 #' @useDynLib randomPlantedForest, .registration = TRUE
