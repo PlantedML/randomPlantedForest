@@ -262,21 +262,67 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
   Rcpp::NumericMatrix out(n, (int)vs);
   double *res = out.begin(); // column-major: res[k * n + row]
 
+  const bool all_components = component_index == std::set<int>{0};
+  const bool intercept_only = component_index == std::set<int>{-1};
+
   if (purified)
   {
-    std::vector<std::vector<double>> rows = to_std_vec(X);
+    // Purified trees are grids: per tree dimension, binary-search the cell
+    // boundaries. Matching trees are resolved once here, not per row.
+    struct GridTree
+    {
+      utils::Matrix<std::vector<double>> *values;
+      std::vector<const std::vector<double> *> bounds; // cell limits per tree dimension
+      std::vector<int> cols;                           // column of X per tree dimension
+    };
+    std::vector<GridTree> grids;
+    for (auto &tree_family : this->tree_families)
+    {
+      for (auto &tree : tree_family)
+      {
+        const bool is_intercept = tree.first == std::set<int>{0};
+        if (intercept_only ? !is_intercept : (!all_components && tree.first != component_index))
+          continue;
+        GridTree g{&tree.second->GridLeaves.values, {}, {}};
+        if (!is_intercept)
+        {
+          int pos = 0;
+          for (int dim : tree.first)
+          {
+            g.bounds.push_back(&tree.second->GridLeaves.lim_list[(size_t)(dim - 1)]);
+            g.cols.push_back(all_components ? dim - 1 : pos);
+            ++pos;
+          }
+        }
+        grids.push_back(std::move(g));
+      }
+    }
+
+    const double *x = X.begin();
     parallel_rows(n, threads, [&](int begin, int end)
                   {
-      for (int r = begin; r < end; ++r) {
-        std::vector<double> pred = predict_single(rows[(size_t)r], component_index);
-        for (size_t k = 0; k < vs && k < pred.size(); ++k) res[k * n + r] = pred[k];
-      } });
+      std::vector<int> idx;
+      for (const GridTree &g : grids) {
+        const size_t nd = g.cols.size();
+        idx.assign(std::max<size_t>(1, nd), 0);
+        for (int r = begin; r < end; ++r) {
+          for (size_t j = 0; j < nd; ++j) {
+            const std::vector<double> &b = *g.bounds[j];
+            if (b.size() < 2) { idx[j] = 0; continue; }
+            int c = (int)(std::upper_bound(b.begin(), b.end(), x[(size_t)g.cols[j] * n + r]) - b.begin());
+            idx[j] = std::min(std::max(0, c - 1), (int)b.size() - 2);
+          }
+          const std::vector<double> &vals = (*g.values)[idx];
+          for (size_t k = 0; k < vs && k < vals.size(); ++k) res[k * n + r] += vals[k];
+        }
+      }
+      for (size_t k = 0; k < vs; ++k)
+        for (int r = begin; r < end; ++r) res[k * n + r] /= n_trees; });
     return out;
   }
 
   // Same leaf membership rule as predict_single: an interval edge at the
   // training bound is open, so new data outside the training range still lands in a leaf.
-  const bool all_components = component_index == std::set<int>{0};
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<FlatTree> trees;
   for (auto &tree_family : this->tree_families)

@@ -202,7 +202,13 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # Get predicted components from C++
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
-  ret <- object$fit$predict_matrix(new_data, components, 0L)
+  # Component inputs are often low-cardinality, so predict each distinct row once.
+  # match(x, x) codes values exactly, unlike pasting doubles.
+  codes <- lapply(seq_len(ncol(new_data)), function(j) match(new_data[, j], new_data[, j]))
+  key <- if (length(codes) == 1L) codes[[1L]] else do.call(paste, codes)
+  first <- which(!duplicated(key))
+  ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
+  ret <- ret[match(key, key[first]), , drop = FALSE]
 
   # Get outcome levels for multiclass handling
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])

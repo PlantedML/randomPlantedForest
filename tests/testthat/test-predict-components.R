@@ -151,3 +151,14 @@ test_that(".predict_single_component is consistent with predictor order", {
     .predict_single_component(rp, new_data, c("cyl", "gear", "am"))
   )
 })
+
+test_that("duplicated rows get the same components as their originals", {
+  rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+  idx <- c(3, 1, 3, 2, 1, 1)
+
+  once <- predict_components(rp, mtcars[1:3, ])
+  repeated <- predict_components(rp, mtcars[idx, ])
+
+  expect_equal(repeated$m, once$m[idx], ignore_attr = TRUE)
+  expect_equal(repeated$intercept, once$intercept)
+})
