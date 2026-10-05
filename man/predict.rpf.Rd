@@ -8,6 +8,7 @@
   object,
   new_data,
   type = ifelse(object$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
   ...
 )
 }
@@ -26,6 +27,9 @@ For \code{type = "prob"}, these are truncated to ensure this property.
 If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} is an alias
 for \code{type = "numeric"}, as in this case the raw predictions have the
 additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
+
+\item{nthreads}{integer or NULL: number of threads to use. If NULL, defaults
+to min of the object's configured \code{nthreads} and available threads.}
 
 \item{...}{Unused.}
 }

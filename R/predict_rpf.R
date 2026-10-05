@@ -12,6 +12,8 @@
 #' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
 #' for `type = "numeric"`, as in this case the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
+#' @param nthreads integer or NULL: number of threads to use. If NULL, defaults
+#'   to min of the object's configured `nthreads` and available threads.
 #' @param ... Unused.
 #'
 #' @return For regression: A [`tbl`][tibble::tibble] with column `.pred` with
@@ -32,12 +34,23 @@
 #' # Regression with L2 loss
 #' rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
 #' predict(rpfit, mtcars[, c("cyl", "wt")])
-predict.rpf <- function(object, new_data, type = ifelse(object$mode == "regression", "numeric", "prob"), ...) {
+predict.rpf <- function(
+  object,
+  new_data,
+  type = ifelse(object$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
+  ...
+) {
   check_rpf_alive(object)
+  if (!is.null(nthreads)) {
+    checkmate::assert_int(nthreads, lower = 1)
+  }
+  # 0 tells C++ to use the forest's own nthreads
+  nthreads <- as.integer(if (is.null(nthreads)) 0L else nthreads)
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
 
-  out <- predict_rpf_bridge(type, object, processed$predictors, ...)
+  out <- predict_rpf_bridge(type, object, processed$predictors, nthreads)
 
   hardhat::validate_prediction_size(out, new_data)
 
@@ -46,7 +59,7 @@ predict.rpf <- function(object, new_data, type = ifelse(object$mode == "regressi
 
 
 # Bridge: Passes new data to corresponding predict function
-predict_rpf_bridge <- function(type, object, predictors, ...) {
+predict_rpf_bridge <- function(type, object, predictors, nthreads = 0L) {
   type <- match.arg(type, choices = c("numeric", "class", "prob", "link"))
   predictors <- preprocess_predictors_predict(object, predictors)
 
@@ -71,15 +84,15 @@ predict_rpf_bridge <- function(type, object, predictors, ...) {
 
   switch(
     type,
-    numeric = predict_rpf_numeric(object, predictors, ...),
-    class = predict_rpf_class(object, predictors, ...),
-    prob = predict_rpf_prob(object, predictors, ...)
+    numeric = predict_rpf_numeric(object, predictors, nthreads),
+    class = predict_rpf_class(object, predictors, nthreads),
+    prob = predict_rpf_prob(object, predictors, nthreads)
   )
 }
 
 # Predict function for numeric outcome / regression
-predict_rpf_numeric <- function(object, new_data, ...) {
-  pred <- object$fit$predict_matrix(new_data, 0)
+predict_rpf_numeric <- function(object, new_data, nthreads = 0L) {
+  pred <- object$fit$predict_matrix(new_data, 0, nthreads)
 
   if (ncol(pred) == 1) {
     # Regression or binary case: just return predictions as-is, single column
@@ -100,10 +113,10 @@ predict_rpf_numeric <- function(object, new_data, ...) {
 # Classification ----------------------------------------------------------
 
 # Predict function for classification: Probability prediction
-predict_rpf_prob <- function(object, new_data, ...) {
+predict_rpf_prob <- function(object, new_data, nthreads = 0L) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
-  pred_raw <- object$fit$predict_matrix(new_data, 0)
+  pred_raw <- object$fit$predict_matrix(new_data, 0, nthreads)
 
   if (length(outcome_levels) == 2) {
     # Binary outcome
@@ -148,11 +161,11 @@ predict_rpf_prob <- function(object, new_data, ...) {
 }
 
 # Class prediction: Take probability prediction and convert to class labels
-predict_rpf_class <- function(object, new_data, ...) {
+predict_rpf_class <- function(object, new_data, nthreads = 0L) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   # Predict probability
-  pred_prob <- predict_rpf_prob(object, new_data, 0, ...)
+  pred_prob <- predict_rpf_prob(object, new_data, nthreads)
 
   # For each instance, class with higher probability
   pred_class <- factor(outcome_levels[max.col(as.matrix(pred_prob))], levels = outcome_levels)

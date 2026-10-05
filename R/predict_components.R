@@ -202,7 +202,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # Get predicted components from C++
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
-  ret <- object$fit$predict_matrix(new_data, components)
+  ret <- object$fit$predict_matrix(new_data, components, 0L)
 
   # Get outcome levels for multiclass handling
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])

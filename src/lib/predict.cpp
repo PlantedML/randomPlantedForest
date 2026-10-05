@@ -1,7 +1,10 @@
 // Prediction entry points split out from rpf.cpp for readability and reuse.
 #include "rpf.hpp"
 #include <algorithm>
+#include <exception>
 #include <iterator>
+#include <limits>
+#include <thread>
 
 // predict single feature vector
 std::vector<double> RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index)
@@ -199,23 +202,146 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
   return total_res / n_trees;
 }
 
-// predict multiple feature vectors
-Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, const NumericVector components)
+namespace
 {
-  std::vector<std::vector<double>> feature_vec = to_std_vec(X);
-  std::set<int> component_index = to_std_set(components);
-  std::vector<std::vector<double>> predictions;
-  if (feature_vec.empty())
-    throw std::invalid_argument("Feature vector is empty.");
-  if (component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec[0].size() != (size_t)this->feature_size)
-    throw std::invalid_argument("Feature vector has wrong dimension.");
-  if (component_index != std::set<int>{0} && component_index != std::set<int>{-1} && component_index.size() != feature_vec[0].size())
-    throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
-  for (auto &vec : feature_vec)
+// One tree's leaves in contiguous arrays, so the per-row scan streams through memory.
+struct FlatTree
+{
+  std::vector<int> cols;      // column of X compared against each tree dimension
+  std::vector<double> lo, hi; // n_leaves x cols.size(), row-major; open bounds stored as -/+inf
+  std::vector<double> values; // n_leaves x value_size
+  size_t n_leaves = 0;
+};
+
+// Runs f(begin, end) on contiguous row ranges, one per thread.
+template <class F>
+void parallel_rows(int n, unsigned int threads, F f)
+{
+  threads = std::max(1u, std::min<unsigned int>(threads, (unsigned int)n));
+  if (threads == 1)
   {
-    predictions.push_back(predict_single(vec, component_index));
+    f(0, n);
+    return;
   }
-  return from_std_vec(predictions);
+  std::vector<std::thread> pool;
+  std::vector<std::exception_ptr> errors(threads);
+  int chunk = (n + (int)threads - 1) / (int)threads;
+  for (unsigned int t = 0; t < threads; ++t)
+  {
+    int begin = (int)t * chunk, end = std::min(n, begin + chunk);
+    pool.emplace_back([&f, &errors, t, begin, end]
+                      {
+      // an exception escaping a std::thread would terminate R
+      try { f(begin, end); }
+      catch (...) { errors[t] = std::current_exception(); } });
+  }
+  for (auto &th : pool)
+    th.join();
+  for (auto &e : errors)
+    if (e)
+      std::rethrow_exception(e);
+}
+} // namespace
+
+// predict multiple feature vectors
+Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, const NumericVector components, int nthreads)
+{
+  std::set<int> component_index = to_std_set(components);
+  const int n = X.nrow(), p = X.ncol();
+  if (n == 0 || p == 0)
+    throw std::invalid_argument("Feature vector is empty.");
+  if (component_index == std::set<int>{0} && this->feature_size >= 0 && p != this->feature_size)
+    throw std::invalid_argument("Feature vector has wrong dimension.");
+  if (component_index != std::set<int>{0} && component_index != std::set<int>{-1} && component_index.size() != (size_t)p)
+    throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
+
+  unsigned int threads = nthreads > 0 ? (unsigned int)nthreads : (unsigned int)std::max(1, this->nthreads);
+  threads = std::min(threads, std::max(1u, std::thread::hardware_concurrency()));
+
+  const size_t vs = value_size;
+  Rcpp::NumericMatrix out(n, (int)vs);
+  double *res = out.begin(); // column-major: res[k * n + row]
+
+  if (purified)
+  {
+    std::vector<std::vector<double>> rows = to_std_vec(X);
+    parallel_rows(n, threads, [&](int begin, int end)
+                  {
+      for (int r = begin; r < end; ++r) {
+        std::vector<double> pred = predict_single(rows[(size_t)r], component_index);
+        for (size_t k = 0; k < vs && k < pred.size(); ++k) res[k * n + r] = pred[k];
+      } });
+    return out;
+  }
+
+  // Same leaf membership rule as predict_single: an interval edge at the
+  // training bound is open, so new data outside the training range still lands in a leaf.
+  const bool all_components = component_index == std::set<int>{0};
+  const double inf = std::numeric_limits<double>::infinity();
+  std::vector<FlatTree> trees;
+  for (auto &tree_family : this->tree_families)
+  {
+    for (auto &tree : tree_family)
+    {
+      if (!all_components && tree.first != component_index)
+        continue;
+      FlatTree ft;
+      std::vector<int> dims;
+      int pos = 0;
+      for (int dim : tree.first)
+      {
+        dims.push_back(std::max(0, dim - 1));
+        ft.cols.push_back(all_components ? std::max(0, dim - 1) : pos);
+        ++pos;
+      }
+      const auto &leaves = tree.second->leaves;
+      ft.n_leaves = leaves.size();
+      ft.lo.reserve(ft.n_leaves * dims.size());
+      ft.hi.reserve(ft.n_leaves * dims.size());
+      ft.values.assign(ft.n_leaves * vs, 0.0);
+      for (size_t l = 0; l < ft.n_leaves; ++l)
+      {
+        for (int d : dims)
+        {
+          const Interval &iv = leaves[l].intervals[(size_t)d];
+          ft.lo.push_back(iv.first == lower_bounds[(size_t)d] ? -inf : iv.first);
+          ft.hi.push_back(iv.second == upper_bounds[(size_t)d] ? inf : iv.second);
+        }
+        for (size_t k = 0; k < vs && k < leaves[l].value.size(); ++k)
+          ft.values[l * vs + k] = leaves[l].value[k];
+      }
+      trees.push_back(std::move(ft));
+    }
+  }
+
+  const double *x = X.begin(); // column-major: x[c * n + row]
+  parallel_rows(n, threads, [&](int begin, int end)
+                {
+    // Tree-outer loop keeps one tree's leaves hot in cache across all rows of the chunk.
+    std::vector<double> xr;
+    for (const FlatTree &ft : trees) {
+      const size_t nd = ft.cols.size();
+      xr.resize(nd);
+      for (int r = begin; r < end; ++r) {
+        for (size_t j = 0; j < nd; ++j) xr[j] = x[(size_t)ft.cols[j] * n + r];
+        for (size_t l = 0; l < ft.n_leaves; ++l) {
+          const double *lo = &ft.lo[l * nd], *hi = &ft.hi[l * nd];
+          bool valid = true;
+          for (size_t j = 0; j < nd; ++j) {
+            // explicit inf checks keep NaN/inf inputs matching predict_single
+            if (!((lo[j] <= xr[j] || lo[j] == -inf) && (xr[j] < hi[j] || hi[j] == inf))) {
+              valid = false;
+              break;
+            }
+          }
+          if (valid)
+            for (size_t k = 0; k < vs; ++k) res[k * n + r] += ft.values[l * vs + k];
+        }
+      }
+    }
+    for (size_t k = 0; k < vs; ++k)
+      for (int r = begin; r < end; ++r) res[k * n + r] /= n_trees; });
+  return out;
 }
 
 Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector &X, const NumericVector components)
