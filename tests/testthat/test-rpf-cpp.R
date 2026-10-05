@@ -34,3 +34,25 @@ test_that("C-level functionality works", {
     "n_trees=60"
   )
 })
+
+test_that("set_data loads without fitting and fit() matches the fitting constructor", {
+  X <- as.matrix(mtcars[, c("cyl", "wt", "hp")])
+  Y <- as.matrix(mtcars$mpg)
+  pars <- c(2, 10, 20, 10, 0.4, 0, 0, 1, 0, 0.1, 50, 1, 3)
+
+  set.seed(1)
+  direct <- new(RandomPlantedForest, Y, X, pars)
+
+  manual <- new(RandomPlantedForest, pars)
+  manual$set_data(Y, X)
+  expect_length(manual$get_model(), 0)
+  set.seed(1)
+  manual$fit()
+
+  expect_identical(manual$predict_matrix(X, 0, 1L), direct$predict_matrix(X, 0, 1L))
+})
+
+test_that("unknown classification loss errors", {
+  pars <- c(1, 50, 30, 10, 0.4, 0, 0, 1, 0, 0.1, 50, 1, 3, 0, 0.1)
+  expect_error(new(ClassificationRPF, "nope", pars), "Unknown loss")
+})

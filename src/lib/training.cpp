@@ -2,6 +2,7 @@
 // manages bootstrapping and threading, and handles optional purification.
 #include "rpf.hpp"
 #include "internal_utils.hpp"
+#include <random>
 
 using namespace rpf_utils;
 
@@ -24,16 +25,13 @@ void RandomPlantedForest::fit()
 
   this->tree_families = std::vector<TreeFamily>(n_trees);
 
-  // Generate per-tree seeds from R's RNG to ensure reproducibility across runs
-  // when the user sets the R seed. These seeds will be used regardless of
-  // threading mode.
+  // Per-tree seeds come from the binding's RNG (R's, via seed_source) so a seed
+  // set there reproduces the fit regardless of threading mode.
+  if (!seed_source)
+    seed_source = [rng = std::mt19937_64(std::random_device{}())]() mutable { return rng(); };
   tree_seeds_.assign((size_t)std::max(0, n_trees), 0ULL);
-  for (int i = 0; i < n_trees; ++i) {
-    // Two 32-bit chunks composed into a 64-bit seed using R's RNG
-    unsigned long long hi = static_cast<unsigned long long>(R::runif(0.0, 4294967296.0));
-    unsigned long long lo = static_cast<unsigned long long>(R::runif(0.0, 4294967296.0));
-    tree_seeds_[(size_t)i] = (hi << 32) ^ lo ^ static_cast<unsigned long long>(i);
-  }
+  for (int i = 0; i < n_trees; ++i)
+    tree_seeds_[(size_t)i] = seed_source() ^ static_cast<unsigned long long>(i);
 
   unsigned int threads_to_use = static_cast<unsigned int>(nthreads);
   if (threads_to_use == 0) threads_to_use = 1;
@@ -41,7 +39,7 @@ void RandomPlantedForest::fit()
   {
     if (threads_to_use > std::thread::hardware_concurrency())
     {
-      Rcout << "Requested " << threads_to_use << " threads but only " << std::thread::hardware_concurrency() << " available" << std::endl;
+      warn("Requested " + std::to_string(threads_to_use) + " threads but only " + std::to_string(std::thread::hardware_concurrency()) + " available");
     }
     for (int start = 0; start < n_trees; start += (int)threads_to_use)
     {
