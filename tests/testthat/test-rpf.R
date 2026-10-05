@@ -59,3 +59,21 @@ test_that("Setting max_interaction = 0 works", {
   # max_interaction = p (= 10 for mtcars, ncol(mtcars) - 1)
   expect_equal(pred0, pred10)
 })
+
+test_that("unknown arguments are an error", {
+  expect_error(rpf(mpg ~ cyl + wt, data = mtcars, max_interactions = 2), class = "rlib_error_dots_nonempty")
+  expect_error(rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg, cv = TRUE), class = "rlib_error_dots_nonempty")
+})
+
+test_that("deterministic fits are seed-independent and warn about redundant trees", {
+  fit_det <- function(seed) {
+    set.seed(seed)
+    rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 1, max_interaction = 2, deterministic = TRUE)
+  }
+  expect_identical(predict(fit_det(1), mtcars), predict(fit_det(2), mtcars))
+
+  expect_warning(
+    rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 5, deterministic = TRUE),
+    "all 5 tree families are identical"
+  )
+})

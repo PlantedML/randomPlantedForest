@@ -1,5 +1,15 @@
 # randomPlantedForest (development version)
 
+* `rpf()` interface cleanup:
+  * Removed `cv`, which never had an effect: the C++ cross-validation was a
+    no-op.
+  * Unknown arguments, such as misspelled ones, are now an error instead of
+    being silently ignored.
+  * `deterministic = TRUE` with `ntrees > 1` warns, as all tree families are
+    then identical.
+  * Arguments are reordered by purpose (forest size, split search, loss,
+    other); call `rpf()` with named arguments beyond the data arguments.
+  * Rewritten documentation, including guidance on choosing parameters.
 * Prediction is much faster: leaves are scanned from flat, cache-friendly
   arrays (~15x single-threaded), and rows are split across threads.
   `predict()` gains `nthreads`, defaulting to the `nthreads` used for fitting.

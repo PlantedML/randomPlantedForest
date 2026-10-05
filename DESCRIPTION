@@ -18,10 +18,12 @@ URL: https://github.com/PlantedML/randomPlantedForest,
 BugReports: https://github.com/PlantedML/randomPlantedForest/issues
 Imports:
     checkmate,
+    cli,
     data.table,
     hardhat,
     methods,
     Rcpp,
+    rlang,
     utils
 Suggests:
     bundle,
