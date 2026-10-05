@@ -199,10 +199,22 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     out_names <- paste0(sort(predictors), collapse = ":")
   }
 
+  # Component inputs are often low-cardinality, so predict each distinct row once.
+  # match(x, x) codes values exactly as the index of their first occurrence;
+  # folding codes column by column keeps keys <= n^2 < 2^53.
+  first_index <- function(x) match(x, x)
+  n <- nrow(new_data)
+  key <- first_index(new_data[, 1L])
+  for (j in seq_len(ncol(new_data))[-1L]) {
+    key <- first_index((key - 1) * n + first_index(new_data[, j]))
+  }
+  first <- which(key == seq_len(n))
+
   # Get predicted components from C++
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
-  ret <- object$fit$predict_matrix(new_data, components)
+  ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
+  ret <- ret[match(key, first), , drop = FALSE]
 
   # Get outcome levels for multiclass handling
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])

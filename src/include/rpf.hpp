@@ -58,7 +58,8 @@ public:
   void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
   // Predict for a matrix or a single vector. `components = {0}` means the full
   // model; otherwise a set of component indices to evaluate (expert mode).
-  NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0});
+  // `nthreads = 0` uses the forest's own nthreads setting.
+  NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0}, int nthreads = 0);
   NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
   // Optional post-processing to redistribute effects across component orders.
   void purify_1();
