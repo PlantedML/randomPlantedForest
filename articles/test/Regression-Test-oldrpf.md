@@ -23,15 +23,15 @@ applicable.
 
 | method  | loss |       R |     Cpp |    diff |
 |:--------|:-----|--------:|--------:|--------:|
-| classif | L1   | 0.08063 | 0.08598 | 0.00502 |
+| classif | L1   | 0.08063 | 0.08591 | 0.00369 |
 
 ### L2 Loss
 
 ![](Regression-Test-oldrpf_files/figure-html/classif-L2-1.png)
 
-| method  | loss |       R |     Cpp |    diff |
-|:--------|:-----|--------:|--------:|--------:|
-| classif | L2   | 0.09227 | 0.09132 | 0.00336 |
+| method  | loss |      R |    Cpp |    diff |
+|:--------|:-----|-------:|-------:|--------:|
+| classif | L2   | 0.0959 | 0.0952 | 0.00357 |
 
 ### Logit Loss
 
@@ -39,24 +39,24 @@ applicable.
 
 | method  | loss  |       R |     Cpp |    diff |
 |:--------|:------|--------:|--------:|--------:|
-| classif | logit | 0.08893 | 0.09096 | 0.00257 |
+| classif | logit | 0.08992 | 0.08721 | 0.00265 |
 
 ### Exponential Loss
 
 ![](Regression-Test-oldrpf_files/figure-html/classif-exponential-1.png)
 
-| method  | loss        |       R |     Cpp |    diff |
-|:--------|:------------|--------:|--------:|--------:|
-| classif | exponential | 0.08266 | 0.07963 | 0.00375 |
+| method  | loss        |      R |     Cpp |    diff |
+|:--------|:------------|-------:|--------:|--------:|
+| classif | exponential | 0.0836 | 0.08097 | 0.00419 |
 
 ## Summary Comparison
 
 | method  | loss        |       R |     Cpp |    diff |
 |:--------|:------------|--------:|--------:|--------:|
 | regr    | L2          | 0.18670 | 0.18369 | 0.07184 |
-| classif | L1          | 0.08063 | 0.08598 | 0.00502 |
-| classif | L2          | 0.09227 | 0.09132 | 0.00336 |
-| classif | logit       | 0.08893 | 0.09096 | 0.00257 |
-| classif | exponential | 0.08266 | 0.07963 | 0.00375 |
+| classif | L1          | 0.08063 | 0.08591 | 0.00369 |
+| classif | L2          | 0.09590 | 0.09520 | 0.00357 |
+| classif | logit       | 0.08992 | 0.08721 | 0.00265 |
+| classif | exponential | 0.08360 | 0.08097 | 0.00419 |
 
 ![](Regression-Test-oldrpf_files/figure-html/comp-preds-plot-1.png)![](Regression-Test-oldrpf_files/figure-html/comp-preds-plot-2.png)
