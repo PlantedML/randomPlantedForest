@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,7 +30,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Random Planted Forest Predictions</h1>
-      <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/v0.4.0/R/predict_rpf.R" class="external-link"><code>R/predict_rpf.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/R/predict_rpf.R" class="external-link"><code>R/predict_rpf.R</code></a></small>
       <div class="d-none name"><code>predict.rpf.Rd</code></div>
     </div>
 
@@ -45,6 +45,7 @@
 <span>  <span class="va">object</span>,</span>
 <span>  <span class="va">new_data</span>,</span>
 <span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">object</span><span class="op">$</span><span class="va">mode</span> <span class="op">==</span> <span class="st">"regression"</span>, <span class="st">"numeric"</span>, <span class="st">"prob"</span><span class="op">)</span>,</span>
+<span>  nthreads <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -70,6 +71,11 @@ For <code>type = "prob"</code>, these are truncated to ensure this property.</p>
 <p>If <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>, <code>type = "link"</code> is an alias
 for <code>type = "numeric"</code>, as in this case the raw predictions have the
 additional interpretation similar to the linear predictor in a <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></code>.</p></dd>
+
+
+<dt id="arg-nthreads">nthreads<a class="anchor" aria-label="anchor" href="#arg-nthreads"></a></dt>
+<dd><p>integer or NULL: number of threads to use. If NULL, defaults
+to min of the object's configured <code>nthreads</code> and available threads.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

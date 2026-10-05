@@ -1,5 +1,17 @@
 # Changelog
 
+## randomPlantedForest (development version)
+
+- Prediction is much faster: leaves are scanned from flat,
+  cache-friendly arrays (~15x single-threaded), and rows are split
+  across threads. [`predict()`](https://rdrr.io/r/stats/predict.html)
+  gains `nthreads`, defaulting to the `nthreads` used for fitting.
+- [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
+  is much faster: purified forests look up only the trees of the
+  requested component, and each distinct input row is predicted once,
+  which pays off for low-cardinality features
+  ([\#59](https://github.com/PlantedML/randomPlantedForest/issues/59)).
+
 ## randomPlantedForest 0.4.0
 
 It is now possible to serialize and de-serialize an `rpf` object via

@@ -10,6 +10,7 @@ predict(
   object,
   new_data,
   type = ifelse(object$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
   ...
 )
 ```
@@ -39,6 +40,11 @@ predict(
   for `type = "numeric"`, as in this case the raw predictions have the
   additional interpretation similar to the linear predictor in a
   [`glm`](https://rdrr.io/r/stats/glm.html).
+
+- nthreads:
+
+  integer or NULL: number of threads to use. If NULL, defaults to min of
+  the object's configured `nthreads` and available threads.
 
 - ...:
 

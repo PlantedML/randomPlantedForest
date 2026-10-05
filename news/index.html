@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">randomPlantedForest</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,9 +30,15 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/v0.4.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="development version" id="randomplantedforest-development-version">randomPlantedForest (development version)<a class="anchor" aria-label="anchor" href="#randomplantedforest-development-version"></a></h2>
+<ul><li>Prediction is much faster: leaves are scanned from flat, cache-friendly arrays (~15x single-threaded), and rows are split across threads. <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> gains <code>nthreads</code>, defaulting to the <code>nthreads</code> used for fitting.</li>
+<li>
+<code><a href="../reference/predict_components.html">predict_components()</a></code> is much faster: purified forests look up only the trees of the requested component, and each distinct input row is predicted once, which pays off for low-cardinality features (<a href="https://github.com/PlantedML/randomPlantedForest/issues/59" class="external-link">#59</a>).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.0" id="randomplantedforest-040">randomPlantedForest 0.4.0<a class="anchor" aria-label="anchor" href="#randomplantedforest-040"></a></h2>
 <p>It is now possible to serialize and de-serialize an <code>rpf</code> object via marshalling, meaning a fitted model can be saved to disk or dispatched to a worker process for parallelization or encapsulation, as is done in <code>mlr3</code>. This also re-opens the door for the <code>mlr3extralearners</code> wrapper, which was removed due to the lack of serialization support.</p>
