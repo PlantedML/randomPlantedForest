@@ -1,6 +1,6 @@
 // Public API for the Random Planted Forest (regression base). The core uses
 // only standard C++ types; language bindings (the Rcpp module in
-// `src/rcpp_interface.hpp`) convert their own types at the boundary.
+// `src/rcpp_interface.h`) convert their own types at the boundary.
 //
 // Key entry points:
 // - ctor(params): configure; set_data(Y, X) loads data; fit() trains

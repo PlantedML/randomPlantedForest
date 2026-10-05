@@ -1,4 +1,4 @@
-#include "rcpp_interface.hpp"
+#include "rcpp_interface.h"
 
 // Methods shared by the regression and classification classes
 template <class T>

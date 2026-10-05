@@ -1,4 +1,4 @@
-#include "rcpp_interface.hpp"
+#include "rcpp_interface.h"
 
 using namespace Rcpp;
 
