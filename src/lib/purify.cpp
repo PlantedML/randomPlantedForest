@@ -384,8 +384,7 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
 void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int mode)
 {
   if (sample_size == 0 || X.empty())
-    Rcpp::stop("Cannot purify: no training data available. If this forest was "
-               "restored with rpf_unmarshal(), marshal it with include_data = TRUE.");
+    throw std::runtime_error("Cannot purify: no training data available.");
 
   // Determine threads: if user provided >0, use it; otherwise default to
   // min(object-configured nthreads, hardware concurrency)
@@ -409,7 +408,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     unsigned int avail = std::thread::hardware_concurrency();
     if (avail > 0 && threads_to_use > avail)
     {
-      Rcout << "Requested " << threads_to_use << " threads but only " << avail << " available" << std::endl;
+      warn("Requested " + std::to_string(threads_to_use) + " threads but only " + std::to_string(avail) + " available");
     }
     for (size_t start = 0; start < this->tree_families.size(); start += (size_t)threads_to_use)
     {

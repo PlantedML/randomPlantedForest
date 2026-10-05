@@ -64,199 +64,153 @@ void RandomPlantedForest::L2_loss(Split &split)
   }
 }
 
-void RandomPlantedForest::parse_parameters(const std::vector<double> &pars)
+RandomPlantedForest::RandomPlantedForest(const RPFParams &params)
 {
-  this->max_interaction = pars[0];
-  this->n_trees = pars[1];
-  this->n_splits = pars[2];
-  this->split_try = pars[3];
-  this->t_try = pars[4];
-  this->purify_forest = pars[5];
-  this->deterministic = pars[6];
-  this->nthreads = pars[7];
-  this->cross_validate = pars[8];
-  this->split_decay_rate_ = pars[9];
-  this->max_candidates_   = static_cast<size_t>(pars[10]);
-  this->delete_leaves   = (pars[11] != 0);
-  // map: 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist
-  this->split_structure_mode_ = (pars.size() >= 13) ? static_cast<int>(pars[12]) : 3;
+  this->max_interaction = params.max_interaction;
+  this->n_trees = params.n_trees;
+  this->n_splits = params.n_splits;
+  this->split_try = params.split_try;
+  this->t_try = params.t_try;
+  this->purify_forest = params.purify_forest;
+  this->deterministic = params.deterministic;
+  this->nthreads = params.nthreads;
+  this->cross_validate = params.cross_validate;
+  this->split_decay_rate_ = params.split_decay_rate;
+  this->max_candidates_ = params.max_candidates;
+  this->delete_leaves = params.delete_leaves;
+  this->split_structure_mode_ = params.split_structure_mode;
 }
 
-// constructor (parsing includes split_structure)
-RandomPlantedForest::RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                                         const NumericVector parameters)
+void RandomPlantedForest::warn(const std::string &msg)
 {
-  Rcpp::RNGScope scope;
-  std::vector<double> pars = to_std_vec(parameters);
-  if (pars.size() != 12 && pars.size() != 13)
-  {
-    Rcpp::stop("RandomPlantedForest requires 12 or 13 parameters, got %d", pars.size());
-  }
-  else
-  {
-    parse_parameters(pars);
-  }
-  this->set_data(samples_Y, samples_X);
-}
-
-// Params-only constructor: parses configuration but loads no data and does
-// not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
-RandomPlantedForest::RandomPlantedForest(const NumericVector parameters)
-{
-  std::vector<double> pars = to_std_vec(parameters);
-  if (pars.size() != 12 && pars.size() != 13)
-    Rcpp::stop("RandomPlantedForest requires 12 or 13 parameters, got %d", pars.size());
-  parse_parameters(pars);
+  if (verbose_out)
+    *verbose_out << msg << std::endl;
 }
 
 void RandomPlantedForest::set_shape(int feature_size_in, int value_size_in, int sample_size_in,
-                                    const NumericVector lower, const NumericVector upper)
+                                    const std::vector<double> &lower, const std::vector<double> &upper)
 {
   this->feature_size = feature_size_in;
   this->value_size = value_size_in;
   this->sample_size = sample_size_in;
-  this->lower_bounds = to_std_vec(lower);
-  this->upper_bounds = to_std_vec(upper);
+  this->lower_bounds = lower;
+  this->upper_bounds = upper;
   this->n_leaves = std::vector<int>(feature_size, 1);
 }
 
-void RandomPlantedForest::set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
+void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Matrix2D &samples_X)
 {
   // Restore path only: bounds are NOT recomputed (they come from the blob via
   // set_shape), but shapes must be consistent with the restored forest so the
   // purify path cannot read out of bounds.
-  if (samples_X.ncol() != feature_size)
-    Rcpp::stop("Corrupt training data: X has %d columns, expected %d.",
-               samples_X.ncol(), feature_size);
-  if (samples_X.nrow() != samples_Y.nrow())
-    Rcpp::stop("Corrupt training data: X has %d rows but Y has %d.",
-               samples_X.nrow(), samples_Y.nrow());
-  this->Y = to_std_vec(samples_Y);
-  this->X = to_std_vec(samples_X);
+  const int x_cols = samples_X.empty() ? 0 : (int)samples_X[0].size();
+  if (x_cols != feature_size)
+    throw std::invalid_argument("Corrupt training data: X has " + std::to_string(x_cols) +
+                                " columns, expected " + std::to_string(feature_size) + ".");
+  if (samples_X.size() != samples_Y.size())
+    throw std::invalid_argument("Corrupt training data: X has " + std::to_string(samples_X.size()) +
+                                " rows but Y has " + std::to_string(samples_Y.size()) + ".");
+  this->Y = samples_Y;
+  this->X = samples_X;
   this->sample_size = X.size();
 }
 
-List RandomPlantedForest::get_data()
+void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
 {
-  return List::create(Named("X") = from_std_vec(X), Named("Y") = from_std_vec(Y));
-}
-
-List RandomPlantedForest::get_bounds()
-{
-  return List::create(Named("lower") = from_std_vec(lower_bounds),
-                      Named("upper") = from_std_vec(upper_bounds));
-}
-
-List RandomPlantedForest::get_shape()
-{
-  return List::create(Named("feature_size") = feature_size,
-                      Named("value_size") = (int)value_size,
-                      Named("sample_size") = (int)sample_size);
-}
-
-void RandomPlantedForest::set_model(List &model)
-{
-  size_t n_families = model.size();
-  tree_families = std::vector<TreeFamily>(n_families);
-  for (size_t i = 0; i < n_families; ++i) {
-    List family = model[i];
-    List variables = family["variables"];
-    List values = family["values"];
-    List intervals = family["intervals"];
-    size_t n_trees_fam = variables.size();
-    for (size_t j = 0; j < n_trees_fam; ++j) {
-      IntegerVector tree_variables = variables[j];
-      std::set<int> dims(tree_variables.begin(), tree_variables.end());
-      List tree_values = values[j];
-      List tree_intervals = intervals[j];
-      size_t n_leaves = tree_values.size();
-      std::vector<Leaf> leaves(n_leaves);
-      for (size_t k = 0; k < n_leaves; ++k) {
-        // get_model() builds leaf_values via push_back() onto a default-constructed
-        // NumericMatrix, which yields a plain vector without matrix dims - read it
-        // back as a vector rather than casting to NumericMatrix.
-        leaves[k].value = as<std::vector<double>>(tree_values[k]);
-        NumericMatrix leaf_intervals = tree_intervals[k];
-        if (leaf_intervals.nrow() < 2 || leaf_intervals.ncol() < feature_size)
-          Rcpp::stop("Corrupt model data: leaf interval matrix has dimensions %dx%d, expected 2x%d.",
-                     leaf_intervals.nrow(), leaf_intervals.ncol(), feature_size);
-        std::vector<Interval> ivs(feature_size);
-        for (int l = 0; l < feature_size; ++l)
-          ivs[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
-        leaves[k].intervals = ivs;
+  tree_families = std::vector<TreeFamily>(model.size());
+  for (size_t i = 0; i < model.size(); ++i) {
+    for (const TreeExport &tree : model[i]) {
+      if (tree.values.size() != tree.intervals.size())
+        throw std::invalid_argument("Corrupt model data: tree has " + std::to_string(tree.values.size()) +
+                                    " leaf values but " + std::to_string(tree.intervals.size()) + " leaf interval sets.");
+      std::vector<Leaf> leaves(tree.values.size());
+      for (size_t k = 0; k < leaves.size(); ++k) {
+        if ((int)tree.intervals[k].size() != feature_size)
+          throw std::invalid_argument("Corrupt model data: leaf has " + std::to_string(tree.intervals[k].size()) +
+                                      " intervals, expected " + std::to_string(feature_size) + ".");
+        leaves[k].value = tree.values[k];
+        leaves[k].intervals = tree.intervals[k];
       }
       tree_families[i].insert(
-          std::make_pair(dims, std::make_shared<DecisionTree>(DecisionTree(dims, leaves))));
+          std::make_pair(tree.variables, std::make_shared<DecisionTree>(DecisionTree(tree.variables, leaves))));
     }
   }
   purified = false;
 }
 
-List RandomPlantedForest::get_grid_leaves()
+std::vector<FamilyExport> RandomPlantedForest::get_model() const
 {
-  List families;
-  for (auto &family : tree_families) {
-    List trees;
-    List fam_lim_list;
+  std::vector<FamilyExport> model;
+  for (const auto &family : tree_families)
+  {
+    FamilyExport fam;
+    for (const auto &tree : family)
+    {
+      TreeExport t;
+      t.variables = tree.first;
+      for (const auto &leaf : tree.second->leaves)
+      {
+        t.values.push_back(leaf.value);
+        t.intervals.push_back(leaf.intervals);
+      }
+      fam.push_back(std::move(t));
+    }
+    model.push_back(std::move(fam));
+  }
+  return model;
+}
+
+std::vector<GridFamilyExport> RandomPlantedForest::get_grid_leaves() const
+{
+  std::vector<GridFamilyExport> families;
+  for (const auto &family : tree_families) {
+    GridFamilyExport fam;
     bool lim_captured = false;
-    for (auto &tree : family) {
+    for (const auto &tree : family) {
       if (!lim_captured) {
         // lim_list is identical for every tree in a family; store once
-        List ll;
-        for (auto &v : tree.second->GridLeaves.lim_list) ll.push_back(from_std_vec(v));
-        fam_lim_list = ll;
+        fam.lim_list = tree.second->GridLeaves.lim_list;
         lim_captured = true;
       }
-      auto &vals = tree.second->GridLeaves.values;
+      const auto &vals = tree.second->GridLeaves.values;
       const auto &flat = vals.flat();
-      NumericMatrix vmat(flat.size(), value_size);
+      GridTreeExport t;
+      t.variables = tree.first;
+      t.dims = vals.dims;
+      t.values.assign(flat.size(), std::vector<double>(value_size, 0.0));
       for (size_t e = 0; e < flat.size(); ++e)
         for (size_t p = 0; p < value_size && p < flat[e].size(); ++p)
-          vmat(e, p) = flat[e][p];
-      trees.push_back(List::create(
-          Named("variables") = from_std_set(tree.first),
-          Named("dims") = from_std_vec(vals.dims),
-          Named("values") = vmat));
+          t.values[e][p] = flat[e][p];
+      fam.trees.push_back(std::move(t));
     }
-    families.push_back(List::create(Named("lim_list") = fam_lim_list,
-                                    Named("trees") = trees));
+    families.push_back(std::move(fam));
   }
   return families;
 }
 
-void RandomPlantedForest::set_grid_leaves(List &grid)
+void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &grid)
 {
-  if ((size_t)grid.size() != tree_families.size())
-    Rcpp::stop("Grid data does not match the number of tree families.");
+  if (grid.size() != tree_families.size())
+    throw std::invalid_argument("Grid data does not match the number of tree families.");
   for (size_t i = 0; i < tree_families.size(); ++i) {
-    List family = grid[i];
-    List fam_lim_list = family["lim_list"];
-    std::vector<std::vector<double>> lim_list;
-    for (int l = 0; l < fam_lim_list.size(); ++l)
-      lim_list.push_back(to_std_vec(NumericVector(fam_lim_list[l])));
-    List trees = family["trees"];
-    for (int j = 0; j < trees.size(); ++j) {
-      List tr = trees[j];
-      IntegerVector vars = tr["variables"];
-      std::set<int> dims_set(vars.begin(), vars.end());
-      auto it = tree_families[i].find(dims_set);
+    for (const GridTreeExport &tr : grid[i].trees) {
+      auto it = tree_families[i].find(tr.variables);
       if (it == tree_families[i].end())
-        Rcpp::stop("Grid data references a tree not present in the forest.");
-      std::vector<int> mdims = to_std_vec(IntegerVector(tr["dims"]));
-      for (int d : mdims)
+        throw std::invalid_argument("Grid data references a tree not present in the forest.");
+      for (int d : tr.dims)
         if (d <= 0)
-          Rcpp::stop("Corrupt grid data: non-positive grid dimension %d.", d);
-      NumericMatrix vmat = tr["values"];
-      utils::Matrix<std::vector<double>> values(mdims, std::vector<double>(value_size, 0));
+          throw std::invalid_argument("Corrupt grid data: non-positive grid dimension " + std::to_string(d) + ".");
+      utils::Matrix<std::vector<double>> values(tr.dims, std::vector<double>(value_size, 0));
       auto &flat = values.flat();
-      if ((size_t)vmat.nrow() != flat.size() || (size_t)vmat.ncol() != value_size)
-        Rcpp::stop("Corrupt grid data: values matrix has dimensions %dx%d, expected %dx%d.",
-                   vmat.nrow(), vmat.ncol(), (int)flat.size(), (int)value_size);
+      const size_t ncol = tr.values.empty() ? value_size : tr.values[0].size();
+      if (tr.values.size() != flat.size() || ncol != value_size)
+        throw std::invalid_argument("Corrupt grid data: values matrix has dimensions " + std::to_string(tr.values.size()) +
+                                    "x" + std::to_string(ncol) + ", expected " + std::to_string(flat.size()) + "x" +
+                                    std::to_string(value_size) + ".");
       for (size_t e = 0; e < flat.size(); ++e)
-        for (size_t p = 0; p < value_size; ++p)
-          flat[e][p] = vmat(e, p);
+        flat[e] = tr.values[e];
       it->second->GridLeaves.values = values;
-      it->second->GridLeaves.lim_list = lim_list;
+      it->second->GridLeaves.lim_list = grid[i].lim_list;
     }
   }
   purified = true;
@@ -300,10 +254,10 @@ Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double
   }
 }
 
-void RandomPlantedForest::set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X)
+void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &samples_X)
 {
-  this->Y = to_std_vec(samples_Y);
-  this->X = to_std_vec(samples_X);
+  this->Y = samples_Y;
+  this->X = samples_X;
   if (Y.empty()) throw std::invalid_argument("Y empty - no data provided.");
   if (X.empty()) throw std::invalid_argument("X empty - no data provided.");
   this->feature_size = X[0].size();
@@ -352,8 +306,6 @@ void RandomPlantedForest::set_data(const NumericMatrix &samples_Y, const Numeric
       }
     }
   }
-  this->fit();
-  if (cross_validate) { this->cross_validation(); }
 }
 
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
@@ -733,17 +685,23 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 // predict_matrix moved to lib/predict.cpp
 // predict_vector moved to lib/predict.cpp
 
-double RandomPlantedForest::MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true)
-{ return sum(Rcpp::pow(Y_true - Y_predicted, 2)) / Y_true.size(); }
-
-double RandomPlantedForest::MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true)
+double RandomPlantedForest::MSE(const Matrix2D &Y_predicted, const Matrix2D &Y_true)
 {
-  double sumv = 0; int Y_size = Y_predicted.size();
-  for (int i = 0; i < Y_size; ++i) sumv += MSE_vec(Y_predicted(i, _), Y_true(i, _));
-  return sumv / Y_size;
+  if (Y_predicted.size() != Y_true.size())
+    throw std::invalid_argument("The two matrices do not have the same number of rows.");
+  double sumv = 0;
+  size_t n = 0;
+  for (size_t i = 0; i < Y_predicted.size(); ++i)
+  {
+    if (Y_predicted[i].size() != Y_true[i].size())
+      throw std::invalid_argument("The two matrices do not have the same number of columns.");
+    for (size_t j = 0; j < Y_predicted[i].size(); ++j, ++n)
+      sumv += (Y_true[i][j] - Y_predicted[i][j]) * (Y_true[i][j] - Y_predicted[i][j]);
+  }
+  return n == 0 ? 0 : sumv / n;
 }
 
-void RandomPlantedForest::print()
+void RandomPlantedForest::print(std::ostream &out)
 {
   for (int n = 0; n < n_trees; ++n)
   {
@@ -751,31 +709,31 @@ void RandomPlantedForest::print()
     for (size_t m = 0; m < keys.size(); ++m)
     {
       DecisionTree tree = *(family[keys[m]]);
-      Rcout << m + 1 << " Tree: "; Rcout << "Dims="; for (const auto &dim : tree.split_dims) Rcout << dim << ",";
-      Rcout << std::endl << "Leaves: (" << tree.leaves.size() << ")" << std::endl;
+      out << m + 1 << " Tree: "; out << "Dims="; for (const auto &dim : tree.split_dims) out << dim << ",";
+      out << std::endl << "Leaves: (" << tree.leaves.size() << ")" << std::endl;
       for (const auto &leaf : tree.leaves)
       {
-        Rcout << "Intervals="; for (const auto &interval : leaf.intervals) { Rcout << interval.first << "," << interval.second << "/"; }
-        Rcout << " Value="; for (const auto &val : leaf.value) Rcout << val << ", "; Rcout << std::endl;
+        out << "Intervals="; for (const auto &interval : leaf.intervals) { out << interval.first << "," << interval.second << "/"; }
+        out << " Value="; for (const auto &val : leaf.value) out << val << ", "; out << std::endl;
       }
-      Rcout << std::endl;
+      out << std::endl;
     }
-    Rcout << std::endl << std::endl;
+    out << std::endl << std::endl;
   }
 }
 
-void RandomPlantedForest::get_parameters()
+void RandomPlantedForest::get_parameters(std::ostream &out)
 {
-  Rcout << "Parameters: n_trees=" << n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try
-        << ", split_decay_rate=" << split_decay_rate_<< ", max_candidates="  << max_candidates_
-        << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", nthreads=" << nthreads
-        << ", feature_size=" << feature_size << ", sample_size=" << sample_size
-        << ", split_structure_mode=" << split_structure_mode_ << std::endl;
+  out << "Parameters: n_trees=" << n_trees << ", n_splits=" << n_splits << ", max_interaction=" << max_interaction << ", t_try=" << t_try
+      << ", split_decay_rate=" << split_decay_rate_<< ", max_candidates="  << max_candidates_
+      << ", split_try=" << split_try << ", purified=" << purified << ", deterministic=" << deterministic << ", nthreads=" << nthreads
+      << ", feature_size=" << feature_size << ", sample_size=" << sample_size
+      << ", split_structure_mode=" << split_structure_mode_ << std::endl;
 }
 
-void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values)
+void RandomPlantedForest::set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values)
 {
-  if (keys.size() != values.size()) { Rcout << "Size of input vectors is not the same. " << std::endl; return; }
+  if (keys.size() != values.size()) { warn("Size of input vectors is not the same. "); return; }
   for (unsigned int i = 0; i < keys.size(); ++i)
   {
     if (keys[i] == "deterministic") this->deterministic = values[i];
@@ -793,37 +751,12 @@ void RandomPlantedForest::set_parameters(StringVector keys, NumericVector values
     else if (keys[i] == "leaf_feature_cache_cap") this->leaf_feature_cache_cap_ = static_cast<size_t>(values[i]);
     
     else if (keys[i] == "split_structure_mode") this->split_structure_mode_ = static_cast<int>(values[i]);
-    else Rcout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
+    else warn("Unkown parameter key  '" + keys[i] + "' .");
   }
   this->fit();
 }
 
-List RandomPlantedForest::get_model()
-{
-  List model;
-  for (const auto &family : tree_families)
-  {
-    List variables, family_values, family_intervals;
-    for (const auto &tree : family)
-    {
-      List tree_values; List tree_intervals; variables.push_back(from_std_set(tree.first));
-      for (const auto &leaf : tree.second->leaves)
-      {
-        NumericMatrix leaf_values; for (const auto &val : leaf.value) leaf_values.push_back(val);
-        tree_values.push_back(leaf_values);
-        NumericVector intervals; for (const auto &interval : leaf.intervals) { intervals.push_back(interval.first); intervals.push_back(interval.second); }
-        NumericMatrix leaf_intervals(2, feature_size, intervals.begin()); tree_intervals.push_back(leaf_intervals);
-      }
-      family_intervals.push_back(tree_intervals); family_values.push_back(tree_values);
-    }
-    model.push_back(List::create(Named("variables") = variables, _["values"] = family_values, _["intervals"] = family_intervals));
-  }
-  return (model);
-}
-
-
-
-void RandomPlantedForest::cross_validation(int n_sets, IntegerVector splits, NumericVector t_tries, IntegerVector split_tries)
+void RandomPlantedForest::cross_validation(int n_sets, const std::vector<int> &splits, const std::vector<double> &t_tries, const std::vector<int> &split_tries)
 {
 
   /*

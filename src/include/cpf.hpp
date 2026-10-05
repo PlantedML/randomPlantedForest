@@ -8,18 +8,14 @@ class ClassificationRPF : public RandomPlantedForest
 
 public:
   using RandomPlantedForest::calcOptimalSplit;
-  ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                    const String loss = "L2", const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 0, 0.1, 50,1});
-  // Params-only constructor: parses configuration and loss but loads no data
-  // and does not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
-  ClassificationRPF(const String loss, const NumericVector parameters);
-  void set_parameters(StringVector keys, NumericVector values);
+  ClassificationRPF(const std::string &loss, const RPFParams &params, double delta = 0.1, double epsilon = 0);
+  void fit() override;
+  void set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values) override;
   ~ClassificationRPF(){};
 
 protected:
-  // Maps a loss-name string to `loss` and `calcLoss` (verbatim move of the
-  // former inline if/else chain).
-  void set_loss_function(const String &loss);
+  // Maps a loss name to `loss` and `calcLoss`; throws on unknown names.
+  void set_loss_function(const std::string &loss);
 
 private:
   double delta;
@@ -40,7 +36,6 @@ private:
   LossType loss;
   void (ClassificationRPF::*calcLoss)(Split &);
   void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
-  void fit() override;
   Split calcOptimalSplit(
       const std::vector<std::vector<double>>& Y,
       const std::vector<std::vector<double>>& X,

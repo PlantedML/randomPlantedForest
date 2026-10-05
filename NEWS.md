@@ -6,6 +6,15 @@
 * `predict_components()` is much faster: purified forests look up only the
   trees of the requested component, and each distinct input row is predicted
   once, which pays off for low-cardinality features (#59).
+* Classification fits are slightly faster, as redundant work during model construction
+  was removed. For a given seed, classification models differ from 0.4.0;
+  regression models are unchanged.
+* The C++ core no longer depends on Rcpp: it uses standard C++ types and
+  exceptions, and an Rcpp layer (`src/rcpp_interface.*`) converts at the
+  boundary. This is groundwork for bindings in other languages such as Python
+  (#57, @jyliuu). For direct users of the C++ object (`$fit`): `set_data()`
+  no longer fits, call `fit()` afterwards; an unknown classification loss
+  is an error instead of a silent fallback to L2.
 
 # randomPlantedForest 0.4.0
 

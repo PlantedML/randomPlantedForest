@@ -1,17 +1,14 @@
-// Public API for the Random Planted Forest (regression base). This header
-// declares the externally visible training, prediction, and model-introspection
-// methods used from R via the Rcpp module in `src/randomPlantedForest.cpp`.
+// Public API for the Random Planted Forest (regression base). The core uses
+// only standard C++ types; language bindings (the Rcpp module in
+// `src/rcpp_interface.h`) convert their own types at the boundary.
 //
 // Key entry points:
-// - ctor(Y, X, parameters): construct and fit a model (calls set_data + fit)
-// - set_data(Y, X): load data (no training) and initialize bounds
-// - fit(): build tree families according to split_structure_mode_
+// - ctor(params): configure; set_data(Y, X) loads data; fit() trains
 // - predict_matrix/predict_vector(): batch/single predictions
-// - purify_1/2/3(): optional post-processing to orthogonalize components
-// - cross_validation(): coarse k-fold search over a few parameters (legacy)
-// - get_parameters()/set_parameters(): inspect or update configuration
-// - get_model(): export current forest (for R printing/plotting)
-// - is_purified(): flag indicating whether purify_* was applied last
+// - purify(): optional post-processing to orthogonalize components
+// - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(): export and
+//   restore the forest for serialization
+// - verbose_out / seed_source: injected by the binding (console, RNG)
 //
 // Implementation notes:
 // - Training orchestrated in `lib/training.cpp`
@@ -22,45 +19,86 @@
 #define RPF_H
 
 #include "trees.hpp"
+#include <cstdint>
+#include <functional>
 
-using namespace Rcpp;
+typedef std::vector<std::vector<double>> Matrix2D; /**< row-major: rows x columns */
+
+struct RPFParams
+{
+  int max_interaction = 1;
+  int n_trees = 50;
+  int n_splits = 30;
+  int split_try = 10;
+  double t_try = 0.4;
+  bool purify_forest = false;
+  bool deterministic = false;
+  int nthreads = 1;
+  bool cross_validate = false;
+  double split_decay_rate = 0.1;
+  size_t max_candidates = 50;
+  bool delete_leaves = true;
+  int split_structure_mode = 3; /**< 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist */
+};
+
+// Forest export for serialization: one entry per tree family.
+struct TreeExport
+{
+  std::set<int> variables;
+  std::vector<std::vector<double>> values;      /**< per leaf: value_size values */
+  std::vector<std::vector<Interval>> intervals; /**< per leaf: feature_size intervals */
+};
+typedef std::vector<TreeExport> FamilyExport;
+
+// Purified grid export: one entry per tree family.
+struct GridTreeExport
+{
+  std::set<int> variables;
+  std::vector<int> dims;
+  Matrix2D values; /**< grid cells (column-major over dims) x value_size */
+};
+struct GridFamilyExport
+{
+  Matrix2D lim_list; /**< cell limits per feature, shared by the family's trees */
+  std::vector<GridTreeExport> trees;
+};
 
 class RandomPlantedForest
 {
 
 public:
-  // Construct and fit a random planted forest on Y ~ X with configuration in
-  // `parameters` (see R docs for positional mapping; last value selects
-  // split-structure mode). Calls set_data() then fit().
-  RandomPlantedForest(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                      const NumericVector parameters = {1, 50, 30, 10, 0.4, 0, 0, 0, 0, 0.1, 50, 1, 3});
   RandomPlantedForest(){};
-  // Params-only constructor: parses configuration but loads no data and does
-  // not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
-  RandomPlantedForest(const NumericVector parameters);
+  explicit RandomPlantedForest(const RPFParams &params);
+  virtual ~RandomPlantedForest(){};
+
+  // Load or replace training data without fitting; computes bounds.
+  void set_data(const Matrix2D &samples_Y, const Matrix2D &samples_X);
+  // Train tree families on the loaded data.
+  virtual void fit();
   // Restore shape metadata without training data (serialization path).
   void set_shape(int feature_size_in, int value_size_in, int sample_size_in,
-                 const NumericVector lower, const NumericVector upper);
+                 const std::vector<double> &lower, const std::vector<double> &upper);
   // Store training data without fitting and without recomputing bounds.
-  void set_training_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
-  // Export training data (for rpf_marshal(include_data = TRUE)).
-  List get_data();
-  // Export bounds/shape metadata (for rpf_marshal()).
-  List get_bounds();
-  List get_shape();
-  // Restore tree structure from get_model()'s output (serialization path).
-  void set_model(List &model);
-  // Export per-tree GridLeaves (purified leaf grid) for serialization.
-  List get_grid_leaves();
-  // Restore per-tree GridLeaves from get_grid_leaves()'s output; sets purified = true.
-  void set_grid_leaves(List &grid);
-  // Load or replace data without fitting; computes bounds and resets state.
-  void set_data(const NumericMatrix &samples_Y, const NumericMatrix &samples_X);
-  // Predict for a matrix or a single vector. `components = {0}` means the full
-  // model; otherwise a set of component indices to evaluate (expert mode).
-  // `nthreads = 0` uses the forest's own nthreads setting.
-  NumericMatrix predict_matrix(const NumericMatrix &X, const NumericVector components = {0}, int nthreads = 0);
-  NumericMatrix predict_vector(const NumericVector &X, const NumericVector components = {0});
+  void set_training_data(const Matrix2D &samples_Y, const Matrix2D &samples_X);
+  const Matrix2D &get_X() const { return X; }
+  const Matrix2D &get_Y() const { return Y; }
+  const std::vector<double> &get_lower_bounds() const { return lower_bounds; }
+  const std::vector<double> &get_upper_bounds() const { return upper_bounds; }
+  int get_feature_size() const { return feature_size; }
+  int get_value_size() const { return (int)value_size; }
+  int get_sample_size() const { return sample_size; }
+  // Export and restore tree structure (serialization path).
+  std::vector<FamilyExport> get_model() const;
+  void set_model(const std::vector<FamilyExport> &model);
+  // Export and restore per-tree purified grids; restoring sets purified = true.
+  std::vector<GridFamilyExport> get_grid_leaves() const;
+  void set_grid_leaves(const std::vector<GridFamilyExport> &grid);
+  // Predict n rows of column-major X (n x p). `components = {0}` means the full
+  // model, `{-1}` the intercept; otherwise a set of component indices with X
+  // holding only those columns. `nthreads = 0` uses the forest's own setting.
+  // Returns column-major n x value_size.
+  std::vector<double> predict_matrix(const double *X, int n, int p, const std::set<int> &components, int nthreads = 0);
+  Matrix2D predict_vector(const std::vector<double> &X, const std::set<int> &components);
   // Optional post-processing to redistribute effects across component orders.
   void purify_1();
   void purify_2();
@@ -68,28 +106,33 @@ public:
   void purify(int maxp_interaction, int nthreads, int mode);
   // Unified entry with explicit threading control
   void purify_fast_exact(int maxp_interaction, int nthreads);
-  // Human-readable dump of forest structure to R console.
-  void print();
-  // Legacy coarse CV over a few parameters; mainly for internal experiments.
-  void cross_validation(int n_sets = 4, IntegerVector splits = {5, 50}, NumericVector t_tries = {0.2, 0.5, 0.7, 0.9}, IntegerVector split_tries = {1, 2, 5, 10});
-  // Mean-squared error helper for matrix outputs.
-  double MSE(const NumericMatrix &Y_predicted, const NumericMatrix &Y_true);
-  // Inspect/update configuration; `set_parameters` may trigger a refit.
-  void get_parameters();
-  void set_parameters(StringVector keys, NumericVector values);
-  // Export a list representation of the current forest for printing/plotting.
-  List get_model();
-  virtual ~RandomPlantedForest(){};
+  // Human-readable dump of forest structure.
+  void print(std::ostream &out);
+  // Legacy coarse CV over a few parameters; currently a no-op.
+  void cross_validation(int n_sets = 4, const std::vector<int> &splits = {5, 50},
+                        const std::vector<double> &t_tries = {0.2, 0.5, 0.7, 0.9},
+                        const std::vector<int> &split_tries = {1, 2, 5, 10});
+  // Mean-squared error over all entries.
+  double MSE(const Matrix2D &Y_predicted, const Matrix2D &Y_true);
+  // Inspect/update configuration; `set_parameters` refits.
+  void get_parameters(std::ostream &out);
+  virtual void set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values);
   bool is_purified();
-  
+
+  // Destination for warnings; nullptr silences them. The core never writes to
+  // std::cout itself, as R forbids that in packages.
+  std::ostream *verbose_out = nullptr;
+  // Source of per-tree seeds, called once per tree on the calling thread when
+  // fitting. Defaults to std::random_device.
+  std::function<std::uint64_t()> seed_source;
+
 protected:
-  // Parse the flat parameter vector shared by both constructors.
-  void parse_parameters(const std::vector<double> &pars);
+  // Write a line to verbose_out, if set.
+  void warn(const std::string &msg);
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
   // Internal per-family worker for fast exact purifier (mode 2)
   void purify_fast_exact_family(TreeFamily &curr_family, int maxp_interaction);
-  double MSE_vec(const NumericVector &Y_predicted, const NumericVector &Y_true);
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */
   int max_interaction;                /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
@@ -110,11 +153,10 @@ protected:
   std::vector<double> upper_bounds;
   std::vector<double> lower_bounds;
   std::vector<TreeFamily> tree_families; /**<  random planted forest containing result */
-  // Seeds generated on the main thread from R's RNG, one per tree family
+  // Per-tree seeds drawn from seed_source on the main thread, one per tree family
   std::vector<unsigned long long> tree_seeds_;
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
   void L2_loss(Split &split);
-  virtual void fit();
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   struct SplitCandidate;
   // overload possibleExists for your vector of SplitCandidate

@@ -36,7 +36,7 @@ using namespace rpf_utils;
 
 // Maps a loss-name string to `loss` and `calcLoss` (verbatim move of the
 // former inline if/else chain from the data-fitting constructor).
-void ClassificationRPF::set_loss_function(const String &loss)
+void ClassificationRPF::set_loss_function(const std::string &loss)
 {
   if (loss == "L1")
   {
@@ -90,83 +90,14 @@ void ClassificationRPF::set_loss_function(const String &loss)
   }
   else
   {
-    Rcout << "Unkown loss function, set to default (L2)." << std::endl;
-    this->loss = LossType::L2;
-    this->calcLoss = &ClassificationRPF::L2_loss;
+    throw std::invalid_argument("Unknown loss function '" + loss + "'.");
   }
 }
 
-// constructor with parameters split_try, t_try, purify_forest, deterministic, nthreads
-ClassificationRPF::ClassificationRPF(const NumericMatrix &samples_Y, const NumericMatrix &samples_X,
-                                     const String loss, const NumericVector parameters)
-    : RandomPlantedForest(
-        samples_Y,
-        samples_X,
-        // pass first 13 parameters to base (includes split_structure)
-        parameters.size() >= 13 ? parameters[Rcpp::Range(0, 12)] : parameters[Rcpp::Range(0, 11)]
-      )
+ClassificationRPF::ClassificationRPF(const std::string &loss, const RPFParams &params, double delta, double epsilon)
+    : RandomPlantedForest(params), delta(delta), epsilon(epsilon)
 {
-
-  // Ensure correct Rcpp RNG state
-  Rcpp::RNGScope scope;
-
-  // initialize class members
-  std::vector<double> pars = to_std_vec(parameters);
   set_loss_function(loss);
-  if (pars.size() != 15)
-  {
-    Rcout << "Wrong number of parameters - set to default." << std::endl;
-    this->max_interaction = 1;
-    this->n_trees = 50;
-    this->n_splits = 30;
-    this->split_try = 10;
-    this->t_try = 0.4;
-    this->purify_forest = 0;
-    this->deterministic = 0;
-    this->nthreads = 1;
-    this->cross_validate = 0;
-    this->split_decay_rate_ = 0.1;
-    this->max_candidates_   = 50;
-    this->delete_leaves   = 1;
-    this->delta = 0.1;
-    this->epsilon = 0;
-  }
-  else
-  {
-    this->max_interaction = pars[0];
-    this->n_trees = pars[1];
-    this->n_splits = pars[2];
-    this->split_try = pars[3];
-    this->t_try = pars[4];
-    this->purify_forest = pars[5];
-    this->deterministic = pars[6];
-    this->nthreads = pars[7];
-    this->cross_validate = pars[8];
-    this->split_decay_rate_ = pars[9];
-    this->max_candidates_   = static_cast<size_t>(pars[10]);
-    this->delete_leaves   =  pars[11];
-    // pars[12] is split_structure for base; already consumed by base
-    this->delta = pars[13];
-    this->epsilon = pars[14];   
-  }
-
-  // set data and data related members
-  this->set_data(samples_Y, samples_X);
-}
-
-// Params-only constructor: parses configuration and loss but loads no data
-// and does not fit. Used by rpf_unmarshal() to rebuild a serialized forest.
-ClassificationRPF::ClassificationRPF(const String loss, const NumericVector parameters)
-    : RandomPlantedForest(
-          parameters.size() >= 13 ? NumericVector(parameters[Rcpp::Range(0, 12)])
-                                  : NumericVector(parameters[Rcpp::Range(0, 11)]))
-{
-  std::vector<double> pars = to_std_vec(parameters);
-  if (pars.size() != 15)
-    Rcpp::stop("ClassificationRPF requires 15 parameters, got %d", (int)pars.size());
-  set_loss_function(loss);
-  this->delta = pars[13];
-  this->epsilon = pars[14];
 }
 
 // Mode 1: cur_trees_2 (classification variant)
@@ -1178,11 +1109,11 @@ void ClassificationRPF::fit()
  updates the model, so far only single valued parameters supported,
  for replacing training data use 'set_data',
  note that changing cv does not trigger cross validation */
-void ClassificationRPF::set_parameters(StringVector keys, NumericVector values)
+void ClassificationRPF::set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values)
 {
   if (keys.size() != values.size())
   {
-    Rcout << "Size of input vectors is not the same. " << std::endl;
+    warn("Size of input vectors is not the same. ");
     return;
   }
 
@@ -1253,7 +1184,7 @@ void ClassificationRPF::set_parameters(StringVector keys, NumericVector values)
       }
       else
       {
-        Rcout << "Unkown loss function." << std::endl;
+        warn("Unkown loss function.");
       }
     }
     else if (keys[i] == "delta")
@@ -1274,7 +1205,7 @@ void ClassificationRPF::set_parameters(StringVector keys, NumericVector values)
     }
     else
     {
-      Rcout << "Unkown parameter key  '" << keys[i] << "' ." << std::endl;
+      warn("Unkown parameter key  '" + keys[i] + "' .");
     }
   }
   this->fit();

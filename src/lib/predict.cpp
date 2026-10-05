@@ -244,10 +244,8 @@ void parallel_rows(int n, unsigned int threads, F f)
 } // namespace
 
 // predict multiple feature vectors
-Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, const NumericVector components, int nthreads)
+std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::set<int> &component_index, int nthreads)
 {
-  std::set<int> component_index = to_std_set(components);
-  const int n = X.nrow(), p = X.ncol();
   if (n == 0 || p == 0)
     throw std::invalid_argument("Feature vector is empty.");
   if (component_index == std::set<int>{0} && this->feature_size >= 0 && p != this->feature_size)
@@ -259,8 +257,8 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
   threads = std::min(threads, std::max(1u, std::thread::hardware_concurrency()));
 
   const size_t vs = value_size;
-  Rcpp::NumericMatrix out(n, (int)vs);
-  double *res = out.begin(); // column-major: res[k * n + row]
+  std::vector<double> out((size_t)n * vs, 0.0);
+  double *res = out.data(); // column-major: res[k * n + row]
 
   const bool all_components = component_index == std::set<int>{0};
   const bool intercept_only = component_index == std::set<int>{-1};
@@ -298,7 +296,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
       }
     }
 
-    const double *x = X.begin();
+    const double *x = X;
     parallel_rows(n, threads, [&](int begin, int end)
                   {
       std::vector<int> idx;
@@ -360,7 +358,7 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
     }
   }
 
-  const double *x = X.begin(); // column-major: x[c * n + row]
+  const double *x = X; // column-major: x[c * n + row]
   parallel_rows(n, threads, [&](int begin, int end)
                 {
     // Tree-outer loop keeps one tree's leaves hot in cache across all rows of the chunk.
@@ -390,15 +388,13 @@ Rcpp::NumericMatrix RandomPlantedForest::predict_matrix(const NumericMatrix &X, 
   return out;
 }
 
-Rcpp::NumericMatrix RandomPlantedForest::predict_vector(const NumericVector &X, const NumericVector components)
+Matrix2D RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec, const std::set<int> &component_index)
 {
-  std::vector<double> feature_vec = to_std_vec(X);
-  std::set<int> component_index = to_std_set(components);
-  std::vector<std::vector<double>> predictions; Rcpp::NumericMatrix res;
-  if (feature_vec.empty()) { Rcout << "Feature vector is empty." << std::endl; return res; }
-  if (component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec.size() != (size_t)this->feature_size) { Rcout << "Feature vector has wrong dimension." << std::endl; return res; }
+  Matrix2D predictions;
+  if (feature_vec.empty()) { warn("Feature vector is empty."); return predictions; }
+  if (component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec.size() != (size_t)this->feature_size) { warn("Feature vector has wrong dimension."); return predictions; }
   if (component_index == std::set<int>{0}) { predictions.push_back(predict_single(feature_vec, component_index)); }
   else { for (auto vec : feature_vec) predictions.push_back(predict_single(std::vector<double>{vec}, component_index)); }
-  res = from_std_vec(predictions); return res;
+  return predictions;
 }
 
