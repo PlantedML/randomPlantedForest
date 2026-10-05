@@ -3,6 +3,9 @@
 * Prediction is much faster: leaves are scanned from flat, cache-friendly
   arrays (~15x single-threaded), and rows are split across threads.
   `predict()` gains `nthreads`, defaulting to the `nthreads` used for fitting.
+* `predict_components()` is much faster: purified forests look up only the
+  trees of the requested component, and each distinct input row is predicted
+  once, which pays off for low-cardinality features (#59).
 
 # randomPlantedForest 0.4.0
 
