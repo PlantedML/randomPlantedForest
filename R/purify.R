@@ -30,10 +30,10 @@
 #' is_purified(rpfit)
 purify <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL) {
   checkmate::assert_class(x, "rpf")
-  if (is_purified(x)) {
-    return(x)
-  }
   rlang::check_dots_empty()
+  if (is_purified(x)) {
+    return(invisible(x))
+  }
   check_rpf_alive(x)
   checkmate::assert_int(maxp_interaction, lower = 1, null.ok = TRUE)
   checkmate::assert_int(mode, lower = 1, upper = 2)
