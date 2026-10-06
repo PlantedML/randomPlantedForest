@@ -1030,10 +1030,11 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           leaf_s.value += curr_split.leaf_index->value;
           leaf_b.value += curr_split.leaf_index->value;
         }
+        // index before push_back, which may reallocate leaves and invalidate leaf_index
+        size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
         *curr_split.leaf_index = leaf_b;                 // replace old interval
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
         if (split_structure_mode_ == 3) {
-          size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
           size_t idx_s = curr_split.tree_index->leaves.size() - 1;
           for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
             std::set<int> res_dims_b = curr_split.tree_index->split_dims; res_dims_b.insert(feature_dim); res_dims_b.erase(0);
