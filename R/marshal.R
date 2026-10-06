@@ -60,8 +60,11 @@ rpf_unmarshal <- function(blob) {
   installed <- utils::packageVersion("randomPlantedForest")
   if (!is.null(state$pkg_version) && state$pkg_version > installed) {
     warning(
-      "This model was marshaled with randomPlantedForest ", state$pkg_version,
-      " but version ", installed, " is installed. Restoring may not be reliable.",
+      "This model was marshaled with randomPlantedForest ",
+      state$pkg_version,
+      " but version ",
+      installed,
+      " is installed. Restoring may not be reliable.",
       call. = FALSE
     )
   }
