@@ -1,6 +1,10 @@
 url: http://plantedml.com/randomPlantedForest/
 template:
   bootstrap: 5
+  light-switch: true
+
+development:
+  mode: auto
 
 articles:
 - title: Regression Tests
@@ -33,4 +37,3 @@ reference:
   - rpf_marshal
   - rpf_is_valid
   - bundle.rpf
-
