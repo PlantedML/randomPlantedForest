@@ -2,24 +2,17 @@
 % Please edit documentation in R/purify.R
 \name{purify}
 \alias{purify}
-\alias{purify.default}
-\alias{purify.rpf}
 \alias{is_purified}
 \title{Purify a Random Planted Forest}
 \usage{
-purify(x, ...)
-
-\method{purify}{default}(x, ...)
-
-\method{purify}{rpf}(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL)
+purify(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL)
 
 is_purified(x)
 }
 \arguments{
 \item{x}{An object of class \code{rpf}.}
 
-\item{...}{Not currently used, but required for extensibility. Unknown
-arguments are an error.}
+\item{...}{Reserved for future expansion.}
 
 \item{maxp_interaction}{\verb{[NULL]}: Highest interaction order to purify.
 Higher-order components are set to zero, but still influence lower orders
@@ -44,6 +37,7 @@ use.
 \details{
 The forest is modified in place: \code{x} and every copy of it are purified,
 whether or not the result is assigned.
+\code{purify()} is idempotent, meaning if the forest is already purified it just returns it unmodified.
 }
 \examples{
 rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)

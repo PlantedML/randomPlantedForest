@@ -7,30 +7,9 @@
 #'
 #' The forest is modified in place: `x` and every copy of it are purified,
 #' whether or not the result is assigned.
+#' `purify()` is idempotent, meaning if the forest is already purified it just returns it unmodified.
 #'
 #' @param x An object of class `rpf`.
-#' @param ... Not currently used, but required for extensibility. Unknown
-#'   arguments are an error.
-#'
-#' @return `purify()` returns `x` invisibly. `is_purified()` returns `TRUE` or
-#'   `FALSE`.
-#' @export
-#'
-#' @examples
-#' rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
-#' is_purified(rpfit)
-#' purify(rpfit)
-#' is_purified(rpfit)
-purify <- function(x, ...) {
-  UseMethod("purify")
-}
-
-#' @export
-#' @rdname purify
-purify.default <- function(x, ...) {
-  cli::cli_abort("{.fn purify} is not defined for a {.cls {class(x)[1]}}.")
-}
-
 #' @param maxp_interaction `[NULL]`: Highest interaction order to purify.
 #'   Higher-order components are set to zero, but still influence lower orders
 #'   during purification. `NULL` purifies all orders.
@@ -38,12 +17,23 @@ purify.default <- function(x, ...) {
 #'   based algorithm, `1` the original grid-based one.
 #' @param nthreads `[NULL]`: Number of threads. `NULL` uses the `nthreads` the
 #'   forest was fitted with, capped at the available cores.
+#' @param ... Reserved for future expansion.
+#'
+#' @return `purify()` returns `x` invisibly. `is_purified()` returns `TRUE` or
+#'   `FALSE`.
 #' @export
-#' @rdname purify
 #' @importFrom rlang %||%
-purify.rpf <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL) {
-  rlang::check_dots_empty()
+#' @examples
+#' rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+#' is_purified(rpfit)
+#' purify(rpfit)
+#' is_purified(rpfit)
+purify <- function(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL) {
   checkmate::assert_class(x, "rpf")
+  if (is_purified(x)) {
+    return(x)
+  }
+  rlang::check_dots_empty()
   check_rpf_alive(x)
   checkmate::assert_int(maxp_interaction, lower = 1, null.ok = TRUE)
   checkmate::assert_int(mode, lower = 1, upper = 2)
