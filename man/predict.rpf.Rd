@@ -28,10 +28,11 @@ If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} i
 for \code{type = "numeric"}, as in this case the raw predictions have the
 additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
 
-\item{nthreads}{integer or NULL: number of threads to use. If NULL, defaults
-to min of the object's configured \code{nthreads} and available threads.}
+\item{nthreads}{\verb{[NULL]}: Number of threads. \code{NULL} uses the \code{nthreads}
+the forest was fitted with, capped at the available cores.}
 
-\item{...}{Unused.}
+\item{...}{Not currently used, but required for extensibility. Unknown
+arguments are an error.}
 }
 \value{
 For regression: A \code{\link[tibble:tibble]{tbl}} with column \code{.pred} with

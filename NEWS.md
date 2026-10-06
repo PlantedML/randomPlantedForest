@@ -1,5 +1,14 @@
 # randomPlantedForest (development version)
 
+* Fixed classification fits not being reproducible for a fixed seed: when a
+  split replaced a leaf, its new split candidates could be lost or attached to
+  the wrong leaf, depending on memory layout. Affected classification models
+  differ from earlier versions.
+* `predict(type = "class")` breaks probability ties by level order instead of
+  at random, so class predictions are deterministic and no longer advance the
+  random number generator.
+* `predict()` and `purify()` error on unknown arguments. `purify()` returns
+  its input invisibly, as documented; it modifies the forest in place.
 * `rpf()` interface cleanup:
   * Removed `cv`, which never had an effect: the C++ cross-validation was a
     no-op.

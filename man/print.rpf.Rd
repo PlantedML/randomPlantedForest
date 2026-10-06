@@ -7,7 +7,7 @@
 \method{print}{rpf}(x, ...)
 }
 \arguments{
-\item{x}{And object of class \code{rpf}.}
+\item{x}{An object of class \code{rpf}.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }

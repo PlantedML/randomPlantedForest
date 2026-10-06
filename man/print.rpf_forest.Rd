@@ -18,7 +18,6 @@
 }
 \description{
 These methods are provided to avoid flooding the console with long nested lists containing tree structures.
-Note
 }
 \examples{
 

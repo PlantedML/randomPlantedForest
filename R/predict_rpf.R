@@ -12,9 +12,10 @@
 #' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
 #' for `type = "numeric"`, as in this case the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
-#' @param nthreads integer or NULL: number of threads to use. If NULL, defaults
-#'   to min of the object's configured `nthreads` and available threads.
-#' @param ... Unused.
+#' @param nthreads `[NULL]`: Number of threads. `NULL` uses the `nthreads`
+#'   the forest was fitted with, capped at the available cores.
+#' @param ... Not currently used, but required for extensibility. Unknown
+#'   arguments are an error.
 #'
 #' @return For regression: A [`tbl`][tibble::tibble] with column `.pred` with
 #' the same number of rows as `new_data`.
@@ -41,6 +42,7 @@ predict.rpf <- function(
   nthreads = NULL,
   ...
 ) {
+  rlang::check_dots_empty()
   check_rpf_alive(object)
   if (!is.null(nthreads)) {
     checkmate::assert_int(nthreads, lower = 1)
@@ -167,8 +169,12 @@ predict_rpf_class <- function(object, new_data, nthreads = 0L) {
   # Predict probability
   pred_prob <- predict_rpf_prob(object, new_data, nthreads)
 
-  # For each instance, class with higher probability
-  pred_class <- factor(outcome_levels[max.col(as.matrix(pred_prob))], levels = outcome_levels)
+  # For each instance, class with higher probability; ties go to the first
+  # level so predictions are deterministic and leave the RNG untouched
+  pred_class <- factor(
+    outcome_levels[max.col(as.matrix(pred_prob), ties.method = "first")],
+    levels = outcome_levels
+  )
   out <- hardhat::spruce_class(pred_class)
 
   out

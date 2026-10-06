@@ -1,6 +1,6 @@
 #' Print an rpf fit
 #'
-#' @param x And object of class `rpf`.
+#' @param x An object of class `rpf`.
 #' @param ... Further arguments passed to or from other methods.
 #'
 #' @return Invisibly: `x`.
@@ -48,7 +48,6 @@ print.rpf <- function(x, ...) {
 #' Compact printing of forest structures
 #'
 #' These methods are provided to avoid flooding the console with long nested lists containing tree structures.
-#' Note
 #'
 #' @param x Object of class `rpf_forest`
 #' @param ... Further arguments passed to or from other methods.

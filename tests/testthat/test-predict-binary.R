@@ -211,3 +211,18 @@ test_that("prob and classif yield same result", {
 
   expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
 })
+
+test_that("class predictions break ties by level order and leave the RNG alone", {
+  fit <- rpf(Species ~ ., data = droplevels(iris[iris$Species != "setosa", ]), ntrees = 2, loss = "L2")
+  local_mocked_bindings(
+    predict_rpf_prob = function(object, new_data, nthreads) {
+      data.frame(.pred_versicolor = c(0.5, 0.3), .pred_virginica = c(0.5, 0.7))
+    }
+  )
+  set.seed(1)
+  expected_draw <- runif(1)
+  set.seed(1)
+  pred <- predict(fit, iris[1:2, ], type = "class")
+  expect_identical(as.character(pred$.pred_class), c("versicolor", "virginica"))
+  expect_identical(runif(1), expected_draw)
+})

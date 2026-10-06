@@ -9,15 +9,11 @@ test_that("Basic fit: All numeric", {
 test_that("Prediction: All numeric", {
   rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
 
-  # check default behavior: components = 0
-  pred_default <- predict(rpf_fit, mtcars[, c(2, 6)], type = "numeric")
-  pred_0 <- predict(rpf_fit, mtcars[, c(2, 6)], type = "numeric", components = 0)
+  pred <- predict(rpf_fit, mtcars[, c(2, 6)], type = "numeric")
 
-  expect_identical(pred_default, pred_0)
-  expect_s3_class(pred_default, "tbl_df")
-
-  # FIXME: Test components
-  pred_1 <- predict(rpf_fit, mtcars[, c(2, 6)], type = "numeric", components = c(0, 1))
+  expect_s3_class(pred, "tbl_df")
+  expect_named(pred, ".pred")
+  expect_equal(nrow(pred), nrow(mtcars))
 })
 
 test_that("Fit + predict: Categorical features", {
@@ -65,4 +61,9 @@ test_that("predictions do not depend on nthreads", {
     predict(fit, mtcars, nthreads = 3L)
   )
   expect_identical(predict(fit, mtcars), predict(fit, mtcars, nthreads = 1L))
+})
+
+test_that("predict() rejects unknown arguments", {
+  fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 5)
+  expect_error(predict(fit, mtcars, newdata = mtcars), class = "rlib_error_dots_nonempty")
 })
