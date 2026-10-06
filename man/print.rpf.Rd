@@ -2,7 +2,7 @@
 % Please edit documentation in R/print.R
 \name{print.rpf}
 \alias{print.rpf}
-\title{Print an rpf fit}
+\title{Print an rpf}
 \usage{
 \method{print}{rpf}(x, ...)
 }
@@ -15,7 +15,7 @@
 Invisibly: \code{x}.
 }
 \description{
-Print an rpf fit
+Print an rpf
 }
 \examples{
 rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)

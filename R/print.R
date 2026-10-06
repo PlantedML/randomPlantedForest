@@ -1,4 +1,4 @@
-#' Print an rpf fit
+#' Print an rpf
 #'
 #' @param x An object of class `rpf`.
 #' @param ... Further arguments passed to or from other methods.
@@ -10,39 +10,88 @@
 #' @examples
 #' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
 print.rpf <- function(x, ...) {
-  model_formula <- sub("\\s\\+ 0$", "", deparse(x$blueprint$formula))
+  cat(format(x, ...), sep = "\n")
+  invisible(x)
+}
+
+#' @export
+format.rpf <- function(x, ...) {
   mode <- switch(x$mode, regression = "Regression", classification = "Classification")
-
-  cat("--", mode, "Random Planted Forest --\n\n")
-
-  # Print interaction level (all, main only, n-th degree)
   p <- length(x$blueprint$ptypes$predictors)
-  # if max_interaction is p, it's equivalent to 0 -> all interactions
-  full <- p == x$params$max_interaction
-  maxint <- ifelse(full, 0, x$params$max_interaction)
+  # max_interaction == p is equivalent to 0: all interactions
+  maxint <- if (p == x$params$max_interaction) 0 else x$params$max_interaction
   degree <- switch(
-    # numeric expression doesn't allow default value, so characterify
     as.character(maxint),
-    "0" = "all possible interactions.\n",
-    "1" = "main effects only.\n",
-    paste0(maxint, "-degree interactions.\n")
+    "0" = "{.emph all possible interactions}",
+    "1" = "{.emph main effects only}",
+    "{.emph interactions to degree {.val {maxint}}}"
   )
 
-  cat("Formula:", model_formula, "\n")
-  cat("Fit using", p, "predictors and", degree)
+  params <- x$params
 
-  purification <- ifelse(is_purified(x), "is", "is _not_")
-  cat("Forest", purification, "purified!\n\n")
+  # format into lines so print() writes to stdout, not cli's message stream
+  cli::cli_format_method({
+    cli::cli_rule(left = "{mode} Random Planted Forest")
+    # only formula blueprints carry a formula; xy and recipe fits don't
+    if (is.null(x$blueprint$formula)) {
+      predictors <- cli::cli_vec(
+        names(x$blueprint$ptypes$predictors),
+        list("vec-trunc" = 5)
+      )
+      cli::cli_text("{.field Predictors}: {.var {predictors}}")
+    } else {
+      model_formula <- sub("\\s\\+ 0$", "", deparse1(x$blueprint$formula))
+      cli::cli_text("{.field Formula}: {.code {model_formula}}")
+    }
+    cli::cli_text(
+      "{.val {params$ntrees}} tree famil{?y/ies} with ",
+      "{.val {params$splits}} split{?s} each on {.val {p}} predictor{?s}, ",
+      degree,
+      "."
+    )
+    if (is_purified(x)) {
+      cli::cli_alert_success("Forest is purified.")
+    } else {
+      cli::cli_alert_info("Forest is not purified.")
+    }
+    if (params$deterministic) {
+      cli::cli_alert_warning("Fit deterministically.")
+    }
 
-  param_names <- names(x$params)
-  nm_lengths <- nchar(param_names)
+    cli::cli_h3("Tree growing")
+    print_params(params[c(
+      "split_structure",
+      "split_try",
+      "t_try",
+      "max_candidates",
+      "split_decay_rate",
+      "delete_leaves"
+    )])
+    if (x$mode == "classification") {
+      cli::cli_h3("Loss")
+      loss_params <- if (params$loss %in% c("logit", "exponential")) {
+        c("loss", "delta", "epsilon")
+      } else {
+        "loss"
+      }
+      print_params(params[loss_params])
+    }
 
-  cat("Called with parameters:\n\n")
-  for (i in seq_along(x$params)) {
-    cat(sprintf(paste0(" %", max(nm_lengths), "s: %s\n"), param_names[[i]], x$params[[i]]))
-  }
+    cli::cli_text("")
+    cli::cli_alert_info(
+      "Fit using {.val {params$nthreads}} thread{?s}, also the default for {.fn predict} and {.fn purify}."
+    )
+  })
+}
 
-  invisible(x)
+print_params <- function(params) {
+  values <- vapply(params, format, character(1))
+  cli::cli_verbatim(paste0(
+    "  ",
+    format(names(values), justify = "right"),
+    ": ",
+    values
+  ))
 }
 
 #' Compact printing of forest structures
@@ -59,7 +108,7 @@ print.rpf <- function(x, ...) {
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {
-  cat(sprintf("<rpf_forest> of %i trees\n", length(x)))
+  cli::cat_line(cli::format_inline("<rpf_forest> of {length(x)} tree{?s}"))
   invisible(x)
 }
 
