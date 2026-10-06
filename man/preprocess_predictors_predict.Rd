@@ -7,9 +7,9 @@
 preprocess_predictors_predict(object, predictors)
 }
 \arguments{
-\item{object}{An object of class \code{rpf} returned by \code{\link[=rpf]{rpf()}}.}
+\item{object}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{predictors}{A data frame or matrix of predictor values to preprocess.}
+\item{predictors}{\verb{[data.frame | matrix]}: Predictor values to preprocess.}
 }
 \value{
 A numeric matrix with the same number of rows as \code{predictors}.

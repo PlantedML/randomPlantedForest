@@ -10,12 +10,12 @@ rpf_marshal(x, include_data = FALSE)
 rpf_unmarshal(blob)
 }
 \arguments{
-\item{x}{An object of class \code{rpf}.}
+\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{include_data}{\verb{[FALSE]}: Store training data in the blob, enabling
+\item{include_data}{\verb{[logical(1): FALSE]}: Store training data in the blob, enabling
 \code{\link[=purify]{purify()}} after restoring.}
 
-\item{blob}{An object of class \code{rpf_marshaled} created by \code{rpf_marshal()}.}
+\item{blob}{\verb{[rpf_marshaled]}: Object created by \code{rpf_marshal()}.}
 }
 \value{
 \code{rpf_marshal()} returns a list of class \code{rpf_marshaled};

@@ -9,10 +9,10 @@
 #' restored forest can predict (including purified prediction if the forest
 #' was purified before marshaling) but can never be purified afterwards.
 #'
-#' @param x An object of class `rpf`.
-#' @param include_data `[FALSE]`: Store training data in the blob, enabling
+#' @param x `[rpf]`: A fitted [`rpf`] model.
+#' @param include_data `[logical(1): FALSE]`: Store training data in the blob, enabling
 #'   [purify()] after restoring.
-#' @param blob An object of class `rpf_marshaled` created by `rpf_marshal()`.
+#' @param blob `[rpf_marshaled]`: Object created by `rpf_marshal()`.
 #' @return `rpf_marshal()` returns a list of class `rpf_marshaled`;
 #'   `rpf_unmarshal()` returns an object of class [rpf].
 #' @export
@@ -107,7 +107,7 @@ rpf_unmarshal <- function(blob) {
 #'
 #' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
 #' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable.
-#' @param x An object of class `rpf`.
+#' @param x `[rpf]`: A fitted [`rpf`] model, possibly restored from disk.
 #' @return `TRUE` if the underlying model can be used, `FALSE` otherwise.
 #' @export
 rpf_is_valid <- function(x) {

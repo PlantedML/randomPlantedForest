@@ -10,18 +10,18 @@ purify(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL)
 is_purified(x)
 }
 \arguments{
-\item{x}{An object of class \code{rpf}.}
+\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
 \item{...}{Reserved for future expansion.}
 
-\item{maxp_interaction}{\verb{[NULL]}: Highest interaction order to purify.
+\item{maxp_interaction}{\verb{[integer(1) | NULL: NULL]}: Highest interaction order to purify.
 Higher-order components are set to zero, but still influence lower orders
 during purification. \code{NULL} purifies all orders.}
 
-\item{mode}{\verb{[2]}: Purification algorithm: \code{2} is the fast exact KD-tree
+\item{mode}{\verb{[integer(1): 2]}: Purification algorithm: \code{2} is the fast exact KD-tree
 based algorithm, \code{1} the original grid-based one.}
 
-\item{nthreads}{\verb{[NULL]}: Number of threads. \code{NULL} uses the \code{nthreads} the
+\item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads} the
 forest was fitted with, capped at the available cores.}
 }
 \value{

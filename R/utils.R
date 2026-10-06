@@ -7,8 +7,8 @@
 #'
 #' See https://doi.org/10.7717/peerj.6339 for details.
 #'
-#' @param x Factor variable to order
-#' @param y Response
+#' @param x `[factor]`: Variable to order.
+#' @param y `[numeric | factor]`: Response.
 #'
 #' @return Re-ordered (ordered) factor
 #' @noRd
@@ -45,8 +45,8 @@ order_factor_by_response <- function(x, y) {
 #' Order factor levels by first principal component of the weighted covariance
 #' matrix of the contingency table
 #'
-#' @param x Factor variable to order
-#' @param y Response
+#' @param x `[factor]`: Variable to order.
+#' @param y `[factor]`: Response.
 #'
 #' @return Order of factor levels
 #'
@@ -128,8 +128,8 @@ preprocess_predictors_fit <- function(processed) {
 #' This is primarily an internal utility used by `predict()` methods but is
 #' exported to support advanced users and tests.
 #'
-#' @param object An object of class `rpf` returned by [`rpf()`].
-#' @param predictors A data frame or matrix of predictor values to preprocess.
+#' @param object `[rpf]`: A fitted [`rpf`] model.
+#' @param predictors `[data.frame | matrix]`: Predictor values to preprocess.
 #'
 #' @return A numeric matrix with the same number of rows as `predictors`.
 #' @export
@@ -250,16 +250,6 @@ softmax <- function(x) {
   exp(x - lse)
 }
 
-#' Get remainders where max_interaction requested in `predict_components` is smaller than
-#' `max_interaction` set in `rpf`.
-#' This is somewhat cumbersome unfortunately, and presumably will have to be partially
-#' repeated for other methods in `glex`
-#' @noRd
-#' @keywords internal
-#' @param m Components as calculated in `predict_components`
-#' @param levels Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
-#' @param pred Regular model predictions as returned by `predict.rpf`.
-#' @param intercept Intercept as stored in output of `predict_components`.
 # Outcome levels represented by columns of the C++ prediction matrix.
 # Multiclass logit uses reference-class encoding: the first level has no column.
 model_outcome_levels <- function(object) {
@@ -270,6 +260,16 @@ model_outcome_levels <- function(object) {
   outcome_levels
 }
 
+#' Get remainders where max_interaction requested in `predict_components` is smaller than
+#' `max_interaction` set in `rpf`.
+#' This is somewhat cumbersome unfortunately, and presumably will have to be partially
+#' repeated for other methods in `glex`
+#' @noRd
+#' @keywords internal
+#' @param m `[data.table]`: Components as calculated in `predict_components`
+#' @param levels `[character]`: Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
+#' @param pred `[data.frame]`: Regular model predictions as returned by `predict.rpf`.
+#' @param intercept `[numeric]`: Intercept as stored in output of `predict_components`.
 calc_remainders_multiclass <- function(m, levels, pred, intercept) {
   # data.table NSE warnings
   term <- remainder <- m_sum <- NULL

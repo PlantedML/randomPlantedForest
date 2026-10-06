@@ -99,78 +99,79 @@ rpf(x, ...)
 )
 }
 \arguments{
-\item{x, y}{Predictors and outcome for the x/y interface.
-\code{x} is a \strong{data frame} or \strong{matrix} of predictors, or a
-\code{\link[recipes:recipe]{recipe}} (then supply \code{data} instead of \code{y}).
+\item{x, y}{\verb{[data.frame | matrix | recipe]}, \verb{[numeric | factor]}:
+Predictors and outcome for the x/y interface.
+\code{x} holds the predictors, or is a \code{\link[recipes:recipe]{recipe}} (then supply
+\code{data} instead of \code{y}).
 \code{y} is the outcome vector: \strong{numeric} for regression, \strong{factor} for
 classification.}
 
 \item{...}{Not currently used, but required for extensibility. Unknown
 (e.g. misspelled) arguments are an error.}
 
-\item{formula}{A formula with the outcome on the left-hand side and the
+\item{formula}{\verb{[formula]}: A formula with the outcome on the left-hand side and the
 predictors on the right-hand side, e.g. \code{y ~ x1 + x2}.}
 
-\item{data}{A \strong{data frame} containing the predictors and the outcome,
+\item{data}{\verb{[data.frame]}: Data containing the predictors and the outcome,
 used with \code{formula} or a recipe \code{x}.}
 
-\item{max_interaction}{\verb{[1]}: Maximum number of features a single tree may
+\item{max_interaction}{\verb{[integer(1): 1]}: Maximum number of predictors a single tree may
 split on. \code{1} fits main effects only (an additive model), \code{2} adds
-pairwise interactions, and so on. \code{0} uses all predictors; values above
+pairwise interactions, and so on. \code{0} uses all predictors and values above
 the number of predictors are reduced to it.}
 
-\item{ntrees}{\verb{[50]}: Number of tree families, i.e. the size of the forest.
+\item{ntrees}{\verb{[integer(1): 50]}: Number of tree families, i.e. the size of the forest.
 Each family is grown on a bootstrap sample and predictions are averaged.}
 
-\item{splits}{\verb{[30]}: Number of splits per tree family. The main tuning
+\item{splits}{\verb{[integer(1): 30]}: Number of splits per tree family. The main tuning
 parameter: more splits fit more complex functions.}
 
-\item{split_structure}{\verb{["leaves"]}: How split candidates are formed and
+\item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
 sampled; one of \code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
 or \code{"res_trees"}. See Details.}
 
-\item{split_try}{\verb{[10]}: Number of thresholds evaluated per split candidate.}
+\item{split_try}{\verb{[integer(1): 10]}: Number of thresholds evaluated per split candidate.}
 
-\item{t_try}{\verb{[0.4]}: Proportion in \verb{(0, 1]} of all possible splits sampled
+\item{t_try}{\verb{[numeric(1): 0.4]}: Proportion in \verb{(0, 1]} of all possible splits sampled
 as candidates in each round, capped at \code{max_candidates}.}
 
-\item{max_candidates}{\verb{[50]}: Maximum number of split candidates per round.}
+\item{max_candidates}{\verb{[integer(1): 50]}: Maximum number of split candidates per round.}
 
-\item{split_decay_rate}{\verb{[0.1]}: Down-weights possible splits that were
+\item{split_decay_rate}{\verb{[numeric(1): 0.1]}: Down-weights possible splits that were
 sampled as candidates but not chosen. Each such round ages a split by one,
 choosing it resets its age to zero, and splits are sampled with weight
 \code{exp(-split_decay_rate * age)}. \code{0} samples uniformly.}
 
-\item{delete_leaves}{\verb{[TRUE]}: Whether to delete a parent leaf when
+\item{delete_leaves}{\verb{[logical(1): TRUE]}: Whether to delete a parent leaf when
 splitting along an existing dimension.}
 
-\item{loss}{\verb{["L2"]}: Loss function. Regression supports only \code{"L2"}.
+\item{loss}{\verb{[character(1): "L2"]}: Loss function. Regression supports only \code{"L2"}.
 Classification also supports \code{"L1"}, \code{"logit"} and \code{"exponential"};
 \code{"exponential"} gives results similar to \code{"logit"} and is faster.}
 
-\item{delta}{\verb{[0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
+\item{delta}{\verb{[numeric(1): 0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Class proportions are truncated to \verb{[delta, 1 - delta]} when computing the
 loss of a split. Should be positive for \code{"logit"}: with \code{delta = 0}, nodes
 containing a single class have infinite loss and their splits are always
 rejected.}
 
-\item{epsilon}{\verb{[0.1]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
+\item{epsilon}{\verb{[numeric(1): 0.1]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Class proportions are truncated to \verb{[epsilon, 1 - epsilon]} when computing
 the fit in a leaf. Unlike \code{delta}, this caps the size of individual leaf
 updates and acts as regularization: smaller values permit larger jumps on
 the link scale.}
 
-\item{purify}{\verb{[FALSE]}: Whether to purify the forest after fitting, which
+\item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
 \code{\link[=predict_components]{predict_components()}} requires. Can also be done later with \code{\link[=purify]{purify()}}.}
 
-\item{nthreads}{\verb{[1]}: Number of threads for fitting. Also the default for
+\item{nthreads}{\verb{[integer(1): 1]}: Number of threads for fitting. Also the default for
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
 
-\item{export_forest}{\verb{[FALSE]}: Whether to store the flattened forest in
+\item{export_forest}{\verb{[logical(1): FALSE]}: Whether to store the flattened forest in
 the returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, which
 saves memory.}
 
-\item{deterministic}{\verb{[FALSE]}: Whether to fit without randomness: no
+\item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
 (\code{t_try} is ignored) and evenly spaced thresholds. The result does not
 depend on the seed, and all tree families are identical, so use
@@ -182,11 +183,12 @@ Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
 or classification. The model is a sum of trees that each split on at most
-\code{max_interaction} features, so it decomposes into main effects and
+\code{max_interaction} predictors, so it decomposes into main effects and
 interaction components; see \code{\link[=predict_components]{predict_components()}}.
 }
 \details{
 \subsection{Choosing parameters}{
+
 Start with \code{max_interaction} and \code{splits}. \code{max_interaction} sets which
 effects the model can represent: \code{1} for an additive model, \code{2} to add
 pairwise interactions. Higher values are more flexible, but slower and the
@@ -195,45 +197,45 @@ follows the data and is the parameter to tune. With a higher
 \code{max_interaction}, splits are spread over more possible components, so tune
 both together.
 
-\code{ntrees} averages over bootstrap samples to reduce variance; fitting and
-prediction time grow linearly with it. The split search parameters
+\code{ntrees} averages over bootstrap samples to reduce variance and fitting and
+prediction time grow linearly with it. The default is lower than the
+usual 500 trees of a random forest because each tree family is itself a
+complete model, a sum of trees covering all components, rather than a
+single tree. Averaging therefore stops paying off sooner, usually after a
+few dozen families. The split search parameters
 (\code{split_structure}, \code{split_try}, \code{t_try}, \code{max_candidates},
 \code{split_decay_rate}) trade speed for a more thorough search.
 
 For classification, \code{"logit"} and \code{"exponential"} fit on the link scale and
 are transformed to probabilities, \code{"exponential"} being faster. \code{"L1"} and
-\code{"L2"} fit class indicators directly; their probabilities are truncated to
-\verb{[0, 1]}.
+\code{"L2"} fit class indicators directly and their probabilities are truncated to \verb{[0, 1]}.
 }
-\subsection{split_structure}{
+
+\subsection{\code{split_structure}}{
+
 In each round, a \code{t_try} fraction of all possible splits (capped at
 \code{max_candidates}) is drawn as candidates with weights
 \code{exp(-split_decay_rate * age)}. \code{split_structure} defines what a candidate is
 and how its thresholds are evaluated.
-
-\describe{
-\item{leaves}{Split candidates are (leaf, split-dimension) pairs. For each sampled
+\itemize{
+\item \code{leaves}: Split candidates are (leaf, split-dimension) pairs. For each sampled
 candidate, \code{split_try} thresholds are drawn uniformly from the valid range within
-that leaf and evaluated to choose the best split.}
-
-\item{hist}{As \code{leaves}, but thresholds are drawn from boundaries of
-quantile bins computed once per feature, which makes evaluating them
-faster on large data.}
-
-\item{cur_trees_1}{Split candidates are (current-tree, split-dimension) pairs. For each
+that leaf and evaluated to choose the best split.
+\item \code{hist}: As \code{leaves}, but thresholds are drawn from boundaries of
+quantile bins computed once per predictor, which makes evaluating them
+faster on large data.
+\item \code{cur_trees_1}: Split candidates are (current-tree, split-dimension) pairs. For each
 sampled candidate, perform \code{split_try} evaluations. Each evaluation samples a leaf
 from the set of valid current trees (with probability proportional to its number of
-available thresholds) and then uniformly samples a single threshold within that leaf.}
-
-\item{cur_trees_2}{Split candidates are (current-tree, split-dimension) pairs. For each
+available thresholds) and then uniformly samples a single threshold within that leaf.
+\item \code{cur_trees_2}: Split candidates are (current-tree, split-dimension) pairs. For each
 sampled candidate, iterate through every
 valid leaf. Within each leaf, sample \code{split_try} thresholds uniformly and
-evaluate them.}
-
-\item{res_trees}{Split candidates are resulting trees. For each sampled candidate, run
+evaluate them.
+\item \code{res_trees}: Split candidates are resulting trees. For each sampled candidate, run
 \code{split_try} evaluations by sampling a (split-dimension, leaf) pair from all valid
 pairs (with probability proportional to its number of available thresholds), then
-uniformly sampling one threshold within that pair.}
+uniformly sampling one threshold within that pair.
 }
 }
 }

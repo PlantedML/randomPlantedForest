@@ -13,11 +13,11 @@
 #' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
 #'
 #' @inheritParams predict.rpf
-#' @param predictors [`character`] or `NULL`: Vector of one or more column names of predictor variables
+#' @param predictors `[character | NULL: NULL]`: Vector of one or more column names of predictor variables
 #'   in `new_data` to extract components for.
 #'   If `NULL`, all variables and their interactions are returned.
-#' @param max_interaction [`integer`] or `NULL`: Maximum degree of interactions to consider.
-#'   Default will use the `max_interaction` parameter from the [`rpf`] object.
+#' @param max_interaction `[integer(1) | NULL: NULL]`: Maximum degree of
+#'   interactions to consider. `NULL` uses the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
 #' @return A `list` with elements:

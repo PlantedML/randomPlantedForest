@@ -1,9 +1,10 @@
 #' Random Planted Forest Predictions
 #'
-#' @param object A fit object of class [`rpf`].
-#' @param new_data Data for new observations to predict.
-#' @param type `"numeric"` for regression outcomes,
+#' @param object `[rpf]`: A fitted [`rpf`] model.
+#' @param new_data `[data.frame | matrix]`: New observations to predict.
+#' @param type `[character(1)]`: `"numeric"` for regression outcomes,
 #' `"class"` for class predictions or `"prob"` for probability predictions.
+#' Defaults to `"numeric"` for regression and `"prob"` for classification.
 #'
 #' For classification and `loss = "L1"` or `"L2"`, `"numeric"` yields raw
 #' predictions which are not guaranteed to be valid probabilities in `[0, 1]`.
@@ -12,7 +13,7 @@
 #' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
 #' for `type = "numeric"`, as in this case the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
-#' @param nthreads `[NULL]`: Number of threads. `NULL` uses the `nthreads`
+#' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads`
 #'   the forest was fitted with, capped at the available cores.
 #' @param ... Not currently used, but required for extensibility. Unknown
 #'   arguments are an error.

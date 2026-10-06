@@ -2,62 +2,63 @@
 #'
 #' Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
 #' or classification. The model is a sum of trees that each split on at most
-#' `max_interaction` features, so it decomposes into main effects and
+#' `max_interaction` predictors, so it decomposes into main effects and
 #' interaction components; see [predict_components()].
 #'
-#' @param x,y Predictors and outcome for the x/y interface.
-#'   `x` is a __data frame__ or __matrix__ of predictors, or a
-#'   [`recipe`][recipes::recipe] (then supply `data` instead of `y`).
+#' @param x,y `[data.frame | matrix | recipe]`, `[numeric | factor]`:
+#'   Predictors and outcome for the x/y interface.
+#'   `x` holds the predictors, or is a [`recipe`][recipes::recipe] (then supply
+#'   `data` instead of `y`).
 #'   `y` is the outcome vector: __numeric__ for regression, __factor__ for
 #'   classification.
 #' @param ... Not currently used, but required for extensibility. Unknown
 #'   (e.g. misspelled) arguments are an error.
-#' @param formula A formula with the outcome on the left-hand side and the
+#' @param formula `[formula]`: A formula with the outcome on the left-hand side and the
 #'   predictors on the right-hand side, e.g. `y ~ x1 + x2`.
-#' @param data A __data frame__ containing the predictors and the outcome,
+#' @param data `[data.frame]`: Data containing the predictors and the outcome,
 #'   used with `formula` or a recipe `x`.
-#' @param max_interaction `[1]`: Maximum number of features a single tree may
+#' @param max_interaction `[integer(1): 1]`: Maximum number of predictors a single tree may
 #'   split on. `1` fits main effects only (an additive model), `2` adds
-#'   pairwise interactions, and so on. `0` uses all predictors; values above
+#'   pairwise interactions, and so on. `0` uses all predictors and values above
 #'   the number of predictors are reduced to it.
-#' @param ntrees `[50]`: Number of tree families, i.e. the size of the forest.
+#' @param ntrees `[integer(1): 50]`: Number of tree families, i.e. the size of the forest.
 #'   Each family is grown on a bootstrap sample and predictions are averaged.
-#' @param splits `[30]`: Number of splits per tree family. The main tuning
+#' @param splits `[integer(1): 30]`: Number of splits per tree family. The main tuning
 #'   parameter: more splits fit more complex functions.
-#' @param split_structure `["leaves"]`: How split candidates are formed and
+#' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
 #'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
 #'   or `"res_trees"`. See Details.
-#' @param split_try `[10]`: Number of thresholds evaluated per split candidate.
-#' @param t_try `[0.4]`: Proportion in `(0, 1]` of all possible splits sampled
+#' @param split_try `[integer(1): 10]`: Number of thresholds evaluated per split candidate.
+#' @param t_try `[numeric(1): 0.4]`: Proportion in `(0, 1]` of all possible splits sampled
 #'   as candidates in each round, capped at `max_candidates`.
-#' @param max_candidates `[50]`: Maximum number of split candidates per round.
-#' @param split_decay_rate `[0.1]`: Down-weights possible splits that were
+#' @param max_candidates `[integer(1): 50]`: Maximum number of split candidates per round.
+#' @param split_decay_rate `[numeric(1): 0.1]`: Down-weights possible splits that were
 #'   sampled as candidates but not chosen. Each such round ages a split by one,
 #'   choosing it resets its age to zero, and splits are sampled with weight
 #'   `exp(-split_decay_rate * age)`. `0` samples uniformly.
-#' @param delete_leaves `[TRUE]`: Whether to delete a parent leaf when
+#' @param delete_leaves `[logical(1): TRUE]`: Whether to delete a parent leaf when
 #'   splitting along an existing dimension.
-#' @param loss `["L2"]`: Loss function. Regression supports only `"L2"`.
+#' @param loss `[character(1): "L2"]`: Loss function. Regression supports only `"L2"`.
 #'   Classification also supports `"L1"`, `"logit"` and `"exponential"`;
 #'   `"exponential"` gives results similar to `"logit"` and is faster.
-#' @param delta `[0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
+#' @param delta `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Class proportions are truncated to `[delta, 1 - delta]` when computing the
 #'   loss of a split. Should be positive for `"logit"`: with `delta = 0`, nodes
 #'   containing a single class have infinite loss and their splits are always
 #'   rejected.
-#' @param epsilon `[0.1]`: Only used if `loss` is `"logit"` or `"exponential"`.
+#' @param epsilon `[numeric(1): 0.1]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Class proportions are truncated to `[epsilon, 1 - epsilon]` when computing
 #'   the fit in a leaf. Unlike `delta`, this caps the size of individual leaf
 #'   updates and acts as regularization: smaller values permit larger jumps on
 #'   the link scale.
-#' @param purify `[FALSE]`: Whether to purify the forest after fitting, which
+#' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
 #'   [predict_components()] requires. Can also be done later with [purify()].
-#' @param nthreads `[1]`: Number of threads for fitting. Also the default for
+#' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
-#' @param export_forest `[FALSE]`: Whether to store the flattened forest in
+#' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in
 #'   the returned object as `$forest`. If `FALSE`, `$forest` is `NULL`, which
 #'   saves memory.
-#' @param deterministic `[FALSE]`: Whether to fit without randomness: no
+#' @param deterministic `[logical(1): FALSE]`: Whether to fit without randomness: no
 #'   bootstrap, the first `max_candidates` possible splits as candidates
 #'   (`t_try` is ignored) and evenly spaced thresholds. The result does not
 #'   depend on the seed, and all tree families are identical, so use
@@ -72,7 +73,8 @@
 #' @importFrom hardhat default_recipe_blueprint
 #'
 #' @details
-#' \subsection{Choosing parameters}{
+#' ## Choosing parameters
+#'
 #' Start with `max_interaction` and `splits`. `max_interaction` sets which
 #' effects the model can represent: `1` for an additive model, `2` to add
 #' pairwise interactions. Higher values are more flexible, but slower and the
@@ -81,47 +83,48 @@
 #' `max_interaction`, splits are spread over more possible components, so tune
 #' both together.
 #'
-#' `ntrees` averages over bootstrap samples to reduce variance; fitting and
-#' prediction time grow linearly with it. The split search parameters
+#' `ntrees` averages over bootstrap samples to reduce variance and fitting and
+#' prediction time grow linearly with it. The default is lower than the
+#' usual 500 trees of a random forest because each tree family is itself a
+#' complete model, a sum of trees covering all components, rather than a
+#' single tree. Averaging therefore stops paying off sooner, usually after a
+#' few dozen families. The split search parameters
 #' (`split_structure`, `split_try`, `t_try`, `max_candidates`,
 #' `split_decay_rate`) trade speed for a more thorough search.
 #'
 #' For classification, `"logit"` and `"exponential"` fit on the link scale and
 #' are transformed to probabilities, `"exponential"` being faster. `"L1"` and
-#' `"L2"` fit class indicators directly; their probabilities are truncated to
-#' `[0, 1]`.
-#' }
-#' \subsection{split_structure}{
+#' `"L2"` fit class indicators directly and their probabilities are truncated to `[0, 1]`.
+#'
+#' ## `split_structure`
+#'
 #' In each round, a `t_try` fraction of all possible splits (capped at
 #' `max_candidates`) is drawn as candidates with weights
 #' `exp(-split_decay_rate * age)`. `split_structure` defines what a candidate is
 #' and how its thresholds are evaluated.
 #'
-#' \describe{
-#'   \item{leaves}{Split candidates are (leaf, split-dimension) pairs. For each sampled
+#' - `leaves`: Split candidates are (leaf, split-dimension) pairs. For each sampled
 #'   candidate, `split_try` thresholds are drawn uniformly from the valid range within
-#'   that leaf and evaluated to choose the best split.}
+#'   that leaf and evaluated to choose the best split.
 #'
-#'   \item{hist}{As `leaves`, but thresholds are drawn from boundaries of
-#'   quantile bins computed once per feature, which makes evaluating them
-#'   faster on large data.}
+#' - `hist`: As `leaves`, but thresholds are drawn from boundaries of
+#'   quantile bins computed once per predictor, which makes evaluating them
+#'   faster on large data.
 #'
-#'   \item{cur_trees_1}{Split candidates are (current-tree, split-dimension) pairs. For each
+#' - `cur_trees_1`: Split candidates are (current-tree, split-dimension) pairs. For each
 #'   sampled candidate, perform `split_try` evaluations. Each evaluation samples a leaf
 #'   from the set of valid current trees (with probability proportional to its number of
-#'   available thresholds) and then uniformly samples a single threshold within that leaf.}
+#'   available thresholds) and then uniformly samples a single threshold within that leaf.
 #'
-#'   \item{cur_trees_2}{Split candidates are (current-tree, split-dimension) pairs. For each
+#' - `cur_trees_2`: Split candidates are (current-tree, split-dimension) pairs. For each
 #'   sampled candidate, iterate through every
 #'   valid leaf. Within each leaf, sample `split_try` thresholds uniformly and
-#'   evaluate them.}
+#'   evaluate them.
 #'
-#'   \item{res_trees}{Split candidates are resulting trees. For each sampled candidate, run
+#' - `res_trees`: Split candidates are resulting trees. For each sampled candidate, run
 #'   `split_try` evaluations by sampling a (split-dimension, leaf) pair from all valid
 #'   pairs (with probability proportional to its number of available thresholds), then
-#'   uniformly sampling one threshold within that pair.}
-#' }
-#' }
+#'   uniformly sampling one threshold within that pair.
 #'
 #' @references
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
@@ -340,7 +343,7 @@ rpf.recipe <- function(
 
 # Bridge: validates arguments and calls rpf_impl() with processed input
 #' @noRd
-#' @param processed Output of `hardhat::mold` from respective rpf methods
+#' @param processed `[list]`: Output of `hardhat::mold` from respective rpf methods
 #' @importFrom hardhat validate_outcomes_are_univariate
 rpf_bridge <- function(
   processed,

@@ -4,7 +4,7 @@
 #' so rpf models work with the standard tidymodels serialization workflow.
 #' Training data is not included; see [rpf_marshal()] for the implications.
 #'
-#' @param x An [rpf] object.
+#' @param x `[rpf]`: A fitted [`rpf`] model.
 #' @param ... Unused.
 #' @return An object of class `bundled_rpf` for `bundle()`, or the restored
 #'   [rpf] object for `unbundle()`.

@@ -9,13 +9,13 @@
 #' whether or not the result is assigned.
 #' `purify()` is idempotent, meaning if the forest is already purified it just returns it unmodified.
 #'
-#' @param x An object of class `rpf`.
-#' @param maxp_interaction `[NULL]`: Highest interaction order to purify.
+#' @param x `[rpf]`: A fitted [`rpf`] model.
+#' @param maxp_interaction `[integer(1) | NULL: NULL]`: Highest interaction order to purify.
 #'   Higher-order components are set to zero, but still influence lower orders
 #'   during purification. `NULL` purifies all orders.
-#' @param mode `[2]`: Purification algorithm: `2` is the fast exact KD-tree
+#' @param mode `[integer(1): 2]`: Purification algorithm: `2` is the fast exact KD-tree
 #'   based algorithm, `1` the original grid-based one.
-#' @param nthreads `[NULL]`: Number of threads. `NULL` uses the `nthreads` the
+#' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the
 #'   forest was fitted with, capped at the available cores.
 #' @param ... Reserved for future expansion.
 #'

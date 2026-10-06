@@ -7,7 +7,7 @@
 \method{bundle}{rpf}(x, ...)
 }
 \arguments{
-\item{x}{An \link{rpf} object.}
+\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
 \item{...}{Unused.}
 }

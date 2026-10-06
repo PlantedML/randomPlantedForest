@@ -13,12 +13,13 @@
 )
 }
 \arguments{
-\item{object}{A fit object of class \code{\link{rpf}}.}
+\item{object}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{new_data}{Data for new observations to predict.}
+\item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
 
-\item{type}{\code{"numeric"} for regression outcomes,
+\item{type}{\verb{[character(1)]}: \code{"numeric"} for regression outcomes,
 \code{"class"} for class predictions or \code{"prob"} for probability predictions.
+Defaults to \code{"numeric"} for regression and \code{"prob"} for classification.
 
 For classification and \code{loss = "L1"} or \code{"L2"}, \code{"numeric"} yields raw
 predictions which are not guaranteed to be valid probabilities in \verb{[0, 1]}.
@@ -28,7 +29,7 @@ If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} i
 for \code{type = "numeric"}, as in this case the raw predictions have the
 additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
 
-\item{nthreads}{\verb{[NULL]}: Number of threads. \code{NULL} uses the \code{nthreads}
+\item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads}
 the forest was fitted with, capped at the available cores.}
 
 \item{...}{Not currently used, but required for extensibility. Unknown
