@@ -377,6 +377,8 @@ rpf_bridge <- function(
   deterministic
 ) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
+  check_no_missing(processed$predictors, "The predictors", call = call)
+  check_no_missing(processed$outcomes, "The outcome", call = call)
   predictors <- preprocess_predictors_fit(processed)
   checkmate::assert_string(loss, null.ok = TRUE)
   outcomes <- preprocess_outcome(processed, loss)

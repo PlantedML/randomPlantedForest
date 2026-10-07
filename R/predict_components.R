@@ -100,6 +100,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
+  check_no_missing(processed$predictors, "{.arg new_data}")
   # Encode factors to (re-)ordered integers according to information saved during model fit
   # Need matrix version for model predictions, and keep data.table version for return (for plotting)
   new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)

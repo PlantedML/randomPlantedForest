@@ -1,3 +1,20 @@
+# rpf has no missing value handling: splits compare feature values directly,
+# so an NA would silently send a row through arbitrary leaves.
+check_no_missing <- function(data, what, call = rlang::caller_env()) {
+  missing_cols <- names(data)[vapply(data, anyNA, logical(1))]
+  if (length(missing_cols) > 0) {
+    cli::cli_abort(
+      c(
+        paste(what, "must not contain missing values."),
+        "x" = "Missing values in {.var {missing_cols}}.",
+        "i" = "Impute or remove them first, e.g. with a recipe passed to {.fn rpf}."
+      ),
+      call = call
+    )
+  }
+  invisible(data)
+}
+
 #' Order factor levels by response
 #'
 #' Regression: Order by mean(y)
