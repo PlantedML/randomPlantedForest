@@ -6,14 +6,6 @@ template:
 development:
   mode: auto
 
-articles:
-- title: Regression Tests
-  desc: |
-    Ensuring that the current implementation still produces the expected results,
-    given some stochasticity.
-  contents:
-  - test/Regression-Test-oldrpf
-
 reference:
 - title: Model fitting and prediction
   desc: >
