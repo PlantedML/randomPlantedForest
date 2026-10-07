@@ -69,7 +69,7 @@ Prediction works as usual:
 predict(rpfit, new_data = head(sim))
 ```
 
-Note that `rpf()` does not handle missing values: rows containing `NA` must be imputed or removed beforehand (see the recipes section below for one way to do this as part of the model specification).
+Note that `rpf()` does not handle missing values: rows containing `NA` must be imputed or removed beforehand (see the `recipes` section below for one way to do this as part of the model specification).
 
 ## Decomposing predictions
 
@@ -190,9 +190,9 @@ The default loss is `"L2"`.
  `"L1"`, `"logit"` and `"exponential"` are also available.
 Note that with `loss = "logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
 
-## Using recipes
+## Using `recipes`
 
-`rpf()` also accepts a [recipes](https://recipes.tidymodels.org/) recipe in place of a formula, so preprocessing can be bundled with the model specification.
+`rpf()` also accepts a [`recipes`](https://recipes.tidymodels.org/) recipe in place of a formula, so preprocessing can be bundled with the model specification.
 This makes it easy to add preprocessing steps, such as imputing missing values, which `rpf()` itself does not accept:
 
 ```{r recipes, message = FALSE}
@@ -237,7 +237,7 @@ all.equal(
 )
 ```
 
-Alternatively, a [bundle](https://rstudio.github.io/bundle/) method wrapping the same mechanism is available via `bundle::bundle()` and `bundle::unbundle()`.
+Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method wrapping the same mechanism is available via `bundle::bundle()` and `bundle::unbundle()`.
 
 ```{r cleanup, include = FALSE}
 unlink(tmp)
