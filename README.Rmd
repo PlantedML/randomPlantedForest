@@ -1,5 +1,7 @@
 ---
-output: github_document
+output:
+  github_document:
+    html_preview: false
 editor_options: 
   chunk_output_type: console
 ---
@@ -25,75 +27,78 @@ set.seed(1)
 [![randomPlantedForest status badge](https://plantedml.r-universe.dev/badges/randomPlantedForest)](https://plantedml.r-universe.dev/randomPlantedForest)
 <!-- badges: end -->
 
-`randomPlantedForest` implements "Random Planted Forest", a directly interpretable tree ensemble [(arxiv)][arxiv1].
+`randomPlantedForest` implements Random Planted Forest
+([Hiabu, Mammen & Meyer][arxiv1]), a tree ensemble whose predictions you can
+read off directly, without post-hoc explanation methods.
+
+Like a random forest, it averages many tree-based models grown on bootstrap
+samples. Unlike a random forest, each of these models is a sum of trees that
+each split on a fixed set of predictors, and `max_interaction` bounds how many
+predictors that can be. With `max_interaction = 1` the forest is an additive
+model; with `2` it adds pairwise interactions, and so on. As a result, the
+fitted model decomposes exactly into an intercept, main effects and
+interactions up to that order:
+
+$$\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k < l} \hat m_{kl}(x_k, x_l) + \dots$$
+
+Each component can be inspected and plotted on its own, and together they sum
+to the prediction.
 
 ## Installation
 
-You can install the development version of `randomPlantedForest` from [GitHub](https://github.com/) with
-
-```r
-# install.packages("remotes")
-remotes::install_github("PlantedML/randomPlantedForest")
-```
-
-or from [r-universe][r-universe] with
+Install the development version from [r-universe][r-universe] with
 
 ```r
 install.packages("randomPlantedForest", repos = "https://plantedml.r-universe.dev")
 ```
 
+or from [GitHub](https://github.com/PlantedML/randomPlantedForest) with
+
+```r
+# install.packages("pak")
+pak::pak("PlantedML/randomPlantedForest")
+```
 
 ## Example
 
-Model fitting uses a familiar interface:
+`rpf()` takes a formula, x/y data or a [recipe](https://recipes.tidymodels.org/),
+and `predict()` returns a tibble as in tidymodels:
 
-```{r}
+```{r helloworld}
 library(randomPlantedForest)
 
 mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
 rpfit
 
-predict(rpfit, new_data = mtcars) |>
-  cbind(mpg = mtcars$mpg) |>
-  head()
+head(predict(rpfit, new_data = mtcars))
 ```
 
-Prediction components can be accessed via `predict_components`, including the intercept, main effects, and interactions up to a specified degree.
-The returned object also contains the original data as `x`, which is required for visualization.
-The `glex` package can be used as well: `glex(rpfit)` yields the same result.
+`predict_components()` returns the decomposition: one column per main effect
+and interaction, plus the intercept.
 
-```{r}
-components <- predict_components(rpfit, new_data = mtcars) 
-
-str(components)
+```{r components}
+components <- predict_components(rpfit, new_data = mtcars)
+head(components$m)
 ```
 
-Various visualization options are available via `glex`, e.g. for main and second-order interaction effects:
+The [glex][glex] package plots these components:
 
-```{r}
-# install glex if not available:
-if (!requireNamespace("glex")) remotes::install_github("PlantedML/glex")
+```{r effects, message = FALSE}
 library(glex)
 library(ggplot2)
-library(patchwork) # For plot arrangement
+library(patchwork)
 
-p1 <- autoplot(components, "wt")
-p2 <- autoplot(components, "hp")
-p3 <- autoplot(components, "cyl")
-p4 <- autoplot(components, c("wt", "hp"))
-
-(p1 + p2) / (p3 + p4) +
-  plot_annotation(
-    title = "Selected effects for mtcars",
-    caption = "(It's a tiny dataset but it has to fit in a README, okay?)"
-  )
+(autoplot(components, "wt") + autoplot(components, "hp")) /
+  (autoplot(components, "cyl") + autoplot(components, c("wt", "hp")))
 ```
 
-
-See the [Bikesharing decomposition][bikes] article for more examples.
-
+The [Get started][get-started] guide covers classification, recipes, saving
+models and more on interpreting components, and the
+[Bikesharing decomposition][bikes] article works through a larger example.
 
 [arxiv1]: https://arxiv.org/abs/2012.14563
+[get-started]: https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html
 [bikes]: https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html
 [r-universe]: https://plantedml.r-universe.dev/packages
+[glex]: https://plantedml.com/glex/
