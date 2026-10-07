@@ -24,3 +24,6 @@
 ^src/lib/.*\.(o|so|a)$
 ^[.]?air[.]toml$
 ^\.vscode$
+^Makefile$
+^TODO\.md$
+^README\.html$
