@@ -24,9 +24,9 @@ Authors:
 \itemize{
   \item Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
   \item Joseph Theo Meyer
-  \item Munir Hiabu
+  \item Munir Hiabu (\href{https://orcid.org/0000-0001-5846-667X}{ORCID})
   \item Maike Spankus
-  \item Marvin N. Wright \email{cran@wrig.de}
+  \item Marvin N. Wright \email{cran@wrig.de} (\href{https://orcid.org/0000-0002-8542-6291}{ORCID})
 }
 
 }

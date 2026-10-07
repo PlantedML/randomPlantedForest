@@ -3,9 +3,11 @@ Title: Random Planted Forest: A Directly Interpretable Tree Ensemble
 Version: 0.5.0
 Authors@R: c(
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
-    person("Munir", "Hiabu", role = "aut"),
+    person("Munir", "Hiabu", role = "aut",
+           comment = c(ORCID = "0000-0001-5846-667X")),
     person("Maike", "Spankus", role = "aut"),
-    person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut"),
+    person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut",
+           comment = c(ORCID = "0000-0002-8542-6291")),
     person("Lukas", "Burk", , "burk@leibniz-bips.de", role = c("cre", "aut"),
            comment = c(ORCID = "0000-0001-7528-3795"))
   )
