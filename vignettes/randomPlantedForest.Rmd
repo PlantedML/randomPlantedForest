@@ -14,6 +14,9 @@ knitr::opts_chunk$set(
   fig.width = 7,
   fig.height = 4.5
 )
+# The classification and recipes sections use suggested packages
+has_suggests <- requireNamespace("palmerpenguins", quietly = TRUE) &&
+  requireNamespace("recipes", quietly = TRUE)
 ```
 
 `randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen & Meyer](https://arxiv.org/abs/2012.14563)), a directly interpretable tree ensemble.
@@ -164,7 +167,7 @@ We illustrate with the `penguins` data from `palmerpenguins`, removing missing v
 
 ### Binary
 
-```{r classif-binary}
+```{r classif-binary, eval = has_suggests}
 penguins <- na.omit(palmerpenguins::penguins)
 
 rpfit_sex <- rpf(sex ~ ., data = penguins, ntrees = 50)
@@ -179,7 +182,7 @@ With the default `loss = "exponential"` (or `"logit"`), `type = "link"` addition
 
 Multiclass classification works the same way: probability predictions contain one column per class:
 
-```{r classif-multiclass}
+```{r classif-multiclass, eval = has_suggests}
 rpfit_species <- rpf(species ~ ., data = penguins, ntrees = 50)
 
 predict(rpfit_species, head(penguins), type = "prob")
@@ -195,7 +198,7 @@ Note that with `loss = "logit"`, multiclass models are fit on a reference-class 
 `rpf()` also accepts a [`recipes`](https://recipes.tidymodels.org/) recipe in place of a formula, so preprocessing can be bundled with the model specification.
 This makes it easy to add preprocessing steps, such as imputing missing values, which `rpf()` itself does not accept:
 
-```{r recipes, message = FALSE}
+```{r recipes, message = FALSE, eval = has_suggests}
 library(recipes)
 
 # rows with a missing outcome still need to be dropped by hand
