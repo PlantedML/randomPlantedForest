@@ -14,30 +14,29 @@ predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
 
 - object:
 
-  A fit object of class
-  [`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md).
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - new_data:
 
-  Data for new observations to predict.
+  `[data.frame | matrix]`: New observations to predict.
 
 - max_interaction:
 
-  [`integer`](https://rdrr.io/r/base/integer.html) or `NULL`: Maximum
-  degree of interactions to consider. Default will use the
-  `max_interaction` parameter from the
-  [`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md)
+  `[integer(1) | NULL: NULL]`: Maximum degree of interactions to
+  consider. `NULL` uses the `max_interaction` parameter from the
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   object. Must be between `1` (main effects only) and the
   `max_interaction` of the
-  [`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md)
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   object.
 
 - predictors:
 
-  [`character`](https://rdrr.io/r/base/character.html) or `NULL`: Vector
-  of one or more column names of predictor variables in `new_data` to
-  extract components for. If `NULL`, all variables and their
-  interactions are returned.
+  `[character | NULL: NULL]`: Vector of one or more column names of
+  predictor variables in `new_data` to extract components for. If
+  `NULL`, all variables and their interactions are returned.
 
 ## Value
 
@@ -65,11 +64,18 @@ A `list` with elements:
 
 Extracts all possible components up to `max_interaction` degrees, up to
 the value set when calling
-[`rpf()`](http://plantedml.com/randomPlantedForest/reference/rpf.md).
+[`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md).
 The intercept is always included. Optionally `predictors` can be
 specified to only include components including the given variables. If
 `max_interaction` is greater than `length(predictors)`, the
 `max_interaction` will be lowered accordingly.
+
+The components are only unique for a purified forest. An unpurified
+forest is purified in place on first use with the defaults of
+[`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md).
+For other settings, such as more threads, call
+[`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
+before `predict_components()`.
 
 ## Note
 

@@ -19,17 +19,19 @@ predict(
 
 - object:
 
-  A fit object of class
-  [`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md).
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - new_data:
 
-  Data for new observations to predict.
+  `[data.frame | matrix]`: New observations to predict.
 
 - type:
 
-  `"numeric"` for regression outcomes, `"class"` for class predictions
-  or `"prob"` for probability predictions.
+  `[character(1)]`: `"numeric"` for regression outcomes, `"class"` for
+  class predictions or `"prob"` for probability predictions. Defaults to
+  `"numeric"` for regression and `"prob"` for classification.
 
   For classification and `loss = "L1"` or `"L2"`, `"numeric"` yields raw
   predictions which are not guaranteed to be valid probabilities in
@@ -43,12 +45,13 @@ predict(
 
 - nthreads:
 
-  integer or NULL: number of threads to use. If NULL, defaults to min of
-  the object's configured `nthreads` and available threads.
+  `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the
+  `nthreads` the forest was fitted with, capped at the available cores.
 
 - ...:
 
-  Unused.
+  Not currently used, but required for extensibility. Unknown arguments
+  are an error.
 
 ## Value
 
@@ -75,15 +78,15 @@ predict(rpfit, mtcars[, c("cyl", "wt")])
 #> # A tibble: 32 × 1
 #>    .pred
 #>    <dbl>
-#>  1  20.5
-#>  2  20.0
+#>  1  20.7
+#>  2  20.5
 #>  3  25.0
-#>  4  20.7
-#>  5  16.8
-#>  6  18.4
+#>  4  21.0
+#>  5  17.8
+#>  6  18.3
 #>  7  14.9
-#>  8  24.1
-#>  9  23.7
-#> 10  19.2
+#>  8  23.5
+#>  9  22.5
+#> 10  18.6
 #> # ℹ 22 more rows
 ```

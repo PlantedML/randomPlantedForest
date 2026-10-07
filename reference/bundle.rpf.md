@@ -3,10 +3,10 @@
 Method for
 [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)
 wrapping
-[`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)/[`rpf_unmarshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md),
+[`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)/[`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md),
 so rpf models work with the standard tidymodels serialization workflow.
 Training data is not included; see
-[`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+[`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
 for the implications.
 
 ## Usage
@@ -20,8 +20,9 @@ bundle(x, ...)
 
 - x:
 
-  An [rpf](http://plantedml.com/randomPlantedForest/reference/rpf.md)
-  object.
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - ...:
 
@@ -30,7 +31,7 @@ bundle(x, ...)
 ## Value
 
 An object of class `bundled_rpf` for `bundle()`, or the restored
-[rpf](http://plantedml.com/randomPlantedForest/reference/rpf.md) object
+[rpf](https://plantedml.com/randomPlantedForest/reference/rpf.md) object
 for `unbundle()`.
 
 ## Examples
@@ -45,15 +46,15 @@ predict(restored, mtcars)
 #> # A tibble: 32 × 1
 #>    .pred
 #>    <dbl>
-#>  1  21.1
-#>  2  19.4
+#>  1  20.4
+#>  2  20.1
 #>  3  23.8
-#>  4  20.1
-#>  5  17.5
-#>  6  18.5
+#>  4  20.5
+#>  5  18.1
+#>  6  18.3
 #>  7  14.7
-#>  8  23.5
-#>  9  22.5
-#> 10  19.4
+#>  8  24.2
+#>  9  22.4
+#> 10  18.7
 #> # ℹ 22 more rows
 ```

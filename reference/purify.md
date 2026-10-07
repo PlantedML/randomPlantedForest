@@ -1,16 +1,17 @@
 # Purify a Random Planted Forest
 
-Purifies an rpf object.
+Purification makes the components of the forest's functional
+decomposition unique, which
+[`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+relies on. Unless
+[`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+was called with `purify = TRUE`,
+[`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+purifies the forest on first use.
 
 ## Usage
 
 ``` r
-purify(x, ...)
-
-# Default S3 method
-purify(x, ...)
-
-# S3 method for class 'rpf'
 purify(x, ..., maxp_interaction = NULL, mode = 2L, nthreads = NULL)
 
 is_purified(x)
@@ -20,73 +21,50 @@ is_purified(x)
 
 - x:
 
-  And object of class `rpf`.
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - ...:
 
-  (Unused)
+  Reserved for future expansion.
 
 - maxp_interaction:
 
-  integer or NULL: Only compute/store purified components up to this
-  interaction order. Higher-order purified trees are zeroed (not
-  computed) but still implicitly influence lower orders during
-  purification. If NULL, purify all orders (default behavior).
+  `[integer(1) | NULL: NULL]`: Highest interaction order to purify.
+  Higher-order components are set to zero, but still influence lower
+  orders during purification, and
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+  then returns zero for them. `NULL` purifies all orders.
 
 - mode:
 
-  integer(1): Purification algorithm mode. 1 = legacy grid path used by
-  `fit$fit$purify()`; 2 = fast exact KD-tree based path. Defaults to 2.
+  `[integer(1): 2]`: Purification algorithm: `2` is the fast exact
+  KD-tree based algorithm, `1` the original grid-based one.
 
 - nthreads:
 
-  integer or NULL: number of threads to use. If NULL, defaults to min of
-  the object's configured `nthreads` and available threads.
+  `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the
+  `nthreads` the forest was fitted with, capped at the available cores.
 
 ## Value
 
-Invisibly: The
-[`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md)
-object.
+`purify()` returns `x` invisibly. `is_purified()` returns `TRUE` or
+`FALSE`.
 
 ## Details
 
-Unless
-[`rpf()`](http://plantedml.com/randomPlantedForest/reference/rpf.md) is
-called with `purify = TRUE`, the forest has to be purified after fit to
-ensure the components extracted by
-[`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
-are valid.
-[`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
-will automatically purify a forest if `is_purified()` reports `FALSE`.
+The forest is modified in place: `x` and every copy of it are purified,
+whether or not the result is assigned. `purify()` is idempotent, meaning
+if the forest is already purified it just returns it unmodified.
 
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~., data = mtcars, max_interaction = 2, ntrees = 10)
+rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+is_purified(rpfit)
+#> [1] FALSE
 purify(rpfit)
-#> -- Regression Random Planted Forest --
-#> 
-#> Formula: mpg ~ . 
-#> Fit using 10 predictors and 2-degree interactions.
-#> Forest is purified!
-#> 
-#> Called with parameters:
-#> 
-#>              loss: L2
-#>            ntrees: 10
-#>   max_interaction: 2
-#>            splits: 30
-#>         split_try: 10
-#>             t_try: 0.4
-#>  split_decay_rate: 0.1
-#>    max_candidates: 50
-#>     delete_leaves: TRUE
-#>   split_structure: leaves
-#>             delta: 0.001
-#>           epsilon: 0.1
-#>     deterministic: FALSE
-#>          nthreads: 1
-#>            purify: FALSE
-#>                cv: FALSE
+is_purified(rpfit)
+#> [1] TRUE
 ```

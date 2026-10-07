@@ -3,7 +3,7 @@
 The C++ forest does not survive
 [`saveRDS()`](https://rdrr.io/r/base/readRDS.html); an `rpf` object
 restored via [`readRDS()`](https://rdrr.io/r/base/readRDS.html) without
-[`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)/[`rpf_unmarshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+[`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)/[`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
 is unusable.
 
 ## Usage
@@ -16,7 +16,9 @@ rpf_is_valid(x)
 
 - x:
 
-  An object of class `rpf`.
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model, possibly restored from disk.
 
 ## Value
 

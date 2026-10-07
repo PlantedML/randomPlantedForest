@@ -1,6 +1,6 @@
-# Print an rpf fit
+# Print an rpf
 
-Print an rpf fit
+Print an rpf
 
 ## Usage
 
@@ -13,7 +13,9 @@ print(x, ...)
 
 - x:
 
-  And object of class `rpf`.
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - ...:
 
@@ -25,34 +27,24 @@ Invisibly: `x`.
 
 ## See also
 
-[`rpf`](http://plantedml.com/randomPlantedForest/reference/rpf.md).
+[`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md).
 
 ## Examples
 
 ``` r
 rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
-#> -- Regression Random Planted Forest --
+#> ── Regression Random Planted Forest ────────────────────────────────────────────
+#> Formula: `mpg ~ cyl + wt + drat`
+#> 10 tree families with 30 splits each on 3 predictors, interactions to degree 2.
+#> ℹ Forest is not purified.
 #> 
-#> Formula: mpg ~ cyl + wt + drat 
-#> Fit using 3 predictors and 2-degree interactions.
-#> Forest is _not_ purified!
+#> ── Tree growing 
+#>    split_structure: leaves
+#>          split_try: 10
+#>              t_try: 0.4
+#>     max_candidates: 50
+#>   split_decay_rate: 0.1
+#>      delete_leaves: TRUE
 #> 
-#> Called with parameters:
-#> 
-#>              loss: L2
-#>            ntrees: 10
-#>   max_interaction: 2
-#>            splits: 30
-#>         split_try: 10
-#>             t_try: 0.4
-#>  split_decay_rate: 0.1
-#>    max_candidates: 50
-#>     delete_leaves: TRUE
-#>   split_structure: leaves
-#>             delta: 0.001
-#>           epsilon: 0.1
-#>     deterministic: FALSE
-#>          nthreads: 1
-#>            purify: FALSE
-#>                cv: FALSE
+#> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
 ```

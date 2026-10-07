@@ -1,29 +1,51 @@
 # randomPlantedForest
 
-`randomPlantedForest` implements “Random Planted Forest”, a directly
-interpretable tree ensemble [(arxiv)](https://arxiv.org/abs/2012.14563).
+`randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen &
+Meyer](https://arxiv.org/abs/2012.14563)), a tree ensemble whose
+predictions you can read off directly, without post-hoc explanation
+methods.
+
+Like a random forest, it averages many tree-based models grown on
+bootstrap samples. Unlike a random forest, each of these models is a sum
+of trees that each split on a fixed set of predictors, and
+`max_interaction` bounds how many predictors that can be. With
+`max_interaction = 1` the forest is an additive model; with `2` it adds
+pairwise interactions, and so on. As a result, the fitted model
+decomposes exactly into an intercept, main effects and interactions up
+to that order:
+
+``` math
+\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k < l} \hat m_{kl}(x_k, x_l) + \dots
+```
+
+Each component can be inspected and plotted on its own, and together
+they sum to the prediction.
 
 ## Installation
 
-You can install the development version of `randomPlantedForest` from
-[GitHub](https://github.com/) with
-
-``` r
-
-# install.packages("remotes")
-remotes::install_github("PlantedML/randomPlantedForest")
-```
-
-or from [r-universe](https://plantedml.r-universe.dev/packages) with
+Install the development version from
+[r-universe](https://plantedml.r-universe.dev/packages) with
 
 ``` r
 
 install.packages("randomPlantedForest", repos = "https://plantedml.r-universe.dev")
 ```
 
+or from [GitHub](https://github.com/PlantedML/randomPlantedForest) with
+
+``` r
+
+# install.packages("pak")
+pak::pak("PlantedML/randomPlantedForest")
+```
+
 ## Example
 
-Model fitting uses a familiar interface:
+[`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+takes a formula, x/y data or a
+[recipe](https://recipes.tidymodels.org/), and
+[`predict()`](https://rdrr.io/r/stats/predict.html) returns a tibble as
+in tidymodels:
 
 ``` r
 
@@ -32,98 +54,68 @@ library(randomPlantedForest)
 mtcars$cyl <- factor(mtcars$cyl)
 rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
 rpfit
-#> -- Regression Random Planted Forest --
+#> ── Regression Random Planted Forest ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#> Formula: `mpg ~ cyl + wt + hp`
+#> 25 tree families with 30 splits each on 3 predictors, interactions to degree 2.
+#> ℹ Forest is not purified.
 #> 
-#> Formula: mpg ~ cyl + wt + hp 
-#> Fit using 3 predictors and 2-degree interactions.
-#> Forest is _not_ purified!
+#> ── Tree growing 
+#>    split_structure: leaves
+#>          split_try: 10
+#>              t_try: 0.4
+#>     max_candidates: 50
+#>   split_decay_rate: 0.1
+#>      delete_leaves: TRUE
 #> 
-#> Called with parameters:
-#> 
-#>              loss: L2
-#>            ntrees: 25
-#>   max_interaction: 2
-#>            splits: 30
-#>         split_try: 10
-#>             t_try: 0.4
-#>  split_decay_rate: 0.1
-#>    max_candidates: 50
-#>     delete_leaves: TRUE
-#>   split_structure: leaves
-#>             delta: 0.001
-#>           epsilon: 0.1
-#>     deterministic: FALSE
-#>          nthreads: 1
-#>            purify: FALSE
-#>                cv: FALSE
+#> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
 
-predict(rpfit, new_data = mtcars) |>
-  cbind(mpg = mtcars$mpg) |>
-  head()
-#>      .pred  mpg
-#> 1 20.56781 21.0
-#> 2 20.57981 21.0
-#> 3 25.36640 22.8
-#> 4 20.86060 21.4
-#> 5 18.25741 18.7
-#> 6 19.01166 18.1
+head(predict(rpfit, new_data = mtcars))
+#> # A tibble: 6 × 1
+#>   .pred
+#>   <dbl>
+#> 1  21.4
+#> 2  21.0
+#> 3  24.4
+#> 4  20.9
+#> 5  17.7
+#> 6  19.1
 ```
 
-Prediction components can be accessed via `predict_components`,
-including the intercept, main effects, and interactions up to a
-specified degree. The returned object also contains the original data as
-`x`, which is required for visualization. The `glex` package can be used
-as well: `glex(rpfit)` yields the same result.
+[`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+returns the decomposition: one column per main effect and interaction,
+plus the intercept.
 
 ``` r
 
-components <- predict_components(rpfit, new_data = mtcars) 
-
-str(components)
-#> List of 3
-#>  $ m        :Classes 'data.table' and 'data.frame':  32 obs. of  6 variables:
-#>   ..$ cyl   : num [1:32] 3.08 3.08 5.56 3.08 1.87 ...
-#>   ..$ wt    : num [1:32] 0.0384 0.0552 1.736 0.1104 -0.876 ...
-#>   ..$ hp    : num [1:32] 0.346 0.346 1.005 0.346 -0.117 ...
-#>   ..$ cyl:wt: num [1:32] 0.1382 0.1483 0.3898 0.1932 0.0373 ...
-#>   ..$ cyl:hp: num [1:32] -0.0284 -0.0284 -0.4527 -0.0284 0.1046 ...
-#>   ..$ hp:wt : num [1:32] 0.137 0.122 0.267 0.303 0.381 ...
-#>   ..- attr(*, ".internal.selfref")=<pointer: 0x101551630> 
-#>  $ intercept: num 16.9
-#>  $ x        :Classes 'data.table' and 'data.frame':  32 obs. of  3 variables:
-#>   ..$ cyl: Factor w/ 3 levels "4","6","8": 2 2 1 2 3 2 3 1 1 2 ...
-#>   ..$ wt : num [1:32] 2.62 2.88 2.32 3.21 3.44 ...
-#>   ..$ hp : num [1:32] 110 110 93 110 175 105 245 62 95 123 ...
-#>   ..- attr(*, ".internal.selfref")=<pointer: 0x101551630> 
-#>  - attr(*, "class")= chr [1:3] "glex" "rpf_components" "list"
+components <- predict_components(rpfit, new_data = mtcars)
+head(components$m)
+#>          cyl         wt         hp     cyl:wt      cyl:hp        hp:wt
+#>        <num>      <num>      <num>      <num>       <num>        <num>
+#> 1: 2.8275105  0.2569457  0.2970626  0.3448129  0.06873138  0.006002504
+#> 2: 2.8275105 -0.2438784  0.2970626  0.3929089  0.06873138  0.076817727
+#> 3: 4.8022694  1.7754646  1.3572422 -0.4610986 -0.41379471 -0.231709254
+#> 4: 2.8275105 -0.4727413  0.2970626  0.3538112  0.06873138  0.256989969
+#> 5: 0.7661282 -1.0143147 -0.3952336  0.4528133  0.02336632  0.241715900
+#> 6: 2.8275105 -1.1525180  0.5397470 -0.4590129 -0.03247695 -0.199217461
 ```
 
-Various visualization options are available via `glex`, e.g. for main
-and second-order interaction effects:
+The [glex](https://plantedml.com/glex/) package plots these components:
 
 ``` r
 
-# install glex if not available:
-if (!requireNamespace("glex")) remotes::install_github("PlantedML/glex")
-#> Loading required namespace: glex
 library(glex)
 library(ggplot2)
-library(patchwork) # For plot arrangement
+library(patchwork)
 
-p1 <- autoplot(components, "wt")
-p2 <- autoplot(components, "hp")
-p3 <- autoplot(components, "cyl")
-p4 <- autoplot(components, c("wt", "hp"))
-
-(p1 + p2) / (p3 + p4) +
-  plot_annotation(
-    title = "Selected effects for mtcars",
-    caption = "(It's a tiny dataset but it has to fit in a README, okay?)"
-  )
+(autoplot(components, "wt") + autoplot(components, "hp")) /
+  (autoplot(components, "cyl") + autoplot(components, c("wt", "hp")))
 ```
 
-![](reference/figures/README-unnamed-chunk-4-1.png)
+![](reference/figures/README-effects-1.png)
 
-See the [Bikesharing
+The [Get
+started](https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html)
+guide covers classification, recipes, saving models and more on
+interpreting components, and the [Bikesharing
 decomposition](https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html)
-article for more examples.
+article works through a larger example.

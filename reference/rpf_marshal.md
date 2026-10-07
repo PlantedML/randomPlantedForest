@@ -1,7 +1,7 @@
 # Serialize and restore Random Planted Forests
 
 `rpf_marshal()` converts an
-[rpf](http://plantedml.com/randomPlantedForest/reference/rpf.md) object
+[rpf](https://plantedml.com/randomPlantedForest/reference/rpf.md) object
 into a plain R list safe for
 [`saveRDS()`](https://rdrr.io/r/base/readRDS.html); `rpf_unmarshal()`
 reverses it. The C++ forest behind an `rpf` object does not survive R
@@ -20,23 +20,25 @@ rpf_unmarshal(blob)
 
 - x:
 
-  An object of class `rpf`.
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  model.
 
 - include_data:
 
-  `[FALSE]`: Store training data in the blob, enabling
-  [`purify()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
+  `[logical(1): FALSE]`: Store training data in the blob, enabling
+  [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   after restoring.
 
 - blob:
 
-  An object of class `rpf_marshaled` created by `rpf_marshal()`.
+  `[rpf_marshaled]`: Object created by `rpf_marshal()`.
 
 ## Value
 
 `rpf_marshal()` returns a list of class `rpf_marshaled`;
 `rpf_unmarshal()` returns an object of class
-[rpf](http://plantedml.com/randomPlantedForest/reference/rpf.md).
+[rpf](https://plantedml.com/randomPlantedForest/reference/rpf.md).
 
 ## Details
 

@@ -5,34 +5,32 @@
 Modeling fundamentals for creation and prediction from Random Planted
 Forest models.
 
-- [`rpf()`](http://plantedml.com/randomPlantedForest/reference/rpf.md) :
-  Random Planted Forest
-- [`predict(`*`<rpf>`*`)`](http://plantedml.com/randomPlantedForest/reference/predict.rpf.md)
+- [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  : Random Planted Forest
+- [`predict(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/predict.rpf.md)
   : Random Planted Forest Predictions
 
 ## Functional decomposition
 
 Enabling and utilizing functional decomposition
 
-- [`purify()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
-  [`is_purified()`](http://plantedml.com/randomPlantedForest/reference/purify.md)
+- [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
+  [`is_purified()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   : Purify a Random Planted Forest
-- [`predict_components()`](http://plantedml.com/randomPlantedForest/reference/predict_components.md)
+- [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   : Extract predicted components from a Random Planted Forest
 
 ## Utility functions
 
-- [`print(`*`<rpf>`*`)`](http://plantedml.com/randomPlantedForest/reference/print.rpf.md)
-  : Print an rpf fit
-- [`print(`*`<rpf_forest>`*`)`](http://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
-  [`str(`*`<rpf_forest>`*`)`](http://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
+- [`print(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf.md)
+  : Print an rpf
+- [`print(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
+  [`str(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
   : Compact printing of forest structures
-- [`preprocess_predictors_predict()`](http://plantedml.com/randomPlantedForest/reference/preprocess_predictors_predict.md)
-  : Preprocess predictors for prediction
-- [`rpf_marshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
-  [`rpf_unmarshal()`](http://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+- [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
+  [`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   : Serialize and restore Random Planted Forests
-- [`rpf_is_valid()`](http://plantedml.com/randomPlantedForest/reference/rpf_is_valid.md)
+- [`rpf_is_valid()`](https://plantedml.com/randomPlantedForest/reference/rpf_is_valid.md)
   : Check whether an rpf object's C++ forest is still alive
-- [`bundle(`*`<rpf>`*`)`](http://plantedml.com/randomPlantedForest/reference/bundle.rpf.md)
+- [`bundle(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/bundle.rpf.md)
   : Bundle an rpf model
