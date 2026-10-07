@@ -15,6 +15,8 @@
   When a split replaced a leaf, its new split candidates could be lost or attached to the wrong leaf, depending on memory layout (#66).
 * `predict(type = "class")` breaks probability ties by level order instead of at random, so class predictions are deterministic and no longer advance the random number generator (#66).
 * `purify()` returns its input invisibly, as documented (#66).
+* Logical predictors in the formula interface are used as a single 0/1 column, as in the x/y interface.
+  Previously they were expanded into two redundant indicator columns, which also counted against `max_interaction` (#66).
 
 ## Performance
 

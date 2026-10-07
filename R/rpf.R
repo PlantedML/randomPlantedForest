@@ -175,6 +175,13 @@ rpf.formula <- function(
   ...
 ) {
   rlang::check_dots_empty()
+  # model.matrix() would expand logical predictors into two dummy columns; use them
+  # as 0/1 like the x/y interface. The outcome stays as is so it is still validated.
+  outcome <- all.vars(rlang::f_lhs(formula))
+  logical_predictors <- setdiff(names(data)[vapply(data, is.logical, logical(1))], outcome)
+  for (col in logical_predictors) {
+    data[[col]] <- as.integer(data[[col]])
+  }
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
   rpf_bridge(
