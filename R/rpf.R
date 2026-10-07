@@ -17,7 +17,7 @@
 #'   predictors on the right-hand side, e.g. `y ~ x1 + x2`.
 #' @param data `[data.frame]`: Data containing the predictors and the outcome,
 #'   used with `formula` or a recipe `x`.
-#' @param max_interaction `[integer(1): 1]`: Maximum number of predictors a single tree may
+#' @param max_interaction `[integer(1): 2]`: Maximum number of predictors a single tree may
 #'   split on. `1` fits main effects only (an additive model), `2` adds
 #'   pairwise interactions, and so on. `0` uses all predictors and values above
 #'   the number of predictors are reduced to it.
@@ -77,9 +77,10 @@
 #' ## Choosing parameters
 #'
 #' Start with `max_interaction` and `splits`. `max_interaction` sets which
-#' effects the model can represent: `1` for an additive model, `2` to add
-#' pairwise interactions. Higher values are more flexible, but slower and the
-#' components are harder to interpret. `splits` sets how closely the model
+#' effects the model can represent: `1` for an additive model, `2` (the
+#' default) to add pairwise interactions, which can still be plotted as
+#' heatmaps. Higher values are more flexible, but slower and the components are
+#' harder to interpret. `splits` sets how closely the model
 #' follows the data and is the parameter to tune. With a higher
 #' `max_interaction`, splits are spread over more possible components, so tune
 #' both together.
@@ -156,7 +157,7 @@ rpf.default <- function(x, ...) {
 rpf.formula <- function(
   formula,
   data,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -211,7 +212,7 @@ rpf.formula <- function(
 rpf.data.frame <- function(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -259,7 +260,7 @@ rpf.data.frame <- function(
 rpf.matrix <- function(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -307,7 +308,7 @@ rpf.matrix <- function(
 rpf.recipe <- function(
   x,
   data,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -384,12 +385,8 @@ rpf_bridge <- function(
   if (max_interaction == 0) {
     max_interaction <- p
   }
-  # same applies to values > p
+  # same applies to values > p, silently, as the default of 2 exceeds p for a single predictor
   if (max_interaction > p) {
-    cli::cli_inform(c(
-      "{.arg max_interaction} is {max_interaction}, but there {?is/are} only {p} predictor{?s}.",
-      "i" = "Setting {.arg max_interaction} to {p}."
-    ))
     max_interaction <- p
   }
 

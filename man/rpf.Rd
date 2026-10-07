@@ -13,7 +13,7 @@ rpf(x, ...)
 \method{rpf}{formula}(
   formula,
   data,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -35,7 +35,7 @@ rpf(x, ...)
 \method{rpf}{data.frame}(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -57,7 +57,7 @@ rpf(x, ...)
 \method{rpf}{matrix}(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -79,7 +79,7 @@ rpf(x, ...)
 \method{rpf}{recipe}(
   x,
   data,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
   split_structure = "leaves",
@@ -115,7 +115,7 @@ predictors on the right-hand side, e.g. \code{y ~ x1 + x2}.}
 \item{data}{\verb{[data.frame]}: Data containing the predictors and the outcome,
 used with \code{formula} or a recipe \code{x}.}
 
-\item{max_interaction}{\verb{[integer(1): 1]}: Maximum number of predictors a single tree may
+\item{max_interaction}{\verb{[integer(1): 2]}: Maximum number of predictors a single tree may
 split on. \code{1} fits main effects only (an additive model), \code{2} adds
 pairwise interactions, and so on. \code{0} uses all predictors and values above
 the number of predictors are reduced to it.}
@@ -191,9 +191,10 @@ interaction components; see \code{\link[=predict_components]{predict_components(
 \subsection{Choosing parameters}{
 
 Start with \code{max_interaction} and \code{splits}. \code{max_interaction} sets which
-effects the model can represent: \code{1} for an additive model, \code{2} to add
-pairwise interactions. Higher values are more flexible, but slower and the
-components are harder to interpret. \code{splits} sets how closely the model
+effects the model can represent: \code{1} for an additive model, \code{2} (the
+default) to add pairwise interactions, which can still be plotted as
+heatmaps. Higher values are more flexible, but slower and the components are
+harder to interpret. \code{splits} sets how closely the model
 follows the data and is the parameter to tune. With a higher
 \code{max_interaction}, splits are spread over more possible components, so tune
 both together.

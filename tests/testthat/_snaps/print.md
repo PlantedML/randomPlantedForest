@@ -5,7 +5,7 @@
     Output
       -- Regression Random Planted Forest --------------------------------------------
       Formula: `mpg ~ cyl + wt`
-      3 tree families with 30 splits each on 2 predictors, main effects only.
+      3 tree families with 30 splits each on 2 predictors, all possible interactions.
       i Forest is not purified.
       
       -- Tree growing 
@@ -25,7 +25,7 @@
     Output
       -- Regression Random Planted Forest --------------------------------------------
       Formula: `mpg ~ cyl + wt`
-      3 tree families with 30 splits each on 2 predictors, main effects only.
+      3 tree families with 30 splits each on 2 predictors, all possible interactions.
       v Forest is purified.
       
       -- Tree growing 
@@ -45,7 +45,7 @@
     Output
       -- Classification Random Planted Forest ----------------------------------------
       Predictors: `Sepal.Length`, `Sepal.Width`, `Petal.Length`, and `Petal.Width`
-      1 tree family with 30 splits each on 4 predictors, main effects only.
+      1 tree family with 30 splits each on 4 predictors, interactions to degree 2.
       i Forest is not purified.
       ! Fit deterministically.
       

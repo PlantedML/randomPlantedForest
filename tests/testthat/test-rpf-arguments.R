@@ -68,12 +68,12 @@ test_that("delta and epsilon are used by the logit loss", {
   expect_false(identical(default, fit_with(epsilon = 0.3)))
 })
 
-test_that("max_interaction above the number of predictors is capped with a message", {
-  expect_message(
-    fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 2, max_interaction = 5),
-    "only 2 predictors"
-  )
+test_that("max_interaction above the number of predictors is capped silently", {
+  expect_no_message(fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 2, max_interaction = 5))
   expect_identical(fit$params$max_interaction, 2L)
+
+  expect_no_message(fit_single <- rpf(mpg ~ wt, data = mtcars, ntrees = 2))
+  expect_identical(fit_single$params$max_interaction, 1L)
 })
 
 test_that("logical predictors are used like 0/1 integers", {
