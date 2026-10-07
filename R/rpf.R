@@ -52,7 +52,8 @@
 #'   updates and acts as regularization: smaller values permit larger jumps on
 #'   the link scale.
 #' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
-#'   [predict_components()] requires. Can also be done later with [purify()].
+#'   [predict_components()] requires, with the defaults of [purify()]. For other
+#'   settings, call [purify()] after fitting instead.
 #' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
 #' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in

@@ -44,6 +44,10 @@ Extracts all possible components up to \code{max_interaction} degrees,
 up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
 Optionally \code{predictors} can be specified to only include components including the given variables.
 If \code{max_interaction} is greater than \code{length(predictors)}, the \code{max_interaction} will be lowered accordingly.
+
+The components are only unique for a purified forest.
+An unpurified forest is purified in place on first use with the defaults of \code{\link[=purify]{purify()}}.
+For other settings, such as more threads, call \code{\link[=purify]{purify()}} before \code{predict_components()}.
 }
 \note{
 Depending on the number of predictors and \code{max_interaction}, the number of components will

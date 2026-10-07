@@ -8,6 +8,10 @@
 #' Optionally `predictors` can be specified to only include components including the given variables.
 #' If `max_interaction` is greater than `length(predictors)`, the `max_interaction` will be lowered accordingly.
 #'
+#' The components are only unique for a purified forest.
+#' An unpurified forest is purified in place on first use with the defaults of [purify()].
+#' For other settings, such as more threads, call [purify()] before `predict_components()`.
+#'
 #' @note
 #' Depending on the number of predictors and `max_interaction`, the number of components will
 #' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
@@ -87,12 +91,8 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     checkmate::assert_subset(predictors, choices = names(object$blueprint$ptypes$predictors))
   }
 
-  # Check if forest is purified, if not we do that now
   if (!is_purified(object)) {
-    # Purify using default policy: mode=2 (fast exact),
-    # maxp_interaction=0 (uncapped),
-    # nthreads defaults to min(training nthreads, available cores)
-    object$fit$purify_threads(0L, 0L, 2L)
+    purify(object)
   }
 
   # If max_interaction is greater than number of predictors requested we need to adjust that

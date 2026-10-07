@@ -16,7 +16,8 @@ is_purified(x)
 
 \item{maxp_interaction}{\verb{[integer(1) | NULL: NULL]}: Highest interaction order to purify.
 Higher-order components are set to zero, but still influence lower orders
-during purification. \code{NULL} purifies all orders.}
+during purification, and \code{\link[=predict_components]{predict_components()}} then returns zero for them.
+\code{NULL} purifies all orders.}
 
 \item{mode}{\verb{[integer(1): 2]}: Purification algorithm: \code{2} is the fast exact KD-tree
 based algorithm, \code{1} the original grid-based one.}

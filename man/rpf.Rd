@@ -162,7 +162,8 @@ updates and acts as regularization: smaller values permit larger jumps on
 the link scale.}
 
 \item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
-\code{\link[=predict_components]{predict_components()}} requires. Can also be done later with \code{\link[=purify]{purify()}}.}
+\code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other
+settings, call \code{\link[=purify]{purify()}} after fitting instead.}
 
 \item{nthreads}{\verb{[integer(1): 1]}: Number of threads for fitting. Also the default for
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
