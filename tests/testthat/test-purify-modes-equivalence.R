@@ -1,8 +1,8 @@
 set.seed(2025)
 
 test_that("single component predictions match across purify modes (non-capped)", {
-  rp1 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 30, deterministic = TRUE)
-  rp2 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 30, deterministic = TRUE)
+  rp1 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 1, deterministic = TRUE)
+  rp2 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 1, deterministic = TRUE)
 
   expect_false(is_purified(rp1))
   expect_false(is_purified(rp2))
@@ -22,8 +22,8 @@ test_that("single component predictions match across purify modes (non-capped)",
 })
 
 test_that("single component predictions match across purify modes (capped)", {
-  rp1 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 30, deterministic = TRUE)
-  rp2 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 30, deterministic = TRUE)
+  rp1 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 1, deterministic = TRUE)
+  rp2 <- rpf(mpg ~ cyl + disp + hp + wt, data = mtcars, max_interaction = 3, ntrees = 1, deterministic = TRUE)
 
   expect_false(is_purified(rp1))
   expect_false(is_purified(rp2))

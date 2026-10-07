@@ -1,14 +1,10 @@
-url: http://plantedml.com/randomPlantedForest/
+url: https://plantedml.com/randomPlantedForest/
 template:
   bootstrap: 5
+  light-switch: true
 
-articles:
-- title: Regression Tests
-  desc: |
-    Ensuring that the current implementation still produces the expected results,
-    given some stochasticity.
-  contents:
-  - test/Regression-Test-oldrpf
+development:
+  mode: auto
 
 reference:
 - title: Model fitting and prediction
@@ -29,8 +25,6 @@ reference:
 - contents:
   - starts_with("print.")
   - starts_with("str.")
-  - preprocess_predictors_predict
   - rpf_marshal
   - rpf_is_valid
   - bundle.rpf
-

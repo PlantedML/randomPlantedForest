@@ -10,15 +10,14 @@
 \method{str}{rpf_forest}(object, ...)
 }
 \arguments{
-\item{x}{Object of class \code{rpf_forest}}
+\item{x}{\verb{[rpf_forest]}: Flattened forest, as in \verb{$forest} of an \code{\link{rpf}}.}
 
 \item{...}{Further arguments passed to or from other methods.}
 
-\item{object}{Object of class \code{rpf_forest}}
+\item{object}{\verb{[rpf_forest]}: Flattened forest.}
 }
 \description{
 These methods are provided to avoid flooding the console with long nested lists containing tree structures.
-Note
 }
 \examples{
 

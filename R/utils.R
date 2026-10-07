@@ -1,3 +1,20 @@
+# rpf has no missing value handling: splits compare feature values directly,
+# so an NA would silently send a row through arbitrary leaves.
+check_no_missing <- function(data, what, call = rlang::caller_env()) {
+  missing_cols <- names(data)[vapply(data, anyNA, logical(1))]
+  if (length(missing_cols) > 0) {
+    cli::cli_abort(
+      c(
+        paste(what, "must not contain missing values."),
+        "x" = "Missing values in {.var {missing_cols}}.",
+        "i" = "Impute or remove them first, e.g. with a recipe passed to {.fn rpf}."
+      ),
+      call = call
+    )
+  }
+  invisible(data)
+}
+
 #' Order factor levels by response
 #'
 #' Regression: Order by mean(y)
@@ -7,8 +24,8 @@
 #'
 #' See https://doi.org/10.7717/peerj.6339 for details.
 #'
-#' @param x Factor variable to order
-#' @param y Response
+#' @param x `[factor]`: Variable to order.
+#' @param y `[numeric | factor]`: Response.
 #'
 #' @return Re-ordered (ordered) factor
 #' @noRd
@@ -30,10 +47,7 @@ order_factor_by_response <- function(x, y) {
       means <- pca_order(x, y)
     }
   } else {
-    stop(paste(
-      "Ordering of factor columns only implemented for regression",
-      "and classification outcomes."
-    ))
+    cli::cli_abort("Ordering of factor columns only implemented for regression and classification outcomes.")
   }
 
   levels_ordered <- as.character(levels(x)[order(means)])
@@ -45,8 +59,8 @@ order_factor_by_response <- function(x, y) {
 #' Order factor levels by first principal component of the weighted covariance
 #' matrix of the contingency table
 #'
-#' @param x Factor variable to order
-#' @param y Response
+#' @param x `[factor]`: Variable to order.
+#' @param y `[factor]`: Response.
 #'
 #' @return Order of factor levels
 #'
@@ -125,19 +139,11 @@ preprocess_predictors_fit <- function(processed) {
 #' `object$factor_levels`), re-encode factor columns as integers, and return a
 #' numeric matrix suitable for the underlying C++ prediction routines.
 #'
-#' This is primarily an internal utility used by `predict()` methods but is
-#' exported to support advanced users and tests.
-#'
-#' @param object An object of class `rpf` returned by [`rpf()`].
-#' @param predictors A data frame or matrix of predictor values to preprocess.
+#' @param object `[rpf]`: A fitted [`rpf`] model.
+#' @param predictors `[data.frame | matrix]`: Predictor values to preprocess.
 #'
 #' @return A numeric matrix with the same number of rows as `predictors`.
-#' @export
-#' @examples
-#' rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
-#' processed <- hardhat::forge(mtcars[, c("cyl", "wt")], rpfit$blueprint)
-#' X <- preprocess_predictors_predict(rpfit, processed$predictors)
-#' dim(X)
+#' @noRd
 preprocess_predictors_predict <- function(object, predictors) {
   predictors <- as.data.table(predictors)
 
@@ -179,7 +185,7 @@ preprocess_predictors_predict <- function(object, predictors) {
 # Used in rpf_impl()
 # Loss is need to transform 1/0 to 1/-1 for exponential
 #' @importFrom stats model.matrix
-preprocess_outcome <- function(processed, loss) {
+preprocess_outcome <- function(processed, loss, call = rlang::caller_env()) {
   outcomes <- processed$outcomes[[1]]
 
   # Task type detection: Could be more concise
@@ -189,14 +195,15 @@ preprocess_outcome <- function(processed, loss) {
   is_numeric <- checkmate::test_numeric(outcomes, any.missing = FALSE)
 
   if (is_binary & is_integerish) {
-    warning(paste(
-      "y is a binary integer, assuming regression task.",
-      "Recode y to a factor for classification."
+    cli::cli_warn(c(
+      "The outcome is a binary integer, assuming a regression task.",
+      "i" = "Recode it to a factor for classification."
     ))
   }
 
   if (is_factor) {
     mode <- "classification"
+    loss <- loss %||% "exponential"
 
     if (is_binary) {
       # Binary case: Convert to 0, 1 integer
@@ -227,16 +234,18 @@ preprocess_outcome <- function(processed, loss) {
     }
   } else if (is_numeric) {
     mode <- "regression"
+    loss <- loss %||% "L2"
     # rpf_impl expects Y to be a matrix
     outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
     # mode <- "unsupported"
-    stop("y should be either numeric (regression) or factor (classification)")
+    cli::cli_abort("The outcome must be numeric (regression) or a factor (classification).", call = call)
   }
 
   list(
     outcomes = outcomes,
-    mode = mode
+    mode = mode,
+    loss = loss
   )
 }
 
@@ -250,16 +259,6 @@ softmax <- function(x) {
   exp(x - lse)
 }
 
-#' Get remainders where max_interaction requested in `predict_components` is smaller than
-#' `max_interaction` set in `rpf`.
-#' This is somewhat cumbersome unfortunately, and presumably will have to be partially
-#' repeated for other methods in `glex`
-#' @noRd
-#' @keywords internal
-#' @param m Components as calculated in `predict_components`
-#' @param levels Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
-#' @param pred Regular model predictions as returned by `predict.rpf`.
-#' @param intercept Intercept as stored in output of `predict_components`.
 # Outcome levels represented by columns of the C++ prediction matrix.
 # Multiclass logit uses reference-class encoding: the first level has no column.
 model_outcome_levels <- function(object) {
@@ -270,6 +269,16 @@ model_outcome_levels <- function(object) {
   outcome_levels
 }
 
+#' Get remainders where max_interaction requested in `predict_components` is smaller than
+#' `max_interaction` set in `rpf`.
+#' This is somewhat cumbersome unfortunately, and presumably will have to be partially
+#' repeated for other methods in `glex`
+#' @noRd
+#' @keywords internal
+#' @param m `[data.table]`: Components as calculated in `predict_components`
+#' @param levels `[character]`: Outcome levels as stored in `rpf$blueprint$ptypes$outcomes`.
+#' @param pred `[data.frame]`: Regular model predictions as returned by `predict.rpf`.
+#' @param intercept `[numeric]`: Intercept as stored in output of `predict_components`.
 calc_remainders_multiclass <- function(m, levels, pred, intercept) {
   # data.table NSE warnings
   term <- remainder <- m_sum <- NULL

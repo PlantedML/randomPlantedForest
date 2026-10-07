@@ -45,14 +45,14 @@ test_that("Binary detection: factor", {
 # Ambiguous, use regression and warn
 test_that("Binary detection: Regression for 0,1", {
   # y in 0, 1: Ambiguous, expect warning, but should classifybrows
-  expect_warning(rpf(y01 ~ ., xdat), regexp = "^y is.*assuming")
+  expect_warning(rpf(y01 ~ ., xdat), regexp = "binary integer, assuming")
   y_01 <- suppressWarnings(rpf(y01 ~ ., xdat))
   expect_s4_class(y_01$fit, "Rcpp_RandomPlantedForest")
 })
 
 test_that("Binary detection: Regression for 1,2", {
   # y in 1, 2: See 0,1
-  expect_warning(rpf(y12 ~ ., xdat), regexp = "^y is.*assuming")
+  expect_warning(rpf(y12 ~ ., xdat), regexp = "binary integer, assuming")
   y_12 <- suppressWarnings(rpf(y12 ~ ., xdat))
   expect_s4_class(y_12$fit, "Rcpp_RandomPlantedForest")
 })
@@ -60,10 +60,10 @@ test_that("Binary detection: Regression for 1,2", {
 test_that("Binary detection: Fail for character, logical", {
   # y two-level character: should fail because ambiguous
   # similar problem as factor but w/o levels no order can be assumed
-  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
+  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 
   # y logical: should error and note what it expects
-  expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "^y should be")
+  expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
   expect_error(rpf(ylogi ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })

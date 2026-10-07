@@ -2,12 +2,12 @@
 % Please edit documentation in R/print.R
 \name{print.rpf}
 \alias{print.rpf}
-\title{Print an rpf fit}
+\title{Print an rpf}
 \usage{
 \method{print}{rpf}(x, ...)
 }
 \arguments{
-\item{x}{And object of class \code{rpf}.}
+\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }
@@ -15,7 +15,7 @@
 Invisibly: \code{x}.
 }
 \description{
-Print an rpf fit
+Print an rpf
 }
 \examples{
 rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)

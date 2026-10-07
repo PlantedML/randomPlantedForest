@@ -7,15 +7,15 @@
 predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
 }
 \arguments{
-\item{object}{A fit object of class \code{\link{rpf}}.}
+\item{object}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{new_data}{Data for new observations to predict.}
+\item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
 
-\item{max_interaction}{\code{\link{integer}} or \code{NULL}: Maximum degree of interactions to consider.
-Default will use the \code{max_interaction} parameter from the \code{\link{rpf}} object.
+\item{max_interaction}{\verb{[integer(1) | NULL: NULL]}: Maximum degree of
+interactions to consider. \code{NULL} uses the \code{max_interaction} parameter from the \code{\link{rpf}} object.
 Must be between \code{1} (main effects only) and the \code{max_interaction} of the \code{\link{rpf}} object.}
 
-\item{predictors}{\code{\link{character}} or \code{NULL}: Vector of one or more column names of predictor variables
+\item{predictors}{\verb{[character | NULL: NULL]}: Vector of one or more column names of predictor variables
 in \code{new_data} to extract components for.
 If \code{NULL}, all variables and their interactions are returned.}
 }
@@ -44,6 +44,10 @@ Extracts all possible components up to \code{max_interaction} degrees,
 up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
 Optionally \code{predictors} can be specified to only include components including the given variables.
 If \code{max_interaction} is greater than \code{length(predictors)}, the \code{max_interaction} will be lowered accordingly.
+
+The components are only unique for a purified forest.
+An unpurified forest is purified in place on first use with the defaults of \code{\link[=purify]{purify()}}.
+For other settings, such as more threads, call \code{\link[=purify]{purify()}} before \code{predict_components()}.
 }
 \note{
 Depending on the number of predictors and \code{max_interaction}, the number of components will

@@ -6,13 +6,13 @@
 \alias{randomPlantedForest-package}
 \title{randomPlantedForest: Random Planted Forest: A Directly Interpretable Tree Ensemble}
 \description{
-An implementation of the Random Planted Forest algorithm for directly interpretable tree ensembles based on a functional ANOVA decomposition.
+Implements Random Planted Forest (Hiabu, Mammen and Meyer, 2020) \doi{10.48550/arXiv.2012.14563}, a directly interpretable tree ensemble for regression and classification. Trees are restricted to a maximum number of interacting predictors, so the fitted model decomposes exactly into main effects and low-order interactions, a functional ANOVA decomposition that can be extracted for interpretation. Fitting and prediction are multithreaded, and fitted models can be serialized.
 }
 \seealso{
 Useful links:
 \itemize{
   \item \url{https://github.com/PlantedML/randomPlantedForest}
-  \item \url{http://plantedml.com/randomPlantedForest/}
+  \item \url{https://plantedml.com/randomPlantedForest/}
   \item Report bugs at \url{https://github.com/PlantedML/randomPlantedForest/issues}
 }
 
@@ -24,9 +24,9 @@ Authors:
 \itemize{
   \item Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
   \item Joseph Theo Meyer
-  \item Munir Hiabu
+  \item Munir Hiabu (\href{https://orcid.org/0000-0001-5846-667X}{ORCID})
   \item Maike Spankus
-  \item Marvin N. Wright \email{cran@wrig.de}
+  \item Marvin N. Wright \email{cran@wrig.de} (\href{https://orcid.org/0000-0002-8542-6291}{ORCID})
 }
 
 }

@@ -1,20 +1,50 @@
-# randomPlantedForest (development version)
+# randomPlantedForest 0.5.0
 
-* Prediction is much faster: leaves are scanned from flat, cache-friendly
-  arrays (~15x single-threaded), and rows are split across threads.
+## Breaking changes
+
+* `rpf()` now defaults to `max_interaction = 2`, main effects and pairwise interactions, instead of `1`, an additive model (#66).
+  Values above the number of predictors are capped silently instead of with a message.
+* `rpf()` now defaults to `loss = "exponential"` for classification instead of `"L2"`, so classification fits give proper probability estimates by default; regression still uses `"L2"` (#66).
+* `rpf()` arguments are reordered by purpose (forest size, split search, loss, other). Pass arguments after the data arguments by name (#66).
+* `rpf()`, `predict()` and `purify()` error on unknown arguments, such as misspelled ones, instead of silently ignoring them (#66).
+* `purify()` is a regular function instead of an S3 generic (#66).
+* `preprocess_predictors_predict()` is no longer exported; it is an internal step of `predict()` (#66).
+* The package now requires R >= 4.1.0 (#66).
+* For a given seed, classification models differ from 0.4.0 due to the fixes and speedup below, but regression models are unchanged (#57, #66).
+* For direct users of the C++ object (`$fit`): `set_data()` no longer fits, call `fit()` afterwards, and an unknown classification loss is an error instead of a silent fallback to L2 (@jyliuu, #57).
+* `rpf()` no longer has a `cv` argument, which never had an effect: the C++ cross-validation was a no-op (#66).
+
+## Bug fixes
+
+* `predict()` and `predict_components()` error on missing values in `new_data`, naming the affected columns.
+  Previously such rows silently received arbitrary predictions, as `rpf()` has no handling for missing values.
+  `rpf()` likewise reports missing values in the training data by column (#66).
+* Classification fits with a fixed seed could differ between runs.
+  When a split replaced a leaf, its new split candidates could be lost or attached to the wrong leaf, depending on memory layout (#66).
+* `predict(type = "class")` breaks probability ties by level order instead of at random, so class predictions are deterministic and no longer advance the random number generator (#66).
+* `purify()` returns its input invisibly, as documented (#66).
+* Logical predictors in the formula interface are used as a single 0/1 column, as in the x/y interface.
+  Previously they were expanded into two redundant indicator columns, which also counted against `max_interaction` (#66).
+
+## Performance
+
+* Prediction is much faster: leaves are scanned from flat, cache-friendly arrays (~15x single-threaded), and rows are split across threads (#65).
   `predict()` gains `nthreads`, defaulting to the `nthreads` used for fitting.
-* `predict_components()` is much faster: purified forests look up only the
-  trees of the requested component, and each distinct input row is predicted
-  once, which pays off for low-cardinality features (#59).
-* Classification fits are slightly faster, as redundant work during model construction
-  was removed. For a given seed, classification models differ from 0.4.0;
-  regression models are unchanged.
-* The C++ core no longer depends on Rcpp: it uses standard C++ types and
-  exceptions, and an Rcpp layer (`src/rcpp_interface.*`) converts at the
-  boundary. This is groundwork for bindings in other languages such as Python
-  (#57, @jyliuu). For direct users of the C++ object (`$fit`): `set_data()`
-  no longer fits, call `fit()` afterwards; an unknown classification loss
-  is an error instead of a silent fallback to L2.
+* `predict_components()` is much faster: purified forests look up only the trees of the requested component, and each distinct input row is predicted once, which pays off for low-cardinality features (#59, #65).
+* Classification fits are slightly faster, as redundant work during model construction was removed (#57).
+
+## Other improvements
+
+* New "Getting started" vignette covering regression, classification, component decomposition, recipes, and saving models (#66).
+* The `print()` method is overhauled and gains a `format()` counterpart: it reports the forest size, interaction degree, purification state, split search settings and number of threads (#66).
+* `deterministic = TRUE` with `ntrees > 1` warns, as all tree families are then identical (#66).
+* Rewritten documentation for `rpf()`, `purify()` and `predict_components()`, including guidance on choosing parameters and on how purification interacts with `predict_components()` (#66).
+
+## Internals
+
+* The C++ core no longer depends on `Rcpp`: it uses standard C++ types and exceptions, and an `Rcpp` layer (`src/rcpp_interface.*`) converts at the boundary.
+  This is groundwork for bindings in other languages such as Python (@jyliuu, #57).
+* `cli` and `rlang` are now imported, `mvtnorm` is only needed to build the `pkgdown` site (#66).
 
 # randomPlantedForest 0.4.0
 

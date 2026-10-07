@@ -7,7 +7,7 @@
 rpf_is_valid(x)
 }
 \arguments{
-\item{x}{An object of class \code{rpf}.}
+\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model, possibly restored from disk.}
 }
 \value{
 \code{TRUE} if the underlying model can be used, \code{FALSE} otherwise.

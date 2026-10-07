@@ -9,17 +9,18 @@ xdat <- data.frame(
   x4 = cut(runif(100), 2, labels = 1:2)
 )
 
-test_that("Default: L2 with 'prob'", {
+test_that("Default: exponential with 'prob'", {
   classif_fit <- rpf(yfact ~ ., data = xdat)
 
-  expect_identical(classif_fit$params$loss, "L2")
+  expect_identical(classif_fit$params$loss, "exponential")
 
   classif_pred <- predict(classif_fit, xdat)
   classif_pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")
 
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(classif_pred), 0)
-  expect_lte(min(classif_pred), 1)
+  expect_lte(max(classif_pred), 1)
+  expect_equal(rowSums(classif_pred), rep(1, nrow(xdat)))
   # Tests 'prob' is default predict type
   expect_identical(classif_pred, classif_pred_prob)
 })

@@ -1,12 +1,15 @@
-bibentry(bibtype = "Article",
-  title    = "Random Planted Forest: a directly interpretable tree ensemble",
-  author   = "Hiabu, Munir and Mammen, Enno and Meyer, Joseph T.",
-  journal  = "arXiv",
-  year     = "2020",
-  doi      = "10.48550/ARXIV.2012.14563",
-  url      = "https://arxiv.org/abs/2012.14563",
+bibentry(
+  bibtype = "Misc",
+  title = "Random Planted Forest: a directly interpretable tree ensemble",
+  author = c(person("Munir", "Hiabu"), person("Enno", "Mammen"), person(c("Joseph", "T."), "Meyer")),
+  year = "2020",
+  publisher = "arXiv",
+  doi = "10.48550/arXiv.2012.14563",
+  url = "https://arxiv.org/abs/2012.14563",
+  note = "arXiv preprint arXiv:2012.14563",
   textVersion = paste(
-    "Hiabu et. al. (2020).",
-    "Random Planted Forest: a directly interpretable tree ensemble. arXiv preprint arXiv:2012.14563 (2020)"
+    "Hiabu, M., Mammen, E., & Meyer, J. T. (2020).",
+    "Random Planted Forest: a directly interpretable tree ensemble.",
+    "arXiv preprint arXiv:2012.14563. https://doi.org/10.48550/arXiv.2012.14563"
   )
 )

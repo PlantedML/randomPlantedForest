@@ -54,3 +54,11 @@ test_that("purification does not alter predictions (with effect)", {
 
   expect_equal(pred_pre, pred_post, tolerance = 1e-10)
 })
+
+test_that("purify() purifies in place, returns invisibly and rejects unknown arguments", {
+  rp <- rpf(mpg ~ cyl + wt + hp, data = mtcars, max_interaction = 2, ntrees = 5)
+  expect_false(is_purified(rp))
+  expect_invisible(purify(rp))
+  expect_true(is_purified(rp))
+  expect_error(purify(rp, nthread = 2), class = "rlib_error_dots_nonempty")
+})

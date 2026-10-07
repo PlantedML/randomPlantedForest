@@ -9,10 +9,10 @@
 #' restored forest can predict (including purified prediction if the forest
 #' was purified before marshaling) but can never be purified afterwards.
 #'
-#' @param x An object of class `rpf`.
-#' @param include_data `[FALSE]`: Store training data in the blob, enabling
+#' @param x `[rpf]`: A fitted [`rpf`] model.
+#' @param include_data `[logical(1): FALSE]`: Store training data in the blob, enabling
 #'   [purify()] after restoring.
-#' @param blob An object of class `rpf_marshaled` created by `rpf_marshal()`.
+#' @param blob `[rpf_marshaled]`: Object created by `rpf_marshal()`.
 #' @return `rpf_marshal()` returns a list of class `rpf_marshaled`;
 #'   `rpf_unmarshal()` returns an object of class [rpf].
 #' @export
@@ -55,15 +55,14 @@ rpf_unmarshal <- function(blob) {
   checkmate::assert_class(blob, "rpf_marshaled")
   state <- blob$fit_state
   if (!identical(state$version, 1L)) {
-    stop("Unsupported rpf_marshaled version: ", state$version)
+    cli::cli_abort("Unsupported {.cls rpf_marshaled} version {.val {state$version}}.")
   }
   installed <- utils::packageVersion("randomPlantedForest")
   if (!is.null(state$pkg_version) && state$pkg_version > installed) {
-    warning(
-      "This model was marshaled with randomPlantedForest ", state$pkg_version,
-      " but version ", installed, " is installed. Restoring may not be reliable.",
-      call. = FALSE
-    )
+    cli::cli_warn(c(
+      "This model was marshaled with {.pkg randomPlantedForest} {state$pkg_version}, but {installed} is installed.",
+      "!" = "Restoring may not be reliable."
+    ))
   }
 
   pars <- rpf_param_vector(blob$params, blob$mode)
@@ -104,7 +103,7 @@ rpf_unmarshal <- function(blob) {
 #'
 #' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
 #' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable.
-#' @param x An object of class `rpf`.
+#' @param x `[rpf]`: A fitted [`rpf`] model, possibly restored from disk.
 #' @return `TRUE` if the underlying model can be used, `FALSE` otherwise.
 #' @export
 rpf_is_valid <- function(x) {
@@ -114,12 +113,13 @@ rpf_is_valid <- function(x) {
 
 check_rpf_alive <- function(x) {
   if (!rpf_is_valid(x)) {
-    stop(
-      "The C++ forest behind this rpf object is gone - most likely it was ",
-      "saved with saveRDS() and restored with readRDS().\n",
-      "Use blob <- rpf_marshal(x) before saving and rpf_unmarshal(blob) ",
-      "after loading. See ?rpf_marshal.",
-      call. = FALSE
+    cli::cli_abort(
+      c(
+        "The C++ forest behind this {.cls rpf} object is gone.",
+        "i" = "Most likely it was saved with {.fn saveRDS} and restored with {.fn readRDS}.",
+        "i" = "Use {.code blob <- rpf_marshal(x)} before saving and {.code rpf_unmarshal(blob)} after loading, see {.help rpf_marshal}."
+      ),
+      call = rlang::caller_env()
     )
   }
   invisible(x)

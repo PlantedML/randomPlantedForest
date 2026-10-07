@@ -11,14 +11,15 @@ xdat <- data.frame(
   x4 = cut(runif(100), 2, labels = 1:2)
 )
 
-test_that("Default: L2 with 'prob'", {
+test_that("Default: exponential with 'prob'", {
   bin_fit <- rpf(yfact ~ ., data = xdat)
   bin_pred <- predict(bin_fit, new_data = xdat)
 
-  expect_identical(bin_fit$params$loss, "L2")
+  expect_identical(bin_fit$params$loss, "exponential")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
   expect_lte(max(bin_pred), 1)
+  expect_equal(rowSums(bin_pred), rep(1, nrow(xdat)))
 })
 
 # Sanity ----
@@ -210,4 +211,19 @@ test_that("prob and classif yield same result", {
   pred_both <- cbind(pred_prob, pred_class)
 
   expect_equal(pred_both$pred_prob_class, pred_both$.pred_class)
+})
+
+test_that("class predictions break ties by level order and leave the RNG alone", {
+  fit <- rpf(Species ~ ., data = droplevels(iris[iris$Species != "setosa", ]), ntrees = 2, loss = "L2")
+  local_mocked_bindings(
+    predict_rpf_prob = function(object, new_data, nthreads) {
+      data.frame(.pred_versicolor = c(0.5, 0.3), .pred_virginica = c(0.5, 0.7))
+    }
+  )
+  set.seed(1)
+  expected_draw <- runif(1)
+  set.seed(1)
+  pred <- predict(fit, iris[1:2, ], type = "class")
+  expect_identical(as.character(pred$.pred_class), c("versicolor", "virginica"))
+  expect_identical(runif(1), expected_draw)
 })

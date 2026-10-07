@@ -1,32 +1,43 @@
 Package: randomPlantedForest
 Title: Random Planted Forest: A Directly Interpretable Tree Ensemble
-Version: 0.4.0.9000
+Version: 0.5.0
 Authors@R: c(
     person(c("Joseph", "Theo"), "Meyer", role = "aut"),
-    person("Munir", "Hiabu", role = "aut"),
+    person("Munir", "Hiabu", role = "aut",
+           comment = c(ORCID = "0000-0001-5846-667X")),
     person("Maike", "Spankus", role = "aut"),
-    person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut"),
+    person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut",
+           comment = c(ORCID = "0000-0002-8542-6291")),
     person("Lukas", "Burk", , "burk@leibniz-bips.de", role = c("cre", "aut"),
            comment = c(ORCID = "0000-0001-7528-3795"))
   )
-Description: An implementation of the Random Planted Forest algorithm for
-    directly interpretable tree ensembles based on a functional ANOVA
-    decomposition.
+Description: Implements Random Planted Forest (Hiabu, Mammen and Meyer,
+    2020) <doi:10.48550/arXiv.2012.14563>, a directly interpretable tree
+    ensemble for regression and classification. Trees are restricted to a
+    maximum number of interacting predictors, so the fitted model
+    decomposes exactly into main effects and low-order interactions, a
+    functional ANOVA decomposition that can be extracted for
+    interpretation. Fitting and prediction are multithreaded, and fitted
+    models can be serialized.
 License: Apache License (>= 2)
 URL: https://github.com/PlantedML/randomPlantedForest,
-    http://plantedml.com/randomPlantedForest/
+    https://plantedml.com/randomPlantedForest/
 BugReports: https://github.com/PlantedML/randomPlantedForest/issues
+Depends:
+    R (>= 4.1.0)
 Imports:
     checkmate,
+    cli,
     data.table,
     hardhat,
     methods,
     Rcpp,
+    rlang,
     utils
 Suggests:
     bundle,
     knitr,
-    mvtnorm,
+    palmerpenguins,
     recipes,
     rmarkdown,
     testthat (>= 3.0.0)
@@ -35,7 +46,7 @@ LinkingTo:
 VignetteBuilder:
     knitr
 Config/Needs/coverage: covr
-Config/Needs/website: patchwork, ggplot2
+Config/Needs/website: bench, ggplot2, mvtnorm, patchwork
 Config/roxygen2/version: 8.1.0
 Config/testthat/edition: 3
 Encoding: UTF-8

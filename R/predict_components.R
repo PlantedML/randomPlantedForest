@@ -8,16 +8,20 @@
 #' Optionally `predictors` can be specified to only include components including the given variables.
 #' If `max_interaction` is greater than `length(predictors)`, the `max_interaction` will be lowered accordingly.
 #'
+#' The components are only unique for a purified forest.
+#' An unpurified forest is purified in place on first use with the defaults of [purify()].
+#' For other settings, such as more threads, call [purify()] before `predict_components()`.
+#'
 #' @note
 #' Depending on the number of predictors and `max_interaction`, the number of components will
 #' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
 #'
 #' @inheritParams predict.rpf
-#' @param predictors [`character`] or `NULL`: Vector of one or more column names of predictor variables
+#' @param predictors `[character | NULL: NULL]`: Vector of one or more column names of predictor variables
 #'   in `new_data` to extract components for.
 #'   If `NULL`, all variables and their interactions are returned.
-#' @param max_interaction [`integer`] or `NULL`: Maximum degree of interactions to consider.
-#'   Default will use the `max_interaction` parameter from the [`rpf`] object.
+#' @param max_interaction `[integer(1) | NULL: NULL]`: Maximum degree of
+#'   interactions to consider. `NULL` uses the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
 #'
 #' @return A `list` with elements:
@@ -87,12 +91,8 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     checkmate::assert_subset(predictors, choices = names(object$blueprint$ptypes$predictors))
   }
 
-  # Check if forest is purified, if not we do that now
   if (!is_purified(object)) {
-    # Purify using default policy: mode=2 (fast exact),
-    # maxp_interaction=0 (uncapped),
-    # nthreads defaults to min(training nthreads, available cores)
-    object$fit$purify_threads(0L, 0L, 2L)
+    purify(object)
   }
 
   # If max_interaction is greater than number of predictors requested we need to adjust that
@@ -100,6 +100,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
+  check_no_missing(processed$predictors, "{.arg new_data}")
   # Encode factors to (re-)ordered integers according to information saved during model fit
   # Need matrix version for model predictions, and keep data.table version for return (for plotting)
   new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)

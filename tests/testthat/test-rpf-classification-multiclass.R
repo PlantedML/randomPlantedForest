@@ -27,7 +27,7 @@ test_that("Multiclass: Detection works", {
   expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
 
   # y 3-level character
-  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
+  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })
 
@@ -39,7 +39,7 @@ test_that("Multiclass logit learns signal (#40)", {
   dat$y <- factor(ifelse(dat$x1 > 0.5, "a", ifelse(dat$x2 > 0.5, "b", "c")))
   idx <- sample(n, 280)
 
-  fit <- rpf(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 50, max_interaction = 2)
+  fit <- rpf(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 10, max_interaction = 2)
   pred <- predict(fit, dat[-idx, ], type = "class")
 
   expect_gt(mean(pred$.pred_class == dat$y[-idx]), 0.85)

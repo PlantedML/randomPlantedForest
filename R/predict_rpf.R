@@ -1,9 +1,10 @@
 #' Random Planted Forest Predictions
 #'
-#' @param object A fit object of class [`rpf`].
-#' @param new_data Data for new observations to predict.
-#' @param type `"numeric"` for regression outcomes,
+#' @param object `[rpf]`: A fitted [`rpf`] model.
+#' @param new_data `[data.frame | matrix]`: New observations to predict.
+#' @param type `[character(1)]`: `"numeric"` for regression outcomes,
 #' `"class"` for class predictions or `"prob"` for probability predictions.
+#' Defaults to `"numeric"` for regression and `"prob"` for classification.
 #'
 #' For classification and `loss = "L1"` or `"L2"`, `"numeric"` yields raw
 #' predictions which are not guaranteed to be valid probabilities in `[0, 1]`.
@@ -12,9 +13,10 @@
 #' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
 #' for `type = "numeric"`, as in this case the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
-#' @param nthreads integer or NULL: number of threads to use. If NULL, defaults
-#'   to min of the object's configured `nthreads` and available threads.
-#' @param ... Unused.
+#' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads`
+#'   the forest was fitted with, capped at the available cores.
+#' @param ... Not currently used, but required for extensibility. Unknown
+#'   arguments are an error.
 #'
 #' @return For regression: A [`tbl`][tibble::tibble] with column `.pred` with
 #' the same number of rows as `new_data`.
@@ -41,6 +43,7 @@ predict.rpf <- function(
   nthreads = NULL,
   ...
 ) {
+  rlang::check_dots_empty()
   check_rpf_alive(object)
   if (!is.null(nthreads)) {
     checkmate::assert_int(nthreads, lower = 1)
@@ -49,6 +52,7 @@ predict.rpf <- function(
   nthreads <- as.integer(if (is.null(nthreads)) 0L else nthreads)
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
+  check_no_missing(processed$predictors, "{.arg new_data}")
 
   out <- predict_rpf_bridge(type, object, processed$predictors, nthreads)
 
@@ -65,14 +69,10 @@ predict_rpf_bridge <- function(type, object, predictors, nthreads = 0L) {
 
   if (object$mode == "regression") {
     if (type != "numeric") {
-      warning(
-        paste0(
-          "Only predict type 'numeric' supported for regression, ",
-          "but type is set to '",
-          type,
-          "'. Setting type to 'numeric'."
-        )
-      )
+      cli::cli_warn(c(
+        "Only {.code type = \"numeric\"} is supported for regression.",
+        "i" = "Using it instead of {.val {type}}."
+      ))
     }
     type <- "numeric"
   } else if (object$mode == "classification") {
@@ -167,8 +167,12 @@ predict_rpf_class <- function(object, new_data, nthreads = 0L) {
   # Predict probability
   pred_prob <- predict_rpf_prob(object, new_data, nthreads)
 
-  # For each instance, class with higher probability
-  pred_class <- factor(outcome_levels[max.col(as.matrix(pred_prob))], levels = outcome_levels)
+  # For each instance, class with higher probability; ties go to the first
+  # level so predictions are deterministic and leave the RNG untouched
+  pred_class <- factor(
+    outcome_levels[max.col(as.matrix(pred_prob), ties.method = "first")],
+    levels = outcome_levels
+  )
   out <- hardhat::spruce_class(pred_class)
 
   out

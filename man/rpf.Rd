@@ -2,210 +2,259 @@
 % Please edit documentation in R/rpf.R
 \name{rpf}
 \alias{rpf}
+\alias{rpf.formula}
 \alias{rpf.data.frame}
 \alias{rpf.matrix}
-\alias{rpf.formula}
 \alias{rpf.recipe}
 \title{Random Planted Forest}
 \usage{
 rpf(x, ...)
 
+\method{rpf}{formula}(
+  formula,
+  data,
+  max_interaction = 2,
+  ntrees = 50,
+  splits = 30,
+  split_structure = "leaves",
+  split_try = 10,
+  t_try = 0.4,
+  max_candidates = 50,
+  split_decay_rate = 0.1,
+  delete_leaves = TRUE,
+  loss = NULL,
+  delta = 0.001,
+  epsilon = 0.1,
+  purify = FALSE,
+  nthreads = 1,
+  export_forest = FALSE,
+  deterministic = FALSE,
+  ...
+)
+
 \method{rpf}{data.frame}(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
+  split_structure = "leaves",
   split_try = 10,
   t_try = 0.4,
-  split_decay_rate = 0.1,
   max_candidates = 50,
+  split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  deterministic = FALSE,
-  nthreads = 1,
-  purify = FALSE,
-  cv = FALSE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  split_structure = "leaves",
+  purify = FALSE,
+  nthreads = 1,
   export_forest = FALSE,
+  deterministic = FALSE,
   ...
 )
 
 \method{rpf}{matrix}(
   x,
   y,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
+  split_structure = "leaves",
   split_try = 10,
   t_try = 0.4,
-  split_decay_rate = 0.1,
   max_candidates = 50,
+  split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  deterministic = FALSE,
-  nthreads = 1,
-  purify = FALSE,
-  cv = FALSE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  split_structure = "leaves",
-  export_forest = FALSE,
-  ...
-)
-
-\method{rpf}{formula}(
-  formula,
-  data,
-  max_interaction = 1,
-  ntrees = 50,
-  splits = 30,
-  split_try = 10,
-  t_try = 0.4,
-  split_decay_rate = 0.1,
-  max_candidates = 50,
-  delete_leaves = TRUE,
-  deterministic = FALSE,
-  nthreads = 1,
   purify = FALSE,
-  cv = FALSE,
-  loss = "L2",
-  delta = 0.001,
-  epsilon = 0.1,
-  split_structure = "leaves",
+  nthreads = 1,
   export_forest = FALSE,
+  deterministic = FALSE,
   ...
 )
 
 \method{rpf}{recipe}(
   x,
   data,
-  max_interaction = 1,
+  max_interaction = 2,
   ntrees = 50,
   splits = 30,
+  split_structure = "leaves",
   split_try = 10,
   t_try = 0.4,
-  split_decay_rate = 0.1,
   max_candidates = 50,
+  split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  deterministic = FALSE,
-  nthreads = 1,
-  purify = FALSE,
-  cv = FALSE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  split_structure = "leaves",
+  purify = FALSE,
+  nthreads = 1,
   export_forest = FALSE,
+  deterministic = FALSE,
   ...
 )
 }
 \arguments{
-\item{x, data}{Feature \code{matrix}, or \code{data.frame}, or \code{\link[recipes:recipe]{recipe}}.}
+\item{x, y}{\verb{[data.frame | matrix | recipe]}, \verb{[numeric | factor]}:
+Predictors and outcome for the x/y interface.
+\code{x} holds the predictors, or is a \code{\link[recipes:recipe]{recipe}} (then supply
+\code{data} instead of \code{y}).
+\code{y} is the outcome vector: \strong{numeric} for regression, \strong{factor} for
+classification.}
 
-\item{...}{(Unused).}
+\item{...}{Not currently used, but required for extensibility. Unknown
+(e.g. misspelled) arguments are an error.}
 
-\item{y}{Target vector for use with \code{x}.
-The class of \code{y} (either \code{numeric} or \code{\link{factor}}) determines if regression
-or classification will be performed.}
+\item{formula}{\verb{[formula]}: A formula with the outcome on the left-hand side and the
+predictors on the right-hand side, e.g. \code{y ~ x1 + x2}.}
 
-\item{max_interaction}{\verb{[1]}: Maximum level of interaction determining maximum
-number of split dimensions for a tree.
-The default \code{1} corresponds to main effects only.
-If \code{0}, the number fo columns in \code{x} is used, i.e. for 10 predictors,
-this is equivalent to setting \code{max_interaction = 10}.}
+\item{data}{\verb{[data.frame]}: Data containing the predictors and the outcome,
+used with \code{formula} or a recipe \code{x}.}
 
-\item{ntrees}{\verb{[50]}: Number of trees generated per family.}
+\item{max_interaction}{\verb{[integer(1): 2]}: Maximum number of predictors a single tree may
+split on. \code{1} fits main effects only (an additive model), \code{2} adds
+pairwise interactions, and so on. \code{0} uses all predictors and values above
+the number of predictors are reduced to it.}
 
-\item{splits}{\verb{[30]}: Number of splits performed for each tree family.}
+\item{ntrees}{\verb{[integer(1): 50]}: Number of tree families, i.e. the size of the forest.
+Each family is grown on a bootstrap sample and predictions are averaged.}
 
-\item{split_try}{\verb{[10]}: Number of split points to be considered when choosing a split candidate.}
+\item{splits}{\verb{[integer(1): 30]}: Number of splits per tree family. The main tuning
+parameter: more splits fit more complex functions.}
 
-\item{t_try}{\verb{[0.4]}: A value in (0,1] specifying the proportion of viable split-candidates in each round.}
+\item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
+sampled; one of \code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
+or \code{"res_trees"}. See Details.}
 
-\item{split_decay_rate}{\verb{[0.1]}: Exponential decay factor for aging split-candidates. Possible splits are initiated with age=0. Whenever a possible split becomes a split_candidate (i.e. it has been drawn when drawing max(max_candidates , t_try * possible options ) times) it ages by +1. The age of the single split-candidate with minimal loss is reset to zero. Split_candidates are sampled from Possible_splits with weight exp(-split_decay_rate_ * age).  A high split_decay_rate means faster aging. split_decay_rate=0 results in no aging and uniform sampling.}
+\item{split_try}{\verb{[integer(1): 10]}: Number of thresholds evaluated per split candidate.}
 
-\item{max_candidates}{\verb{[50]}: Maximum number of split-candidates sampled per iteration. Number of split_candidates in each round is given  by max(max_candidates , t_try * possible options).}
+\item{t_try}{\verb{[numeric(1): 0.4]}: Proportion in \verb{(0, 1]} of all possible splits sampled
+as candidates in each round, capped at \code{max_candidates}.}
 
-\item{delete_leaves}{\verb{[TRUE]}: Whether to delete a parent leaf when splitting along an existing dimension.}
+\item{max_candidates}{\verb{[integer(1): 50]}: Maximum number of split candidates per round.}
 
-\item{deterministic}{\verb{[FALSE]}: Choose whether approach deterministic or random.}
+\item{split_decay_rate}{\verb{[numeric(1): 0.1]}: Down-weights possible splits that were
+sampled as candidates but not chosen. Each such round ages a split by one,
+choosing it resets its age to zero, and splits are sampled with weight
+\code{exp(-split_decay_rate * age)}. \code{0} samples uniformly.}
 
-\item{nthreads}{\verb{[1L]}: Number of threads used for computation, defaulting to serial execution.}
+\item{delete_leaves}{\verb{[logical(1): TRUE]}: Whether to delete a parent leaf when
+splitting along an existing dimension.}
 
-\item{purify}{\verb{[FALSE]}: Whether the forest should be purified.
-Set to \code{TRUE} to enable components extract with \code{\link[=predict_components]{predict_components()}} are valid.
-Can be achieved after fitting with \code{\link[=purify]{purify()}}.}
+\item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
+regression, the only supported loss, and \code{"exponential"} for classification.
+Classification also supports \code{"logit"}, which gives similar results but is
+slower, and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do
+not yield proper probability estimates.}
 
-\item{cv}{\verb{[FALSE]}: Determines if cross validation is performed.}
+\item{delta}{\verb{[numeric(1): 0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
+Class proportions are truncated to \verb{[delta, 1 - delta]} when computing the
+loss of a split. Should be positive for \code{"logit"}: with \code{delta = 0}, nodes
+containing a single class have infinite loss and their splits are always
+rejected.}
 
-\item{loss}{\verb{["L2"]}: For regression, only \code{"L2"} is supported. For
-classification, \code{"L1"}, \code{"logit"} and \code{"exponential"} are also available.
-\code{"exponential"} yields similar results as \code{"logit"} while being significantly faster.}
+\item{epsilon}{\verb{[numeric(1): 0.1]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
+Class proportions are truncated to \verb{[epsilon, 1 - epsilon]} when computing
+the fit in a leaf. Unlike \code{delta}, this caps the size of individual leaf
+updates and acts as regularization: smaller values permit larger jumps on
+the link scale.}
 
-\item{delta}{\verb{[0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
-Proportion of class membership is truncated to be within \verb{[delta, 1-delta]}
-when calculating the loss to determine the optimal split. Should be positive
-for \code{"logit"}: with \code{delta = 0}, nodes containing only a single class produce
-an infinite loss and the corresponding splits are always rejected.}
+\item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
+\code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other
+settings, call \code{\link[=purify]{purify()}} after fitting instead.}
 
-\item{epsilon}{\verb{[0.1]}: Only used if loss = \code{"logit"} or \code{"exponential"}.
-Proportion of class membership is truncated to be within \verb{[epsilon, 1-epsilon]}
-when calculating the fit in a leaf. Unlike \code{delta} (a numerical guard for the
-split criterion), this caps the magnitude of individual leaf updates and acts
-as regularization: smaller values permit larger per-leaf jumps on the link scale.}
+\item{nthreads}{\verb{[integer(1): 1]}: Number of threads for fitting. Also the default for
+\link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
 
-\item{split_structure}{\verb{["leaves"]}: Defines the structure of a possible split and how to choose split_candidates. Can be one of "leaves", "hist", "cur_trees_1", "cur_trees_2", or "res_trees". Further details are given below.}
+\item{export_forest}{\verb{[logical(1): FALSE]}: Whether to store the flattened forest in
+the returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, which
+saves memory.}
 
-\item{export_forest}{\verb{[FALSE]}: Whether to store the flattened forest in the
-returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, reducing
-memory use of the returned object.}
-
-\item{formula}{Formula specification, e.g. y ~ x1 + x2.}
+\item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
+bootstrap, the first \code{max_candidates} possible splits as candidates
+(\code{t_try} is ignored) and evenly spaced thresholds. The result does not
+depend on the seed, and all tree families are identical, so use
+\code{ntrees = 1}. Mainly useful for testing and debugging.}
 }
 \value{
 Object of class \code{"rpf"} with model object contained in \verb{$fit}.
 }
 \description{
-Random Planted Forest
+Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
+or classification. The model is a sum of trees that each split on at most
+\code{max_interaction} predictors, so it decomposes into main effects and
+interaction components; see \code{\link[=predict_components]{predict_components()}}.
 }
 \details{
-\subsection{splits}{
-The number of \code{splits} is the main tuning parameter affecting the accuracy of predictions.
+\subsection{Choosing parameters}{
+
+Start with \code{max_interaction} and \code{splits}. \code{max_interaction} sets which
+effects the model can represent: \code{1} for an additive model, \code{2} (the
+default) to add pairwise interactions, which can still be plotted as
+heatmaps. Higher values are more flexible, but slower and the components are
+harder to interpret. \code{splits} sets how closely the model
+follows the data and is the parameter to tune. With a higher
+\code{max_interaction}, splits are spread over more possible components, so tune
+both together.
+
+\code{ntrees} averages over bootstrap samples to reduce variance and fitting and
+prediction time grow linearly with it. The default is lower than the
+usual 500 trees of a random forest because each tree family is itself a
+complete model, a sum of trees covering all components, rather than a
+single tree. Averaging therefore stops paying off sooner, usually after a
+few dozen families. The split search parameters
+(\code{split_structure}, \code{split_try}, \code{t_try}, \code{max_candidates},
+\code{split_decay_rate}) trade speed for a more thorough search.
+
+For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
+link scale and are transformed to probabilities, \code{"exponential"} being faster.
+\code{"L1"} and \code{"L2"} fit class indicators directly and their probabilities are
+truncated to \verb{[0, 1]}.
 }
-\subsection{split_structure}{
-The \code{split_structure} argument controls how split candidates are constructed and sampled.
-In each round, a \code{t_try} fraction (capped by \code{max_candidates}) is drawn
-from the pool of all possible splits with weights \code{exp(-split_decay_rate * age)}.
 
-\describe{
-\item{leaves}{Split candidates are (leaf, split-dimension) pairs. For each sampled
+\subsection{\code{split_structure}}{
+
+In each round, a \code{t_try} fraction of all possible splits (capped at
+\code{max_candidates}) is drawn as candidates with weights
+\code{exp(-split_decay_rate * age)}. \code{split_structure} defines what a candidate is
+and how its thresholds are evaluated.
+\itemize{
+\item \code{leaves}: Split candidates are (leaf, split-dimension) pairs. For each sampled
 candidate, \code{split_try} thresholds are drawn uniformly from the valid range within
-that leaf and evaluated to choose the best split.}
-
-\item{cur_trees_1}{Split candidates are (current-tree, split-dimension) pairs. For each
+that leaf and evaluated to choose the best split.
+\item \code{hist}: As \code{leaves}, but thresholds are drawn from boundaries of
+quantile bins computed once per predictor, which makes evaluating them
+faster on large data.
+\item \code{cur_trees_1}: Split candidates are (current-tree, split-dimension) pairs. For each
 sampled candidate, perform \code{split_try} evaluations. Each evaluation samples a leaf
 from the set of valid current trees (with probability proportional to its number of
-available thresholds) and then uniformly samples a single threshold within that leaf.}
-
-\item{cur_trees_2}{Split candidates are (current-tree, split-dimension) pairs. For each
+available thresholds) and then uniformly samples a single threshold within that leaf.
+\item \code{cur_trees_2}: Split candidates are (current-tree, split-dimension) pairs. For each
 sampled candidate, iterate through every
 valid leaf. Within each leaf, sample \code{split_try} thresholds uniformly and
-evaluate them.}
-
-\item{res_trees}{Split candidates are resulting trees. For each sampled candidate, run
+evaluate them.
+\item \code{res_trees}: Split candidates are resulting trees. For each sampled candidate, run
 \code{split_try} evaluations by sampling a (split-dimension, leaf) pair from all valid
 pairs (with probability proportional to its number of available thresholds), then
-uniformly sampling one threshold within that pair.}
+uniformly sampling one threshold within that pair.
 }
 }
 }
 \examples{
-# Regression with x and y
-rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
-
 # Regression with formula
 rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
+
+# Regression with x and y, allowing pairwise interactions
+rpfit <- rpf(x = mtcars[, c("cyl", "wt", "hp")], y = mtcars$mpg, max_interaction = 2)
+
+# Classification
+rpfit <- rpf(Species ~ ., data = iris, loss = "exponential")
+}
+\references{
+Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
+directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
 }
