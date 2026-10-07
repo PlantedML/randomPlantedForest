@@ -1,4 +1,4 @@
-url: http://plantedml.com/randomPlantedForest/
+url: https://plantedml.com/randomPlantedForest/
 template:
   bootstrap: 5
   light-switch: true
@@ -25,7 +25,6 @@ reference:
 - contents:
   - starts_with("print.")
   - starts_with("str.")
-  - preprocess_predictors_predict
   - rpf_marshal
   - rpf_is_valid
   - bundle.rpf

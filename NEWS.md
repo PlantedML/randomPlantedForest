@@ -8,12 +8,17 @@
 * `rpf()` arguments are reordered by purpose (forest size, split search, loss, other). Pass arguments after the data arguments by name (#66).
 * `rpf()`, `predict()` and `purify()` error on unknown arguments, such as misspelled ones, instead of silently ignoring them (#66).
 * `purify()` is a regular function instead of an S3 generic (#66).
+* `preprocess_predictors_predict()` is no longer exported; it is an internal step of `predict()` (#66).
+* The package now requires R >= 4.1.0 (#66).
 * For a given seed, classification models differ from 0.4.0 due to the fixes and speedup below, but regression models are unchanged (#57, #66).
 * For direct users of the C++ object (`$fit`): `set_data()` no longer fits, call `fit()` afterwards, and an unknown classification loss is an error instead of a silent fallback to L2 (@jyliuu, #57).
 * `rpf()` no longer has a `cv` argument, which never had an effect: the C++ cross-validation was a no-op (#66).
 
 ## Bug fixes
 
+* `predict()` and `predict_components()` error on missing values in `new_data`, naming the affected columns.
+  Previously such rows silently received arbitrary predictions, as `rpf()` has no handling for missing values.
+  `rpf()` likewise reports missing values in the training data by column (#66).
 * Classification fits with a fixed seed could differ between runs.
   When a split replaced a leaf, its new split candidates could be lost or attached to the wrong leaf, depending on memory layout (#66).
 * `predict(type = "class")` breaks probability ties by level order instead of at random, so class predictions are deterministic and no longer advance the random number generator (#66).
