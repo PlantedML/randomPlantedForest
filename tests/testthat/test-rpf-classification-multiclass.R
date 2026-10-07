@@ -27,7 +27,7 @@ test_that("Multiclass: Detection works", {
   expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
 
   # y 3-level character
-  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "^y should be")
+  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
   expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
 })
 

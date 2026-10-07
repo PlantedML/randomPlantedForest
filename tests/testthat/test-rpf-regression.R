@@ -45,12 +45,12 @@ test_that("Warn for y = 0,1", {
 
   expect_warning(
     predict(bin_fit, new_data = xdat, type = "class"),
-    regexp = "^Only predict type 'numeric' supported for regression"
+    regexp = "is supported for regression"
   )
 
   expect_warning(
     predict(bin_fit, new_data = xdat, type = "link"),
-    regexp = "^Only predict type 'numeric' supported for regression"
+    regexp = "is supported for regression"
   )
 })
 
