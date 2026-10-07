@@ -22,7 +22,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -44,7 +44,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -66,7 +66,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -88,7 +88,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -145,9 +145,11 @@ choosing it resets its age to zero, and splits are sampled with weight
 \item{delete_leaves}{\verb{[logical(1): TRUE]}: Whether to delete a parent leaf when
 splitting along an existing dimension.}
 
-\item{loss}{\verb{[character(1): "L2"]}: Loss function. Regression supports only \code{"L2"}.
-Classification also supports \code{"L1"}, \code{"logit"} and \code{"exponential"};
-\code{"exponential"} gives results similar to \code{"logit"} and is faster.}
+\item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
+regression, the only supported loss, and \code{"exponential"} for classification.
+Classification also supports \code{"logit"}, which gives similar results but is
+slower, and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do
+not yield proper probability estimates.}
 
 \item{delta}{\verb{[numeric(1): 0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Class proportions are truncated to \verb{[delta, 1 - delta]} when computing the
@@ -208,9 +210,10 @@ few dozen families. The split search parameters
 (\code{split_structure}, \code{split_try}, \code{t_try}, \code{max_candidates},
 \code{split_decay_rate}) trade speed for a more thorough search.
 
-For classification, \code{"logit"} and \code{"exponential"} fit on the link scale and
-are transformed to probabilities, \code{"exponential"} being faster. \code{"L1"} and
-\code{"L2"} fit class indicators directly and their probabilities are truncated to \verb{[0, 1]}.
+For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
+link scale and are transformed to probabilities, \code{"exponential"} being faster.
+\code{"L1"} and \code{"L2"} fit class indicators directly and their probabilities are
+truncated to \verb{[0, 1]}.
 }
 
 \subsection{\code{split_structure}}{

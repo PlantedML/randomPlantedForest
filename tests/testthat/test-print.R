@@ -10,7 +10,7 @@ test_that("print() covers x/y fits, classification losses and deterministic fits
   fit_logit <- rpf(x = iris[, 1:4], y = iris$Species, ntrees = 1, loss = "logit", deterministic = TRUE)
   expect_snapshot(print(fit_logit))
 
-  fit_l2 <- rpf(Species ~ ., data = iris, ntrees = 2, max_interaction = 1)
+  fit_l2 <- rpf(Species ~ ., data = iris, ntrees = 2, max_interaction = 1, loss = "L2")
   expect_snapshot(print(fit_l2))
 })
 

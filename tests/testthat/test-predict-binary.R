@@ -11,14 +11,15 @@ xdat <- data.frame(
   x4 = cut(runif(100), 2, labels = 1:2)
 )
 
-test_that("Default: L2 with 'prob'", {
+test_that("Default: exponential with 'prob'", {
   bin_fit <- rpf(yfact ~ ., data = xdat)
   bin_pred <- predict(bin_fit, new_data = xdat)
 
-  expect_identical(bin_fit$params$loss, "L2")
+  expect_identical(bin_fit$params$loss, "exponential")
   expect_equal(dim(bin_pred), c(nrow(xdat), nlevels(xdat$yfact)))
   expect_gte(min(bin_pred), 0)
   expect_lte(max(bin_pred), 1)
+  expect_equal(rowSums(bin_pred), rep(1, nrow(xdat)))
 })
 
 # Sanity ----

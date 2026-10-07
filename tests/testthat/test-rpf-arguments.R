@@ -114,3 +114,9 @@ test_that("purify() on a purified forest returns it unchanged", {
   expect_true(is_purified(fit))
   expect_identical(predict_components(fit, mtcars), before)
 })
+
+test_that("the default loss depends on the outcome", {
+  expect_identical(rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 2)$params$loss, "L2")
+  expect_identical(rpf(Species ~ ., data = iris, ntrees = 2)$params$loss, "exponential")
+  expect_error(rpf(Species ~ ., data = iris, ntrees = 2, loss = c("L1", "L2")))
+})

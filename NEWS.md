@@ -4,6 +4,7 @@
 
 * `rpf()` now defaults to `max_interaction = 2`, main effects and pairwise interactions, instead of `1`, an additive model (#66).
   Values above the number of predictors are capped silently instead of with a message.
+* `rpf()` now defaults to `loss = "exponential"` for classification instead of `"L2"`, so classification fits give proper probability estimates by default; regression still uses `"L2"` (#66).
 * `rpf()` arguments are reordered by purpose (forest size, split search, loss, other). Pass arguments after the data arguments by name (#66).
 * `rpf()`, `predict()` and `purify()` error on unknown arguments, such as misspelled ones, instead of silently ignoring them (#66).
 * `purify()` is a regular function instead of an S3 generic (#66).

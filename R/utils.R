@@ -197,6 +197,7 @@ preprocess_outcome <- function(processed, loss) {
 
   if (is_factor) {
     mode <- "classification"
+    loss <- loss %||% "exponential"
 
     if (is_binary) {
       # Binary case: Convert to 0, 1 integer
@@ -227,6 +228,7 @@ preprocess_outcome <- function(processed, loss) {
     }
   } else if (is_numeric) {
     mode <- "regression"
+    loss <- loss %||% "L2"
     # rpf_impl expects Y to be a matrix
     outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
@@ -236,7 +238,8 @@ preprocess_outcome <- function(processed, loss) {
 
   list(
     outcomes = outcomes,
-    mode = mode
+    mode = mode,
+    loss = loss
   )
 }
 

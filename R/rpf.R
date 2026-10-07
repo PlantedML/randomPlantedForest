@@ -38,9 +38,11 @@
 #'   `exp(-split_decay_rate * age)`. `0` samples uniformly.
 #' @param delete_leaves `[logical(1): TRUE]`: Whether to delete a parent leaf when
 #'   splitting along an existing dimension.
-#' @param loss `[character(1): "L2"]`: Loss function. Regression supports only `"L2"`.
-#'   Classification also supports `"L1"`, `"logit"` and `"exponential"`;
-#'   `"exponential"` gives results similar to `"logit"` and is faster.
+#' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
+#'   regression, the only supported loss, and `"exponential"` for classification.
+#'   Classification also supports `"logit"`, which gives similar results but is
+#'   slower, and `"L1"` and `"L2"`, which fit class indicators directly and do
+#'   not yield proper probability estimates.
 #' @param delta `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Class proportions are truncated to `[delta, 1 - delta]` when computing the
 #'   loss of a split. Should be positive for `"logit"`: with `delta = 0`, nodes
@@ -94,9 +96,10 @@
 #' (`split_structure`, `split_try`, `t_try`, `max_candidates`,
 #' `split_decay_rate`) trade speed for a more thorough search.
 #'
-#' For classification, `"logit"` and `"exponential"` fit on the link scale and
-#' are transformed to probabilities, `"exponential"` being faster. `"L1"` and
-#' `"L2"` fit class indicators directly and their probabilities are truncated to `[0, 1]`.
+#' For classification, `"exponential"` (the default) and `"logit"` fit on the
+#' link scale and are transformed to probabilities, `"exponential"` being faster.
+#' `"L1"` and `"L2"` fit class indicators directly and their probabilities are
+#' truncated to `[0, 1]`.
 #'
 #' ## `split_structure`
 #'
@@ -166,7 +169,7 @@ rpf.formula <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -221,7 +224,7 @@ rpf.data.frame <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -269,7 +272,7 @@ rpf.matrix <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -317,7 +320,7 @@ rpf.recipe <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
-  loss = "L2",
+  loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
   purify = FALSE,
@@ -375,7 +378,9 @@ rpf_bridge <- function(
 ) {
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   predictors <- preprocess_predictors_fit(processed)
+  checkmate::assert_string(loss, null.ok = TRUE)
   outcomes <- preprocess_outcome(processed, loss)
+  loss <- outcomes$loss
   p <- ncol(predictors$predictors_matrix)
 
   # Check arguments
