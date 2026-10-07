@@ -47,10 +47,7 @@ order_factor_by_response <- function(x, y) {
       means <- pca_order(x, y)
     }
   } else {
-    stop(paste(
-      "Ordering of factor columns only implemented for regression",
-      "and classification outcomes."
-    ))
+    cli::cli_abort("Ordering of factor columns only implemented for regression and classification outcomes.")
   }
 
   levels_ordered <- as.character(levels(x)[order(means)])
@@ -142,19 +139,11 @@ preprocess_predictors_fit <- function(processed) {
 #' `object$factor_levels`), re-encode factor columns as integers, and return a
 #' numeric matrix suitable for the underlying C++ prediction routines.
 #'
-#' This is primarily an internal utility used by `predict()` methods but is
-#' exported to support advanced users and tests.
-#'
 #' @param object `[rpf]`: A fitted [`rpf`] model.
 #' @param predictors `[data.frame | matrix]`: Predictor values to preprocess.
 #'
 #' @return A numeric matrix with the same number of rows as `predictors`.
-#' @export
-#' @examples
-#' rpfit <- rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg)
-#' processed <- hardhat::forge(mtcars[, c("cyl", "wt")], rpfit$blueprint)
-#' X <- preprocess_predictors_predict(rpfit, processed$predictors)
-#' dim(X)
+#' @noRd
 preprocess_predictors_predict <- function(object, predictors) {
   predictors <- as.data.table(predictors)
 
@@ -196,7 +185,7 @@ preprocess_predictors_predict <- function(object, predictors) {
 # Used in rpf_impl()
 # Loss is need to transform 1/0 to 1/-1 for exponential
 #' @importFrom stats model.matrix
-preprocess_outcome <- function(processed, loss) {
+preprocess_outcome <- function(processed, loss, call = rlang::caller_env()) {
   outcomes <- processed$outcomes[[1]]
 
   # Task type detection: Could be more concise
@@ -206,9 +195,9 @@ preprocess_outcome <- function(processed, loss) {
   is_numeric <- checkmate::test_numeric(outcomes, any.missing = FALSE)
 
   if (is_binary & is_integerish) {
-    warning(paste(
-      "y is a binary integer, assuming regression task.",
-      "Recode y to a factor for classification."
+    cli::cli_warn(c(
+      "The outcome is a binary integer, assuming a regression task.",
+      "i" = "Recode it to a factor for classification."
     ))
   }
 
@@ -250,7 +239,7 @@ preprocess_outcome <- function(processed, loss) {
     outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
     # mode <- "unsupported"
-    stop("y should be either numeric (regression) or factor (classification)")
+    cli::cli_abort("The outcome must be numeric (regression) or a factor (classification).", call = call)
   }
 
   list(

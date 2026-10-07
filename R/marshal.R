@@ -55,18 +55,14 @@ rpf_unmarshal <- function(blob) {
   checkmate::assert_class(blob, "rpf_marshaled")
   state <- blob$fit_state
   if (!identical(state$version, 1L)) {
-    stop("Unsupported rpf_marshaled version: ", state$version)
+    cli::cli_abort("Unsupported {.cls rpf_marshaled} version {.val {state$version}}.")
   }
   installed <- utils::packageVersion("randomPlantedForest")
   if (!is.null(state$pkg_version) && state$pkg_version > installed) {
-    warning(
-      "This model was marshaled with randomPlantedForest ",
-      state$pkg_version,
-      " but version ",
-      installed,
-      " is installed. Restoring may not be reliable.",
-      call. = FALSE
-    )
+    cli::cli_warn(c(
+      "This model was marshaled with {.pkg randomPlantedForest} {state$pkg_version}, but {installed} is installed.",
+      "!" = "Restoring may not be reliable."
+    ))
   }
 
   pars <- rpf_param_vector(blob$params, blob$mode)
@@ -117,12 +113,13 @@ rpf_is_valid <- function(x) {
 
 check_rpf_alive <- function(x) {
   if (!rpf_is_valid(x)) {
-    stop(
-      "The C++ forest behind this rpf object is gone - most likely it was ",
-      "saved with saveRDS() and restored with readRDS().\n",
-      "Use blob <- rpf_marshal(x) before saving and rpf_unmarshal(blob) ",
-      "after loading. See ?rpf_marshal.",
-      call. = FALSE
+    cli::cli_abort(
+      c(
+        "The C++ forest behind this {.cls rpf} object is gone.",
+        "i" = "Most likely it was saved with {.fn saveRDS} and restored with {.fn readRDS}.",
+        "i" = "Use {.code blob <- rpf_marshal(x)} before saving and {.code rpf_unmarshal(blob)} after loading, see {.help rpf_marshal}."
+      ),
+      call = rlang::caller_env()
     )
   }
   invisible(x)

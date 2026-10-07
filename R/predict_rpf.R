@@ -52,6 +52,7 @@ predict.rpf <- function(
   nthreads <- as.integer(if (is.null(nthreads)) 0L else nthreads)
   # Enforces column order, type, column names, etc
   processed <- hardhat::forge(new_data, object$blueprint)
+  check_no_missing(processed$predictors, "{.arg new_data}")
 
   out <- predict_rpf_bridge(type, object, processed$predictors, nthreads)
 
@@ -68,14 +69,10 @@ predict_rpf_bridge <- function(type, object, predictors, nthreads = 0L) {
 
   if (object$mode == "regression") {
     if (type != "numeric") {
-      warning(
-        paste0(
-          "Only predict type 'numeric' supported for regression, ",
-          "but type is set to '",
-          type,
-          "'. Setting type to 'numeric'."
-        )
-      )
+      cli::cli_warn(c(
+        "Only {.code type = \"numeric\"} is supported for regression.",
+        "i" = "Using it instead of {.val {type}}."
+      ))
     }
     type <- "numeric"
   } else if (object$mode == "classification") {
