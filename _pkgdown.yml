@@ -20,6 +20,12 @@ reference:
 - contents:
     - purify
     - predict_components
+
+- title: Visualization
+  desc: Inspecting the trees of a forest
+- contents:
+    - plot.rpf
+    - rpf_boxes
 - text: -------
 - title: Utility functions
 - contents:

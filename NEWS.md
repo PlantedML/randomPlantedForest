@@ -1,3 +1,12 @@
+# randomPlantedForest (development version)
+
+## New features
+
+* `plot()` draws the trees of one tree family to illustrate how a Random Planted Forest predicts.
+  `type = "tree"` draws a split diagram in the style of Figure 1b of the paper, reconstructed from the fitted leaves; `type = "boxes"` draws the leaves in variable space, before or after purification.
+  `rpf_boxes()` returns the leaves as a data frame.
+  Requires `ggplot2`, and `patchwork` for `type = "boxes"`.
+
 # randomPlantedForest 0.5.0
 
 ## Breaking changes
