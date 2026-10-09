@@ -1,0 +1,59 @@
+# Serialize and restore Random Planted Forests
+
+`rpf_marshal()` converts an
+[rpf](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+object into a plain R list safe for
+[`saveRDS()`](https://rdrr.io/r/base/readRDS.html); `rpf_unmarshal()`
+reverses it. The C++ forest behind an `rpf` object does not survive R
+serialization, so this explicit round-trip is required to store or
+transfer fitted models.
+
+## Usage
+
+``` r
+rpf_marshal(x, include_data = FALSE)
+
+rpf_unmarshal(blob)
+```
+
+## Arguments
+
+- x:
+
+  `[rpf]`: A fitted
+  [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  model.
+
+- include_data:
+
+  `[logical(1): FALSE]`: Store training data in the blob, enabling
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  after restoring.
+
+- blob:
+
+  `[rpf_marshaled]`: Object created by `rpf_marshal()`.
+
+## Value
+
+`rpf_marshal()` returns a list of class `rpf_marshaled`;
+`rpf_unmarshal()` returns an object of class
+[rpf](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
+
+## Details
+
+Training data is only included with `include_data = TRUE`; without it, a
+restored forest can predict (including purified prediction if the forest
+was purified before marshaling) but can never be purified afterwards.
+
+## Examples
+
+``` r
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
+blob <- rpf_marshal(fit)
+tmp <- tempfile(fileext = ".rds")
+saveRDS(blob, tmp)
+restored <- rpf_unmarshal(readRDS(tmp))
+all.equal(predict(fit, mtcars), predict(restored, mtcars))
+#> [1] TRUE
+```
