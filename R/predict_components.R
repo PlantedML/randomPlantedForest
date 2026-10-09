@@ -31,7 +31,8 @@
 #' to the prediction.
 #' For multiclass classification, the number of output columns is multiplied by
 #' the number of levels in the outcome.
-#' - `intercept` (`numeric(1)`): Expected value of the prediction.
+#' - `intercept` (`numeric`): Expected value of the prediction.
+#' For multiclass classification, one value per target level, named by `target_levels`.
 #' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
 #' by `predictors`.
 #' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
@@ -135,6 +136,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
   model_levels <- model_outcome_levels(object)
   if (length(outcome_levels) > 2) {
+    ret$intercept <- stats::setNames(intercept[1, ], model_levels)
     ret$target_levels <- model_levels
   }
 

@@ -25,6 +25,8 @@
 
 ## Bug fixes
 
+* `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels`.
+  Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
 * `predict()` and `predict_components()` error on missing values in `new_data`, naming the affected columns.
   Previously such rows silently received arbitrary predictions, as `rpf()` has no handling for missing values.
   `rpf()` likewise reports missing values in the training data by column (#66).
