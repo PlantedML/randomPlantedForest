@@ -50,7 +50,9 @@ A `list` with elements:
   classification, the number of output columns is multiplied by the
   number of levels in the outcome.
 
-- `intercept` (`numeric(1)`): Expected value of the prediction.
+- `intercept` (`numeric`): Expected value of the prediction. For
+  multiclass classification, one value per target level, named by
+  `target_levels`.
 
 - `x`
   ([`data.table`](https://rdrr.io/pkg/data.table/man/data.table.html)):

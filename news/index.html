@@ -36,7 +36,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/v0.5.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
@@ -64,6 +64,8 @@
 <div class="section level3">
 <h3 id="bug-fixes-0-5-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-5-0"></a></h3>
 <ul><li>
+<code><a href="../reference/predict_components.html">predict_components()</a></code> returns one intercept per target level for multiclass classification, named by <code>target_levels</code>. Previously only the first level’s intercept was returned, so components plus intercept did not sum to the prediction for other levels.</li>
+<li>
 <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> and <code><a href="../reference/predict_components.html">predict_components()</a></code> error on missing values in <code>new_data</code>, naming the affected columns. Previously such rows silently received arbitrary predictions, as <code><a href="../reference/rpf.html">rpf()</a></code> has no handling for missing values. <code><a href="../reference/rpf.html">rpf()</a></code> likewise reports missing values in the training data by column (<a href="https://github.com/PlantedML/randomPlantedForest/issues/66" class="external-link">#66</a>).</li>
 <li>Classification fits with a fixed seed could differ between runs. When a split replaced a leaf, its new split candidates could be lost or attached to the wrong leaf, depending on memory layout (<a href="https://github.com/PlantedML/randomPlantedForest/issues/66" class="external-link">#66</a>).</li>
 <li>

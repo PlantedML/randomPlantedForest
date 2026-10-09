@@ -49,6 +49,11 @@
 
 ### Bug fixes
 
+- [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+  returns one intercept per target level for multiclass classification,
+  named by `target_levels`. Previously only the first level’s intercept
+  was returned, so components plus intercept did not sum to the
+  prediction for other levels.
 - [`predict()`](https://rdrr.io/r/stats/predict.html) and
   [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   error on missing values in `new_data`, naming the affected columns.
