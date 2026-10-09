@@ -28,7 +28,8 @@ All components together with the intercept sum up
 to the prediction.
 For multiclass classification, the number of output columns is multiplied by
 the number of levels in the outcome.
-\item \code{intercept} (\code{numeric(1)}): Expected value of the prediction.
+\item \code{intercept} (\code{numeric}): Expected value of the prediction.
+For multiclass classification, one value per target level, named by \code{target_levels}.
 \item \code{x} (\code{\link[data.table:data.table]{data.table}}): Copy of \code{new_data} containing predictors selected
 by \code{predictors}.
 \item \code{target_levels} (\code{character}): For multiclass classification only: Vector of target levels
