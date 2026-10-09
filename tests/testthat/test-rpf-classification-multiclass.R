@@ -54,7 +54,22 @@ test_that("Remainder is calculcated correctly", {
   expect_equal(nrow(components$m), nrow(components$remainder))
   expect_equal(ncol(components$remainder), length(components$target_levels))
   expect_named(components$remainder, components$target_levels)
+})
 
-  # TODO: verify sum(m) + intercept == prediction
-  # Cumbersome structure of m does not help here.
+test_that("Multiclass: components and class-specific intercept sum to prediction", {
+  for (loss in c("L2", "logit", "exponential")) {
+    fit <- rpf(yfact ~ ., data = xdat, max_interaction = 2, ntrees = 10, loss = loss)
+    components <- predict_components(fit, xdat)
+    pred <- predict(fit, xdat, type = "numeric")
+
+    expect_named(components$intercept, components$target_levels)
+    for (level in components$target_levels) {
+      m_level <- components$m[, endsWith(names(components$m), paste0("__class:", level)), with = FALSE]
+      expect_equal(
+        rowSums(m_level) + components$intercept[[level]],
+        pred[[paste0(".pred_", level)]],
+        info = paste(loss, level)
+      )
+    }
+  }
 })
