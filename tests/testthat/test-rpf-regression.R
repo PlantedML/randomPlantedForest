@@ -58,7 +58,7 @@ test_that("predictions do not depend on nthreads", {
   fit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, max_interaction = 2, nthreads = 2)
   expect_identical(
     predict(fit, mtcars, nthreads = 1L),
-    predict(fit, mtcars, nthreads = 3L)
+    predict(fit, mtcars, nthreads = 2L)
   )
   expect_identical(predict(fit, mtcars), predict(fit, mtcars, nthreads = 1L))
 })
