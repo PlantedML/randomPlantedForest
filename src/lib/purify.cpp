@@ -1,6 +1,7 @@
 #include "rpf.hpp"
 #include "kdtree.hpp"
 #include "diffbuf.hpp"
+#include <exception>
 #include <limits>
 #include <cmath>
 #include <unordered_map>
@@ -415,15 +416,23 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
       size_t batch = std::min<size_t>((size_t)threads_to_use, this->tree_families.size() - start);
       if (batch == 0) break;
       std::vector<std::thread> threads(batch);
+      std::vector<std::exception_ptr> errors(batch);
       for (size_t i = 0; i < batch; ++i)
       {
         size_t fam_index = start + i;
-        threads[i] = std::thread([&worker](TreeFamily *fam_ptr){ worker(*fam_ptr); }, &this->tree_families[fam_index]);
+        // an exception escaping a std::thread would terminate R
+        threads[i] = std::thread([&worker, &errors, i](TreeFamily *fam_ptr){
+          try { worker(*fam_ptr); }
+          catch (...) { errors[i] = std::current_exception(); }
+        }, &this->tree_families[fam_index]);
       }
       for (auto &th : threads)
       {
         if (th.joinable()) th.join();
       }
+      for (auto &e : errors)
+        if (e)
+          std::rethrow_exception(e);
     }
     purified = true;
     return;
@@ -1187,7 +1196,7 @@ void RandomPlantedForest::purify_2()
             std::vector<double> avg(value_size, 0);
 
             // get sum of individuals
-            for (int i = 0; i < individuals[curr_tree_index].n_entries; ++i)
+            for (int i = 0; i < (int)individuals[curr_tree_index].n_entries; ++i)
             {
               std::vector<int> tmp{i};
               sum_ind += individuals[curr_tree_index][tmp];
@@ -1196,14 +1205,14 @@ void RandomPlantedForest::purify_2()
               continue;
 
             // calc avg
-            for (int i = 0; i < individuals[curr_tree_index].n_entries; ++i)
+            for (int i = 0; i < (int)individuals[curr_tree_index].n_entries; ++i)
             {
               std::vector<int> tmp{i};
               avg += (individuals[curr_tree_index][tmp] * values[curr_tree_index][tmp]) / sum_ind;
             }
 
             // update values of one dimensional and null tree
-            for (int i = 0; i < values[curr_tree_index].n_entries; ++i)
+            for (int i = 0; i < (int)values[curr_tree_index].n_entries; ++i)
             {
               std::vector<int> tmp{i};
               values[curr_tree_index][tmp] -= avg;

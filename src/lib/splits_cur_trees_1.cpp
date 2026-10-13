@@ -160,7 +160,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
           if (X[ind][k] < sp) { ++ns; for (size_t p = 0; p < this->value_size; ++p) sum_s_adj[p] += Y[ind][p]; }
           else { ++nb; for (size_t p = 0; p < this->value_size; ++p) sum_b_adj[p] += Y[ind][p]; }
         }
-        if (ns == 0 || nb == 0) continue; double loss = 0.0;
+        if (ns == 0 || nb == 0) continue;
+        double loss = 0.0;
         for (size_t p = 0; p < this->value_size; ++p) { loss -= (sum_s_adj[p] * sum_s_adj[p]) / (double)ns; loss -= (sum_b_adj[p] * sum_b_adj[p]) / (double)nb; }
         if (loss < min_split.min_sum) { min_split.min_sum = loss; min_split.tree_index = sel_tree; min_split.leaf_index = leaf_ptr; min_split.split_coordinate = k + 1; min_split.split_point = sp; best_idx = (int)idx; min_split.sum_s = sum_s_adj; min_split.sum_b = sum_b_adj; }
       }
@@ -182,12 +183,14 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
             leaf.unique_vals_cache[k] = std::move(uniques);
             unique_ptr = &leaf.unique_vals_cache[k];
           }
-          if ((int)unique_count <= 2 * leaf_size) continue; int left = leaf_size; int right = (int)unique_count - leaf_size;
+          if ((int)unique_count <= 2 * leaf_size) continue;
+          int left = leaf_size; int right = (int)unique_count - leaf_size;
           std::vector<int> samples = compute_even_spread_indices(left, right, (size_t)this->split_try);
           for (int s_idx : samples) {
             const double sp = (*unique_ptr)[(size_t)s_idx]; size_t ns = 0, nb = 0; std::vector<double> sum_s_adj(this->value_size, 0.0), sum_b_adj(this->value_size, 0.0);
             for (int ind : leaf.individuals) { if (X[ind][k] < sp) { ++ns; for (size_t p = 0; p < this->value_size; ++p) sum_s_adj[p] += Y[ind][p]; } else { ++nb; for (size_t p = 0; p < this->value_size; ++p) sum_b_adj[p] += Y[ind][p]; } }
-            if (ns == 0 || nb == 0) continue; double loss = 0.0; for (size_t p = 0; p < this->value_size; ++p) { loss -= (sum_s_adj[p] * sum_s_adj[p]) / (double)ns; loss -= (sum_b_adj[p] * sum_b_adj[p]) / (double)nb; }
+            if (ns == 0 || nb == 0) continue;
+            double loss = 0.0; for (size_t p = 0; p < this->value_size; ++p) { loss -= (sum_s_adj[p] * sum_s_adj[p]) / (double)ns; loss -= (sum_b_adj[p] * sum_b_adj[p]) / (double)nb; }
             if (loss < min_split.min_sum) { min_split.min_sum = loss; min_split.tree_index = src_tree; min_split.leaf_index = &leaf; min_split.split_coordinate = k + 1; min_split.split_point = sp; best_idx = (int)idx; min_split.sum_s = sum_s_adj; min_split.sum_b = sum_b_adj; }
           }
         }

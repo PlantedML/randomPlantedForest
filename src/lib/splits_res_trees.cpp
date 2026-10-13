@@ -104,7 +104,8 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
     size_t grand_total_remaining = 0;
 
     for (int kdim : treePtr->split_dims) {
-      if (kdim == 0) continue; const int k = kdim - 1; const int leaf_size = this->n_leaves[k];
+      if (kdim == 0) continue;
+      const int k = kdim - 1; const int leaf_size = this->n_leaves[k];
 
       std::vector<std::shared_ptr<DecisionTree>> sources; sources.reserve(2);
       std::set<int> S = treePtr->split_dims; S.erase(kdim);
@@ -144,12 +145,14 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
         double step = total_all0 / (double)draws;
         double target = step * (t + 0.5); if (target >= total_all0) target = std::max(0.0, total_all0 - 1.0);
         b_idx = rpf_utils::fenwick_find_by_prefix(bucket_bit, target);
-        if (b_idx == 0) continue; --b_idx;
+        if (b_idx == 0) continue;
+        --b_idx;
       } else {
         if (bucket_total_all <= 0.0) break;
         double r = rng_runif(0.0, bucket_total_all);
         b_idx = rpf_utils::fenwick_find_by_prefix(bucket_bit, r);
-        if (b_idx == 0) continue; --b_idx;
+        if (b_idx == 0) continue;
+        --b_idx;
       }
 
       auto &bucket = buckets[b_idx];
@@ -169,7 +172,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
       }
       const std::vector<double>& bit_view = bucket.has_local ? bucket.bit : *(bucket.bit_src);
       size_t leaf_idx_sel = rpf_utils::fenwick_find_by_prefix(bit_view, r_leaf);
-      if (leaf_idx_sel == 0) continue; leaf_idx_sel -= 1; size_t wts_size = bucket.has_local ? bucket.wts.size() : (bucket.wts_src ? bucket.wts_src->size() : 0); if (leaf_idx_sel >= wts_size || leaf_idx_sel >= bucket.tree->leaves.size()) continue;
+      if (leaf_idx_sel == 0) continue;
+      leaf_idx_sel -= 1; size_t wts_size = bucket.has_local ? bucket.wts.size() : (bucket.wts_src ? bucket.wts_src->size() : 0);
+      if (leaf_idx_sel >= wts_size || leaf_idx_sel >= bucket.tree->leaves.size()) continue;
       Leaf *leaf_ptr = &bucket.tree->leaves[leaf_idx_sel];
 
       // Prepare local per-leaf-per-dim state lazily
@@ -202,7 +207,7 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
       if (state.right <= state.left || wts_view[leaf_idx_sel] <= 0.0) { continue; }
 
       // Select threshold index within [left, right) avoiding repeats
-      int s_idx;
+      int s_idx = -1;
       if (this->deterministic) {
         int range = state.right - state.left;
         int remaining_here = (int)wts_view[leaf_idx_sel];
@@ -222,6 +227,8 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
       } else {
         do { s_idx = rng_randint(state.left, state.right); } while (!state.used_flags.empty() && state.used_flags[s_idx - state.left]);
       }
+      // every threshold in range already used
+      if (s_idx < 0) continue;
       if (!state.used_flags.empty()) state.used_flags[(size_t)(s_idx - state.left)] = 1;
       state.used_count += 1;
 

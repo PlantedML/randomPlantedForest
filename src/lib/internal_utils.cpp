@@ -168,7 +168,8 @@ std::vector<size_t> sample_weighted_indices_filtered(
     size_t k = std::min(n_candidates, all.size());
     for (size_t i = 0; i < k; ++i) {
       size_t j = i + static_cast<size_t>(rng_runif01() * (double)(all.size() - i));
-      if (j >= all.size()) j = all.size() - 1; std::swap(all[i], all[j]);
+      if (j >= all.size()) j = all.size() - 1;
+      std::swap(all[i], all[j]);
     }
     for (size_t i = 0; i < k; ++i) sample_idxs.push_back(all[i]);
   } else {

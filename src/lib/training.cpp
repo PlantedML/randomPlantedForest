@@ -2,6 +2,7 @@
 // manages bootstrapping and threading, and handles optional purification.
 #include "rpf.hpp"
 #include "internal_utils.hpp"
+#include <exception>
 #include <random>
 
 using namespace rpf_utils;
@@ -46,26 +47,34 @@ void RandomPlantedForest::fit()
       int batch = std::min<int>((int)threads_to_use, n_trees - start);
       if (batch <= 0) break;
       std::vector<std::thread> threads((size_t)batch);
+      std::vector<std::exception_ptr> errors((size_t)batch);
       for (int i = 0; i < batch; ++i)
       {
         int tree_index = start + i;
-        threads[(size_t)i] = std::thread([this, &initial_leaves](int tree_index_inner){
-          std::mt19937_64 rng_local;
-          std::mt19937_64* prev_ptr = rpf_utils::swap_tls_rng(nullptr);
-          if (!tree_seeds_.empty() && (size_t)tree_index_inner < tree_seeds_.size()) {
-            rng_local.seed(tree_seeds_[(size_t)tree_index_inner]);
-          } else {
-            rng_local.seed(88172645463393265ULL ^ (unsigned long long)tree_index_inner);
+        threads[(size_t)i] = std::thread([this, &initial_leaves, &errors, i](int tree_index_inner){
+          // an exception escaping a std::thread would terminate R
+          try {
+            std::mt19937_64 rng_local;
+            std::mt19937_64* prev_ptr = rpf_utils::swap_tls_rng(nullptr);
+            if (!tree_seeds_.empty() && (size_t)tree_index_inner < tree_seeds_.size()) {
+              rng_local.seed(tree_seeds_[(size_t)tree_index_inner]);
+            } else {
+              rng_local.seed(88172645463393265ULL ^ (unsigned long long)tree_index_inner);
+            }
+            rpf_utils::swap_tls_rng(&rng_local);
+            this->create_tree_family(initial_leaves, (size_t)tree_index_inner);
+            rpf_utils::swap_tls_rng(prev_ptr);
           }
-          rpf_utils::swap_tls_rng(&rng_local);
-          this->create_tree_family(initial_leaves, (size_t)tree_index_inner);
-          rpf_utils::swap_tls_rng(prev_ptr);
+          catch (...) { errors[(size_t)i] = std::current_exception(); }
         }, tree_index);
       }
       for (auto &th : threads)
       {
         if (th.joinable()) th.join();
       }
+      for (auto &e : errors)
+        if (e)
+          std::rethrow_exception(e);
     }
   }
   else

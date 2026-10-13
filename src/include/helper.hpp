@@ -80,7 +80,7 @@ namespace utils
         index += a;
       }
       index += indices[0];
-      if (index > n_entries || index < 0)
+      if (index < 0 || (size_t)index >= n_entries)
         throw std::invalid_argument("Index out of range.");
       return entries[index];
     }
