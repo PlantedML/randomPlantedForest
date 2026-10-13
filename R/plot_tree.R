@@ -4,10 +4,25 @@
 
 # Split structure ------------------------------------------------------------
 
-# A tree's leaves are one or more partitions of a region: a leaf split on a
-# new variable stays and can be split again, adding another partition.
-# Repeatedly take a subset of leaves that exactly tiles the region as a split
-# tree; leaves left over hang from the region individually.
+#' Rebuild a split structure from a tree's leaves
+#'
+#' A tree's leaves are one or more partitions of a region: a leaf split on a
+#' new variable stays and can be split again, adding another partition.
+#' Repeatedly take a subset of leaves that exactly tiles the region as a split
+#' tree; leaves left over hang from the region individually.
+#'
+#' Nodes are lists with `kind` and `region` (named list of `c(lower, upper)`
+#' per variable), plus `leaf` (one row of `leaves`) for `"leaf"`, `variable`,
+#' `value` and two `children` for `"split"`, and `children` for `"overlap"`,
+#' a region with several partitions.
+#'
+#' @param leaves `[data.frame]`: Rows of [rpf_boxes()] for one tree, with `.id`
+#'   and `.value`.
+#' @param variables `[character]`: The tree's variables.
+#' @param region `[list]`: Region to tile, see above.
+#'
+#' @return `[list]`: The root node.
+#' @noRd
 split_leaves <- function(leaves, variables, region) {
   groups <- list()
   remaining <- leaves
@@ -31,8 +46,16 @@ split_leaves <- function(leaves, variables, region) {
   list(kind = "overlap", children = children, region = region)
 }
 
-# A split tree whose leaves exactly tile `region`, or NULL. Prefers a single
-# leaf, then the most balanced cut. `budget` caps the search on large trees.
+#' Find a split tree whose leaves exactly tile a region
+#'
+#' Prefers a single leaf, then the most balanced cut, recursing into both sides.
+#'
+#' @inheritParams split_leaves
+#' @param budget `[environment]`: Counter `calls`, capping the search on large trees.
+#'
+#' @return `[list | NULL]`: A node as in `split_leaves()`, or `NULL` if no
+#'   subset of `leaves` tiles `region`.
+#' @noRd
 tile_region <- function(leaves, variables, region, budget) {
   budget$calls <- budget$calls + 1
   if (budget$calls > 5000) {
@@ -76,7 +99,14 @@ tile_region <- function(leaves, variables, region, budget) {
   NULL
 }
 
-# Leaf bounds strictly inside the region, most balanced first
+#' Candidate cuts of a region, most balanced first
+#'
+#' @inheritParams split_leaves
+#'
+#' @return `[list]` of cuts, each a list with `variable`, `value` (a leaf
+#'   bound strictly inside `region`) and `balance` (leaves entirely below
+#'   minus entirely above, in absolute value).
+#' @noRd
 candidate_cuts <- function(leaves, variables, region) {
   cuts <- list()
   for (variable in variables) {
@@ -92,6 +122,12 @@ candidate_cuts <- function(leaves, variables, region) {
   cuts[order(vapply(cuts, `[[`, numeric(1), "balance"))]
 }
 
+#' `.id`s of all leaves in a split tree
+#'
+#' @param node `[list]`: A node as in `split_leaves()`.
+#'
+#' @return `[integer]`.
+#' @noRd
 tiling_ids <- function(node) {
   if (node$kind == "leaf") {
     return(node$leaf$.id)
@@ -99,6 +135,13 @@ tiling_ids <- function(node) {
   unlist(lapply(node$children, tiling_ids))
 }
 
+#' Region covered by a single leaf
+#'
+#' @param leaf `[data.frame]`: One row of [rpf_boxes()].
+#' @param variables `[character]`: The tree's variables.
+#'
+#' @return `[list]`: Region as in `split_leaves()`.
+#' @noRd
 leaf_region <- function(leaf, variables) {
   stats::setNames(
     lapply(variables, \(v) c(leaf[[paste0(v, "_lower")]], leaf[[paste0(v, "_upper")]])),
@@ -108,7 +151,15 @@ leaf_region <- function(leaf, variables) {
 
 # Labels ---------------------------------------------------------------------
 
-# Describe where `region` is narrower than `parent`, e.g. "x1 < 0.5" or "g in {a, c}"
+#' Describe where a region is narrower than its parent
+#'
+#' @param region,parent `[list]`: Regions as in `split_leaves()`.
+#' @param levels `[list]`: Factor levels by predictor name; factors are
+#'   labelled by level sets, e.g. `"g in {a, c}"`.
+#'
+#' @return `[character(1)]`: One line per narrowed variable, e.g.
+#'   `"x1 < 0.5"`, empty if none.
+#' @noRd
 region_label <- function(region, parent, levels) {
   parts <- character()
   for (variable in names(region)) {
@@ -142,8 +193,18 @@ region_label <- function(region, parent, levels) {
 box_half_width <- 0.42
 box_half_height <- 0.22
 
-# Place leaves on consecutive slots and inner nodes above the mean of their
-# children; returns nodes and elbow edges in tree-local coordinates.
+#' Lay out one split tree
+#'
+#' Places leaves on consecutive slots and inner nodes above the mean of their
+#' children, in tree-local coordinates with the top at `y = 0`.
+#'
+#' @param node `[list]`: Root node from `split_leaves()`.
+#' @inheritParams region_label
+#'
+#' @return `[list]` with `nodes` (data frame `x`, `y`, `kind`, `value`,
+#'   `label`), `edges` (data frame of elbow segments `x`, `xend`, `y`, `yend`,
+#'   `overlap`), `width` (number of slots) and `top_x`.
+#' @noRd
 layout_split_tree <- function(node, levels) {
   nodes <- list()
   edges <- list()
@@ -194,6 +255,13 @@ layout_split_tree <- function(node, levels) {
   list(nodes = do.call(rbind, nodes), edges = do.call(rbind, edges), width = next_slot, top_x = top_x)
 }
 
+#' Translate layout coordinates
+#'
+#' @param df `[data.frame]`: Nodes or edges from `layout_split_tree()`.
+#' @param dx,dy `[numeric(1)]`: Offsets.
+#'
+#' @return `df`, shifted.
+#' @noRd
 shift_layout <- function(df, dx, dy) {
   df$x <- df$x + dx
   df$y <- df$y + dy
@@ -204,8 +272,18 @@ shift_layout <- function(df, dx, dy) {
   df
 }
 
-# Arrange the trees in rows by interaction order below the root, each tree
-# with a header naming its variables and, where narrower than the data, its region.
+#' Lay out all trees of a family
+#'
+#' Arranges the trees in rows by interaction order below the root, each tree
+#' with a header naming its variables and, where narrower than the data, its region.
+#'
+#' @param boxes `[data.frame]`: Rows of [rpf_boxes()] to draw, with `.value`.
+#' @inheritParams region_label
+#'
+#' @return `[list]` with `nodes` and `edges` as in `layout_split_tree()` in
+#'   family coordinates, `headers` (data frame `tree`, `region`, `order`, `x`,
+#'   `y`) and `trees` (tree names in drawing order).
+#' @noRd
 layout_family <- function(boxes, levels) {
   predictors <- sub("_lower$", "", grep("_lower$", names(boxes), value = TRUE))
   predictors <- predictors[vapply(predictors, \(v) any(!is.na(boxes[[paste0(v, "_lower")]])), logical(1))]
@@ -267,6 +345,12 @@ layout_family <- function(boxes, levels) {
 
 # Plot -----------------------------------------------------------------------
 
+#' Draw the split diagram of a tree family
+#'
+#' @inheritParams plot_family_boxes
+#'
+#' @return A `ggplot`.
+#' @noRd
 plot_family_tree <- function(boxes, family, levels, value_label, remainder) {
   if (!any(boxes$order > 0)) {
     cli::cli_abort("Tree family {family} has no trees to draw.")
@@ -386,7 +470,13 @@ plot_family_tree <- function(boxes, family, levels, value_label, remainder) {
     ggplot2::theme(plot.margin = ggplot2::margin(10, 10, 10, 60))
 }
 
-# A label below the diagram standing in for the trees not drawn
+#' Label standing in for the trees not drawn
+#'
+#' @param remainder `[character(1) | NULL]`: Caption from `summarize_remainder()`.
+#' @param y `[numeric(1)]`: Vertical position, below the diagram.
+#'
+#' @return A ggplot2 layer, or `NULL`.
+#' @noRd
 remainder_layers <- function(remainder, y) {
   if (is.null(remainder)) {
     return(NULL)

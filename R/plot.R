@@ -76,7 +76,18 @@ rpf_boxes <- function(x, family = 1L, ...) {
   out
 }
 
-# Raw leaves from get_model(): one 2 x p bounds matrix per leaf
+#' Boxes of an unpurified tree family
+#'
+#' Flattens the leaves of one tree family as grown, one row per leaf.
+#'
+#' @param family `[list]`: One element of `x$fit$get_model()`, with per tree
+#'   `variables` (1-based predictor indices, `0` for the root), `values` and
+#'   `intervals` (one 2 x p bounds matrix per leaf).
+#'
+#' @return `[list]` with one entry per box: `variables` (list of the tree's
+#'   predictor indices), `box` (index within its tree), and matrices `values`
+#'   (boxes x outcome columns), `lower` and `upper` (boxes x predictors).
+#' @noRd
 leaf_boxes <- function(family) {
   n_leaves <- lengths(family$values)
   leaves <- unlist(family$intervals, recursive = FALSE)
@@ -89,9 +100,19 @@ leaf_boxes <- function(family) {
   )
 }
 
-# Purified grid from get_grid_leaves(): cells between consecutive limits of
-# each tree variable, values in column-major order over the tree's dims.
-# The last index per dimension is padding and never used for prediction.
+#' Boxes of a purified tree family
+#'
+#' Turns the purified grid of one tree family into boxes: one cell between
+#' consecutive limits of each tree variable, values in column-major order over
+#' the tree's dims. The last index per dimension is padding and never used for
+#' prediction, so it is dropped.
+#'
+#' @param family `[list]`: One element of `x$fit$get_grid_leaves()`, with
+#'   `lim_list` (grid limits per predictor) and `trees` (per tree `variables`,
+#'   `dims` and `values`).
+#'
+#' @return `[list]`: Same structure as `leaf_boxes()`.
+#' @noRd
 grid_boxes <- function(family) {
   p <- length(family$lim_list)
   trees <- lapply(family$trees, \(tree) {
@@ -223,8 +244,15 @@ plot.rpf <- function(
   )
 }
 
-# Trees not drawn, summarized like the remainder term of predict_components();
-# NULL if there are none
+#' Describe the trees not drawn
+#'
+#' Summarizes trees left out of a plot, like the remainder term of
+#' [predict_components()].
+#'
+#' @param high `[data.frame]`: Rows of [rpf_boxes()] that are not drawn.
+#'
+#' @return `[character(1) | NULL]`: A caption, or `NULL` if all trees are drawn.
+#' @noRd
 summarize_remainder <- function(high) {
   if (nrow(high) == 0) {
     return(NULL)
@@ -240,6 +268,22 @@ summarize_remainder <- function(high) {
   )
 }
 
+#' Plot the boxes of a tree family in variable space
+#'
+#' One panel per tree: `plot_main_tree()` for trees on one variable,
+#' `plot_pair_tree()` for trees on two. Panels of the same order share their
+#' value scale so that they are comparable.
+#'
+#' @param boxes `[data.frame]`: Rows of [rpf_boxes()] to draw, with the values
+#'   to plot in `.value`.
+#' @param family `[integer(1)]`: Tree family, for the title.
+#' @param levels `[list]`: Factor levels by predictor name, empty to label
+#'   factors by their integer codes.
+#' @param value_label `[character(1)]`: Name of the value scale.
+#' @param remainder `[character(1) | NULL]`: Caption from `summarize_remainder()`.
+#'
+#' @return A `patchwork`.
+#' @noRd
 plot_family_boxes <- function(boxes, family, levels, value_label, remainder) {
   mains <- unique(boxes$tree[boxes$order == 1])
   main_limits <- range(0, boxes$.value[boxes$order == 1])
@@ -262,6 +306,15 @@ plot_family_boxes <- function(boxes, family, levels, value_label, remainder) {
     )
 }
 
+#' Choose the value column to plot
+#'
+#' @param x `[rpf]`: The fitted model.
+#' @param boxes `[data.frame]`: Output of [rpf_boxes()].
+#' @param class `[character(1) | NULL]`: Outcome level for multiclass
+#'   classification, `NULL` for the first level. Must be `NULL` otherwise.
+#'
+#' @return `[character(1)]`: `"value"`, or `"value_<class>"` for multiclass.
+#' @noRd
 value_column <- function(x, boxes, class) {
   if (!"value" %in% names(boxes)) {
     outcome_levels <- levels(x$blueprint$ptypes$outcomes[[1]])
@@ -275,9 +328,18 @@ value_column <- function(x, boxes, class) {
   "value"
 }
 
-# Bounds of a box along one variable, as plot coordinates. A factor box
-# [lower, upper) covers the codes from ceiling(lower) to ceiling(upper) - 1,
-# drawn as unit-wide cells centred on the codes.
+#' Box bounds along one variable as plot coordinates
+#'
+#' A factor box `[lower, upper)` covers the codes from `ceiling(lower)` to
+#' `ceiling(upper) - 1`, drawn as unit-wide cells centred on the codes.
+#' Continuous bounds are used as is.
+#'
+#' @param boxes `[data.frame]`: Rows of [rpf_boxes()].
+#' @param variable `[character(1)]`: Predictor name.
+#' @param levels `[list]`: Factor levels by predictor name, see `plot_family_boxes()`.
+#'
+#' @return `[list]` with numeric vectors `min` and `max`, one entry per box.
+#' @noRd
 axis_bounds <- function(boxes, variable, levels) {
   lower <- boxes[[paste0(variable, "_lower")]]
   upper <- boxes[[paste0(variable, "_upper")]]
@@ -288,6 +350,14 @@ axis_bounds <- function(boxes, variable, levels) {
   }
 }
 
+#' Position scale for a predictor, labelling factor codes by level
+#'
+#' @param aesthetic `[character(1)]`: `"x"` or `"y"`.
+#' @param variable `[character(1)]`: Predictor name, used as axis title.
+#' @param levels `[list]`: Factor levels by predictor name, see `plot_family_boxes()`.
+#'
+#' @return A ggplot2 continuous position scale.
+#' @noRd
 axis_scale <- function(aesthetic, variable, levels) {
   scale <- if (aesthetic == "x") ggplot2::scale_x_continuous else ggplot2::scale_y_continuous
   if (variable %in% names(levels)) {
@@ -297,6 +367,18 @@ axis_scale <- function(aesthetic, variable, levels) {
   }
 }
 
+#' Plot a tree on one variable
+#'
+#' Each leaf is a translucent bar from zero to its value, so overlapping
+#' leaves visibly add up.
+#'
+#' @param boxes `[data.frame]`: Rows of [rpf_boxes()] for this tree, with `.value`.
+#' @param variable `[character(1)]`: The tree's variable.
+#' @param limits `[numeric(2)]`: Value axis limits, shared across these panels.
+#' @inheritParams plot_family_boxes
+#'
+#' @return A `ggplot`.
+#' @noRd
 plot_main_tree <- function(boxes, variable, limits, levels, value_label) {
   xs <- axis_bounds(boxes, variable, levels)
   rects <- data.frame(xmin = xs$min, xmax = xs$max, ymin = 0, ymax = boxes$.value)
@@ -313,6 +395,18 @@ plot_main_tree <- function(boxes, variable, limits, levels, value_label) {
     ggplot2::theme_minimal()
 }
 
+#' Plot a tree on two variables
+#'
+#' Each leaf is a translucent rectangle filled by its value.
+#'
+#' @param boxes `[data.frame]`: Rows of [rpf_boxes()] for this tree, with `.value`.
+#' @param tree `[character(1)]`: Tree name, e.g. `"x1:x2"`, for the title.
+#' @param limits `[numeric(2)]`: Fill limits, symmetric around zero and
+#'   shared across these panels.
+#' @inheritParams plot_family_boxes
+#'
+#' @return A `ggplot`.
+#' @noRd
 plot_pair_tree <- function(boxes, tree, limits, levels, value_label) {
   bounds <- grep("_lower$", names(boxes), value = TRUE)
   variables <- sort(sub("_lower$", "", bounds[!is.na(unlist(boxes[1, bounds]))]))
