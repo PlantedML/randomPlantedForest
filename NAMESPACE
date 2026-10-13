@@ -2,6 +2,7 @@
 
 S3method(bundle::bundle,rpf)
 S3method(format,rpf)
+S3method(plot,rpf)
 S3method(predict,rpf)
 S3method(print,rpf)
 S3method(print,rpf_forest)
@@ -15,6 +16,7 @@ export(is_purified)
 export(predict_components)
 export(purify)
 export(rpf)
+export(rpf_boxes)
 export(rpf_is_valid)
 export(rpf_marshal)
 export(rpf_unmarshal)
@@ -45,7 +47,10 @@ importFrom(hardhat,
   validate_prediction_size
 )
 importFrom(methods,new)
-importFrom(rlang,"%||%")
+importFrom(rlang,
+  "%||%",
+  .data
+)
 importFrom(stats,model.matrix)
 importFrom(utils,combn)
 useDynLib(randomPlantedForest, .registration = TRUE)
