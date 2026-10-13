@@ -175,8 +175,8 @@ region_label <- function(region, parent, levels) {
     }
     low <- bounds[1] > outer[1]
     high <- bounds[2] < outer[2]
-    lower <- format(bounds[1], digits = 3)
-    upper <- format(bounds[2], digits = 3)
+    lower <- format(bounds[1], digits = 2)
+    upper <- format(bounds[2], digits = 2)
     if (low && high) {
       parts <- c(parts, sprintf("%s \u2264 %s < %s", lower, variable, upper))
     } else if (low) {
@@ -365,7 +365,7 @@ plot_family_tree <- function(boxes, family, levels, value_label, remainder) {
   layout <- layout_family(boxes, levels)
   # widen slots so that split labels of long variable names fit
   label_chars <- max(nchar(unlist(strsplit(layout$nodes$label, "\n", fixed = TRUE))), 0)
-  slot <- max(1, label_chars / 12)
+  slot <- max(1, label_chars / 10)
   layout$nodes$x <- layout$nodes$x * slot
   layout$edges[c("x", "xend")] <- layout$edges[c("x", "xend")] * slot
   layout$headers$x <- layout$headers$x * slot
@@ -438,13 +438,12 @@ plot_family_tree <- function(boxes, family, levels, value_label, remainder) {
       vjust = -0.3,
       lineheight = 0.9
     ) +
-    ggplot2::geom_label(
+    ggplot2::geom_text(
       ggplot2::aes(.data$x, .data$y + 0.05, label = .data$label),
       data = headers,
       size = 3,
       vjust = 0,
-      lineheight = 0.9,
-      label.size = 0
+      lineheight = 0.9
     ) +
     ggplot2::geom_label(
       ggplot2::aes(.data$x, .data$y, label = sprintf("root\n%s", format(intercept, digits = 3))),

@@ -17,6 +17,8 @@ knitr::opts_chunk$set(
 # The classification and recipes sections use suggested packages
 has_suggests <- requireNamespace("palmerpenguins", quietly = TRUE) &&
   requireNamespace("recipes", quietly = TRUE)
+has_plot <- requireNamespace("ggplot2", quietly = TRUE) &&
+  requireNamespace("patchwork", quietly = TRUE)
 ```
 
 `randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen & Meyer](https://arxiv.org/abs/2012.14563)), a directly interpretable tree ensemble.
@@ -73,6 +75,39 @@ predict(rpfit, new_data = head(sim))
 ```
 
 Note that `rpf()` does not handle missing values: rows containing `NA` must be imputed or removed beforehand (see the `recipes` section below for one way to do this as part of the model specification).
+
+## Inside a tree family
+
+The forest averages `ntrees` tree families.
+Unlike a single CART tree, a family consists of several trees, each splitting on its own set of variables, and it predicts a point by adding up the values of all leaves containing it.
+New trees grow from existing ones by splitting on an additional variable, and `max_interaction = 2` limits each tree to at most two variables.
+
+To look at one family, we fit a forest with a single, small family to the same data:
+
+```{r fit-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
+small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10)
+plot(small)
+```
+
+The trees are arranged in rows by the number of variables they split on, with the leaves coloured by their value.
+`plot(type = "boxes")` draws the same leaves in variable space instead, one panel per tree:
+
+```{r boxes-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
+plot(small, type = "boxes")
+```
+
+These trees are not yet the components of the decomposition.
+The leaves of different trees overlap, so an effect can be spread over several trees: the quadratic effect of `x2`, for instance, can just as well be carried by trees on `x2` together with another variable as by a tree on `x2` alone.
+Purification moves each effect to the lowest-order tree it belongs to, without changing the family's predictions:
+
+```{r boxes-purified, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
+purify(small)
+plot(small, type = "boxes")
+```
+
+Now each panel is one component: the main effects resemble the true shapes, `x1:x2` shows the sign pattern of a product, and the root value is the intercept, close to the true value of 1.
+Averaging these components over all tree families gives the decomposition of the whole forest, which `predict_components()` computes.
+With a single family and few splits the estimates are coarse, which is why the next section uses the forest of 50 families fitted above.
 
 ## Decomposing predictions
 
