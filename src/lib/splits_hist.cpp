@@ -53,7 +53,8 @@ Split RandomPlantedForest::calcOptimalSplit_hist(const std::vector<std::vector<d
         if (!cuts_k.empty()) {
           auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), v);
           b = (int)std::distance(cuts_k.begin(), itb);
-          if (b < 0) b = 0; if ((size_t)b >= Kf) b = (int)Kf - 1;
+          if (b < 0) b = 0;
+          if ((size_t)b >= Kf) b = (int)Kf - 1;
         }
         cnt[(size_t)b] += 1;
         for (size_t p = 0; p < this->value_size; ++p) sum[(size_t)b][p] += Y[ind][p];

@@ -227,7 +227,8 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
 
 // Mode 0: res_trees (operate on resulting trees pool)
 bool RandomPlantedForest::resultingTreeExists(const std::vector<RandomPlantedForest::ResultingTreeCandidate>& pool, const std::set<int>& dims) {
-  for (const auto &c : pool) if (c.tree->get_split_dims() == dims) return true; return false;
+  for (const auto &c : pool) if (c.tree->get_split_dims() == dims) return true;
+  return false;
 }
 
 // Mode 0: res_trees moved to lib/splits_res_trees.cpp
@@ -270,7 +271,7 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
   this->lower_bounds = std::vector<double>(feature_size);
   for (int i = 0; i < feature_size; ++i) {
     double minVal = X[0][i], maxVal = X[0][i];
-    for (size_t j = 0; j < sample_size; ++j) { double currVal = X[j][i]; if (currVal < minVal) minVal = currVal; if (currVal > maxVal) maxVal = currVal; }
+    for (size_t j = 0; j < (size_t)sample_size; ++j) { double currVal = X[j][i]; if (currVal < minVal) minVal = currVal; if (currVal > maxVal) maxVal = currVal; }
     this->upper_bounds[i] = maxVal + 2 * eps; this->lower_bounds[i] = minVal;
   }
   // Prepare histogram bins if histogram mode is requested
@@ -282,7 +283,7 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
     // For each feature, compute quantile cuts using sorted sample values
     for (int k = 0; k < feature_size; ++k) {
       std::vector<double> vals(sample_size);
-      for (size_t i = 0; i < sample_size; ++i) vals[i] = X[i][k];
+      for (size_t i = 0; i < (size_t)sample_size; ++i) vals[i] = X[i][k];
       std::sort(vals.begin(), vals.end());
       vals.erase(std::unique(vals.begin(), vals.end()), vals.end());
       size_t unique_n = vals.size();
@@ -291,10 +292,11 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
       feature_cut_points_[k].resize(cuts);
       for (size_t c = 1; c <= cuts; ++c) {
         double q = (double)c / (double)K; size_t idx = static_cast<size_t>(std::floor(q * (double)(unique_n - 1)));
-        if (idx >= unique_n) idx = unique_n - 1; feature_cut_points_[k][c - 1] = vals[idx];
+        if (idx >= unique_n) idx = unique_n - 1;
+        feature_cut_points_[k][c - 1] = vals[idx];
       }
       // Assign bin ids for all samples in original X for this feature
-      for (size_t i = 0; i < sample_size; ++i) {
+      for (size_t i = 0; i < (size_t)sample_size; ++i) {
         double v = X[i][k];
         auto &cuts_k = feature_cut_points_[k];
         int bin = 0;
@@ -328,7 +330,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     if (deterministic) { samples_X = X; samples_Y = Y; this->t_try = 1; }
     else {
       samples_X = std::vector<std::vector<double>>(sample_size); samples_Y = std::vector<std::vector<double>>(sample_size);
-      for (size_t i = 0; i < sample_size; ++i) { sample_index = rng_randint(0, (int)sample_size); samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; }
+      for (size_t i = 0; i < (size_t)sample_size; ++i) { sample_index = rng_randint(0, (int)sample_size); samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; }
     }
 
     Split curr_split;
@@ -416,10 +418,10 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
     // bootstrap
     int sample_index; std::vector<std::vector<double>> samples_X, samples_Y; std::vector<int> boot_idx(sample_size);
-    if (deterministic) { samples_X = X; samples_Y = Y; this->t_try = 1; for (size_t i=0;i<sample_size;++i) boot_idx[i] = static_cast<int>(i); }
+    if (deterministic) { samples_X = X; samples_Y = Y; this->t_try = 1; for (size_t i=0;i<(size_t)sample_size;++i) boot_idx[i] = static_cast<int>(i); }
     else {
       samples_X = std::vector<std::vector<double>>(sample_size); samples_Y = std::vector<std::vector<double>>(sample_size);
-      for (size_t i=0;i<sample_size;++i){ sample_index = rng_randint(0, (int)sample_size); boot_idx[i] = sample_index; samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; }
+      for (size_t i=0;i<(size_t)sample_size;++i){ sample_index = rng_randint(0, (int)sample_size); boot_idx[i] = sample_index; samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; }
     }
     
 
@@ -431,11 +433,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       for (int k = 0; k < feature_size; ++k) {
         // Reuse global precomputed bin ids via bootstrap index mapping
         if (!feature_cut_points_.empty() && (size_t)k < sample_bin_id_.size()) {
-          for (size_t i = 0; i < sample_size; ++i) working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
+          for (size_t i = 0; i < (size_t)sample_size; ++i) working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
         } else {
           // Fallback: compute on-the-fly (should be rare if cuts are available)
           const auto &cuts_k = (k >= 0 && k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
-          for (size_t i = 0; i < sample_size; ++i) {
+          for (size_t i = 0; i < (size_t)sample_size; ++i) {
             int bin = 0; if (!cuts_k.empty()) { auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), samples_X[i][k]); bin = (int)std::distance(cuts_k.begin(), itb); }
             working_bin_id[k][i] = bin;
           }
@@ -558,7 +560,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   // bootstrap
   int sample_index; std::vector<std::vector<double>> samples_X, samples_Y;
   if (deterministic) { samples_X = X; samples_Y = Y; this->t_try = 1; }
-  else { samples_X = std::vector<std::vector<double>>(sample_size); samples_Y = std::vector<std::vector<double>>(sample_size); for (size_t i=0;i<sample_size;++i){ sample_index = rng_randint(0, (int)sample_size); samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; } }
+  else { samples_X = std::vector<std::vector<double>>(sample_size); samples_Y = std::vector<std::vector<double>>(sample_size); for (size_t i=0;i<(size_t)sample_size;++i){ sample_index = rng_randint(0, (int)sample_size); samples_Y[i] = Y[sample_index]; samples_X[i] = X[sample_index]; } }
 
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {

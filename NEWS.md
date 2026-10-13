@@ -10,6 +10,9 @@
 
 ## Bug fixes
 
+* Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
+  Previously an error in a worker thread terminated the R session.
+* The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
 

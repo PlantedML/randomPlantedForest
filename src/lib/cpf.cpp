@@ -397,7 +397,9 @@ Split ClassificationRPF::calcOptimalSplit_leaves(const std::vector<std::vector<d
       int s_idx = -1;
       if (deterministic) {
         int range = right - left; int guess = left + (int)(((double)used_pos.size()+0.5)/((double)range+0.5)*range);
-        if (guess < left) guess = left; if (guess >= right) guess = right - 1; int lo=guess, hi=guess;
+        if (guess < left) guess = left;
+        if (guess >= right) guess = right - 1;
+        int lo=guess, hi=guess;
         while (lo>=left || hi<right) { if (lo>=left && !used_pos.count(lo)) { s_idx=lo; break; } if (hi<right && !used_pos.count(hi)) { s_idx=hi; break; } --lo; ++hi; }
         if (s_idx == -1) for (int p=left;p<right;++p) if (!used_pos.count(p)) { s_idx=p; break; }
       } else { do { s_idx = rpf_utils::rng_randint(left, right); } while (used_pos.count(s_idx)); }
@@ -460,7 +462,8 @@ Split ClassificationRPF::calcOptimalSplit_hist(const std::vector<std::vector<dou
       if (!cuts_k.empty()) {
         auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), v);
         b = (int)std::distance(cuts_k.begin(), itb);
-        if (b < 0) b = 0; if ((size_t)b >= Kf) b = (int)Kf - 1;
+        if (b < 0) b = 0;
+        if ((size_t)b >= Kf) b = (int)Kf - 1;
       }
       cnt[(size_t)b] += 1;
       for (size_t p = 0; p < this->value_size; ++p) sum[(size_t)b][p] += Y[ind][p];
@@ -607,7 +610,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     samples_Y = std::vector<std::vector<double>>(sample_size);
 
     // bagging/subsampling
-    for (size_t i = 0; i < sample_size; ++i)
+    for (size_t i = 0; i < (size_t)sample_size; ++i)
     {
       sample_index = rpf_utils::rng_randint(0, (int)sample_size);
       samples_Y[i] = Y[sample_index];
