@@ -2,6 +2,19 @@
 
 ## randomPlantedForest (development version)
 
+### New features
+
+- [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
+  trees of one tree family to illustrate how a Random Planted Forest
+  predicts. `type = "tree"` draws a split diagram in the style of Figure
+  1b of the paper, reconstructed from the fitted leaves,
+  `type = "boxes"` draws the leaves in variable space, before or after
+  purification.
+  [`rpf_boxes()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.md)
+  returns the leaves as a data frame. Requires `ggplot2`, and
+  `patchwork` for `type = "boxes"`. The “Getting started” vignette uses
+  it to show how a tree family is built and what purification does.
+
 ### Bug fixes
 
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)

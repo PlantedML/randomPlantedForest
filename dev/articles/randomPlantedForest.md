@@ -99,6 +99,62 @@ does not handle missing values: rows containing `NA` must be imputed or
 removed beforehand (see the `recipes` section below for one way to do
 this as part of the model specification).
 
+## Inside a tree family
+
+The forest averages `ntrees` tree families. Unlike a single CART tree, a
+family consists of several trees, each splitting on its own set of
+variables, and it predicts a point by adding up the values of all leaves
+containing it. New trees grow from existing ones by splitting on an
+additional variable, and `max_interaction = 2` limits each tree to at
+most two variables.
+
+To look at one family, we fit a forest with a single, small family to
+the same data:
+
+``` r
+
+small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10)
+plot(small)
+```
+
+![](randomPlantedForest_files/figure-html/fit-small-1.png)
+
+The trees are arranged in rows by the number of variables they split on,
+with the leaves coloured by their value. `plot(type = "boxes")` draws
+the same leaves in variable space instead, one panel per tree:
+
+``` r
+
+plot(small, type = "boxes")
+```
+
+![](randomPlantedForest_files/figure-html/boxes-small-1.png)
+
+These trees are not yet the components of the decomposition. The leaves
+of different trees overlap, so an effect can be spread over several
+trees: the quadratic effect of `x2`, for instance, can just as well be
+carried by trees on `x2` together with another variable as by a tree on
+`x2` alone. Purification moves each effect to the lowest-order tree it
+belongs to, without changing the family’s predictions:
+
+``` r
+
+purify(small)
+plot(small, type = "boxes")
+```
+
+![](randomPlantedForest_files/figure-html/boxes-purified-1.png)
+
+Now each panel is one component: the main effects resemble the true
+shapes, `x1:x2` shows the sign pattern of a product, and the root value
+is the intercept, close to the true value of 1. Averaging these
+components over all tree families gives the decomposition of the whole
+forest, which
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+computes. With a single family and few splits the estimates are coarse,
+which is why the next section uses the forest of 50 families fitted
+above.
+
 ## Decomposing predictions
 
 Because the interaction order is bounded, the prediction function is a
@@ -243,12 +299,12 @@ predict(rpfit_sex, head(penguins), type = "prob")
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1       0.0591    0.941  
-#> 2       0.806     0.194  
-#> 3       0.995     0.00546
-#> 4       0.998     0.00219
-#> 5       0.0243    0.976  
-#> 6       0.992     0.00801
+#> 1       0.0669    0.933  
+#> 2       0.809     0.191  
+#> 3       0.997     0.00263
+#> 4       0.993     0.00741
+#> 5       0.0175    0.982  
+#> 6       0.996     0.00362
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -277,12 +333,12 @@ predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000   0.00000000457     1.35e-11
-#> 2        1.000   0.0000000237      5.63e-11
-#> 3        1.000   0.0000000217      3.63e-11
-#> 4        1.000   0.00000000188     7.16e-12
-#> 5        1.000   0.00000000200     8.66e-12
-#> 6        1.000   0.0000000225      4.10e-11
+#> 1        1.000   0.00000000884     2.66e-11
+#> 2        1.000   0.000000124       2.05e-10
+#> 3        1.000   0.000000257       1.58e-10
+#> 4        1.000   0.0000000126      3.16e-11
+#> 5        1.000   0.0000000100      2.78e-11
+#> 6        1.000   0.0000000415      5.37e-11
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -332,12 +388,12 @@ predict(rpfit_rec, head(peng_raw))
 #> # A tibble: 6 × 1
 #>   .pred
 #>   <dbl>
-#> 1 3801.
-#> 2 3491.
-#> 3 3572.
-#> 4 3482.
-#> 5 4006.
-#> 6 3422.
+#> 1 3744.
+#> 2 3470.
+#> 3 3598.
+#> 4 3503.
+#> 5 3984.
+#> 6 3364.
 ```
 
 The preprocessing steps are stored with the model and applied

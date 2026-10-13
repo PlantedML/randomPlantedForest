@@ -42,6 +42,11 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="development version" id="randomplantedforest-development-version">randomPlantedForest (development version)<a class="anchor" aria-label="anchor" href="#randomplantedforest-development-version"></a></h2>
 <div class="section level3">
+<h3 id="new-features-development-version">New features<a class="anchor" aria-label="anchor" href="#new-features-development-version"></a></h3>
+<ul><li>
+<code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code> draws the trees of one tree family to illustrate how a Random Planted Forest predicts. <code>type = "tree"</code> draws a split diagram in the style of Figure 1b of the paper, reconstructed from the fitted leaves, <code>type = "boxes"</code> draws the leaves in variable space, before or after purification. <code><a href="../reference/rpf_boxes.html">rpf_boxes()</a></code> returns the leaves as a data frame. Requires <code>ggplot2</code>, and <code>patchwork</code> for <code>type = "boxes"</code>. The “Getting started” vignette uses it to show how a tree family is built and what purification does.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
 <ul><li>
 <code><a href="../reference/predict_components.html">predict_components()</a></code> returns one intercept per target level for multiclass classification, named by <code>target_levels</code> (<a href="https://github.com/PlantedML/randomPlantedForest/issues/70" class="external-link">#70</a>). Previously only the first level’s intercept was returned, so components plus intercept did not sum to the prediction for other levels.</li>

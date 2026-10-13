@@ -20,6 +20,15 @@ Enabling and utilizing functional decomposition
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
   : Extract predicted components from a Random Planted Forest
 
+## Visualization
+
+Inspecting the trees of a forest
+
+- [`plot(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/plot.rpf.md)
+  : Plot a tree family
+- [`rpf_boxes()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.md)
+  : Extract the boxes of a tree family
+
 ## Utility functions
 
 - [`print(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf.md)
