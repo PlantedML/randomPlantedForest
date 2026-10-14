@@ -95,7 +95,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
             leaf.unique_count_cache[kdim] = unique_count;
           }
           // Weight = number of unique thresholds that respect min leaf size
-          const long width_unique = (long)unique_count - 2L * (long)leaf_size;
+          const long width_unique = (long)unique_count - 2L * (long)leaf_size + 1L;
           const double w = (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
           wts[li] = w; total += w; if (w != 0.0) rpf_utils::fenwick_add(bit, li + 1, w);
         }
@@ -150,8 +150,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
           leaf_ptr->unique_vals_cache[k] = std::move(uniques);
           unique_ptr = &leaf_ptr->unique_vals_cache[k];
         }
-        const int left = leaf_size; const int right_exclusive = (int)unique_count - leaf_size;
-        if (right_exclusive - left <= 1) continue;
+        const int left = leaf_size; const int right_exclusive = (int)unique_count - leaf_size + 1;
+        if (right_exclusive <= left) continue;
         int s_idx = rng_randint(left, right_exclusive);
         double sp = (*unique_ptr)[(size_t)s_idx];
 
@@ -183,8 +183,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
             leaf.unique_vals_cache[k] = std::move(uniques);
             unique_ptr = &leaf.unique_vals_cache[k];
           }
-          if ((int)unique_count <= 2 * leaf_size) continue;
-          int left = leaf_size; int right = (int)unique_count - leaf_size;
+          if ((int)unique_count < 2 * leaf_size) continue;
+          int left = leaf_size; int right = (int)unique_count - leaf_size + 1;
           std::vector<int> samples = compute_even_spread_indices(left, right, (size_t)this->split_try);
           for (int s_idx : samples) {
             const double sp = (*unique_ptr)[(size_t)s_idx]; size_t ns = 0, nb = 0; std::vector<double> sum_s_adj(this->value_size, 0.0), sum_b_adj(this->value_size, 0.0);

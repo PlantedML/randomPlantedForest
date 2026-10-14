@@ -219,7 +219,7 @@ Split ClassificationRPF::calcOptimalSplit_curTrees2(const std::vector<std::vecto
           { // randomly picked samples otherwise
             samples = std::vector<int>(split_try);
             for (size_t i = 0; i < samples.size(); ++i)
-              samples[i] = rpf_utils::rng_randint((int)leaf_size, (int)unique_samples.size() - (int)leaf_size);
+              samples[i] = rpf_utils::rng_randint((int)leaf_size, (int)unique_samples.size() - (int)leaf_size + 1);
             std::sort(samples.begin(), samples.end());
           }
 
@@ -315,7 +315,7 @@ Split ClassificationRPF::calcOptimalSplit_curTrees2(const std::vector<std::vecto
           } else {
             samples.resize(this->split_try);
             for (size_t i = 0; i < samples.size(); ++i)
-              samples[i] = rpf_utils::rng_randint(leaf_size, (int)unique_vals.size() - (int)leaf_size);
+              samples[i] = rpf_utils::rng_randint(leaf_size, (int)unique_vals.size() - (int)leaf_size + 1);
             std::sort(samples.begin(), samples.end());
           }
 
@@ -390,7 +390,7 @@ Split ClassificationRPF::calcOptimalSplit_leaves(const std::vector<std::vector<d
     std::vector<double> unique; unique.reserve(leafPtr->individuals.size());
     for (int ind : leafPtr->individuals) unique.push_back(X[ind][k]);
     std::sort(unique.begin(), unique.end()); unique.erase(std::unique(unique.begin(), unique.end()), unique.end());
-    int left = (int)leaf_size; int right = (int)unique.size() - (int)leaf_size; if (right <= left) continue;
+    int left = (int)leaf_size; int right = (int)unique.size() - (int)leaf_size + 1; if (right <= left) continue;
     size_t window = (size_t)(right - left); size_t draws = std::min((size_t)split_try, window);
     std::unordered_set<int> used_pos;
     for (size_t t=0; t<draws; ++t) {

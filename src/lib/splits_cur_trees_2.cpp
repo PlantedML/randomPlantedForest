@@ -94,7 +94,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(const std::vector<std::vec
           samples.resize(maxp); std::iota(samples.begin(), samples.end(), 1);
         } else {
           samples.resize(this->split_try);
-          for (size_t i = 0; i < samples.size(); ++i) samples[i] = rng_randint(leaf_size, (int)unique_count - leaf_size);
+          for (size_t i = 0; i < samples.size(); ++i) samples[i] = rng_randint(leaf_size, (int)unique_count - leaf_size + 1);
           std::sort(samples.begin(), samples.end());
         }
         const bool single_eval = (samples.size() == 1);

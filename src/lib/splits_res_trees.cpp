@@ -80,7 +80,7 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
           }
           leaf.unique_count_cache[kdim] = unique_count;
         }
-        const long width_unique = (long)unique_count - 2L * (long)leaf_size_local;
+        const long width_unique = (long)unique_count - 2L * (long)leaf_size_local + 1L;
         const double w = (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
         wts[li] = w; total += w; if (w != 0.0) rpf_utils::fenwick_add(bit, li + 1, w);
       }
@@ -196,7 +196,7 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
           state.unique_ptr = &leaf_ptr->unique_vals_cache[k];
         }
         const int leaf_size_here = this->n_leaves[k];
-        state.left = leaf_size_here; state.right = (int)unique_count - leaf_size_here;
+        state.left = leaf_size_here; state.right = (int)unique_count - leaf_size_here + 1;
         if (state.right < state.left) { state.left = 0; state.right = 0; }
         if (state.right > state.left) state.used_flags.assign((size_t)(state.right - state.left), 0);
         // Build prefix sums for fast evaluation
