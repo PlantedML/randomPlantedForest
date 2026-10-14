@@ -291,7 +291,7 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
       if (unique_n <= 1 || cuts == 0) { feature_cut_points_[k].clear(); feature_cut_points_[k].shrink_to_fit(); continue; }
       feature_cut_points_[k].resize(cuts);
       for (size_t c = 1; c <= cuts; ++c) {
-        double q = (double)c / (double)K; size_t idx = static_cast<size_t>(std::floor(q * (double)(unique_n - 1)));
+        double q = (double)c / (double)K; size_t idx = static_cast<size_t>(std::ceil(q * (double)(unique_n - 1)));
         if (idx >= unique_n) idx = unique_n - 1;
         feature_cut_points_[k][c - 1] = vals[idx];
       }

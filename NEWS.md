@@ -10,6 +10,9 @@
 
 ## Bug fixes
 
+* Splits can separate the largest value of a predictor within a leaf.
+  Previously every split structure except `"leaves"` for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all.
+  Fitted models change for classification and for regression with `split_structure` other than `"leaves"`.
 * Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
   Previously an error in a worker thread terminated the R session.
 * The C++ code compiles without warnings under `-Wall -pedantic`.
