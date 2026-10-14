@@ -48,7 +48,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
-<ul><li>Errors while fitting or purifying with <code>nthreads &gt; 1</code> are reported as R errors. Previously an error in a worker thread terminated the R session.</li>
+<ul><li>Splits can separate the largest value of a predictor within a leaf. Previously every split structure except <code>"leaves"</code> for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all. Fitted models change for classification and for regression with <code>split_structure</code> other than <code>"leaves"</code>.</li>
+<li>Errors while fitting or purifying with <code>nthreads &gt; 1</code> are reported as R errors. Previously an error in a worker thread terminated the R session.</li>
 <li>The C++ code compiles without warnings under <code>-Wall -pedantic</code>.</li>
 <li>
 <code><a href="../reference/predict_components.html">predict_components()</a></code> returns one intercept per target level for multiclass classification, named by <code>target_levels</code> (<a href="https://github.com/PlantedML/randomPlantedForest/issues/70" class="external-link">#70</a>). Previously only the first level’s intercept was returned, so components plus intercept did not sum to the prediction for other levels.</li>

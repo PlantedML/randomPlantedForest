@@ -299,12 +299,12 @@ predict(rpfit_sex, head(penguins), type = "prob")
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1       0.0669    0.933  
-#> 2       0.809     0.191  
-#> 3       0.997     0.00263
-#> 4       0.993     0.00741
-#> 5       0.0175    0.982  
-#> 6       0.996     0.00362
+#> 1       0.0462    0.954  
+#> 2       0.823     0.177  
+#> 3       0.996     0.00370
+#> 4       0.996     0.00404
+#> 5       0.0152    0.985  
+#> 6       0.997     0.00297
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -333,12 +333,12 @@ predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000   0.00000000884     2.66e-11
-#> 2        1.000   0.000000124       2.05e-10
-#> 3        1.000   0.000000257       1.58e-10
-#> 4        1.000   0.0000000126      3.16e-11
-#> 5        1.000   0.0000000100      2.78e-11
-#> 6        1.000   0.0000000415      5.37e-11
+#> 1        1.000        1.12e-14     8.78e-15
+#> 2        1.000        7.02e-13     9.82e-13
+#> 3        1.000        6.16e-13     1.25e-13
+#> 4        1.000        7.11e-14     3.26e-14
+#> 5        1.000        9.81e-15     8.47e-15
+#> 6        1.000        1.42e-13     5.77e-14
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
