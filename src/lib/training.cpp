@@ -35,55 +35,54 @@ void RandomPlantedForest::fit()
     tree_seeds_[(size_t)i] = seed_source() ^ static_cast<unsigned long long>(i);
 
   unsigned int threads_to_use = static_cast<unsigned int>(nthreads);
-  if (threads_to_use == 0) threads_to_use = 1;
-  if (threads_to_use > 1)
-  {
-    if (threads_to_use > std::thread::hardware_concurrency())
-    {
-      warn("Requested " + std::to_string(threads_to_use) + " threads but only " + std::to_string(std::thread::hardware_concurrency()) + " available");
+  if (threads_to_use == 0)
+    threads_to_use = 1;
+  if (threads_to_use > 1) {
+    if (threads_to_use > std::thread::hardware_concurrency()) {
+      warn("Requested " + std::to_string(threads_to_use) + " threads but only " +
+           std::to_string(std::thread::hardware_concurrency()) + " available");
     }
-    for (int start = 0; start < n_trees; start += (int)threads_to_use)
-    {
+    for (int start = 0; start < n_trees; start += (int)threads_to_use) {
       int batch = std::min<int>((int)threads_to_use, n_trees - start);
-      if (batch <= 0) break;
+      if (batch <= 0)
+        break;
       std::vector<std::thread> threads((size_t)batch);
       std::vector<std::exception_ptr> errors((size_t)batch);
-      for (int i = 0; i < batch; ++i)
-      {
+      for (int i = 0; i < batch; ++i) {
         int tree_index = start + i;
-        threads[(size_t)i] = std::thread([this, &initial_leaves, &errors, i](int tree_index_inner){
-          // an exception escaping a std::thread would terminate R
-          try {
-            std::mt19937_64 rng_local;
-            std::mt19937_64* prev_ptr = rpf_utils::swap_tls_rng(nullptr);
-            if (!tree_seeds_.empty() && (size_t)tree_index_inner < tree_seeds_.size()) {
-              rng_local.seed(tree_seeds_[(size_t)tree_index_inner]);
-            } else {
-              rng_local.seed(88172645463393265ULL ^ (unsigned long long)tree_index_inner);
-            }
-            rpf_utils::swap_tls_rng(&rng_local);
-            this->create_tree_family(initial_leaves, (size_t)tree_index_inner);
-            rpf_utils::swap_tls_rng(prev_ptr);
-          }
-          catch (...) { errors[(size_t)i] = std::current_exception(); }
-        }, tree_index);
+        threads[(size_t)i] = std::thread(
+            [this, &initial_leaves, &errors, i](int tree_index_inner) {
+              // an exception escaping a std::thread would terminate R
+              try {
+                std::mt19937_64 rng_local;
+                std::mt19937_64 *prev_ptr = rpf_utils::swap_tls_rng(nullptr);
+                if (!tree_seeds_.empty() && (size_t)tree_index_inner < tree_seeds_.size()) {
+                  rng_local.seed(tree_seeds_[(size_t)tree_index_inner]);
+                } else {
+                  rng_local.seed(88172645463393265ULL ^ (unsigned long long)tree_index_inner);
+                }
+                rpf_utils::swap_tls_rng(&rng_local);
+                this->create_tree_family(initial_leaves, (size_t)tree_index_inner);
+                rpf_utils::swap_tls_rng(prev_ptr);
+              } catch (...) {
+                errors[(size_t)i] = std::current_exception();
+              }
+            },
+            tree_index);
       }
-      for (auto &th : threads)
-      {
-        if (th.joinable()) th.join();
+      for (auto &th : threads) {
+        if (th.joinable())
+          th.join();
       }
       for (auto &e : errors)
         if (e)
           std::rethrow_exception(e);
     }
-  }
-  else
-  {
+  } else {
     // Single-threaded: still drive randomness from per-tree seeds
     std::mt19937_64 rng_local;
-    std::mt19937_64* prev_ptr = rpf_utils::swap_tls_rng(nullptr);
-    for (int n = 0; n < n_trees; ++n)
-    {
+    std::mt19937_64 *prev_ptr = rpf_utils::swap_tls_rng(nullptr);
+    for (int n = 0; n < n_trees; ++n) {
       if (!tree_seeds_.empty() && (size_t)n < tree_seeds_.size()) {
         rng_local.seed(tree_seeds_[(size_t)n]);
       } else {
@@ -95,15 +94,10 @@ void RandomPlantedForest::fit()
     rpf_utils::swap_tls_rng(prev_ptr);
   }
 
-  if (purify_forest)
-  {
+  if (purify_forest) {
     // Default: cap=0 (uncapped), nthreads=0 (auto; min(object nthreads, available)), mode=2 (fast exact)
     this->purify(0, 0, 2);
-  }
-  else
-  {
+  } else {
     purified = false;
   }
 }
-
-

@@ -9,8 +9,7 @@ using namespace utils;
 using namespace grid;
 
 class DecisionTree;
-struct Leaf
-{
+struct Leaf {
   std::vector<int> individuals;    /**< considered samples for each leaf */
   std::vector<double> value;       /**< residual */
   std::vector<Interval> intervals; /**< min/max for each feature of the interval */
@@ -23,7 +22,6 @@ struct Leaf
   std::unordered_map<int, std::vector<double>> unique_vals_cache;
   // Cache: unique count per feature (to quickly skip leaves with too few thresholds)
   std::unordered_map<int, size_t> unique_count_cache;
-  
 };
 
 /**
@@ -31,8 +29,7 @@ struct Leaf
  *
  * Remembers data for the two news leaves.
  */
-struct Split
-{
+struct Split {
   double min_sum;                           /**< minimal achievable sum of squared residuals */
   std::shared_ptr<DecisionTree> tree_index; /**< pointer to tree */
   Leaf *leaf_index;                         /**< pointer to leaf containing interval */
@@ -48,19 +45,20 @@ struct Split
   std::vector<double> M_b; /**< mean or median of individuals bigger than splitpoint */
   const std::vector<std::vector<double>> *W;
   const std::vector<std::vector<double>> *Y;
-  Split() : min_sum(INF), tree_index(nullptr), leaf_index(nullptr), split_coordinate(1), split_point(0), M_sp(0), M_bp(0){};
+  Split()
+      : min_sum(INF), tree_index(nullptr), leaf_index(nullptr), split_coordinate(1), split_point(0), M_sp(0),
+        M_bp(0) {};
 };
 
 /**
  * \brief Decision trees contain split data as leaves for respective splitting
  * dimensions.
  */
-class DecisionTree
-{
+class DecisionTree {
 public:
-  DecisionTree(){};
-  DecisionTree(std::set<int> dims, std::vector<Leaf> &first_leaves) : split_dims(dims), leaves(first_leaves){};
-  DecisionTree(std::set<int> dims) : split_dims(dims){};
+  DecisionTree() {};
+  DecisionTree(std::set<int> dims, std::vector<Leaf> &first_leaves) : split_dims(dims), leaves(first_leaves) {};
+  DecisionTree(std::set<int> dims) : split_dims(dims) {};
   std::set<int> get_split_dims() const;
   std::vector<Leaf> get_leaves() const;
 
@@ -82,14 +80,14 @@ private:
   std::vector<std::vector<double>> leaf_weights_by_dim_v; // length == feature_size (lazy-sized)
   // For each feature dimension k, total weight across all leaves
   std::vector<double> weights_total_by_dim_v; // length == feature_size (lazy-sized)
-
 };
 
 typedef std::map<std::set<int>, std::shared_ptr<DecisionTree>, setComp> TreeFamily;
 
 std::shared_ptr<DecisionTree> treeExists(const std::set<int> &split_dims, TreeFamily &tree_family);
 // Legacy overload kept in trees.cpp for backward compatibility in R-facing helpers.
-bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, const std::set<int> &resulting_dims);
+bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits,
+                    const std::set<int> &resulting_dims);
 bool leafExists(std::vector<Interval> &intervals, const std::shared_ptr<DecisionTree> tree);
 
 #endif // TREES_H

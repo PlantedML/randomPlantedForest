@@ -1,8 +1,18 @@
 all: format doc README.md
 
+# Pinned: clang-format output differs between versions
+CLANG_FORMAT ?= uvx clang-format@23.1.3
+CPP_SOURCES = $(filter-out src/RcppExports.cpp,$(wildcard src/*.cpp src/*.h src/lib/*.cpp src/include/*.hpp))
+
 .PHONY: format
 format:
 	air format .
+	$(CLANG_FORMAT) -i $(CPP_SOURCES)
+
+.PHONY: format-check
+format-check:
+	air format --check .
+	$(CLANG_FORMAT) --dry-run --Werror $(CPP_SOURCES)
 
 .PHONY: doc
 doc: format

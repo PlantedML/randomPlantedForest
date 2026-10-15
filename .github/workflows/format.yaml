@@ -1,0 +1,18 @@
+# Checks formatting only, never commits: run `make format` locally to fix
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+name: format
+
+permissions: read-all
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: posit-dev/setup-air@v1
+      - uses: astral-sh/setup-uv@v6
+      - run: make format-check

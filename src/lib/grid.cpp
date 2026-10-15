@@ -7,11 +7,9 @@ NDGrid::NDGrid() {}
 NDGrid::NDGrid(std::vector<int> dims) : dimensions(dims)
 {
   // fill space with dimensions
-  for (const auto &dim : dims)
-  {
+  for (const auto &dim : dims) {
     Dimension d;
-    for (int i = 0; i < dim; ++i)
-    {
+    for (int i = 0; i < dim; ++i) {
       d.push_back(i);
     }
     space.push_back(d);
@@ -21,8 +19,7 @@ NDGrid::NDGrid(std::vector<int> dims) : dimensions(dims)
 std::vector<int> NDGrid::getPoint()
 {
   std::vector<int> gridPoint(current.size());
-  for (unsigned int i = 0; i < current.size(); ++i)
-  {
+  for (unsigned int i = 0; i < current.size(); ++i) {
     gridPoint[i] = *current[i];
   }
   return gridPoint;
@@ -32,11 +29,9 @@ bool NDGrid::nextPoint()
 {
 
   // get first point in N-dimensional space
-  if (first)
-  {
+  if (first) {
     first = false;
-    for (Space::iterator dims_it = space.begin(); dims_it != space.end(); ++dims_it)
-    {
+    for (Space::iterator dims_it = space.begin(); dims_it != space.end(); ++dims_it) {
       current.push_back((*dims_it).begin());
     }
     return false;
@@ -45,16 +40,13 @@ bool NDGrid::nextPoint()
   // go to next point in space
   Space::iterator dims_it = space.begin();
   Point::iterator cur_it = current.begin();
-  for (; dims_it != space.end(); ++dims_it, ++cur_it)
-  {
+  for (; dims_it != space.end(); ++dims_it, ++cur_it) {
 
     // check if next in dimension is at the end
-    if (++(*cur_it) == (*dims_it).end())
-    {
+    if (++(*cur_it) == (*dims_it).end()) {
 
       // check if we have finished whole space
-      if (dims_it == space.end() - 1)
-      {
+      if (dims_it == space.end() - 1) {
         // reset setup for next time of iteration
         first = true;
         current.clear();
@@ -64,9 +56,7 @@ bool NDGrid::nextPoint()
       // reset this dimension to begin
       // and go to next dimension
       *cur_it = (*dims_it).begin();
-    }
-    else
-    {
+    } else {
       // next point is valid
       break;
     }

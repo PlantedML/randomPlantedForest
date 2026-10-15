@@ -25,9 +25,7 @@ std::vector<GridFamilyExport> list_to_grid(const Rcpp::List &grid);
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
 
-template <class Core>
-class RcppForest
-{
+template <class Core> class RcppForest {
 public:
   // Construct and fit (regression)
   RcppForest(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X,
@@ -38,8 +36,8 @@ public:
     fit_data(samples_Y, samples_X, parameters);
   }
   // Construct and fit (classification)
-  RcppForest(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X,
-             const std::string loss, const Rcpp::NumericVector parameters)
+  RcppForest(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X, const std::string loss,
+             const Rcpp::NumericVector parameters)
       : core(make_cpf(loss, parameters, true))
   {
     connect_to_r(core);
@@ -47,8 +45,10 @@ public:
   }
   // Params-only constructors: no data, no fit. Used by rpf_unmarshal().
   explicit RcppForest(const Rcpp::NumericVector parameters) : core(make_rpf(parameters)) { connect_to_r(core); }
-  RcppForest(const std::string loss, const Rcpp::NumericVector parameters)
-      : core(make_cpf(loss, parameters, false)) { connect_to_r(core); }
+  RcppForest(const std::string loss, const Rcpp::NumericVector parameters) : core(make_cpf(loss, parameters, false))
+  {
+    connect_to_r(core);
+  }
 
   void set_data(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X)
   {
@@ -59,11 +59,11 @@ public:
     Rcpp::RNGScope scope;
     core.fit();
   }
-  void set_shape(int feature_size, int value_size, int sample_size,
-                 const Rcpp::NumericVector lower, const Rcpp::NumericVector upper)
+  void set_shape(int feature_size, int value_size, int sample_size, const Rcpp::NumericVector lower,
+                 const Rcpp::NumericVector upper)
   {
-    core.set_shape(feature_size, value_size, sample_size,
-                   Rcpp::as<std::vector<double>>(lower), Rcpp::as<std::vector<double>>(upper));
+    core.set_shape(feature_size, value_size, sample_size, Rcpp::as<std::vector<double>>(lower),
+                   Rcpp::as<std::vector<double>>(upper));
   }
   void set_training_data(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X)
   {
@@ -112,7 +112,8 @@ public:
                  "restored with rpf_unmarshal(), marshal it with include_data = TRUE.");
     core.purify(maxp_interaction, nthreads, mode);
   }
-  void cross_validation(int n_sets, Rcpp::IntegerVector splits, Rcpp::NumericVector t_tries, Rcpp::IntegerVector split_tries)
+  void cross_validation(int n_sets, Rcpp::IntegerVector splits, Rcpp::NumericVector t_tries,
+                        Rcpp::IntegerVector split_tries)
   {
     core.cross_validation(n_sets, Rcpp::as<std::vector<int>>(splits), Rcpp::as<std::vector<double>>(t_tries),
                           Rcpp::as<std::vector<int>>(split_tries));

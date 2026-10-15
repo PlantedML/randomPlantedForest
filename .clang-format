@@ -1,0 +1,13 @@
+# Format with `make format`, which pins the clang-format version (see Makefile)
+BasedOnStyle: LLVM
+ColumnLimit: 120
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+# One statement per line, also in short if/for/while bodies
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Inline
+# Include order can matter (R headers), leave it to the author
+SortIncludes: Never

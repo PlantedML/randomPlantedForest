@@ -65,8 +65,7 @@ ClassificationRPF make_cpf(const std::string &loss, const NumericVector &paramet
   RPFParams params = parse_rpf_params(base);
   double delta = pars.size() == 15 ? pars[13] : 0.1;
   double epsilon = pars.size() == 15 ? pars[14] : 0;
-  if (pars.size() != 15)
-  {
+  if (pars.size() != 15) {
     if (!fitting)
       Rcpp::stop("ClassificationRPF requires 15 parameters, got %d", (int)pars.size());
     Rcout << "Wrong number of parameters - set to default." << std::endl;
@@ -80,19 +79,15 @@ ClassificationRPF make_cpf(const std::string &loss, const NumericVector &paramet
 List model_to_list(const std::vector<FamilyExport> &model, int feature_size)
 {
   List out;
-  for (const FamilyExport &family : model)
-  {
+  for (const FamilyExport &family : model) {
     List variables, family_values, family_intervals;
-    for (const TreeExport &tree : family)
-    {
+    for (const TreeExport &tree : family) {
       variables.push_back(IntegerVector(tree.variables.begin(), tree.variables.end()));
       List tree_values, tree_intervals;
-      for (size_t k = 0; k < tree.values.size(); ++k)
-      {
+      for (size_t k = 0; k < tree.values.size(); ++k) {
         tree_values.push_back(NumericVector(tree.values[k].begin(), tree.values[k].end()));
         NumericMatrix leaf_intervals(2, feature_size);
-        for (int l = 0; l < feature_size; ++l)
-        {
+        for (int l = 0; l < feature_size; ++l) {
           leaf_intervals(0, l) = tree.intervals[k][l].first;
           leaf_intervals(1, l) = tree.intervals[k][l].second;
         }
@@ -110,22 +105,19 @@ List model_to_list(const std::vector<FamilyExport> &model, int feature_size)
 std::vector<FamilyExport> list_to_model(const List &model, int feature_size)
 {
   std::vector<FamilyExport> out;
-  for (int i = 0; i < model.size(); ++i)
-  {
+  for (int i = 0; i < model.size(); ++i) {
     List family = model[i];
     List variables = family["variables"];
     List values = family["values"];
     List intervals = family["intervals"];
     FamilyExport fam;
-    for (int j = 0; j < variables.size(); ++j)
-    {
+    for (int j = 0; j < variables.size(); ++j) {
       TreeExport tree;
       IntegerVector tree_variables = variables[j];
       tree.variables = std::set<int>(tree_variables.begin(), tree_variables.end());
       List tree_values = values[j];
       List tree_intervals = intervals[j];
-      for (int k = 0; k < tree_values.size(); ++k)
-      {
+      for (int k = 0; k < tree_values.size(); ++k) {
         tree.values.push_back(as<std::vector<double>>(tree_values[k]));
         NumericMatrix leaf_intervals = tree_intervals[k];
         if (leaf_intervals.nrow() < 2 || leaf_intervals.ncol() < feature_size)
@@ -146,21 +138,18 @@ std::vector<FamilyExport> list_to_model(const List &model, int feature_size)
 List grid_to_list(const std::vector<GridFamilyExport> &grid, int value_size)
 {
   List families;
-  for (const GridFamilyExport &family : grid)
-  {
+  for (const GridFamilyExport &family : grid) {
     List lim_list;
     for (const auto &v : family.lim_list)
       lim_list.push_back(wrap(v));
     List trees;
-    for (const GridTreeExport &tree : family.trees)
-    {
+    for (const GridTreeExport &tree : family.trees) {
       NumericMatrix values(tree.values.size(), value_size);
       for (size_t e = 0; e < tree.values.size(); ++e)
         for (int p = 0; p < value_size; ++p)
           values(e, p) = tree.values[e][p];
       trees.push_back(List::create(Named("variables") = IntegerVector(tree.variables.begin(), tree.variables.end()),
-                                   Named("dims") = wrap(tree.dims),
-                                   Named("values") = values));
+                                   Named("dims") = wrap(tree.dims), Named("values") = values));
     }
     families.push_back(List::create(Named("lim_list") = lim_list, Named("trees") = trees));
   }
@@ -170,16 +159,14 @@ List grid_to_list(const std::vector<GridFamilyExport> &grid, int value_size)
 std::vector<GridFamilyExport> list_to_grid(const List &grid)
 {
   std::vector<GridFamilyExport> out;
-  for (int i = 0; i < grid.size(); ++i)
-  {
+  for (int i = 0; i < grid.size(); ++i) {
     List family = grid[i];
     GridFamilyExport fam;
     List lim_list = family["lim_list"];
     for (int l = 0; l < lim_list.size(); ++l)
       fam.lim_list.push_back(as<std::vector<double>>(lim_list[l]));
     List trees = family["trees"];
-    for (int j = 0; j < trees.size(); ++j)
-    {
+    for (int j = 0; j < trees.size(); ++j) {
       List tr = trees[j];
       GridTreeExport tree;
       IntegerVector variables = tr["variables"];
@@ -196,8 +183,7 @@ std::vector<GridFamilyExport> list_to_grid(const List &grid)
 void connect_to_r(RandomPlantedForest &core)
 {
   core.verbose_out = &Rcout;
-  core.seed_source = []
-  {
+  core.seed_source = [] {
     // Two 32-bit draws from R's RNG composed into one 64-bit seed
     std::uint64_t hi = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));
     std::uint64_t lo = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));

@@ -11,69 +11,56 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 {
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-  if (!purified)
-  {
+  if (!purified) {
     // consider all components
-    if (component_index == std::set<int>{0})
-    {
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
-          for (auto &leaf : tree.second->leaves)
-          {
+    if (component_index == std::set<int>{0}) {
+      for (auto &tree_family : this->tree_families) {
+        for (auto &tree : tree_family) {
+          for (auto &leaf : tree.second->leaves) {
             bool valid = true;
-            for (auto &dim : tree.first)
-            {
-              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) && (leaf.intervals[std::max(0, dim - 1)].second > X[std::max(0, dim - 1)] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
-              {
+            for (auto &dim : tree.first) {
+              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[std::max(0, dim - 1)] ||
+                     leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) &&
+                    (leaf.intervals[std::max(0, dim - 1)].second > X[std::max(0, dim - 1)] ||
+                     leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)]))) {
                 valid = false;
                 break;
               }
             }
-            if (valid)
-            {
-              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p)
-              {
+            if (valid) {
+              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p) {
                 total_res[p] += leaf.value[p];
               }
             }
           }
         }
       }
-    }
-    else
-    { // choose components for prediction
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
+    } else { // choose components for prediction
+      for (auto &tree_family : this->tree_families) {
+        for (auto &tree : tree_family) {
           // only consider trees with same dimensions as component_index
           if (tree.first != component_index)
             continue;
 
           std::vector<int> dims;
-          for (auto dim : tree.first)
-          {
+          for (auto dim : tree.first) {
             dims.push_back(dim);
           }
 
-          for (auto &leaf : tree.second->leaves)
-          {
+          for (auto &leaf : tree.second->leaves) {
             bool valid = true;
-            for (unsigned int i = 0; i < dims.size(); ++i)
-            {
+            for (unsigned int i = 0; i < dims.size(); ++i) {
               int dim = dims[i];
-              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[i] || leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) && (leaf.intervals[std::max(0, dim - 1)].second > X[i] || leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)])))
-              {
+              if (!((leaf.intervals[std::max(0, dim - 1)].first <= X[i] ||
+                     leaf.intervals[std::max(0, dim - 1)].first == lower_bounds[std::max(0, dim - 1)]) &&
+                    (leaf.intervals[std::max(0, dim - 1)].second > X[i] ||
+                     leaf.intervals[std::max(0, dim - 1)].second == upper_bounds[std::max(0, dim - 1)]))) {
                 valid = false;
                 break;
               }
             }
-            if (valid)
-            {
-              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p)
-              {
+            if (valid) {
+              for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p) {
                 total_res[p] += leaf.value[p];
               }
             }
@@ -81,44 +68,29 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
         }
       }
     }
-  }
-  else
-  {
-    if (component_index == std::set<int>{-1})
-    {
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
+  } else {
+    if (component_index == std::set<int>{-1}) {
+      for (auto &tree_family : this->tree_families) {
+        for (auto &tree : tree_family) {
           std::vector<int> leaf_index(tree.first.size(), -1);
-          if (tree.first == std::set<int>{0})
-          {
+          if (tree.first == std::set<int>{0}) {
             leaf_index = std::vector<int>(tree.first.size(), 0);
-            
+
             const auto &vals = tree.second->GridLeaves.values[leaf_index];
-            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
-            {
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p) {
               total_res[p] += vals[p];
             }
           }
         }
       }
-    }
-    else if (component_index == std::set<int>{0})
-    {
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
+    } else if (component_index == std::set<int>{0}) {
+      for (auto &tree_family : this->tree_families) {
+        for (auto &tree : tree_family) {
           std::vector<int> leaf_index(tree.first.size(), -1);
-          if (tree.first == std::set<int>{0})
-          {
+          if (tree.first == std::set<int>{0}) {
             leaf_index = std::vector<int>(tree.first.size(), 0);
-          }
-          else
-          {
-            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
-            {
+          } else {
+            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index) {
               int dim = 0;
               {
                 auto dim_pnt = tree.first.begin();
@@ -127,8 +99,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 --dim; // convert to 0-based original feature index
               }
               auto &bounds = tree.second->GridLeaves.lim_list[dim];
-              if (bounds.size() < 2)
-              {
+              if (bounds.size() < 2) {
                 leaf_index[dim_index] = 0;
                 continue;
               }
@@ -138,34 +109,26 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
               leaf_index[dim_index] = std::min(std::max(0, c - 1), (int)bounds.size() - 2);
             }
           }
-          for (int &index : leaf_index) index = std::max(0, index);
+          for (int &index : leaf_index)
+            index = std::max(0, index);
           {
             const auto &vals = tree.second->GridLeaves.values[leaf_index];
-            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
-            {
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p) {
               total_res[p] += vals[p];
             }
           }
         }
       }
-    }
-    else
-    {
-      for (auto &tree_family : this->tree_families)
-      {
-        for (auto &tree : tree_family)
-        {
+    } else {
+      for (auto &tree_family : this->tree_families) {
+        for (auto &tree : tree_family) {
           if (tree.first != component_index)
             continue;
           std::vector<int> leaf_index(tree.first.size(), -1);
-          if (tree.first == std::set<int>{0})
-          {
+          if (tree.first == std::set<int>{0}) {
             leaf_index = std::vector<int>(tree.first.size(), 0);
-          }
-          else
-          {
-            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index)
-            {
+          } else {
+            for (size_t dim_index = 0; dim_index < tree.first.size(); ++dim_index) {
               int dim = 0;
               {
                 auto dim_pnt = tree.first.begin();
@@ -174,8 +137,7 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
                 --dim; // 0-based original feature index for bounds lookup only
               }
               auto &bounds = tree.second->GridLeaves.lim_list[dim];
-              if (bounds.size() < 2)
-              {
+              if (bounds.size() < 2) {
                 leaf_index[dim_index] = 0;
                 continue;
               }
@@ -186,11 +148,11 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
               leaf_index[dim_index] = std::min(std::max(0, c - 1), (int)bounds.size() - 2);
             }
           }
-          for (int &index : leaf_index) index = std::max(0, index);
+          for (int &index : leaf_index)
+            index = std::max(0, index);
           {
             const auto &vals = tree.second->GridLeaves.values[leaf_index];
-            for (size_t p = 0; p < value_size && p < vals.size(); ++p)
-            {
+            for (size_t p = 0; p < value_size && p < vals.size(); ++p) {
               total_res[p] += vals[p];
             }
           }
@@ -202,11 +164,9 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
   return total_res / n_trees;
 }
 
-namespace
-{
+namespace {
 // One tree's leaves in contiguous arrays, so the per-row scan streams through memory.
-struct FlatTree
-{
+struct FlatTree {
   std::vector<int> cols;      // column of X compared against each tree dimension
   std::vector<double> lo, hi; // n_leaves x cols.size(), row-major; open bounds stored as -/+inf
   std::vector<double> values; // n_leaves x value_size
@@ -214,26 +174,26 @@ struct FlatTree
 };
 
 // Runs f(begin, end) on contiguous row ranges, one per thread.
-template <class F>
-void parallel_rows(int n, unsigned int threads, F f)
+template <class F> void parallel_rows(int n, unsigned int threads, F f)
 {
   threads = std::max(1u, std::min<unsigned int>(threads, (unsigned int)n));
-  if (threads == 1)
-  {
+  if (threads == 1) {
     f(0, n);
     return;
   }
   std::vector<std::thread> pool;
   std::vector<std::exception_ptr> errors(threads);
   int chunk = (n + (int)threads - 1) / (int)threads;
-  for (unsigned int t = 0; t < threads; ++t)
-  {
+  for (unsigned int t = 0; t < threads; ++t) {
     int begin = (int)t * chunk, end = std::min(n, begin + chunk);
-    pool.emplace_back([&f, &errors, t, begin, end]
-                      {
+    pool.emplace_back([&f, &errors, t, begin, end] {
       // an exception escaping a std::thread would terminate R
-      try { f(begin, end); }
-      catch (...) { errors[t] = std::current_exception(); } });
+      try {
+        f(begin, end);
+      } catch (...) {
+        errors[t] = std::current_exception();
+      }
+    });
   }
   for (auto &th : pool)
     th.join();
@@ -244,13 +204,15 @@ void parallel_rows(int n, unsigned int threads, F f)
 } // namespace
 
 // predict multiple feature vectors
-std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::set<int> &component_index, int nthreads)
+std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, int p,
+                                                        const std::set<int> &component_index, int nthreads)
 {
   if (n == 0 || p == 0)
     throw std::invalid_argument("Feature vector is empty.");
   if (component_index == std::set<int>{0} && this->feature_size >= 0 && p != this->feature_size)
     throw std::invalid_argument("Feature vector has wrong dimension.");
-  if (component_index != std::set<int>{0} && component_index != std::set<int>{-1} && component_index.size() != (size_t)p)
+  if (component_index != std::set<int>{0} && component_index != std::set<int>{-1} &&
+      component_index.size() != (size_t)p)
     throw std::invalid_argument("The input X has the wrong dimension in order to calculate f_i(x)");
 
   unsigned int threads = nthreads > 0 ? (unsigned int)nthreads : (unsigned int)std::max(1, this->nthreads);
@@ -263,30 +225,24 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
   const bool all_components = component_index == std::set<int>{0};
   const bool intercept_only = component_index == std::set<int>{-1};
 
-  if (purified)
-  {
+  if (purified) {
     // Purified trees are grids: per tree dimension, binary-search the cell
     // boundaries. Matching trees are resolved once here, not per row.
-    struct GridTree
-    {
+    struct GridTree {
       utils::Matrix<std::vector<double>> *values;
       std::vector<const std::vector<double> *> bounds; // cell limits per tree dimension
       std::vector<int> cols;                           // column of X per tree dimension
     };
     std::vector<GridTree> grids;
-    for (auto &tree_family : this->tree_families)
-    {
-      for (auto &tree : tree_family)
-      {
+    for (auto &tree_family : this->tree_families) {
+      for (auto &tree : tree_family) {
         const bool is_intercept = tree.first == std::set<int>{0};
         if (intercept_only ? !is_intercept : (!all_components && tree.first != component_index))
           continue;
         GridTree g{&tree.second->GridLeaves.values, {}, {}};
-        if (!is_intercept)
-        {
+        if (!is_intercept) {
           int pos = 0;
-          for (int dim : tree.first)
-          {
+          for (int dim : tree.first) {
             g.bounds.push_back(&tree.second->GridLeaves.lim_list[(size_t)(dim - 1)]);
             g.cols.push_back(all_components ? dim - 1 : pos);
             ++pos;
@@ -297,8 +253,7 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
     }
 
     const double *x = X;
-    parallel_rows(n, threads, [&](int begin, int end)
-                  {
+    parallel_rows(n, threads, [&](int begin, int end) {
       std::vector<int> idx;
       for (const GridTree &g : grids) {
         const size_t nd = g.cols.size();
@@ -306,16 +261,22 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
         for (int r = begin; r < end; ++r) {
           for (size_t j = 0; j < nd; ++j) {
             const std::vector<double> &b = *g.bounds[j];
-            if (b.size() < 2) { idx[j] = 0; continue; }
+            if (b.size() < 2) {
+              idx[j] = 0;
+              continue;
+            }
             int c = (int)(std::upper_bound(b.begin(), b.end(), x[(size_t)g.cols[j] * n + r]) - b.begin());
             idx[j] = std::min(std::max(0, c - 1), (int)b.size() - 2);
           }
           const std::vector<double> &vals = (*g.values)[idx];
-          for (size_t k = 0; k < vs && k < vals.size(); ++k) res[k * n + r] += vals[k];
+          for (size_t k = 0; k < vs && k < vals.size(); ++k)
+            res[k * n + r] += vals[k];
         }
       }
       for (size_t k = 0; k < vs; ++k)
-        for (int r = begin; r < end; ++r) res[k * n + r] /= n_trees; });
+        for (int r = begin; r < end; ++r)
+          res[k * n + r] /= n_trees;
+    });
     return out;
   }
 
@@ -323,17 +284,14 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
   // training bound is open, so new data outside the training range still lands in a leaf.
   const double inf = std::numeric_limits<double>::infinity();
   std::vector<FlatTree> trees;
-  for (auto &tree_family : this->tree_families)
-  {
-    for (auto &tree : tree_family)
-    {
+  for (auto &tree_family : this->tree_families) {
+    for (auto &tree : tree_family) {
       if (!all_components && tree.first != component_index)
         continue;
       FlatTree ft;
       std::vector<int> dims;
       int pos = 0;
-      for (int dim : tree.first)
-      {
+      for (int dim : tree.first) {
         dims.push_back(std::max(0, dim - 1));
         ft.cols.push_back(all_components ? std::max(0, dim - 1) : pos);
         ++pos;
@@ -343,10 +301,8 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
       ft.lo.reserve(ft.n_leaves * dims.size());
       ft.hi.reserve(ft.n_leaves * dims.size());
       ft.values.assign(ft.n_leaves * vs, 0.0);
-      for (size_t l = 0; l < ft.n_leaves; ++l)
-      {
-        for (int d : dims)
-        {
+      for (size_t l = 0; l < ft.n_leaves; ++l) {
+        for (int d : dims) {
           const Interval &iv = leaves[l].intervals[(size_t)d];
           ft.lo.push_back(iv.first == lower_bounds[(size_t)d] ? -inf : iv.first);
           ft.hi.push_back(iv.second == upper_bounds[(size_t)d] ? inf : iv.second);
@@ -359,15 +315,15 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
   }
 
   const double *x = X; // column-major: x[c * n + row]
-  parallel_rows(n, threads, [&](int begin, int end)
-                {
+  parallel_rows(n, threads, [&](int begin, int end) {
     // Tree-outer loop keeps one tree's leaves hot in cache across all rows of the chunk.
     std::vector<double> xr;
     for (const FlatTree &ft : trees) {
       const size_t nd = ft.cols.size();
       xr.resize(nd);
       for (int r = begin; r < end; ++r) {
-        for (size_t j = 0; j < nd; ++j) xr[j] = x[(size_t)ft.cols[j] * n + r];
+        for (size_t j = 0; j < nd; ++j)
+          xr[j] = x[(size_t)ft.cols[j] * n + r];
         for (size_t l = 0; l < ft.n_leaves; ++l) {
           const double *lo = &ft.lo[l * nd], *hi = &ft.hi[l * nd];
           bool valid = true;
@@ -379,22 +335,36 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
             }
           }
           if (valid)
-            for (size_t k = 0; k < vs; ++k) res[k * n + r] += ft.values[l * vs + k];
+            for (size_t k = 0; k < vs; ++k)
+              res[k * n + r] += ft.values[l * vs + k];
         }
       }
     }
     for (size_t k = 0; k < vs; ++k)
-      for (int r = begin; r < end; ++r) res[k * n + r] /= n_trees; });
+      for (int r = begin; r < end; ++r)
+        res[k * n + r] /= n_trees;
+  });
   return out;
 }
 
-Matrix2D RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec, const std::set<int> &component_index)
+Matrix2D RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec,
+                                             const std::set<int> &component_index)
 {
   Matrix2D predictions;
-  if (feature_vec.empty()) { warn("Feature vector is empty."); return predictions; }
-  if (component_index == std::set<int>{0} && this->feature_size >= 0 && feature_vec.size() != (size_t)this->feature_size) { warn("Feature vector has wrong dimension."); return predictions; }
-  if (component_index == std::set<int>{0}) { predictions.push_back(predict_single(feature_vec, component_index)); }
-  else { for (auto vec : feature_vec) predictions.push_back(predict_single(std::vector<double>{vec}, component_index)); }
+  if (feature_vec.empty()) {
+    warn("Feature vector is empty.");
+    return predictions;
+  }
+  if (component_index == std::set<int>{0} && this->feature_size >= 0 &&
+      feature_vec.size() != (size_t)this->feature_size) {
+    warn("Feature vector has wrong dimension.");
+    return predictions;
+  }
+  if (component_index == std::set<int>{0}) {
+    predictions.push_back(predict_single(feature_vec, component_index));
+  } else {
+    for (auto vec : feature_vec)
+      predictions.push_back(predict_single(std::vector<double>{vec}, component_index));
+  }
   return predictions;
 }
-

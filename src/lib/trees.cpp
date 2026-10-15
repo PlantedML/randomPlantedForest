@@ -33,10 +33,10 @@ std::shared_ptr<DecisionTree> treeExists(const std::set<int> &split_dims, TreeFa
  * \param possible_splits containing all possible splits.
  * \param resulting_dims as union set of split dimension and dimensions of tree which is splitted.
  */
-bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits, const std::set<int> &resulting_dims)
+bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits,
+                    const std::set<int> &resulting_dims)
 {
-  for (auto &elem : possible_splits)
-  {
+  for (auto &elem : possible_splits) {
     if (elem.first == dim && elem.second->get_split_dims() == resulting_dims)
       return 1;
   }
@@ -52,14 +52,11 @@ bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<Deci
 bool leafExists(std::vector<Interval> &intervals, const std::shared_ptr<DecisionTree> tree)
 {
   bool exists = false;
-  for (auto &leaf : tree->get_leaves())
-  {
+  for (auto &leaf : tree->get_leaves()) {
 
     bool same_intervals = true;
-    for (unsigned int i = 0; i < intervals.size(); ++i)
-    {
-      if (leaf.intervals[i] != intervals[i])
-      {
+    for (unsigned int i = 0; i < intervals.size(); ++i) {
+      if (leaf.intervals[i] != intervals[i]) {
         same_intervals = false;
         break;
       }
