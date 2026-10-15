@@ -24,14 +24,24 @@ int rng_randint(int left_inclusive, int right_exclusive);
 std::mt19937_64 *swap_tls_rng(std::mt19937_64 *new_ptr);
 
 // Leaf/order/prefix helpers
-void ensure_order_and_sorted_vals_for_leaf(const std::vector<std::vector<double>> &X, Leaf &leaf, int k,
-                                           std::vector<size_t> &order_out, std::vector<double> &sorted_vals_out);
+void ensure_order_and_sorted_vals_for_leaf(
+    const std::vector<std::vector<double>> &X,
+    Leaf &leaf,
+    int k,
+    std::vector<size_t> &order_out,
+    std::vector<double> &sorted_vals_out
+);
 
 std::vector<double> compute_unique_sorted_values(const std::vector<double> &sorted_vals);
 
-void build_prefix_and_total_given_order(const std::vector<std::vector<double>> &Y, const Leaf &leaf,
-                                        const std::vector<size_t> &order, size_t value_size,
-                                        std::vector<std::vector<double>> &prefix_out, std::vector<double> &total_out);
+void build_prefix_and_total_given_order(
+    const std::vector<std::vector<double>> &Y,
+    const Leaf &leaf,
+    const std::vector<size_t> &order,
+    size_t value_size,
+    std::vector<std::vector<double>> &prefix_out,
+    std::vector<double> &total_out
+);
 
 void finalize_split_from_sums(Split &winner, const std::vector<std::vector<double>> &X, size_t value_size);
 

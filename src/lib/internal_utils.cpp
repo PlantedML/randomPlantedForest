@@ -80,8 +80,13 @@ int rng_randint(int left_inclusive, int right_exclusive)
   return dist(fallback_rng);
 }
 
-void ensure_order_and_sorted_vals_for_leaf(const std::vector<std::vector<double>> &X, Leaf &leaf, int k,
-                                           std::vector<size_t> &order_out, std::vector<double> &sorted_vals_out)
+void ensure_order_and_sorted_vals_for_leaf(
+    const std::vector<std::vector<double>> &X,
+    Leaf &leaf,
+    int k,
+    std::vector<size_t> &order_out,
+    std::vector<double> &sorted_vals_out
+)
 {
   const size_t m = leaf.individuals.size();
   if (leaf.order_cache.count(k) && leaf.order_cache[k].size() == m) {
@@ -89,8 +94,9 @@ void ensure_order_and_sorted_vals_for_leaf(const std::vector<std::vector<double>
   } else {
     order_out.resize(m);
     std::iota(order_out.begin(), order_out.end(), 0);
-    std::stable_sort(order_out.begin(), order_out.end(),
-                     [&](size_t a, size_t b) { return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k]; });
+    std::stable_sort(order_out.begin(), order_out.end(), [&](size_t a, size_t b) {
+      return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k];
+    });
     leaf.order_cache[k] = order_out;
   }
   if (leaf.sorted_vals_cache.count(k) && leaf.sorted_vals_cache[k].size() == m) {
@@ -116,9 +122,14 @@ std::vector<double> compute_unique_sorted_values(const std::vector<double> &sort
   return unique;
 }
 
-void build_prefix_and_total_given_order(const std::vector<std::vector<double>> &Y, const Leaf &leaf,
-                                        const std::vector<size_t> &order, size_t value_size,
-                                        std::vector<std::vector<double>> &prefix_out, std::vector<double> &total_out)
+void build_prefix_and_total_given_order(
+    const std::vector<std::vector<double>> &Y,
+    const Leaf &leaf,
+    const std::vector<size_t> &order,
+    size_t value_size,
+    std::vector<std::vector<double>> &prefix_out,
+    std::vector<double> &total_out
+)
 {
   const size_t m = leaf.individuals.size();
   prefix_out.assign(value_size, std::vector<double>(m, 0.0));
@@ -197,8 +208,9 @@ std::vector<size_t> sample_weighted_indices_filtered(const std::vector<double> &
       keys.emplace_back(key, pos_idx[i]);
     }
     if (k < keys.size()) {
-      std::nth_element(keys.begin(), keys.begin() + k, keys.end(),
-                       [](const auto &a, const auto &b) { return a.first < b.first; });
+      std::nth_element(keys.begin(), keys.begin() + k, keys.end(), [](const auto &a, const auto &b) {
+        return a.first < b.first;
+      });
       keys.resize(k);
     }
     for (auto &kv : keys)

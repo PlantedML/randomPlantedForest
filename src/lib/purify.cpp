@@ -64,7 +64,8 @@ void RandomPlantedForest::purify_1()
               } else {
                 if (!tree) {
                   curr_family.insert(
-                      std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims))));
+                      std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims)))
+                  );
                   tree = curr_family[tree_dims];
                 }
               }
@@ -187,7 +188,8 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
     S_vars.push_back(S);
     if (S == std::set<int>{0})
       diff_S.emplace_back(
-          rpf_diff::NDArray<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
+          rpf_diff::NDArray<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
+      );
     else {
       std::vector<int> diff_dims;
       diff_dims.reserve(S.size());
@@ -545,7 +547,8 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
                 errors[i] = std::current_exception();
               }
             },
-            &this->tree_families[fam_index]);
+            &this->tree_families[fam_index]
+        );
       }
       for (auto &th : threads) {
         if (th.joinable())
@@ -733,10 +736,12 @@ void RandomPlantedForest::purify_3_family(TreeFamily &curr_family, int maxp_inte
 
   // ------------- create new trees -------------
   grids.insert(grids.begin(), grid::NDGrid());
-  values.insert(values.begin(),
-                utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
-  values_old.insert(values_old.begin(),
-                    utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
+  values.insert(
+      values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
+  );
+  values_old.insert(
+      values_old.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
+  );
   individuals.insert(individuals.begin(), utils::Matrix<int>(std::vector<int>{1}));
   variables.insert(variables.begin(), std::set<int>{0});
 
@@ -762,11 +767,14 @@ void RandomPlantedForest::purify_3_family(TreeFamily &curr_family, int maxp_inte
               matrix_dimensions.erase(matrix_dimensions.begin() + dim_index2);
               auto grid = grid::NDGrid(matrix_dimensions);
               grids.insert(grids.begin() + tree_index2, grid);
-              values.insert(values.begin() + tree_index2,
-                            utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0)));
+              values.insert(
+                  values.begin() + tree_index2,
+                  utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0))
+              );
               values_old.insert(
                   values_old.begin() + tree_index2,
-                  utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0)));
+                  utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(value_size, 0))
+              );
               individuals.insert(individuals.begin() + tree_index2, utils::Matrix<int>(matrix_dimensions));
               variables.insert(variables.begin() + tree_index2, tree_dims);
               // fill individuals of new trees using precomputed sample bins
@@ -1130,8 +1138,9 @@ void RandomPlantedForest::purify_2()
 
     // insert null tree
     grids.insert(grids.begin(), grid::NDGrid());
-    values.insert(values.begin(),
-                  utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0)));
+    values.insert(
+        values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
+    );
     individuals.insert(individuals.begin(), utils::Matrix<int>(std::vector<int>{1}));
     variables.insert(variables.begin(), std::set<int>{0});
 
@@ -1181,8 +1190,10 @@ void RandomPlantedForest::purify_2()
                 // initialize data for new tree
                 auto grid = grid::NDGrid(matrix_dimensions);
                 grids.insert(grids.begin() + tree_index, grid);
-                values.insert(values.begin() + tree_index, utils::Matrix<std::vector<double>>(
-                                                               matrix_dimensions, std::vector<double>(0, value_size)));
+                values.insert(
+                    values.begin() + tree_index,
+                    utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(0, value_size))
+                );
                 individuals.insert(individuals.begin() + tree_index, utils::Matrix<int>(matrix_dimensions));
                 variables.insert(variables.begin() + tree_index, tree_dims);
 

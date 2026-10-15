@@ -86,8 +86,11 @@ typedef std::map<std::set<int>, std::shared_ptr<DecisionTree>, setComp> TreeFami
 
 std::shared_ptr<DecisionTree> treeExists(const std::set<int> &split_dims, TreeFamily &tree_family);
 // Legacy overload kept in trees.cpp for backward compatibility in R-facing helpers.
-bool possibleExists(const int dim, const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits,
-                    const std::set<int> &resulting_dims);
+bool possibleExists(
+    const int dim,
+    const std::multimap<int, std::shared_ptr<DecisionTree>> &possible_splits,
+    const std::set<int> &resulting_dims
+);
 bool leafExists(std::vector<Interval> &intervals, const std::shared_ptr<DecisionTree> tree);
 
 #endif // TREES_H

@@ -96,8 +96,11 @@ List model_to_list(const std::vector<FamilyExport> &model, int feature_size)
       family_values.push_back(tree_values);
       family_intervals.push_back(tree_intervals);
     }
-    out.push_back(List::create(Named("variables") = variables, Named("values") = family_values,
-                               Named("intervals") = family_intervals));
+    out.push_back(
+        List::create(
+            Named("variables") = variables, Named("values") = family_values, Named("intervals") = family_intervals
+        )
+    );
   }
   return out;
 }
@@ -121,8 +124,12 @@ std::vector<FamilyExport> list_to_model(const List &model, int feature_size)
         tree.values.push_back(as<std::vector<double>>(tree_values[k]));
         NumericMatrix leaf_intervals = tree_intervals[k];
         if (leaf_intervals.nrow() < 2 || leaf_intervals.ncol() < feature_size)
-          Rcpp::stop("Corrupt model data: leaf interval matrix has dimensions %dx%d, expected 2x%d.",
-                     leaf_intervals.nrow(), leaf_intervals.ncol(), feature_size);
+          Rcpp::stop(
+              "Corrupt model data: leaf interval matrix has dimensions %dx%d, expected 2x%d.",
+              leaf_intervals.nrow(),
+              leaf_intervals.ncol(),
+              feature_size
+          );
         std::vector<Interval> ivs(feature_size);
         for (int l = 0; l < feature_size; ++l)
           ivs[l] = Interval{leaf_intervals(0, l), leaf_intervals(1, l)};
@@ -148,8 +155,13 @@ List grid_to_list(const std::vector<GridFamilyExport> &grid, int value_size)
       for (size_t e = 0; e < tree.values.size(); ++e)
         for (int p = 0; p < value_size; ++p)
           values(e, p) = tree.values[e][p];
-      trees.push_back(List::create(Named("variables") = IntegerVector(tree.variables.begin(), tree.variables.end()),
-                                   Named("dims") = wrap(tree.dims), Named("values") = values));
+      trees.push_back(
+          List::create(
+              Named("variables") = IntegerVector(tree.variables.begin(), tree.variables.end()),
+              Named("dims") = wrap(tree.dims),
+              Named("values") = values
+          )
+      );
     }
     families.push_back(List::create(Named("lim_list") = lim_list, Named("trees") = trees));
   }

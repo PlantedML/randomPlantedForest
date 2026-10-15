@@ -5,9 +5,12 @@
 
 using namespace rpf_utils;
 
-Split RandomPlantedForest::calcOptimalSplit_hist(const std::vector<std::vector<double>> &Y,
-                                                 const std::vector<std::vector<double>> &X,
-                                                 std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family)
+Split RandomPlantedForest::calcOptimalSplit_hist(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family
+)
 {
   Split min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();

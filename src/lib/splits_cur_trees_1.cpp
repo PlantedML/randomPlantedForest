@@ -5,10 +5,12 @@
 
 using namespace rpf_utils;
 
-Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vector<double>> &Y,
-                                                      const std::vector<std::vector<double>> &X,
-                                                      std::vector<SplitCandidate> &possible_splits,
-                                                      TreeFamily &curr_family)
+Split RandomPlantedForest::calcOptimalSplit_curTrees1(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family
+)
 {
   Split curr_split, min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();
@@ -72,8 +74,9 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
         keys.emplace_back(key, pos_idx[i]);
       }
       if (k2 < keys.size()) {
-        std::nth_element(keys.begin(), keys.begin() + k2, keys.end(),
-                         [](const auto &a, const auto &b) { return a.first < b.first; });
+        std::nth_element(keys.begin(), keys.begin() + k2, keys.end(), [](const auto &a, const auto &b) {
+          return a.first < b.first;
+        });
         keys.resize(k2);
       }
       for (auto &kv : keys)
@@ -90,8 +93,9 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(const std::vector<std::vec
         keys.emplace_back(key, pos_idx[i]);
       }
       if (k < keys.size()) {
-        std::nth_element(keys.begin(), keys.begin() + k, keys.end(),
-                         [](const auto &a, const auto &b) { return a.first < b.first; });
+        std::nth_element(keys.begin(), keys.begin() + k, keys.end(), [](const auto &a, const auto &b) {
+          return a.first < b.first;
+        });
         keys.resize(k);
       }
       for (auto &kv : keys)

@@ -71,8 +71,13 @@ public:
   // Train tree families on the loaded data.
   virtual void fit();
   // Restore shape metadata without training data (serialization path).
-  void set_shape(int feature_size_in, int value_size_in, int sample_size_in, const std::vector<double> &lower,
-                 const std::vector<double> &upper);
+  void set_shape(
+      int feature_size_in,
+      int value_size_in,
+      int sample_size_in,
+      const std::vector<double> &lower,
+      const std::vector<double> &upper
+  );
   // Store training data without fitting and without recomputing bounds.
   void set_training_data(const Matrix2D &samples_Y, const Matrix2D &samples_X);
   const Matrix2D &get_X() const { return X; }
@@ -104,9 +109,12 @@ public:
   // Human-readable dump of forest structure.
   void print(std::ostream &out);
   // Legacy coarse CV over a few parameters; currently a no-op.
-  void cross_validation(int n_sets = 4, const std::vector<int> &splits = {5, 50},
-                        const std::vector<double> &t_tries = {0.2, 0.5, 0.7, 0.9},
-                        const std::vector<int> &split_tries = {1, 2, 5, 10});
+  void cross_validation(
+      int n_sets = 4,
+      const std::vector<int> &splits = {5, 50},
+      const std::vector<double> &t_tries = {0.2, 0.5, 0.7, 0.9},
+      const std::vector<int> &split_tries = {1, 2, 5, 10}
+  );
   // Mean-squared error over all entries.
   double MSE(const Matrix2D &Y_predicted, const Matrix2D &Y_true);
   // Inspect/update configuration; `set_parameters` refits.
@@ -155,15 +163,27 @@ protected:
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   struct SplitCandidate;
   // overload possibleExists for your vector of SplitCandidate
-  static bool possibleExists(int dim, const std::vector<SplitCandidate> &possible_splits,
-                             const std::set<int> &resulting_dims);
+  static bool
+  possibleExists(int dim, const std::vector<SplitCandidate> &possible_splits, const std::set<int> &resulting_dims);
   // helpers for different split-structure modes
-  Split calcOptimalSplit_leaves(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family);
-  Split calcOptimalSplit_curTrees2(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                   std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family);
-  Split calcOptimalSplit_curTrees1(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                   std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family);
+  Split calcOptimalSplit_leaves(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      TreeFamily &curr_family
+  );
+  Split calcOptimalSplit_curTrees2(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      TreeFamily &curr_family
+  );
+  Split calcOptimalSplit_curTrees1(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      TreeFamily &curr_family
+  );
   struct ResultingTreeCandidate {
     std::shared_ptr<DecisionTree> tree;
     double age = 0.0;
@@ -171,10 +191,18 @@ protected:
     explicit ResultingTreeCandidate(std::shared_ptr<DecisionTree> t) : tree(std::move(t)) {}
   };
   bool resultingTreeExists(const std::vector<ResultingTreeCandidate> &pool, const std::set<int> &dims);
-  Split calcOptimalSplit_resTrees(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                  std::vector<ResultingTreeCandidate> &possible_trees, TreeFamily &curr_family);
-  virtual Split calcOptimalSplit(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                                 std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family);
+  Split calcOptimalSplit_resTrees(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<ResultingTreeCandidate> &possible_trees,
+      TreeFamily &curr_family
+  );
+  virtual Split calcOptimalSplit(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      TreeFamily &curr_family
+  );
   // exponential‐decay rate for split age
   double split_decay_rate_;
   size_t max_candidates_;
@@ -209,13 +237,18 @@ protected:
   // Moved to thread-local storage in implementation to avoid races under multithreading
   // std::vector<std::vector<int>> working_bin_id_;
 
-  bool leafCandidateExists(const std::vector<SplitCandidate> &, const std::shared_ptr<DecisionTree> &, size_t leaf_idx,
-                           int dim);
+  bool leafCandidateExists(
+      const std::vector<SplitCandidate> &, const std::shared_ptr<DecisionTree> &, size_t leaf_idx, int dim
+  );
   bool delete_leaves;
 
   // Mode 4: histogram-binned split evaluation
-  Split calcOptimalSplit_hist(const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-                              std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family);
+  Split calcOptimalSplit_hist(
+      const std::vector<std::vector<double>> &Y,
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      TreeFamily &curr_family
+  );
 };
 
 #endif // RPF_HPP

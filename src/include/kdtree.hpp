@@ -36,14 +36,22 @@ class KDTree {
 public:
   KDTree() = default;
 
-  KDTree(const std::vector<std::vector<double>> *X_ptr, const std::vector<int> &all_indices, int dims,
-         size_t leaf_size = 32)
+  KDTree(
+      const std::vector<std::vector<double>> *X_ptr,
+      const std::vector<int> &all_indices,
+      int dims,
+      size_t leaf_size = 32
+  )
   {
     build(X_ptr, all_indices, dims, leaf_size);
   }
 
-  void build(const std::vector<std::vector<double>> *X_ptr, const std::vector<int> &all_indices, int dims,
-             size_t leaf_size = 32)
+  void build(
+      const std::vector<std::vector<double>> *X_ptr,
+      const std::vector<int> &all_indices,
+      int dims,
+      size_t leaf_size = 32
+  )
   {
     X_ = X_ptr;
     dims_ = dims;
@@ -103,8 +111,9 @@ private:
     right_idxs.reserve(idxs.size());
     std::vector<int> tmp = idxs;
     size_t mid = tmp.size() / 2;
-    std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end(),
-                     [&](int a, int b) { return (*X_)[a][axis] < (*X_)[b][axis]; });
+    std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end(), [&](int a, int b) {
+      return (*X_)[a][axis] < (*X_)[b][axis];
+    });
     double split = (*X_)[tmp[mid]][axis];
     node->split_value = split;
     for (int i : idxs) {
@@ -124,8 +133,8 @@ private:
     return node;
   }
 
-  static inline bool box_outside(const std::vector<double> &minv, const std::vector<double> &maxv,
-                                 const std::vector<RangeConstraint> &C)
+  static inline bool
+  box_outside(const std::vector<double> &minv, const std::vector<double> &maxv, const std::vector<RangeConstraint> &C)
   {
     for (const auto &rc : C) {
       if (maxv[rc.dim] <= rc.left)
@@ -136,8 +145,8 @@ private:
     return false;
   }
 
-  static inline bool box_inside(const std::vector<double> &minv, const std::vector<double> &maxv,
-                                const std::vector<RangeConstraint> &C)
+  static inline bool
+  box_inside(const std::vector<double> &minv, const std::vector<double> &maxv, const std::vector<RangeConstraint> &C)
   {
     for (const auto &rc : C) {
       if (minv[rc.dim] < rc.left)

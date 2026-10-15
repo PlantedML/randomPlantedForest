@@ -263,8 +263,8 @@ template <typename VT> std::vector<VT> calcMedian(std::vector<std::vector<VT>> &
  * \param colwise a bool indicating if calculate row or columnwise.
  */
 template <typename VT>
-std::vector<VT> calcMedian(const std::vector<std::vector<VT>> &mat, const std::vector<int> &indices,
-                           bool colwise = true)
+std::vector<VT>
+calcMedian(const std::vector<std::vector<VT>> &mat, const std::vector<int> &indices, bool colwise = true)
 {
 
   if (mat.size() == 0)

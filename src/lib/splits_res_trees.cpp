@@ -5,10 +5,12 @@
 
 using namespace rpf_utils;
 
-Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vector<double>> &Y,
-                                                     const std::vector<std::vector<double>> &X,
-                                                     std::vector<ResultingTreeCandidate> &possible_trees,
-                                                     TreeFamily &curr_family)
+Split RandomPlantedForest::calcOptimalSplit_resTrees(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<ResultingTreeCandidate> &possible_trees,
+    TreeFamily &curr_family
+)
 {
   Split curr_split, min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();
@@ -60,8 +62,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
         keys.emplace_back(key, pos_idx[i]);
       }
       if (k < keys.size()) {
-        std::nth_element(keys.begin(), keys.begin() + k, keys.end(),
-                         [](const auto &a, const auto &b) { return a.first < b.first; });
+        std::nth_element(keys.begin(), keys.begin() + k, keys.end(), [](const auto &a, const auto &b) {
+          return a.first < b.first;
+        });
         keys.resize(k);
       }
       for (auto &kv : keys)
@@ -221,8 +224,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
       return s;
     };
 
-    const double total_all0 = std::accumulate(buckets.begin(), buckets.end(), 0.0,
-                                              [](double s, const Bucket &b) { return s + std::max(0.0, b.total); });
+    const double total_all0 = std::accumulate(buckets.begin(), buckets.end(), 0.0, [](double s, const Bucket &b) {
+      return s + std::max(0.0, b.total);
+    });
     double bucket_total_all = total_all0;
     size_t draws = std::min((size_t)this->split_try, (size_t)std::llround(total_all0));
 
@@ -312,8 +316,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
         if (state.right > state.left)
           state.used_flags.assign((size_t)(state.right - state.left), 0);
         // Build prefix sums for fast evaluation
-        build_prefix_and_total_given_order(Y, *leaf_ptr, state.order_cf, this->value_size, state.prefix_cf,
-                                           state.total_cf);
+        build_prefix_and_total_given_order(
+            Y, *leaf_ptr, state.order_cf, this->value_size, state.prefix_cf, state.total_cf
+        );
         state.initialized = true;
       }
       const std::vector<double> &wts_view = bucket.has_local ? bucket.wts : *(bucket.wts_src);
@@ -374,7 +379,8 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(const std::vector<std::vect
       double sp = (*state.unique_ptr)[(size_t)s_idx];
       const size_t m_eval = leaf_ptr->individuals.size();
       size_t pos_in_sorted = static_cast<size_t>(
-          std::lower_bound(state.sorted_vals.begin(), state.sorted_vals.end(), sp) - state.sorted_vals.begin());
+          std::lower_bound(state.sorted_vals.begin(), state.sorted_vals.end(), sp) - state.sorted_vals.begin()
+      );
       if (pos_in_sorted == 0 || pos_in_sorted >= m_eval) {
         continue;
       }

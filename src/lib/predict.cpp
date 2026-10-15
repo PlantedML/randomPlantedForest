@@ -204,8 +204,8 @@ template <class F> void parallel_rows(int n, unsigned int threads, F f)
 } // namespace
 
 // predict multiple feature vectors
-std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, int p,
-                                                        const std::set<int> &component_index, int nthreads)
+std::vector<double>
+RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::set<int> &component_index, int nthreads)
 {
   if (n == 0 || p == 0)
     throw std::invalid_argument("Feature vector is empty.");
@@ -347,8 +347,8 @@ std::vector<double> RandomPlantedForest::predict_matrix(const double *X, int n, 
   return out;
 }
 
-Matrix2D RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec,
-                                             const std::set<int> &component_index)
+Matrix2D
+RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec, const std::set<int> &component_index)
 {
   Matrix2D predictions;
   if (feature_vec.empty()) {

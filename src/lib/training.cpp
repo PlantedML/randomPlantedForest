@@ -39,8 +39,10 @@ void RandomPlantedForest::fit()
     threads_to_use = 1;
   if (threads_to_use > 1) {
     if (threads_to_use > std::thread::hardware_concurrency()) {
-      warn("Requested " + std::to_string(threads_to_use) + " threads but only " +
-           std::to_string(std::thread::hardware_concurrency()) + " available");
+      warn(
+          "Requested " + std::to_string(threads_to_use) + " threads but only " +
+          std::to_string(std::thread::hardware_concurrency()) + " available"
+      );
     }
     for (int start = 0; start < n_trees; start += (int)threads_to_use) {
       int batch = std::min<int>((int)threads_to_use, n_trees - start);
@@ -68,7 +70,8 @@ void RandomPlantedForest::fit()
                 errors[(size_t)i] = std::current_exception();
               }
             },
-            tree_index);
+            tree_index
+        );
       }
       for (auto &th : threads) {
         if (th.joinable())

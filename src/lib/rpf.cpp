@@ -20,8 +20,9 @@ using namespace rpf_utils;
 thread_local std::vector<std::vector<int>> *tls_working_bin_id_ptr = nullptr;
 
 // Utilities shared across modes
-bool RandomPlantedForest::possibleExists(int dim, const std::vector<SplitCandidate> &possible_splits,
-                                         const std::set<int> &resulting_dims)
+bool RandomPlantedForest::possibleExists(
+    int dim, const std::vector<SplitCandidate> &possible_splits, const std::set<int> &resulting_dims
+)
 {
   for (const auto &c : possible_splits) {
     if (c.dim == dim && c.tree && c.tree->split_dims == resulting_dims)
@@ -30,8 +31,12 @@ bool RandomPlantedForest::possibleExists(int dim, const std::vector<SplitCandida
   return false;
 }
 
-bool RandomPlantedForest::leafCandidateExists(const std::vector<SplitCandidate> &possible_splits,
-                                              const std::shared_ptr<DecisionTree> &tree, size_t leaf_idx, int dim)
+bool RandomPlantedForest::leafCandidateExists(
+    const std::vector<SplitCandidate> &possible_splits,
+    const std::shared_ptr<DecisionTree> &tree,
+    size_t leaf_idx,
+    int dim
+)
 {
   for (const auto &c : possible_splits) {
     if (c.dim == dim && c.tree.get() == tree.get() && c.leaf_idx == leaf_idx)
@@ -81,8 +86,13 @@ void RandomPlantedForest::warn(const std::string &msg)
     *verbose_out << msg << std::endl;
 }
 
-void RandomPlantedForest::set_shape(int feature_size_in, int value_size_in, int sample_size_in,
-                                    const std::vector<double> &lower, const std::vector<double> &upper)
+void RandomPlantedForest::set_shape(
+    int feature_size_in,
+    int value_size_in,
+    int sample_size_in,
+    const std::vector<double> &lower,
+    const std::vector<double> &upper
+)
 {
   this->feature_size = feature_size_in;
   this->value_size = value_size_in;
@@ -99,11 +109,15 @@ void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Mat
   // purify path cannot read out of bounds.
   const int x_cols = samples_X.empty() ? 0 : (int)samples_X[0].size();
   if (x_cols != feature_size)
-    throw std::invalid_argument("Corrupt training data: X has " + std::to_string(x_cols) + " columns, expected " +
-                                std::to_string(feature_size) + ".");
+    throw std::invalid_argument(
+        "Corrupt training data: X has " + std::to_string(x_cols) + " columns, expected " +
+        std::to_string(feature_size) + "."
+    );
   if (samples_X.size() != samples_Y.size())
-    throw std::invalid_argument("Corrupt training data: X has " + std::to_string(samples_X.size()) +
-                                " rows but Y has " + std::to_string(samples_Y.size()) + ".");
+    throw std::invalid_argument(
+        "Corrupt training data: X has " + std::to_string(samples_X.size()) + " rows but Y has " +
+        std::to_string(samples_Y.size()) + "."
+    );
   this->Y = samples_Y;
   this->X = samples_X;
   this->sample_size = X.size();
@@ -115,19 +129,23 @@ void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
   for (size_t i = 0; i < model.size(); ++i) {
     for (const TreeExport &tree : model[i]) {
       if (tree.values.size() != tree.intervals.size())
-        throw std::invalid_argument("Corrupt model data: tree has " + std::to_string(tree.values.size()) +
-                                    " leaf values but " + std::to_string(tree.intervals.size()) +
-                                    " leaf interval sets.");
+        throw std::invalid_argument(
+            "Corrupt model data: tree has " + std::to_string(tree.values.size()) + " leaf values but " +
+            std::to_string(tree.intervals.size()) + " leaf interval sets."
+        );
       std::vector<Leaf> leaves(tree.values.size());
       for (size_t k = 0; k < leaves.size(); ++k) {
         if ((int)tree.intervals[k].size() != feature_size)
-          throw std::invalid_argument("Corrupt model data: leaf has " + std::to_string(tree.intervals[k].size()) +
-                                      " intervals, expected " + std::to_string(feature_size) + ".");
+          throw std::invalid_argument(
+              "Corrupt model data: leaf has " + std::to_string(tree.intervals[k].size()) + " intervals, expected " +
+              std::to_string(feature_size) + "."
+          );
         leaves[k].value = tree.values[k];
         leaves[k].intervals = tree.intervals[k];
       }
       tree_families[i].insert(
-          std::make_pair(tree.variables, std::make_shared<DecisionTree>(DecisionTree(tree.variables, leaves))));
+          std::make_pair(tree.variables, std::make_shared<DecisionTree>(DecisionTree(tree.variables, leaves)))
+      );
     }
   }
   purified = false;
@@ -196,9 +214,10 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
       auto &flat = values.flat();
       const size_t ncol = tr.values.empty() ? value_size : tr.values[0].size();
       if (tr.values.size() != flat.size() || ncol != value_size)
-        throw std::invalid_argument("Corrupt grid data: values matrix has dimensions " +
-                                    std::to_string(tr.values.size()) + "x" + std::to_string(ncol) + ", expected " +
-                                    std::to_string(flat.size()) + "x" + std::to_string(value_size) + ".");
+        throw std::invalid_argument(
+            "Corrupt grid data: values matrix has dimensions " + std::to_string(tr.values.size()) + "x" +
+            std::to_string(ncol) + ", expected " + std::to_string(flat.size()) + "x" + std::to_string(value_size) + "."
+        );
       for (size_t e = 0; e < flat.size(); ++e)
         flat[e] = tr.values[e];
       it->second->GridLeaves.values = values;
@@ -218,8 +237,9 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
 // Mode 2: cur_trees_1 moved to lib/splits_cur_trees_1.cpp
 
 // Mode 0: res_trees (operate on resulting trees pool)
-bool RandomPlantedForest::resultingTreeExists(const std::vector<RandomPlantedForest::ResultingTreeCandidate> &pool,
-                                              const std::set<int> &dims)
+bool RandomPlantedForest::resultingTreeExists(
+    const std::vector<RandomPlantedForest::ResultingTreeCandidate> &pool, const std::set<int> &dims
+)
 {
   for (const auto &c : pool)
     if (c.tree->get_split_dims() == dims)
@@ -232,9 +252,12 @@ bool RandomPlantedForest::resultingTreeExists(const std::vector<RandomPlantedFor
 // moved to lib/splits_hist.cpp
 
 // Dispatcher used by create_tree_family
-Split RandomPlantedForest::calcOptimalSplit(const std::vector<std::vector<double>> &Y,
-                                            const std::vector<std::vector<double>> &X,
-                                            std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family)
+Split RandomPlantedForest::calcOptimalSplit(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family
+)
 {
   if (split_structure_mode_ == 3) {
     return this->calcOptimalSplit_leaves(Y, X, possible_splits, curr_family);
@@ -284,7 +307,8 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
   // Prepare histogram bins if histogram mode is requested
   if (this->split_structure_mode_ == 4) {
     const size_t K = std::max<size_t>(
-        2, std::min<size_t>(num_bins_, static_cast<size_t>(std::max(2, (int)std::sqrt((double)sample_size)))));
+        2, std::min<size_t>(num_bins_, static_cast<size_t>(std::max(2, (int)std::sqrt((double)sample_size))))
+    );
     this->num_bins_ = K;
     feature_cut_points_.assign((size_t)feature_size, std::vector<double>());
     sample_bin_id_.assign((size_t)feature_size, std::vector<int>(sample_size, 0));
@@ -330,7 +354,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
   TreeFamily curr_family;
   curr_family.insert(
-      {std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves))});
+      {std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves))}
+  );
 
   // res_trees uses a separate pool
   if (split_structure_mode_ == 0) {
@@ -973,8 +998,9 @@ void RandomPlantedForest::set_parameters(const std::vector<std::string> &keys, c
   this->fit();
 }
 
-void RandomPlantedForest::cross_validation(int n_sets, const std::vector<int> &splits,
-                                           const std::vector<double> &t_tries, const std::vector<int> &split_tries)
+void RandomPlantedForest::cross_validation(
+    int n_sets, const std::vector<int> &splits, const std::vector<double> &t_tries, const std::vector<int> &split_tries
+)
 {
 
   /*

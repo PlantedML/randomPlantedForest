@@ -79,10 +79,13 @@ ClassificationRPF::ClassificationRPF(const std::string &loss, const RPFParams &p
 }
 
 // Mode 1: cur_trees_2 (classification variant)
-Split ClassificationRPF::calcOptimalSplit_curTrees2(const std::vector<std::vector<double>> &Y,
-                                                    const std::vector<std::vector<double>> &X,
-                                                    std::vector<SplitCandidate> &possible_splits,
-                                                    TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+Split ClassificationRPF::calcOptimalSplit_curTrees2(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
 
   Split curr_split, min_split;
@@ -370,10 +373,13 @@ Split ClassificationRPF::calcOptimalSplit_curTrees2(const std::vector<std::vecto
 }
 
 // Mode 3: leaves (classification variant)
-Split ClassificationRPF::calcOptimalSplit_leaves(const std::vector<std::vector<double>> &Y,
-                                                 const std::vector<std::vector<double>> &X,
-                                                 std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family,
-                                                 std::vector<std::vector<double>> &weights)
+Split ClassificationRPF::calcOptimalSplit_leaves(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
   Split curr_split, min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();
@@ -510,10 +516,13 @@ Split ClassificationRPF::calcOptimalSplit_leaves(const std::vector<std::vector<d
 }
 
 // Mode 4: histogram-binned (classification variant)
-Split ClassificationRPF::calcOptimalSplit_hist(const std::vector<std::vector<double>> &Y,
-                                               const std::vector<std::vector<double>> &X,
-                                               std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family,
-                                               std::vector<std::vector<double>> &weights)
+Split ClassificationRPF::calcOptimalSplit_hist(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
   Split min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();
@@ -667,10 +676,13 @@ Split ClassificationRPF::calcOptimalSplit_hist(const std::vector<std::vector<dou
 }
 
 // Mode 2: cur_trees_1 (classification variant)
-Split ClassificationRPF::calcOptimalSplit_curTrees1(const std::vector<std::vector<double>> &Y,
-                                                    const std::vector<std::vector<double>> &X,
-                                                    std::vector<SplitCandidate> &possible_splits,
-                                                    TreeFamily &curr_family, std::vector<std::vector<double>> &weights)
+Split ClassificationRPF::calcOptimalSplit_curTrees1(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
   // reuse current implementation by sampling per-leaf candidates across predecessor/current trees
   // We delegate to the old flow by temporarily constructing the same sampling but using loss with W
@@ -680,9 +692,12 @@ Split ClassificationRPF::calcOptimalSplit_curTrees1(const std::vector<std::vecto
 
 // Mode 0: res_trees (classification variant)
 Split ClassificationRPF::calcOptimalSplit_resTrees(
-    const std::vector<std::vector<double>> &Y, const std::vector<std::vector<double>> &X,
-    std::vector<RandomPlantedForest::ResultingTreeCandidate> &possible_trees, TreeFamily &curr_family,
-    std::vector<std::vector<double>> &weights)
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<RandomPlantedForest::ResultingTreeCandidate> &possible_trees,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
   // Classification loss evaluation on res_trees follows the base structure; to keep changes minimal here,
   // we adopt the cur_trees_1 sampling over the trees in possible_trees' dims using our calcLoss and W.
@@ -697,10 +712,13 @@ Split ClassificationRPF::calcOptimalSplit_resTrees(
 }
 
 // Dispatcher selecting by split_structure_mode_
-Split ClassificationRPF::calcOptimalSplit(const std::vector<std::vector<double>> &Y,
-                                          const std::vector<std::vector<double>> &X,
-                                          std::vector<SplitCandidate> &possible_splits, TreeFamily &curr_family,
-                                          std::vector<std::vector<double>> &weights)
+Split ClassificationRPF::calcOptimalSplit(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family,
+    std::vector<std::vector<double>> &weights
+)
 {
   if (split_structure_mode_ == 4)
     return this->calcOptimalSplit_hist(Y, X, possible_splits, curr_family, weights);
@@ -717,9 +735,9 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
 {
 
   TreeFamily curr_family;
-  curr_family.insert(std::make_pair(
-      std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(
-                            std::set<int>{0}, initial_leaves)))); // save tree with one leaf in the beginning
+  curr_family.insert(
+      std::make_pair(std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves)))
+  ); // save tree with one leaf in the beginning
 
   // Seed per mode
   std::vector<SplitCandidate> possible_splits;
@@ -1015,10 +1033,12 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::vector<double> sum_s = curr_split.M_s;
         std::vector<double> sum_b = curr_split.M_b;
 
-        std::for_each(sum_s.begin(), sum_s.end(),
-                      [this](double &S) { S = std::min(std::max(epsilon, S), 1 - epsilon); });
-        std::for_each(sum_b.begin(), sum_b.end(),
-                      [this](double &S) { S = std::min(std::max(epsilon, S), 1 - epsilon); });
+        std::for_each(sum_s.begin(), sum_s.end(), [this](double &S) {
+          S = std::min(std::max(epsilon, S), 1 - epsilon);
+        });
+        std::for_each(sum_b.begin(), sum_b.end(), [this](double &S) {
+          S = std::min(std::max(epsilon, S), 1 - epsilon);
+        });
 
         double sum_sp = std::min(std::max(epsilon, curr_split.M_sp), 1 - epsilon);
         double sum_bp = std::min(std::max(epsilon, curr_split.M_bp), 1 - epsilon);
