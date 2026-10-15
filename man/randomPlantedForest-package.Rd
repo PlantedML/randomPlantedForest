@@ -18,11 +18,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
+\strong{Maintainer}: Lukas Burk \email{cran@lukasburk.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
 
 Authors:
 \itemize{
-  \item Lukas Burk \email{burk@leibniz-bips.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
+  \item Lukas Burk \email{cran@lukasburk.de} (\href{https://orcid.org/0000-0001-7528-3795}{ORCID})
   \item Joseph Theo Meyer
   \item Munir Hiabu (\href{https://orcid.org/0000-0001-5846-667X}{ORCID})
   \item Maike Spankus

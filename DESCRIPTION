@@ -8,7 +8,7 @@ Authors@R: c(
     person("Maike", "Spankus", role = "aut"),
     person(c("Marvin", "N."), "Wright", , "cran@wrig.de", role = "aut",
            comment = c(ORCID = "0000-0002-8542-6291")),
-    person("Lukas", "Burk", , "burk@leibniz-bips.de", role = c("cre", "aut"),
+    person("Lukas", "Burk", , "cran@lukasburk.de", role = c("cre", "aut"),
            comment = c(ORCID = "0000-0001-7528-3795"))
   )
 Description: Implements Random Planted Forest (Hiabu, Mammen and Meyer,
