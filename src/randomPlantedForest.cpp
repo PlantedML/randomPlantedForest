@@ -1,8 +1,7 @@
 #include "rcpp_interface.h"
 
 // Methods shared by the regression and classification classes
-template <class T>
-void expose_methods(Rcpp::class_<T> &cls)
+template <class T> void expose_methods(Rcpp::class_<T> &cls)
 {
   cls.method("set_data", &T::set_data)
       .method("fit", &T::fit)

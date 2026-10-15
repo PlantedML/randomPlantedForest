@@ -27,3 +27,4 @@
 ^Makefile$
 ^TODO\.md$
 ^README\.html$
+^\.clang-format$

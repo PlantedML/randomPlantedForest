@@ -21,7 +21,7 @@ double rng_runif01();
 double rng_runif(double a, double b);
 int rng_randint(int left_inclusive, int right_exclusive);
 // Swap the thread-local RNG pointer; returns previous pointer
-std::mt19937_64* swap_tls_rng(std::mt19937_64* new_ptr);
+std::mt19937_64 *swap_tls_rng(std::mt19937_64 *new_ptr);
 
 // Leaf/order/prefix helpers
 void ensure_order_and_sorted_vals_for_leaf(
@@ -29,7 +29,8 @@ void ensure_order_and_sorted_vals_for_leaf(
     Leaf &leaf,
     int k,
     std::vector<size_t> &order_out,
-    std::vector<double> &sorted_vals_out);
+    std::vector<double> &sorted_vals_out
+);
 
 std::vector<double> compute_unique_sorted_values(const std::vector<double> &sorted_vals);
 
@@ -39,17 +40,13 @@ void build_prefix_and_total_given_order(
     const std::vector<size_t> &order,
     size_t value_size,
     std::vector<std::vector<double>> &prefix_out,
-    std::vector<double> &total_out);
+    std::vector<double> &total_out
+);
 
-void finalize_split_from_sums(
-    Split &winner,
-    const std::vector<std::vector<double>> &X,
-    size_t value_size);
+void finalize_split_from_sums(Split &winner, const std::vector<std::vector<double>> &X, size_t value_size);
 
 // Sampling helpers
-std::vector<size_t> sample_weighted_indices_filtered(
-    const std::vector<double> &weights,
-    size_t n_candidates);
+std::vector<size_t> sample_weighted_indices_filtered(const std::vector<double> &weights, size_t n_candidates);
 
 std::vector<int> compute_even_spread_indices(int left_inclusive, int right_exclusive, size_t max_draws);
 std::vector<int> sample_unique_ints_uniform_R(int left_inclusive, int right_exclusive, size_t k);
@@ -63,7 +60,10 @@ template <typename CandidateT>
 inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_idx, std::vector<CandidateT> &pool)
 {
   for (size_t idx : sample_idxs) {
-    if (static_cast<int>(idx) != best_idx) pool[idx].age += 1.0; else pool[idx].age = 0.0;
+    if (static_cast<int>(idx) != best_idx)
+      pool[idx].age += 1.0;
+    else
+      pool[idx].age = 0.0;
   }
 }
 
@@ -75,8 +75,6 @@ inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_
 // with a non-trivial destructor (e.g. std::vector) must NOT be used here:
 // its emutls destructor crashes at std::thread exit on Windows (MinGW) when
 // the package DLL is loaded via LoadLibrary.
-extern thread_local std::vector<std::vector<int>>* tls_working_bin_id_ptr;
+extern thread_local std::vector<std::vector<int>> *tls_working_bin_id_ptr;
 
 #endif // INTERNAL_UTILS_HPP
-
-
