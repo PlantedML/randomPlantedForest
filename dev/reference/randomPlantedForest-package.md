@@ -22,12 +22,12 @@ Useful links:
 
 ## Author
 
-**Maintainer**: Lukas Burk <burk@leibniz-bips.de>
+**Maintainer**: Lukas Burk <cran@lukasburk.de>
 ([ORCID](https://orcid.org/0000-0001-7528-3795))
 
 Authors:
 
-- Lukas Burk <burk@leibniz-bips.de>
+- Lukas Burk <cran@lukasburk.de>
   ([ORCID](https://orcid.org/0000-0001-7528-3795))
 
 - Joseph Theo Meyer
