@@ -77,7 +77,7 @@ pca_order <- function(x, y) {
   # Create contingency table of the nominal outcome with the nominal covariate
   N <- table(x, droplevels(y))
 
-  # PCA of weighted covariance matrix of class probabilites
+  # PCA of weighted covariance matrix of class probabilities
   P <- N / rowSums(N)
   S <- stats::cov.wt(P, wt = rowSums(N))$cov
   pc1 <- stats::prcomp(S, rank. = 1)$rotation
