@@ -110,10 +110,8 @@ directly interpretable tree ensemble. arXiv:2012.14563.
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 1, splits = 10)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10)
 plot(rpfit)
-
-plot(rpfit, type = "boxes")
 
 purify(rpfit)
 plot(rpfit, type = "boxes")
