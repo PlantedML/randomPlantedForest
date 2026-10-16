@@ -78,9 +78,8 @@ plotting functions in \code{glex}.
 }
 \examples{
 \dontshow{if (rlang::is_installed(c("ggplot2", "patchwork"))) withAutoprint(\{ # examplesIf}
-rpfit <- rpf(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 1, splits = 10)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10)
 plot(rpfit)
-plot(rpfit, type = "boxes")
 purify(rpfit)
 plot(rpfit, type = "boxes")
 \dontshow{\}) # examplesIf}
