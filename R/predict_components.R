@@ -105,7 +105,8 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # Encode factors to (re-)ordered integers according to information saved during model fit
   # Need matrix version for model predictions, and keep data.table version for return (for plotting)
   new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)
-  data.table::setDT(new_data)
+  # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table
+  new_data_dt <- data.table::as.data.table(new_data)
 
   # iterate over 1 through max_interaction, get all subsets of predictors,
   # extract the component for each combination and append them column wise
@@ -128,7 +129,7 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   ret <- list(
     m = data.table::as.data.table(all_components),
     intercept = intercept[[1]],
-    x = new_data[, predictors, with = FALSE]
+    x = new_data_dt[, predictors, with = FALSE]
   )
 
   # Get outcome levels for multiclass handling

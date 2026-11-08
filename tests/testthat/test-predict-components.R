@@ -162,3 +162,29 @@ test_that("duplicated rows get the same components as their originals", {
   expect_equal(repeated$m, once$m[idx], ignore_attr = TRUE)
   expect_equal(repeated$intercept, once$intercept)
 })
+
+test_that("predict_components() takes a matrix and leaves a data.frame new_data unchanged", {
+  set.seed(54)
+  x <- as.matrix(mtcars[, 2:6])
+  fit <- rpf(x, mtcars$mpg, max_interaction = 2, ntrees = 8, splits = 30)
+  nd <- mtcars[1:12, 2:6]
+  nd_before <- nd
+
+  pc_df <- predict_components(fit, nd)
+  # the caller's data.frame is neither converted to a data.table nor modified
+  expect_identical(class(nd), "data.frame")
+  expect_identical(nd, nd_before)
+
+  pc_mat <- predict_components(fit, x[1:12, ])
+  expect_identical(pc_mat$m, pc_df$m)
+  expect_equal(pc_mat$x, pc_df$x, ignore_attr = TRUE)
+  expect_equal(pc_mat$intercept, pc_df$intercept)
+
+  # with a remainder (max_interaction below the fit's) and a subset of predictors
+  pc_mat1 <- predict_components(fit, x[1:12, ], max_interaction = 1, predictors = c("hp", "cyl"))
+  pc_df1 <- predict_components(fit, nd, max_interaction = 1, predictors = c("hp", "cyl"))
+  expect_identical(pc_mat1$m, pc_df1$m)
+  expect_identical(pc_mat1$remainder, pc_df1$remainder)
+  expect_identical(names(pc_mat1$x), c("hp", "cyl"))
+  expect_identical(class(nd), "data.frame")
+})
