@@ -29,6 +29,12 @@
   The table has the plain and the corrected out-of-bag RMSE (the correction of `prune_components()`) at four checkpoints per doubling of the splits (`oob_path_checkpoints()`), or at given ones.
   On 52 data sets, choosing `splits` by the lowest corrected error among the values of a cross-validation grid did as well as 5-fold cross-validation over that grid (test error 0.06% lower on average), at 0.9 of its cost.
   The fitted forest is the same as without `oob_path`, which is off by default.
+* `rpf(splits = NULL)` chooses the number of splits out of bag while the forest grows (regression).
+  The forest's corrected out-of-bag error is followed at four checkpoints per doubling of the splits, growing stops once its lowest value is one doubling back (at most 25,600 splits), and the forest at the lowest error is returned: the forest that `rpf()` with that many `splits` and the same seed gives.
+  On 52 data sets this chose the same `splits` as the lowest error along a fixed budget of 3,200 splits on 50, and a later, lower minimum on the other two, while growing 0.72 of the splits.
+  The tree families grow one at a time, `nthreads` together, and keep only their out-of-bag predictions and a 40-byte record per split, from which the chosen forest is rebuilt without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1 GB) bounds the memory of families waiting for the stop.
+  `print()` shows the chosen `splits` and where growing stopped.
+  The default stays `splits = 30`.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
