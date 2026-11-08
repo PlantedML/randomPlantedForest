@@ -45,6 +45,8 @@ void ClassificationRPF::exponential_loss(Split &split)
 void ClassificationRPF::exponential_loss_2(Split &split)
 {
   split.min_sum = 0;
+  split.M_s = std::vector<double>(value_size, 0);
+  split.M_b = std::vector<double>(value_size, 0);
   std::vector<double> W_s_sum(value_size, 0), W_b_sum(value_size, 0), sum_s(value_size, 0), sum_b(value_size, 0),
       sum_s2(value_size, 0), sum_b2(value_size, 0);
   for (size_t p = 0; p < value_size; ++p) {

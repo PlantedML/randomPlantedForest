@@ -78,6 +78,19 @@ private:
       TreeFamily &curr_family,
       std::vector<std::vector<double>> &weights
   );
+  // Helpers shared by the split modes above. They mirror the regression split modes
+  // (splits_*.cpp): same candidate pool, same sampling (and RNG draws), same aging;
+  // only the loss is evaluated with calcLoss.
+  std::vector<size_t> sampleCandidates(const std::vector<double> &ages, bool clamp_to_positive = false);
+  void evaluateSplit(
+      Split &curr_split, const Leaf &leaf, int k, double split_point, const std::vector<std::vector<double>> &X
+  );
+  void ensureThresholdWeights(
+      const std::shared_ptr<DecisionTree> &tree, int kdim, const std::vector<std::vector<double>> &X
+  );
+  void updateThresholdWeight(
+      const std::shared_ptr<DecisionTree> &tree, size_t leaf_idx, bool append, const std::vector<std::vector<double>> &X
+  );
   void L1_loss(Split &split);
   void median_loss(Split &split);
   void logit_loss(Split &split);
