@@ -108,25 +108,7 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       double total = 0.0;
       const int leaf_size_local = this->n_leaves[k];
       for (size_t li = 0; li < L; ++li) {
-        auto &leaf = tree->leaves[li];
-        size_t unique_count = 0;
-        auto it_uc = leaf.unique_count_cache.find(kdim);
-        if (it_uc != leaf.unique_count_cache.end()) {
-          unique_count = it_uc->second;
-        } else {
-          std::vector<size_t> order_cf;
-          std::vector<double> sorted_vals_cf;
-          ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order_cf, sorted_vals_cf);
-          if (!sorted_vals_cf.empty()) {
-            unique_count = 1;
-            for (size_t i = 1; i < sorted_vals_cf.size(); ++i)
-              if (sorted_vals_cf[i] != sorted_vals_cf[i - 1])
-                ++unique_count;
-          }
-          leaf.unique_count_cache[kdim] = unique_count;
-        }
-        const long width_unique = (long)unique_count - 2L * (long)leaf_size_local + 1L;
-        const double w = (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
+        const double w = leaf_threshold_weight(X, tree->leaves[li], k, leaf_size_local);
         wts[li] = w;
         total += w;
         if (w != 0.0)

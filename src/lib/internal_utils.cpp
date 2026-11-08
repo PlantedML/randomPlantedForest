@@ -23,6 +23,17 @@ void fenwick_add(std::vector<double> &bit, size_t idx1, double delta)
   }
 }
 
+void fenwick_push_back(std::vector<double> &bit, double w)
+{
+  // node i (1-based) holds the elements (i - lowbit(i), i]: w plus the nodes i - 1, i - 2, i - 4, ... below lowbit(i)
+  const size_t i = bit.size() + 1;
+  const size_t low = i & (~i + 1);
+  double node = w;
+  for (size_t step = 1; step < low; step <<= 1)
+    node += bit[i - step - 1];
+  bit.push_back(node);
+}
+
 size_t fenwick_find_by_prefix(const std::vector<double> &bit, double target)
 {
   // Return smallest i such that sum(i) >= target; 1-based index
@@ -107,6 +118,28 @@ void ensure_order_and_sorted_vals_for_leaf(
       sorted_vals_out[i] = X[leaf.individuals[order_out[i]]][k];
     leaf.sorted_vals_cache[k] = sorted_vals_out;
   }
+}
+
+double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size)
+{
+  size_t unique_count = 0;
+  auto it_uc = leaf.unique_count_cache.find(k);
+  if (it_uc != leaf.unique_count_cache.end()) {
+    unique_count = it_uc->second;
+  } else {
+    std::vector<size_t> order;
+    std::vector<double> sorted_vals;
+    ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order, sorted_vals);
+    if (!sorted_vals.empty()) {
+      unique_count = 1;
+      for (size_t i = 1; i < sorted_vals.size(); ++i)
+        if (sorted_vals[i] != sorted_vals[i - 1])
+          ++unique_count;
+    }
+    leaf.unique_count_cache[k] = unique_count;
+  }
+  const long width_unique = (long)unique_count - 2L * (long)leaf_size + 1L;
+  return (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
 }
 
 std::vector<double> compute_unique_sorted_values(const std::vector<double> &sorted_vals)
