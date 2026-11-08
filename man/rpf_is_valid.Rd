@@ -7,7 +7,8 @@
 rpf_is_valid(x)
 }
 \arguments{
-\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model, possibly restored from disk.}
+\item{x}{\verb{[rpf | rpf_pruned]}: A fitted \code{\link{rpf}} model, or a pruned one from
+\code{\link[=prune_components]{prune_components()}}, possibly restored from disk.}
 }
 \value{
 \code{TRUE} if the underlying model can be used, \code{FALSE} otherwise.

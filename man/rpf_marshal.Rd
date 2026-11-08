@@ -10,16 +10,18 @@ rpf_marshal(x, include_data = FALSE)
 rpf_unmarshal(blob)
 }
 \arguments{
-\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
+\item{x}{\verb{[rpf | rpf_pruned]}: A fitted \code{\link{rpf}} model, or a pruned one from
+\code{\link[=prune_components]{prune_components()}}.}
 
 \item{include_data}{\verb{[logical(1): FALSE]}: Store training data in the blob, enabling
 \code{\link[=purify]{purify()}} after restoring.}
 
-\item{blob}{\verb{[rpf_marshaled]}: Object created by \code{rpf_marshal()}.}
+\item{blob}{\verb{[rpf_marshaled | rpf_pruned_marshaled]}: Object created by \code{rpf_marshal()}.}
 }
 \value{
-\code{rpf_marshal()} returns a list of class \code{rpf_marshaled};
-\code{rpf_unmarshal()} returns an object of class \link{rpf}.
+\code{rpf_marshal()} returns a list of class \code{rpf_marshaled}
+(\code{rpf_pruned_marshaled} for a pruned forest);
+\code{rpf_unmarshal()} returns an object of class \link{rpf} (\code{rpf_pruned}).
 }
 \description{
 \code{rpf_marshal()} converts an \link{rpf} object into a plain R list safe for
@@ -31,6 +33,11 @@ required to store or transfer fitted models.
 Training data is only included with \code{include_data = TRUE}; without it, a
 restored forest can predict (including purified prediction if the forest
 was purified before marshaling) but can never be purified afterwards.
+
+A pruned forest from \code{\link[=prune_components]{prune_components()}} (class \code{rpf_pruned}) is marshaled
+the same way: its forest as above, and the pruning (rule, coefficients,
+components, CV table) as it is. The restored model predicts as before;
+its forest is purified, so it needs no training data for that.
 }
 \examples{
 fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)

@@ -2,23 +2,28 @@
 % Please edit documentation in R/bundle.R
 \name{bundle.rpf}
 \alias{bundle.rpf}
+\alias{bundle.rpf_pruned}
 \title{Bundle an rpf model}
 \usage{
 \method{bundle}{rpf}(x, ...)
+
+\method{bundle}{rpf_pruned}(x, ...)
 }
 \arguments{
-\item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
+\item{x}{\verb{[rpf | rpf_pruned]}: A fitted \code{\link{rpf}} model, or a pruned one from
+\code{\link[=prune_components]{prune_components()}}.}
 
 \item{...}{Unused.}
 }
 \value{
-An object of class \code{bundled_rpf} for \code{bundle()}, or the restored
-\link{rpf} object for \code{unbundle()}.
+An object of class \code{bundled_rpf} (\code{bundled_rpf_pruned}) for \code{bundle()},
+or the restored \link{rpf} (\code{rpf_pruned}) object for \code{unbundle()}.
 }
 \description{
 Method for \code{\link[bundle:bundle]{bundle::bundle()}} wrapping \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}},
 so rpf models work with the standard tidymodels serialization workflow.
 Training data is not included; see \code{\link[=rpf_marshal]{rpf_marshal()}} for the implications.
+Pruned forests from \code{\link[=prune_components]{prune_components()}} are bundled the same way.
 }
 \examples{
 \dontshow{if (requireNamespace("bundle", quietly = TRUE)) withAutoprint(\{ # examplesIf}
