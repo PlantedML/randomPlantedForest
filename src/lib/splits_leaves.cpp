@@ -49,14 +49,23 @@ void leaf_order_refs(
 // changes), the same random draws in the same order (one per entry with a
 // positive weight), the same keys -log(u) / w in the same order and the same
 // nth_element, so the same sample in the same order.
+//
+// With rows_check, entries whose rows_ok is 0 are left out, as an entry with
+// weight 0 is (no random draw).
 template <typename Cand>
 std::vector<size_t> draw_leaf_candidates(
-    std::vector<Cand> &pool, size_t n_candidates, double decay, std::vector<std::pair<double, size_t>> &keys
+    std::vector<Cand> &pool,
+    size_t n_candidates,
+    double decay,
+    std::vector<std::pair<double, size_t>> &keys,
+    bool rows_check
 )
 {
   keys.clear();
   for (size_t i = 0; i < pool.size(); ++i) {
     Cand &c = pool[i];
+    if (rows_check && c.rows_ok == 0)
+      continue;
     if (!(c.w_age == c.age)) {
       c.w = std::exp(-decay * c.age);
       c.w_age = c.age;
@@ -81,6 +90,47 @@ std::vector<size_t> draw_leaf_candidates(
     out.push_back(keys[j].second);
   return out;
 }
+
+// The distinct-value indices u of a leaf's sorted values (first positions
+// first_pos of the m rows) whose threshold leaves at least leaf_size distinct
+// values and at least min_rows rows on each side: [lo, hi_excl). first_pos is
+// increasing, so these u are contiguous. With min_rows = 1 this is
+// [leaf_size, distinct - leaf_size + 1), the range without a row limit.
+void min_rows_range(const std::vector<size_t> &first_pos, size_t m, int leaf_size, int min_rows, int &lo, int &hi_excl)
+{
+  const int n_distinct = (int)first_pos.size();
+  const size_t mr = (size_t)min_rows;
+  const int a = (int)(std::lower_bound(first_pos.begin(), first_pos.end(), mr) - first_pos.begin());
+  const int b = (m >= mr) ? (int)(std::upper_bound(first_pos.begin(), first_pos.end(), m - mr) - first_pos.begin()) : 0;
+  lo = std::max(leaf_size, a);
+  hi_excl = std::min(n_distinct - leaf_size + 1, b);
+}
+
+// Whether the leaf has a threshold on feature k with at least min_rows rows and
+// at least leaf_size distinct values on each side.
+bool min_rows_feasible(const std::vector<std::vector<double>> &X, const Leaf &leaf, int k, int leaf_size, int min_rows)
+{
+  const size_t m = leaf.individuals.size();
+  if (m < 2 * (size_t)min_rows || m < 2 * (size_t)leaf_size)
+    return false;
+  std::vector<double> v(m);
+  for (size_t i = 0; i < m; ++i)
+    v[i] = X[leaf.individuals[i]][k];
+  if (leaf_size == 1) { // a threshold exists iff the min_rows-th smallest value is below the min_rows-th largest
+    std::nth_element(v.begin(), v.begin() + (min_rows - 1), v.end());
+    const double a = v[min_rows - 1];
+    std::nth_element(v.begin(), v.begin() + (m - min_rows), v.end());
+    return a < v[m - min_rows];
+  }
+  std::sort(v.begin(), v.end());
+  std::vector<size_t> first_pos(1, 0);
+  for (size_t i = 1; i < m; ++i)
+    if (v[i] != v[i - 1])
+      first_pos.push_back(i);
+  int lo, hi_excl;
+  min_rows_range(first_pos, m, leaf_size, min_rows, lo, hi_excl);
+  return lo < hi_excl;
+}
 } // namespace
 
 Split RandomPlantedForest::calcOptimalSplit_leaves(
@@ -104,12 +154,24 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
   unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  // min_leaf_rows: pool entries whose leaf has no threshold with min_rows rows
+  // on each side are not drawn (checked once per leaf and feature)
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
   std::vector<size_t> sample_idxs;
   if (this->deterministic) {
     for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
       sample_idxs.push_back(i);
   } else {
-    sample_idxs = draw_leaf_candidates(possible_splits, n_candidates, this->split_decay_rate_, sc.keys);
+    if (rows_check)
+      for (auto &c : possible_splits)
+        if (c.rows_ok < 0) {
+          const bool ok =
+              c.tree && c.leaf_idx < c.tree->leaves.size() &&
+              min_rows_feasible(X, c.tree->leaves[c.leaf_idx], c.dim - 1, this->n_leaves[c.dim - 1], min_rows);
+          c.rows_ok = ok ? 1 : 0;
+        }
+    sample_idxs = draw_leaf_candidates(possible_splits, n_candidates, this->split_decay_rate_, sc.keys, rows_check);
   }
 
   int best_idx = -1;
@@ -126,7 +188,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     if (m == 0)
       continue;
     // Quick infeasibility check: cannot split if fewer than 2*leaf_size individuals
-    if (m < static_cast<size_t>(2 * leaf_size))
+    if (m < static_cast<size_t>(2 * leaf_size) || m < static_cast<size_t>(2 * min_rows))
       continue;
 
     // The leaf's cached order and sorted values by reference; its distinct
@@ -157,6 +219,11 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     std::vector<int> samples;
     int left = leaf_size;
     int right_exclusive = (int)unique.size() - leaf_size + 1;
+    if (rows_check) { // only thresholds with at least min_rows rows on each side
+      min_rows_range(first_pos, m, leaf_size, min_rows, left, right_exclusive);
+      if (left >= right_exclusive)
+        continue;
+    }
     samples = this->deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try)
                                   : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)this->split_try);
 
@@ -184,6 +251,8 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
       if (pos == 0 || pos >= m)
         continue;
       if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
+        continue;
+      if (pos < static_cast<size_t>(min_rows) || (m - pos) < static_cast<size_t>(min_rows))
         continue;
 
       double loss = 0.0;

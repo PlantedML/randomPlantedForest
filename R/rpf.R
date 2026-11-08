@@ -38,6 +38,11 @@
 #'   `exp(-split_decay_rate * age)`. `0` samples uniformly.
 #' @param delete_leaves `[logical(1): TRUE]`: Whether to delete a parent leaf when
 #'   splitting along an existing dimension.
+#' @param min_leaf_rows `[integer(1): 1]`: Minimum number of rows of the
+#'   bootstrap sample on each side of every split, so in every leaf. Leaves
+#'   without a threshold that keeps this many rows on each side are not drawn
+#'   as split candidates. Only for regression with `split_structure = "leaves"`; `1`
+#'   (no limit) otherwise.
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
 #'   regression, the only supported loss, and `"exponential"` for classification.
 #'   Classification also supports `"logit"`, which gives similar results but is
@@ -169,6 +174,7 @@ rpf.formula <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -199,6 +205,7 @@ rpf.formula <- function(
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
+    min_leaf_rows = min_leaf_rows,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -224,6 +231,7 @@ rpf.data.frame <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -247,6 +255,7 @@ rpf.data.frame <- function(
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
+    min_leaf_rows = min_leaf_rows,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -272,6 +281,7 @@ rpf.matrix <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -295,6 +305,7 @@ rpf.matrix <- function(
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
+    min_leaf_rows = min_leaf_rows,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -320,6 +331,7 @@ rpf.recipe <- function(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -343,6 +355,7 @@ rpf.recipe <- function(
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
+    min_leaf_rows = min_leaf_rows,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -368,6 +381,7 @@ rpf_bridge <- function(
   max_candidates,
   split_decay_rate,
   delete_leaves,
+  min_leaf_rows,
   loss,
   delta,
   epsilon,
@@ -407,6 +421,13 @@ rpf_bridge <- function(
   checkmate::assert_int(max_candidates, lower = 1)
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
+  checkmate::assert_int(min_leaf_rows, lower = 1)
+  if (min_leaf_rows > 1 && (outcomes$mode != "regression" || split_structure != "leaves")) {
+    cli::cli_abort(
+      "{.arg min_leaf_rows} > 1 needs regression with {.code split_structure = \"leaves\"}.",
+      call = call
+    )
+  }
 
   # "median" loss is implemented but discarded
   loss_functions <- switch(outcomes$mode, "regression" = "L2", "classification" = c("L1", "L2", "logit", "exponential"))
@@ -435,6 +456,7 @@ rpf_bridge <- function(
     split_decay_rate = split_decay_rate,
     max_candidates = max_candidates,
     delete_leaves = delete_leaves,
+    min_leaf_rows = as.integer(min_leaf_rows),
     split_structure = split_structure,
     delta = delta,
     epsilon = epsilon,
@@ -478,7 +500,9 @@ new_rpf <- function(fit, blueprint, ...) {
 }
 
 # Assemble the positional parameter vector for the C++ constructors.
-# 13 elements for regression, 15 (+ delta, epsilon) for classification.
+# 14 elements for regression (+ min_leaf_rows), 15 (+ delta, epsilon) for
+# classification. Models saved before min_leaf_rows existed have no such entry
+# in their params and were fitted with 1.
 rpf_param_vector <- function(params, mode) {
   split_mode <- switch(
     params$split_structure,
@@ -505,6 +529,8 @@ rpf_param_vector <- function(params, mode) {
   )
   if (mode == "classification") {
     base <- c(base, params$delta, params$epsilon)
+  } else {
+    base <- c(base, if (is.null(params$min_leaf_rows)) 1L else params$min_leaf_rows)
   }
   base
 }

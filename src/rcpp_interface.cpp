@@ -32,8 +32,8 @@ std::set<int> to_int_set(const NumericVector &v)
 
 RPFParams parse_rpf_params(const std::vector<double> &pars)
 {
-  if (pars.size() != 12 && pars.size() != 13)
-    Rcpp::stop("RandomPlantedForest requires 12 or 13 parameters, got %d", (int)pars.size());
+  if (pars.size() < 12 || pars.size() > 14)
+    Rcpp::stop("RandomPlantedForest requires 12 to 14 parameters, got %d", (int)pars.size());
   RPFParams p;
   p.max_interaction = pars[0];
   p.n_trees = pars[1];
@@ -47,8 +47,10 @@ RPFParams parse_rpf_params(const std::vector<double> &pars)
   p.split_decay_rate = pars[9];
   p.max_candidates = static_cast<size_t>(pars[10]);
   p.delete_leaves = (pars[11] != 0);
-  if (pars.size() == 13)
+  if (pars.size() >= 13)
     p.split_structure_mode = static_cast<int>(pars[12]);
+  if (pars.size() == 14)
+    p.min_leaf_rows = static_cast<int>(pars[13]);
   return p;
 }
 

@@ -22,6 +22,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -44,6 +45,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -66,6 +68,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -88,6 +91,7 @@ rpf(x, ...)
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -144,6 +148,12 @@ choosing it resets its age to zero, and splits are sampled with weight
 
 \item{delete_leaves}{\verb{[logical(1): TRUE]}: Whether to delete a parent leaf when
 splitting along an existing dimension.}
+
+\item{min_leaf_rows}{\verb{[integer(1): 1]}: Minimum number of rows of the
+bootstrap sample on each side of every split, so in every leaf. Leaves
+without a threshold that keeps this many rows on each side are not drawn
+as split candidates. Only for regression with \code{split_structure = "leaves"}; \code{1}
+(no limit) otherwise.}
 
 \item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
 regression, the only supported loss, and \code{"exponential"} for classification.

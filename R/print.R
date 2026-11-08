@@ -65,7 +65,9 @@ format.rpf <- function(x, ...) {
       "t_try",
       "max_candidates",
       "split_decay_rate",
-      "delete_leaves"
+      "delete_leaves",
+      # only when set, so that fits without it print as before
+      if (!is.null(params$min_leaf_rows) && params$min_leaf_rows > 1) "min_leaf_rows"
     )])
     if (x$mode == "classification") {
       cli::cli_h3("Loss")
