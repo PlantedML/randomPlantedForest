@@ -282,16 +282,16 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
         ensure_order_and_sorted_vals_for_leaf(X, *leaf_ptr, k, state.order_cf, state.sorted_vals);
         // Compute or reuse unique values and left/right bounds
         size_t unique_count = 0;
-        if (leaf_ptr->unique_vals_cache.count(k)) {
-          state.unique_ptr = &leaf_ptr->unique_vals_cache[k];
+        if (leaf_ptr->cache().unique_vals_cache.count(k)) {
+          state.unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
           unique_count = state.unique_ptr->size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
         } else {
           auto uniques = compute_unique_sorted_values(state.sorted_vals);
           unique_count = uniques.size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
-          leaf_ptr->unique_vals_cache[k] = std::move(uniques);
-          state.unique_ptr = &leaf_ptr->unique_vals_cache[k];
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_vals_cache[k] = std::move(uniques);
+          state.unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
         }
         const int leaf_size_here = this->n_leaves[k];
         state.left = leaf_size_here;

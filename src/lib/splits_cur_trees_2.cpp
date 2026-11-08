@@ -127,17 +127,17 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
         // Unique count & values caching
         std::vector<double> *unique_ptr = nullptr;
         size_t unique_count = 0;
-        if (leaf.unique_count_cache.count(k)) {
-          unique_count = leaf.unique_count_cache[k];
-          if (unique_count != 0 && leaf.unique_vals_cache.count(k))
-            unique_ptr = &leaf.unique_vals_cache[k];
+        if (leaf.cache().unique_count_cache.count(k)) {
+          unique_count = leaf.cache().unique_count_cache[k];
+          if (unique_count != 0 && leaf.cache().unique_vals_cache.count(k))
+            unique_ptr = &leaf.cache().unique_vals_cache[k];
         }
         if (!unique_ptr) {
           auto uniques = compute_unique_sorted_values(sorted_vals_cf);
           unique_count = uniques.size();
-          leaf.unique_count_cache[k] = unique_count;
-          leaf.unique_vals_cache[k] = std::move(uniques);
-          unique_ptr = &leaf.unique_vals_cache[k];
+          leaf.cache().unique_count_cache[k] = unique_count;
+          leaf.cache().unique_vals_cache[k] = std::move(uniques);
+          unique_ptr = &leaf.cache().unique_vals_cache[k];
         }
         if (unique_count < 2 * static_cast<size_t>(leaf_size))
           continue;
