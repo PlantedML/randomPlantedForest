@@ -1170,8 +1170,4 @@ void RandomPlantedForest::cross_validation(
    */
 }
 
-// purify_1 moved to lib/purify.cpp
-
-// purify_2 moved to lib/purify.cpp
-
 // purify_3 moved to lib/purify.cpp

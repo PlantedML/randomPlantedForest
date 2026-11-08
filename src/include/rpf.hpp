@@ -130,13 +130,9 @@ public:
   predict_components(const double *X, int n, int p, const std::vector<std::vector<int>> &sets, int nthreads = 0);
   // The feature sets (1-based) of the components a purified forest stores; every other component is zero.
   std::vector<std::vector<int>> purified_components() const;
-  // Optional post-processing to redistribute effects across component orders.
-  void purify_1();
-  void purify_2();
-  // Unified purifier: mode 1 = grid path, mode 2 = fast exact (KD-tree)
+  // Optional post-processing to redistribute effects across component orders: mode 1 = dense grids per tree,
+  // mode 2 = exact KD-tree counts, the components kept as weighted rectangles (rects.hpp)
   void purify(int maxp_interaction, int nthreads, int mode);
-  // Unified entry with explicit threading control
-  void purify_fast_exact(int maxp_interaction, int nthreads);
   // Human-readable dump of forest structure.
   void print(std::ostream &out);
   // Legacy coarse CV over a few parameters; currently a no-op.
