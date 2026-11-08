@@ -241,23 +241,20 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
     return tot;
   };
 
-  // Exact cache for KD range_count queries keyed by (dim, lo_idx, hi_idx) triples per constrained dim
-  // Key construction: 64-bit hash mixed from ordered triples to avoid building strings/sets
-  auto mix64 = [](unsigned long long x) {
-    x ^= x >> 33;
-    x *= 0xff51afd7ed558ccdULL;
-    x ^= x >> 33;
-    x *= 0xc4ceb9fe1a85ec53ULL;
-    x ^= x >> 33;
-    return x;
+  // Exact cache for KD range_count queries, keyed by the ordered (dim, lo_idx, hi_idx) triples of the constrained dims.
+  // The key is the triples themselves, so two different queries never share a cache entry.
+  struct KeyHash {
+    size_t operator()(const std::vector<int> &v) const
+    {
+      unsigned long long acc = 1469598103934665603ULL;
+      for (int x : v) {
+        acc ^= (unsigned long long)(unsigned int)x + 0x9e3779b97f4a7c15ULL + (acc << 6) + (acc >> 2);
+        acc = (acc ^ (acc >> 33)) * 0xff51afd7ed558ccdULL;
+      }
+      return (size_t)acc;
+    }
   };
-  auto pack3 = [&](unsigned long long acc, int d, int lo, int hi) {
-    unsigned long long k = ((unsigned long long)(unsigned int)d << 32) ^ ((unsigned long long)(unsigned int)lo << 16) ^
-                           (unsigned long long)(unsigned int)hi;
-    acc ^= mix64(k + 0x9e3779b97f4a7c15ULL + (acc << 6) + (acc >> 2));
-    return acc;
-  };
-  std::unordered_map<unsigned long long, size_t> kd_cache;
+  std::unordered_map<std::vector<int>, size_t, KeyHash> kd_cache;
   kd_cache.reserve(1u << 15);
 
   // 4) Accumulate leaf contributions from ALL trees T (any order), enumerating only S up to maxp
@@ -338,14 +335,17 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
         cons.reserve(U.size());
         bool empty_range = false;
         // Build exact cache key from ordered (dim, lo_idx, hi_idx)
-        unsigned long long key = 1469598103934665603ULL; // FNV offset basis-ish seed
+        std::vector<int> key;
+        key.reserve(3 * U.size());
         for (int u : U) {
           if (!rc_ok[u]) {
             empty_range = true;
             break;
           }
           cons.push_back(rc_by_dim[u]);
-          key = pack3(key, u - 1, rc_lo_idx[u], rc_hi_idx[u]);
+          key.push_back(u - 1);
+          key.push_back(rc_lo_idx[u]);
+          key.push_back(rc_hi_idx[u]);
         }
         size_t cnt = 0;
         if (empty_range)
