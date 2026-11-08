@@ -19,6 +19,11 @@
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
 
+## Performance
+
+* Fitting regression forests with `split_structure = "leaves"` (the default) is about 1.4 times as fast on larger data, for example 310 s → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
+  Fitted models are bitwise unchanged.
+
 # randomPlantedForest 0.5.0
 
 ## Breaking changes
