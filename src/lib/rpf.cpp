@@ -18,6 +18,8 @@ using namespace rpf_utils;
 // internal_utils.hpp for why this must be a trivially-destructible pointer
 // and not a thread_local std::vector).
 thread_local std::vector<std::vector<int>> *tls_working_bin_id_ptr = nullptr;
+// The same for the leaves split search's scratch buffers.
+thread_local LeavesScratch *tls_leaves_scratch_ptr = nullptr;
 
 // Utilities shared across modes
 bool RandomPlantedForest::possibleExists(
@@ -504,18 +506,40 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   // Non-res_trees modes use SplitCandidate pool
   std::vector<SplitCandidate> possible_splits;
   if (split_structure_mode_ == 3 || split_structure_mode_ == 4) {
-    // leaves: seed with leaf-level candidates from null tree (single leaf at index 0)
+    // The pool's (tree, leaf, feature) entries in a hash set, for the duplicate
+    // check (a linear scan of the pool, leafCandidateExists(), before). Entries
+    // are never removed, so the set and the pool hold the same entries.
+    struct EntryKey {
+      const DecisionTree *t;
+      size_t li;
+      int dim;
+      bool operator==(const EntryKey &o) const { return t == o.t && li == o.li && dim == o.dim; }
+    };
+    struct EntryHash {
+      size_t operator()(const EntryKey &e) const
+      {
+        size_t h = std::hash<const void *>()(e.t);
+        h ^= std::hash<size_t>()(e.li) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        h ^= std::hash<int>()(e.dim) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        return h;
+      }
+    };
+    std::unordered_set<EntryKey, EntryHash> pool_entries;
+    // Add per-leaf candidate entries for all dimensions, respecting max_interaction and dedup
     auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
+      if (!T)
+        return;
       for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
         std::set<int> res_dims = T->split_dims;
         res_dims.insert(feature_dim);
         res_dims.erase(0);
         if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction)
           continue;
-        if (!leafCandidateExists(possible_splits, T, li, feature_dim))
+        if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
           possible_splits.emplace_back(feature_dim, T, li);
       }
     };
+    // leaves: seed with leaf-level candidates from null tree (single leaf at index 0)
     auto null_tree = curr_family[{0}];
     if (!null_tree->leaves.empty())
       add_leaf_candidates(null_tree, 0);
@@ -568,6 +592,15 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       tls_working_bin_id_ptr = &working_bin_id;
     }
 
+    // The leaves split search's scratch buffers, reused across this family's
+    // splits. They live on this function's stack; TLS only holds a pointer to
+    // them, detached by the guard however the function exits.
+    LeavesScratch leaves_scratch;
+    struct LeavesScratchGuard {
+      ~LeavesScratchGuard() { tls_leaves_scratch_ptr = nullptr; }
+    } leaves_scratch_guard;
+    tls_leaves_scratch_ptr = &leaves_scratch;
+
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
 
@@ -606,21 +639,6 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
           found_tree = curr_family[resulting_dims];
         }
 
-        auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
-          if (!T)
-            return;
-          // Re-add per-leaf candidate entries for all dimensions, respecting max_interaction and dedup
-          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-            std::set<int> res_dims = T->split_dims;
-            res_dims.insert(feature_dim);
-            res_dims.erase(0);
-            if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction)
-              continue;
-            if (!leafCandidateExists(possible_splits, T, li, feature_dim)) {
-              possible_splits.emplace_back(feature_dim, T, li);
-            }
-          }
-        };
         if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate)) && delete_leaves) {
 
           leaf_s.value += curr_split.leaf_index->value;
@@ -633,13 +651,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
           size_t idx_s = curr_split.tree_index->leaves.size() - 1;
           add_leaf_candidates(curr_split.tree_index, idx_b);
           add_leaf_candidates(curr_split.tree_index, idx_s);
-          // invalidate per-leaf unique caches for new structure (affects cur_trees_2 only for this tree)
-          if (!curr_split.tree_index->leaves.empty()) {
-            for (auto &lf : curr_split.tree_index->leaves) {
-              lf.unique_count_cache.clear();
-              lf.unique_vals_cache.clear();
-            }
-          }
+          // (no loop over the tree's leaves clearing their unique-value caches: leaves and hist never fill them)
         } else {
 
           // Append by value; avoid referencing invalidated addresses
@@ -650,13 +662,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
           size_t idx_b = found_tree->leaves.size() - 1;
           add_leaf_candidates(found_tree, idx_s);
           add_leaf_candidates(found_tree, idx_b);
-          // invalidate unique caches on the receiving tree (cur_trees_2)
-          if (!found_tree->leaves.empty()) {
-            for (auto &lf : found_tree->leaves) {
-              lf.unique_count_cache.clear();
-              lf.unique_vals_cache.clear();
-            }
-          }
+          // (no loop over the tree's leaves clearing their unique-value caches: leaves and hist never fill them)
         }
       }
     }
