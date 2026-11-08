@@ -120,7 +120,6 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
     x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
     return (int)((((x + (x >> 4)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24);
   };
-  auto nextDown = [](double x) { return std::nextafter(x, -std::numeric_limits<double>::infinity()); };
 
   // 0) Ensure all subset components exist in the family (sources and targets)
   {
@@ -234,9 +233,7 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
     consU.reserve(U.size());
     for (int u : U) {
       const auto &lims = lim_list[u - 1];
-      double lo = lims.front();
-      double hi = nextDown(lims.back());
-      consU.push_back({u - 1, lo, hi});
+      consU.push_back({u - 1, lims.front(), lims.back()});
     }
     size_t cnt = consU.empty() ? (size_t)sample_size : kdt.range_count(consU);
     double tot = (double)cnt;
@@ -303,11 +300,10 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
         }
         double l = std::max(leaf.intervals[d - 1].first, lims.front());
         double r = std::min(leaf.intervals[d - 1].second, lims.back());
-        double hi = nextDown(r);
-        if (!(hi >= l)) {
+        if (!(r > l)) {
           rc_ok[d] = 0;
         } else {
-          rc_by_dim[d] = {d - 1, l, hi};
+          rc_by_dim[d] = {d - 1, l, r};
           rc_ok[d] = 1;
           int lidx = (int)(std::lower_bound(lims.begin(), lims.end(), l) - lims.begin());
           int ridx = (int)(std::lower_bound(lims.begin(), lims.end(), r) - lims.begin());
