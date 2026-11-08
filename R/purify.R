@@ -17,7 +17,10 @@
 #'   [predict()][predict.rpf()] still returns the whole forest's prediction.
 #'   `NULL` purifies all orders.
 #' @param mode `[integer(1): 2]`: Purification algorithm: `2` is the fast exact KD-tree
-#'   based algorithm, `1` the original grid-based one.
+#'   based algorithm, which keeps the components as weighted rectangles, `1` the
+#'   original grid-based one, which stores every component as a dense grid over
+#'   the split points and can run out of memory from `max_interaction = 3` on.
+#'   Both give the same components up to rounding.
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the
 #'   forest was fitted with, capped at the available cores.
 #' @param ... Reserved for future expansion.
