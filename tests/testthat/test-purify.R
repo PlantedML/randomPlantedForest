@@ -62,3 +62,47 @@ test_that("purify() purifies in place, returns invisibly and rejects unknown arg
   expect_true(is_purified(rp))
   expect_error(purify(rp, nthread = 2), class = "rlib_error_dots_nonempty")
 })
+
+test_that("purify(maxp_interaction = k) keeps predict(), and predict_components() sums to it", {
+  set.seed(3)
+  n <- 400
+  X <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n), x4 = runif(n))
+  y <- 4 * X$x1 * X$x2 * X$x3 + X$x4 + rnorm(n, sd = 0.3)
+  Xt <- X[1:100, ]
+  for (mode in 1:2) {
+    set.seed(1)
+    fit <- rpf(x = X, y = y, max_interaction = 4, ntrees = 10, splits = 60)
+    p0 <- predict(fit, Xt)
+    purify(fit, maxp_interaction = 2, mode = mode)
+    # the whole forest's prediction, not the intercept plus the components of order <= 2
+    expect_identical(predict(fit, Xt), p0)
+    # the components of order 3 and 4 are zero columns; their sum is the remainder
+    pc <- predict_components(fit, Xt)
+    expect_false(is.null(pc$remainder))
+    expect_equal(rowSums(pc$m) + pc$intercept + pc$remainder, p0$.pred, tolerance = 1e-12)
+    expect_gt(max(abs(pc$remainder)), 0.01)
+    expect_true(fit$fit$is_purify_capped())
+    # purifying all orders again clears the cap (R's purify() leaves a purified forest as it is)
+    fit$fit$purify_threads(0L, 0L, as.integer(mode))
+    expect_false(fit$fit$is_purify_capped())
+    expect_equal(predict(fit, Xt)$.pred, p0$.pred, tolerance = 1e-12)
+    expect_null(predict_components(fit, Xt)$remainder)
+  }
+})
+
+test_that("purify(maxp_interaction = k) keeps predict() for multiclass classification", {
+  set.seed(5)
+  fit <- rpf(Species ~ ., data = iris, max_interaction = 3, ntrees = 10, loss = "L2")
+  p0 <- predict(fit, iris, type = "numeric")
+  purify(fit, maxp_interaction = 1)
+  expect_identical(predict(fit, iris, type = "numeric"), p0)
+  pc <- predict_components(fit, iris)
+  for (level in pc$target_levels) {
+    cols <- endsWith(names(pc$m), paste0("__class:", level))
+    expect_equal(
+      rowSums(pc$m[, cols, with = FALSE]) + pc$intercept[[level]] + pc$remainder[[level]],
+      p0[[paste0(".pred_", level)]],
+      tolerance = 1e-12
+    )
+  }
+})

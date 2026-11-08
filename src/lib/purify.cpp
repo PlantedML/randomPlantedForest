@@ -518,6 +518,9 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     threads_to_use = std::min(obj, eff_avail);
   }
 
+  // Below the fit's order, the higher-order grids stay zero, so they no longer sum to the forest's prediction
+  const bool capped = maxp_interaction > 0 && maxp_interaction < std::min(max_interaction, feature_size);
+
   auto worker = [this, maxp_interaction, mode](TreeFamily &fam) {
     if (mode == 2)
       this->purify_fast_exact_family(fam, maxp_interaction);
@@ -559,12 +562,14 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
           std::rethrow_exception(e);
     }
     purified = true;
+    purify_capped = capped;
     return;
   }
 
   for (auto &fam : this->tree_families)
     worker(fam);
   purified = true;
+  purify_capped = capped;
 }
 
 // Purify a single family, but only materialize outputs up to maxp_interaction.

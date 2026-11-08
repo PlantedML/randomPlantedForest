@@ -142,8 +142,10 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   # If max_interaction here is smaller than that of model fit, we calculate a remainder term
   # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
+  # The same after purify(maxp_interaction = k) below the fit's order: the components above k
+  # are zero columns, and the remainder holds their sum.
 
-  if (max_interaction < object$params$max_interaction) {
+  if (max_interaction < object$params$max_interaction || object$fit$is_purify_capped()) {
     pred <- predict.rpf(object, new_data = new_data, type = "numeric")
 
     # handling differs if multiclass
