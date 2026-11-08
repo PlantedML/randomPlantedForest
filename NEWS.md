@@ -24,6 +24,11 @@
   Every fit records how often each training row is in each family's bootstrap sample (fits are unchanged), and `rpf_marshal(include_data = TRUE)` stores these in-bag counts.
   On 44 synthetic data sets with known sparse structure, the pruned models kept no false component (except five tiny main effects on one additive set) and 111 of the 113 true interactions, and their test error was 15% lower than that of the unpruned forest tuned by CV, lower on 42 of the 44 sets.
   The result, of class `rpf_pruned`, has methods for `predict()`, `predict_components()` (now an S3 generic) and `print()`, and works with `rpf_marshal()`, `rpf_unmarshal()` and `bundle()`.
+* `rpf(oob_path = TRUE)` gives the out-of-bag error along the splits from one regression fit, in `$oob_path`.
+  With the same seed, the forest with `k` splits is exactly the first `k` splits of a forest with more, so while each tree family grows, its prediction at the training rows outside its bootstrap sample is updated split by split.
+  The table has the plain and the corrected out-of-bag RMSE (the correction of `prune_components()`) at four checkpoints per doubling of the splits (`oob_path_checkpoints()`), or at given ones.
+  On 52 data sets, choosing `splits` by the lowest corrected error among the values of a cross-validation grid did as well as 5-fold cross-validation over that grid (test error 0.06% lower on average), at 0.9 of its cost.
+  The fitted forest is the same as without `oob_path`, which is off by default.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
