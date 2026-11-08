@@ -57,10 +57,11 @@ size_t fenwick_find_by_prefix(const std::vector<double> &bit, double target);
 // Append an element with value w (the new node also sums the elements of its range before it)
 void fenwick_push_back(std::vector<double> &bit, double w);
 
-// Sampling weight of a leaf in dimension k for cur_trees_1 / res_trees: its number of available thresholds,
+// Sampling weight of a leaf in dimension k for res_trees: its number of available thresholds,
 // max(0, unique values of X[, k] in the leaf - 2 * leaf_size + 1), the width of the range [leaf_size,
-// unique - leaf_size] the samplers draw from. Caches the unique count in leaf.unique_count_cache. Used by
-// both the lazy Fenwick rebuild and the incremental update after a split, so that the two agree.
+// unique - leaf_size] the samplers draw from. Caches the unique count in leaf.unique_count_cache. cur_trees_1
+// computes the same weight from the family's ranks (rpf_ct1::leaf_weight in cur_trees_1.hpp), in both its lazy
+// Fenwick rebuild and the incremental update after a split, so that the two agree.
 double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size);
 
 // Aging helper must be header (templated)

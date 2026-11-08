@@ -1,9 +1,254 @@
 // Split-mode: cur_trees_1. Samples feasible leaves proportionally to their
 // number of candidate thresholds, then evaluates a single threshold.
+//
+// How the search is organised (the fit is that of a row-by-row search, bit for bit):
+// - All tries of a split search (split_try per candidate) are drawn first, with the same random draws in the same
+//   order, and then evaluated; the first strict minimum in candidate and try order wins.
+// - A try's pass over its leaf's rows is branch-free and compares the rows' ranks (cur_trees_1.hpp) instead of their
+//   values. Four tries run in lockstep (rpf_ct1::lane_sums), so that the additions of their sums overlap. Each sum is
+//   still accumulated row by row in the leaf's row order, so the losses, the winner and the leaf values are the same.
+// - Leaf weights and distinct values come from the family's ranks: no sorted order is kept per leaf and feature.
 #include "rpf.hpp"
 #include "internal_utils.hpp"
+#include "cur_trees_1.hpp"
 
 using namespace rpf_utils;
+
+namespace rpf_ct1 {
+
+uint32_t FamilyRanks::next_epoch()
+{
+  if (++epoch == 0) {
+    std::fill(stamp.begin(), stamp.end(), 0u);
+    epoch = 1;
+  }
+  return epoch;
+}
+
+FamilyRanks &family_ranks(std::shared_ptr<FamilyRanks> &slot, const std::vector<std::vector<double>> &X)
+{
+  if (slot && slot->X == &X && slot->n == X.size())
+    return *slot;
+  auto fr = std::make_shared<FamilyRanks>();
+  fr->X = &X;
+  fr->n = X.size();
+  fr->p = X.empty() ? 0 : X[0].size();
+  fr->rank.assign(fr->p, std::vector<int32_t>(fr->n, 0));
+  fr->value.assign(fr->p, std::vector<double>());
+  std::vector<int32_t> idx(fr->n);
+  size_t max_distinct = 1;
+  for (size_t k = 0; k < fr->p; ++k) {
+    std::iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&](int32_t a, int32_t b) { return X[(size_t)a][k] < X[(size_t)b][k]; });
+    auto &rk = fr->rank[k];
+    auto &val = fr->value[k];
+    for (size_t i = 0; i < fr->n; ++i) {
+      const double v = X[(size_t)idx[i]][k];
+      if (val.empty() || val.back() < v)
+        val.push_back(v);
+      rk[(size_t)idx[i]] = (int32_t)val.size() - 1;
+    }
+    val.shrink_to_fit();
+    max_distinct = std::max(max_distinct, val.size());
+  }
+  fr->stamp.assign(max_distinct, 0u);
+  fr->epoch = 0;
+  slot = std::move(fr);
+  return *slot;
+}
+
+size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k)
+{
+  auto it = leaf.unique_count_cache.find(k);
+  if (it != leaf.unique_count_cache.end())
+    return it->second;
+  const int32_t *rk = fr.rank[(size_t)k].data();
+  uint32_t *st = fr.stamp.data();
+  const uint32_t e = fr.next_epoch();
+  size_t c = 0;
+  for (int ind : leaf.individuals) {
+    const int32_t r = rk[ind];
+    c += (st[r] != e) ? 1 : 0;
+    st[r] = e;
+  }
+  leaf.unique_count_cache[k] = c;
+  return c;
+}
+
+double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size)
+{
+  const size_t unique = unique_count(fr, leaf, k);
+  const long width_unique = (long)unique - 2L * (long)leaf_size + 1L;
+  return (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
+}
+
+const std::vector<double> &unique_values(FamilyRanks &fr, const std::vector<std::vector<double>> &X, Leaf &leaf, int k)
+{
+  auto it = leaf.unique_vals_cache.find(k);
+  if (it != leaf.unique_vals_cache.end())
+    return it->second;
+  const int32_t *rk = fr.rank[(size_t)k].data();
+  uint32_t *st = fr.stamp.data();
+  const uint32_t e = fr.next_epoch();
+  auto &buf = fr.buf;
+  buf.resize(leaf.individuals.size());
+  size_t c = 0;
+  for (int ind : leaf.individuals) {
+    const int32_t r = rk[ind];
+    buf[c] = r;
+    c += (st[r] != e) ? 1 : 0;
+    st[r] = e;
+  }
+  buf.resize(c);
+  std::sort(buf.begin(), buf.end());
+  const auto &val = fr.value[(size_t)k];
+  std::vector<double> u(buf.size());
+  for (size_t i = 0; i < buf.size(); ++i) {
+    double v = val[(size_t)buf[i]];
+    // -0 and +0 share a rank: the run is represented by its first row in the leaf's order, as a stable sort gives
+    if (v == 0.0)
+      for (int ind : leaf.individuals)
+        if (X[(size_t)ind][(size_t)k] == 0.0) {
+          v = X[(size_t)ind][(size_t)k];
+          break;
+        }
+    u[i] = v;
+  }
+  leaf.unique_count_cache[k] = u.size();
+  auto &slot = leaf.unique_vals_cache[k];
+  slot = std::move(u);
+  return slot;
+}
+
+int32_t rank_of(const FamilyRanks &fr, int k, double v)
+{
+  // std::lower_bound without branches: the first i with val[i] >= v
+  const auto &val = fr.value[(size_t)k];
+  if (val.empty())
+    return 0;
+  const double *base = val.data();
+  size_t n = val.size();
+  while (n > 1) {
+    const size_t half = n / 2;
+    base = (base[half] < v) ? base + half : base;
+    n -= half;
+  }
+  return (int32_t)((base - val.data()) + ((*base < v) ? 1 : 0));
+}
+
+namespace {
+// L lanes in lockstep over rows [i0, i1) of each. A row adds its y to its lane's "below" sum if its rank is below the
+// lane's threshold, and to the "not below" sum otherwise; the other sum gets + 0.0, which leaves it unchanged (a sum
+// starts at +0 and so is never -0). So each sum is the row-by-row sum over its rows in the leaf's order, as a pass
+// with a branch per row gives; the lanes only interleave independent sums.
+template <size_t L> void lanes_step(Lane *const *ln, size_t i0, size_t i1, const std::vector<std::vector<double>> &Y)
+{
+  const int *rows[L];
+  const int32_t *rk[L];
+  int32_t thr[L];
+  double S[L], B[L];
+  size_t N[L];
+  for (size_t j = 0; j < L; ++j) {
+    rows[j] = ln[j]->rows->data();
+    rk[j] = ln[j]->rk;
+    thr[j] = ln[j]->thr;
+    S[j] = ln[j]->s;
+    B[j] = ln[j]->b;
+    N[j] = ln[j]->ns;
+  }
+  for (size_t i = i0; i < i1; ++i) {
+    for (size_t j = 0; j < L; ++j) {
+      const int ind = rows[j][i];
+      const double y = Y[(size_t)ind][0];
+      const bool l = rk[j][ind] < thr[j];
+      S[j] += l ? y : 0.0;
+      B[j] += l ? 0.0 : y;
+      N[j] += l ? 1 : 0;
+    }
+  }
+  for (size_t j = 0; j < L; ++j) {
+    ln[j]->s = S[j];
+    ln[j]->b = B[j];
+    ln[j]->ns = N[j];
+  }
+}
+} // namespace
+
+void lane_sums(std::vector<Lane> &lanes, const std::vector<std::vector<double>> &Y)
+{
+  // Longest first, in groups of 4 of about the same length; within a group, when the shortest lane ends, the others
+  // go on with one lane fewer. The grouping changes no lane's sums, so the order of equal lengths does not matter.
+  std::vector<Lane *> ord(lanes.size());
+  for (size_t i = 0; i < lanes.size(); ++i) {
+    lanes[i].ns = 0;
+    lanes[i].s = 0.0;
+    lanes[i].b = 0.0;
+    ord[i] = &lanes[i];
+  }
+  std::sort(ord.begin(), ord.end(), [](const Lane *a, const Lane *b) { return a->rows->size() > b->rows->size(); });
+  for (size_t g = 0; g < ord.size(); g += 4) {
+    const size_t L = std::min<size_t>(4, ord.size() - g);
+    Lane *grp[4];
+    for (size_t j = 0; j < L; ++j)
+      grp[j] = ord[g + L - 1 - j]; // ascending length
+    size_t from = 0;
+    for (size_t j = 0; j < L; ++j) {
+      const size_t to = grp[j]->rows->size();
+      if (to > from) {
+        switch (L - j) {
+        case 4:
+          lanes_step<4>(grp + j, from, to, Y);
+          break;
+        case 3:
+          lanes_step<3>(grp + j, from, to, Y);
+          break;
+        case 2:
+          lanes_step<2>(grp + j, from, to, Y);
+          break;
+        default:
+          lanes_step<1>(grp + j, from, to, Y);
+          break;
+        }
+        from = to;
+      }
+    }
+  }
+}
+
+} // namespace rpf_ct1
+
+namespace {
+// One threshold of one leaf: the row-by-row pass, for responses with several columns.
+void sums_rowwise(
+    const std::vector<std::vector<double>> &X,
+    const std::vector<std::vector<double>> &Y,
+    const Leaf &leaf,
+    int k,
+    double sp,
+    size_t value_size,
+    size_t &ns,
+    size_t &nb,
+    std::vector<double> &sum_s,
+    std::vector<double> &sum_b
+)
+{
+  ns = 0;
+  nb = 0;
+  sum_s.assign(value_size, 0.0);
+  sum_b.assign(value_size, 0.0);
+  for (int ind : leaf.individuals) {
+    if (X[ind][k] < sp) {
+      ++ns;
+      for (size_t p = 0; p < value_size; ++p)
+        sum_s[p] += Y[ind][p];
+    } else {
+      ++nb;
+      for (size_t p = 0; p < value_size; ++p)
+        sum_b[p] += Y[ind][p];
+    }
+  }
+}
+} // namespace
 
 Split RandomPlantedForest::calcOptimalSplit_curTrees1(
     const std::vector<std::vector<double>> &Y,
@@ -105,7 +350,88 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
     for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
       sample_idxs.push_back(i);
   }
+
+  // The family's ranks of its working rows, held by its null tree
+  auto itNull = curr_family.find(std::set<int>{0});
+  if (itNull == curr_family.end())
+    throw std::logic_error("cur_trees_1: the tree family has no null tree.");
+  rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(itNull->second->ct1_ranks, X);
+  const bool one_column = (this->value_size == 1);
+
+  // A drawn (or, if deterministic, listed) threshold sp of a leaf in feature k, for candidate idx, and its sums
+  struct Try {
+    std::shared_ptr<DecisionTree> tree;
+    Leaf *leaf;
+    int k;
+    size_t idx;
+    double sp;
+    int32_t r_sp;
+    size_t ns, nb;
+    double s, b;
+    std::vector<double> sum_s, sum_b;
+  };
+  std::vector<Try> tries;
+  std::vector<rpf_ct1::Lane> lanes;
+  // The sums of tries[from..): with one column in lanes (rpf_ct1::lane_sums), with several row by row
+  auto evaluate = [&](size_t from) {
+    if (one_column) {
+      lanes.resize(tries.size() - from);
+      for (size_t i = from; i < tries.size(); ++i) {
+        const Try &t = tries[i];
+        lanes[i - from] = rpf_ct1::Lane{&t.leaf->individuals, fr.rank[(size_t)t.k].data(), t.r_sp, 0, 0.0, 0.0};
+      }
+      rpf_ct1::lane_sums(lanes, Y);
+      for (size_t i = from; i < tries.size(); ++i) {
+        Try &t = tries[i];
+        const rpf_ct1::Lane &l = lanes[i - from];
+        t.ns = l.ns;
+        t.nb = t.leaf->individuals.size() - l.ns;
+        t.s = l.s;
+        t.b = l.b;
+      }
+    } else {
+      for (size_t i = from; i < tries.size(); ++i) {
+        Try &t = tries[i];
+        sums_rowwise(X, Y, *t.leaf, t.k, t.sp, this->value_size, t.ns, t.nb, t.sum_s, t.sum_b);
+      }
+    }
+  };
+  // Compare tries[from..) in order (candidate order, then try order) with the best so far: the first strict minimum
+  // wins
   int best_idx = -1;
+  auto compare = [&](size_t from) {
+    for (size_t i = from; i < tries.size(); ++i) {
+      const Try &t = tries[i];
+      if (t.ns == 0 || t.nb == 0)
+        continue;
+      double loss = 0.0;
+      if (one_column) {
+        loss -= (t.s * t.s) / (double)t.ns;
+        loss -= (t.b * t.b) / (double)t.nb;
+      } else {
+        for (size_t p = 0; p < this->value_size; ++p) {
+          loss -= (t.sum_s[p] * t.sum_s[p]) / (double)t.ns;
+          loss -= (t.sum_b[p] * t.sum_b[p]) / (double)t.nb;
+        }
+      }
+      if (loss < min_split.min_sum) {
+        min_split.min_sum = loss;
+        min_split.tree_index = t.tree;
+        min_split.leaf_index = t.leaf;
+        min_split.split_coordinate = t.k + 1;
+        min_split.split_point = t.sp;
+        best_idx = (int)t.idx;
+        if (one_column) {
+          min_split.sum_s.assign(1, t.s);
+          min_split.sum_b.assign(1, t.b);
+        } else {
+          min_split.sum_s = t.sum_s;
+          min_split.sum_b = t.sum_b;
+        }
+      }
+    }
+  };
+
   for (size_t idx : sample_idxs) {
     auto it = possible_splits.begin();
     std::advance(it, idx);
@@ -149,7 +475,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         double total = 0.0;
         for (size_t li = 0; li < L; ++li) {
           // Weight = number of unique thresholds that respect min leaf size
-          const double w = leaf_threshold_weight(X, tree->leaves[li], kdim, leaf_size);
+          const double w = rpf_ct1::leaf_weight(fr, tree->leaves[li], kdim, leaf_size);
           wts[li] = w;
           total += w;
           if (w != 0.0)
@@ -181,6 +507,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
       if (src_info.empty() || total_all <= 0.0)
         continue;
 
+      // Draw the tries; they are evaluated with the other candidates' tries below (evaluating draws nothing)
       for (size_t t = 0; t < (size_t)this->split_try; ++t) {
         // Sample a source tree proportionally to its total weight
         double r_src = rng_runif(0.0, total_all);
@@ -205,123 +532,58 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
           continue;
         Leaf *leaf_ptr = &sel_tree->leaves[leaf_idx_sel];
         // Sample by unique thresholds: build/reuse unique values for this leaf and dim
-        std::vector<size_t> order_cf;
-        std::vector<double> sorted_vals_cf;
-        ensure_order_and_sorted_vals_for_leaf(X, *leaf_ptr, k, order_cf, sorted_vals_cf);
-        size_t unique_count = 0;
-        std::vector<double> *unique_ptr = nullptr;
-        if (leaf_ptr->unique_vals_cache.count(k)) {
-          unique_ptr = &leaf_ptr->unique_vals_cache[k];
-          unique_count = unique_ptr->size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
-        } else {
-          auto uniques = compute_unique_sorted_values(sorted_vals_cf);
-          unique_count = uniques.size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
-          leaf_ptr->unique_vals_cache[k] = std::move(uniques);
-          unique_ptr = &leaf_ptr->unique_vals_cache[k];
-        }
+        const std::vector<double> &uniques = rpf_ct1::unique_values(fr, X, *leaf_ptr, k);
+        const size_t unique_count = uniques.size();
         const int left = leaf_size;
         const int right_exclusive = (int)unique_count - leaf_size + 1;
         if (right_exclusive <= left)
           continue;
         int s_idx = rng_randint(left, right_exclusive);
-        double sp = (*unique_ptr)[(size_t)s_idx];
-
-        size_t ns = 0, nb = 0;
-        std::vector<double> sum_s_adj(this->value_size, 0.0), sum_b_adj(this->value_size, 0.0);
-        for (int ind : leaf_ptr->individuals) {
-          if (X[ind][k] < sp) {
-            ++ns;
-            for (size_t p = 0; p < this->value_size; ++p)
-              sum_s_adj[p] += Y[ind][p];
-          } else {
-            ++nb;
-            for (size_t p = 0; p < this->value_size; ++p)
-              sum_b_adj[p] += Y[ind][p];
-          }
-        }
-        if (ns == 0 || nb == 0)
-          continue;
-        double loss = 0.0;
-        for (size_t p = 0; p < this->value_size; ++p) {
-          loss -= (sum_s_adj[p] * sum_s_adj[p]) / (double)ns;
-          loss -= (sum_b_adj[p] * sum_b_adj[p]) / (double)nb;
-        }
-        if (loss < min_split.min_sum) {
-          min_split.min_sum = loss;
-          min_split.tree_index = sel_tree;
-          min_split.leaf_index = leaf_ptr;
-          min_split.split_coordinate = k + 1;
-          min_split.split_point = sp;
-          best_idx = (int)idx;
-          min_split.sum_s = sum_s_adj;
-          min_split.sum_b = sum_b_adj;
-        }
+        Try tr;
+        tr.tree = sel_tree;
+        tr.leaf = leaf_ptr;
+        tr.k = k;
+        tr.idx = idx;
+        tr.sp = uniques[(size_t)s_idx];
+        tr.r_sp = rpf_ct1::rank_of(fr, k, tr.sp);
+        tries.push_back(std::move(tr));
       }
     } else {
+      const size_t from = tries.size();
       for (const auto &src_tree : sources) {
         if (src_tree->leaves.empty())
           continue;
         for (auto &leaf : src_tree->leaves) {
-          std::vector<size_t> order_cf;
-          std::vector<double> sorted_vals_cf;
-          ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order_cf, sorted_vals_cf);
           // Build/reuse unique values for deterministic sampling across unique thresholds
-          size_t unique_count = 0;
-          std::vector<double> *unique_ptr = nullptr;
-          if (leaf.unique_vals_cache.count(k)) {
-            unique_ptr = &leaf.unique_vals_cache[k];
-            unique_count = unique_ptr->size();
-            leaf.unique_count_cache[k] = unique_count;
-          } else {
-            auto uniques = compute_unique_sorted_values(sorted_vals_cf);
-            unique_count = uniques.size();
-            leaf.unique_count_cache[k] = unique_count;
-            leaf.unique_vals_cache[k] = std::move(uniques);
-            unique_ptr = &leaf.unique_vals_cache[k];
-          }
+          const std::vector<double> &uniques = rpf_ct1::unique_values(fr, X, leaf, k);
+          const size_t unique_count = uniques.size();
           if ((int)unique_count < 2 * leaf_size)
             continue;
           int left = leaf_size;
           int right = (int)unique_count - leaf_size + 1;
           std::vector<int> samples = compute_even_spread_indices(left, right, (size_t)this->split_try);
           for (int s_idx : samples) {
-            const double sp = (*unique_ptr)[(size_t)s_idx];
-            size_t ns = 0, nb = 0;
-            std::vector<double> sum_s_adj(this->value_size, 0.0), sum_b_adj(this->value_size, 0.0);
-            for (int ind : leaf.individuals) {
-              if (X[ind][k] < sp) {
-                ++ns;
-                for (size_t p = 0; p < this->value_size; ++p)
-                  sum_s_adj[p] += Y[ind][p];
-              } else {
-                ++nb;
-                for (size_t p = 0; p < this->value_size; ++p)
-                  sum_b_adj[p] += Y[ind][p];
-              }
-            }
-            if (ns == 0 || nb == 0)
-              continue;
-            double loss = 0.0;
-            for (size_t p = 0; p < this->value_size; ++p) {
-              loss -= (sum_s_adj[p] * sum_s_adj[p]) / (double)ns;
-              loss -= (sum_b_adj[p] * sum_b_adj[p]) / (double)nb;
-            }
-            if (loss < min_split.min_sum) {
-              min_split.min_sum = loss;
-              min_split.tree_index = src_tree;
-              min_split.leaf_index = &leaf;
-              min_split.split_coordinate = k + 1;
-              min_split.split_point = sp;
-              best_idx = (int)idx;
-              min_split.sum_s = sum_s_adj;
-              min_split.sum_b = sum_b_adj;
-            }
+            Try tr;
+            tr.tree = src_tree;
+            tr.leaf = &leaf;
+            tr.k = k;
+            tr.idx = idx;
+            tr.sp = uniques[(size_t)s_idx];
+            tr.r_sp = rpf_ct1::rank_of(fr, k, tr.sp);
+            tries.push_back(std::move(tr));
           }
         }
       }
+      // Deterministic: the thresholds of all of a candidate's leaves at once
+      evaluate(from);
+      compare(from);
+      tries.clear();
     }
+  }
+  // Random: every candidate's tries at once (all draws are done)
+  if (!this->deterministic) {
+    evaluate(0);
+    compare(0);
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);

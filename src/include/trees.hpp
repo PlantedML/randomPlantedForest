@@ -8,6 +8,10 @@
 using namespace utils;
 using namespace grid;
 
+namespace rpf_ct1 {
+struct FamilyRanks; // cur_trees_1.hpp
+}
+
 class DecisionTree;
 struct Leaf {
   std::vector<int> individuals;    /**< considered samples for each leaf */
@@ -80,6 +84,9 @@ private:
   std::vector<std::vector<double>> leaf_weights_by_dim_v; // length == feature_size (lazy-sized)
   // For each feature dimension k, total weight across all leaves
   std::vector<double> weights_total_by_dim_v; // length == feature_size (lazy-sized)
+  // cur_trees_1: the family's ranks of its working rows (cur_trees_1.hpp), held by the null tree while the family
+  // grows (training only)
+  std::shared_ptr<rpf_ct1::FamilyRanks> ct1_ranks;
 };
 
 typedef std::map<std::set<int>, std::shared_ptr<DecisionTree>, setComp> TreeFamily;
