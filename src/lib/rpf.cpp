@@ -185,7 +185,9 @@ void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Mat
 void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
 {
   tree_families = std::vector<TreeFamily>(model.size());
-  inbag_.clear(); // restored with set_inbag(), if at all
+  inbag_.clear();       // restored with set_inbag(), if at all
+  path_sum_[0].clear(); // no OOB path
+  path_sum_[1].clear();
   for (size_t i = 0; i < model.size(); ++i) {
     for (const TreeExport &tree : model[i]) {
       if (tree.values.size() != tree.intervals.size())
@@ -525,9 +527,14 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
+    std::shared_ptr<PathTracker> path = path_start(n);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
+      if (path)
+        path_step(*path, split_count);
       curr_split = this->calcOptimalSplit_resTrees(samples_Y, samples_X, possible_trees, curr_family);
+      if (path && !std::isinf(curr_split.min_sum))
+        path_split(*path, curr_split);
       if (!std::isinf(curr_split.min_sum)) {
         // ensure D' and its one-step supersets are in pool
         std::set<int> Dprime = curr_split.tree_index->split_dims;
@@ -740,13 +747,18 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     } leaves_scratch_guard;
     tls_leaves_scratch_ptr = &leaves_scratch;
 
+    std::shared_ptr<PathTracker> path = path_start(n);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
+      if (path)
+        path_step(*path, split_count);
 
       if (split_structure_mode_ == 4)
         curr_split = this->calcOptimalSplit_hist(samples_Y, samples_X, possible_splits, curr_family);
       else
         curr_split = this->calcOptimalSplit_leaves(samples_Y, samples_X, possible_splits, curr_family);
+      if (path && !std::isinf(curr_split.min_sum))
+        path_split(*path, curr_split);
 
       if (!std::isinf(curr_split.min_sum)) {
 
@@ -888,12 +900,17 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
 
+  std::shared_ptr<PathTracker> path = path_start(n);
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
+    if (path)
+      path_step(*path, split_count);
     if (split_structure_mode_ == 2)
       curr_split = this->calcOptimalSplit_curTrees1(samples_Y, samples_X, possible_splits, curr_family);
     else
       curr_split = this->calcOptimalSplit_curTrees2(samples_Y, samples_X, possible_splits, curr_family);
+    if (path && !std::isinf(curr_split.min_sum))
+      path_split(*path, curr_split);
     if (!std::isinf(curr_split.min_sum)) {
       // Update possible_splits like tryeveryleaf/splittrynew
       for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {

@@ -296,6 +296,29 @@ public:
         Rcpp::Named("count") = count
     );
   }
+  // The out-of-bag path (regression): set the checkpoints before fit(), read the sums after it (see OobPath)
+  void set_oob_path(const Rcpp::IntegerVector &checkpoints)
+  {
+    core.set_oob_path(Rcpp::as<std::vector<int>>(checkpoints));
+  }
+  Rcpp::List oob_path()
+  {
+    if (!core.has_oob_path())
+      Rcpp::stop("The forest has no OOB path: fit it with `oob_path`.");
+    OobPath o = core.oob_path();
+    const int n = core.get_sample_size(), ncol = (int)(o.checkpoints.size() * core.get_value_size());
+    Rcpp::NumericMatrix s0(n, ncol), s1(n, ncol);
+    std::copy(o.sum0.begin(), o.sum0.end(), s0.begin());
+    std::copy(o.sum1.begin(), o.sum1.end(), s1.begin());
+    Rcpp::IntegerMatrix count(n, 2);
+    std::copy(o.count.begin(), o.count.end(), count.begin());
+    return Rcpp::List::create(
+        Rcpp::Named("checkpoints") = Rcpp::IntegerVector(o.checkpoints.begin(), o.checkpoints.end()),
+        Rcpp::Named("sum0") = s0,
+        Rcpp::Named("sum1") = s1,
+        Rcpp::Named("count") = count
+    );
+  }
 
 private:
   Core core;

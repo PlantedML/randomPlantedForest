@@ -9,6 +9,8 @@
 // - purify(): optional post-processing to orthogonalize components;
 //   purify_oob(): the same, plus every family's components at its
 //   out-of-bag training rows (from the in-bag counts of the fit)
+// - set_oob_path() / oob_path(): the out-of-bag error along the splits, from
+//   one fit (`lib/oob_path.cpp`)
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
 //   for serialization
@@ -86,6 +88,15 @@ struct OobComponents {
   std::vector<double> sum0, sum1;             /**< n x (sets.size() * value_size): the two sums */
   std::vector<double> intercept0, intercept1; /**< n x value_size: the sums of the families' intercepts */
   std::vector<int> count;                     /**< n x 2: the number of OOB families of each half */
+};
+
+// The out-of-bag (OOB) path of a fit with checkpoints (set_oob_path()): every family's prediction at each of its OOB
+// training rows (in-bag count 0) after each checkpoint's number of splits, summed per row over the families of even
+// and of odd index (0-based), in family order. All matrices are column-major.
+struct OobPath {
+  std::vector<int> checkpoints;   /**< the split counts, ascending */
+  std::vector<double> sum0, sum1; /**< n x (checkpoints.size() * value_size), column c * value_size + v */
+  std::vector<int> count;         /**< n x 2: the number of OOB families of each half */
 };
 
 namespace rpf_cnt {
@@ -182,6 +193,12 @@ public:
   // purify(maxp_interaction, nthreads, 2), and the out-of-bag components of the training rows (see OobComponents).
   // The purified forest is the same as after purify(). Needs the training data and the in-bag counts.
   OobComponents purify_oob(int maxp_interaction, int nthreads);
+  // Track the OOB path in the next fit() (regression): `checkpoints` are increasing split counts in 1..splits; empty
+  // turns it off (the default: a plain fit does none of this). The fit itself is unchanged.
+  void set_oob_path(const std::vector<int> &checkpoints);
+  // Whether the last fit tracked an OOB path; oob_path() returns it (see OobPath).
+  bool has_oob_path() const;
+  OobPath oob_path() const;
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -225,6 +242,24 @@ protected:
     if (c < 255)
       ++c;
   }
+  // The OOB path (oob_path.cpp). While family n grows, its tracker (path_tracker.hpp, owned by the family's thread)
+  // follows the family's prediction at its OOB rows split by split; after the family is grown, its snapshots are added
+  // to the sums on the calling thread in family order (path_merge), so the sums do not depend on the threads.
+  struct PathTracker;
+  std::vector<int> path_checkpoints_;
+  std::vector<double> path_sum_[2]; /**< as OobPath::sum0 / sum1 */
+  std::vector<std::shared_ptr<PathTracker>> path_family_;
+  // Clear the sums for a new fit (fit()); the checkpoints must lie in 1..n_splits
+  void path_reset();
+  // A tracker for family n after its bootstrap (nullptr if the path is off)
+  std::shared_ptr<PathTracker> path_start(size_t n);
+  // A split found by the search, before the family's leaves change: move the tracked rows of the split leaf to the two
+  // new leaves and add M_s / M_b to their predictions (the change of the family's prediction)
+  void path_split(PathTracker &trk, const Split &split) const;
+  // `k` splits are done: snapshot the predictions if k is the next checkpoint
+  void path_step(PathTracker &trk, int k) const;
+  // Family n is grown: its last snapshot, then add its snapshots to the sums and free its tracker
+  void path_merge(size_t n);
   GridFamilyExport family_grid_from_rects(size_t f) const;
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */

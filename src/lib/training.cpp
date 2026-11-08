@@ -26,6 +26,7 @@ void RandomPlantedForest::fit()
 
   this->tree_families = std::vector<TreeFamily>(n_trees);
   this->inbag_.assign((size_t)std::max(0, n_trees), std::vector<uint8_t>());
+  path_reset();
 
   // Per-tree seeds come from the binding's RNG (R's, via seed_source) so a seed
   // set there reproduces the fit regardless of threading mode.
@@ -81,6 +82,9 @@ void RandomPlantedForest::fit()
       for (auto &e : errors)
         if (e)
           std::rethrow_exception(e);
+      // the OOB path's sums, in family order
+      for (int i = 0; i < batch; ++i)
+        path_merge((size_t)(start + i));
     }
   } else {
     // Single-threaded: still drive randomness from per-tree seeds
@@ -94,6 +98,7 @@ void RandomPlantedForest::fit()
       }
       rpf_utils::swap_tls_rng(&rng_local);
       create_tree_family(initial_leaves, n);
+      path_merge((size_t)n);
     }
     rpf_utils::swap_tls_rng(prev_ptr);
   }
