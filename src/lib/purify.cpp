@@ -1,5 +1,8 @@
 #include "rpf.hpp"
 #include "kdtree.hpp"
+#include "subset_count.hpp"
+#include <array>
+#include <map>
 #include <functional>
 #include <numeric>
 #include <thread>
@@ -29,9 +32,13 @@ void RandomPlantedForest::purify_fast_exact_family(
     int maxp_interaction,
     const rpf_kd::KDTree &kdt,
     const std::vector<std::vector<double>> &cuts,
-    rpf_rect::Accumulator &acc
+    rpf_rect::Accumulator &acc,
+    const rpf_cnt::SubsetCounter *counter
 ) const
 {
+  auto range_count = [&](const std::vector<rpf_kd::RangeConstraint> &c) -> size_t {
+    return counter ? counter->range_count(c) : kdt.range_count(c);
+  };
   // Normalize cap: treat 0 (or out-of-range) as full order p = feature_size
   if (maxp_interaction <= 0 || maxp_interaction > feature_size)
     maxp_interaction = feature_size;
@@ -78,7 +85,7 @@ void RandomPlantedForest::purify_fast_exact_family(
       const auto &lims = lim_list[u - 1];
       consU.push_back({u - 1, lims.front(), lims.back()});
     }
-    size_t cnt = consU.empty() ? (size_t)sample_size : kdt.range_count(consU);
+    size_t cnt = consU.empty() ? (size_t)sample_size : range_count(consU);
     double tot = (double)cnt;
     tot_cache.insert({U, tot});
     return tot;
@@ -224,7 +231,7 @@ void RandomPlantedForest::purify_fast_exact_family(
           if (kIt != kd_cache.end())
             cnt = kIt->second;
           else {
-            cnt = kdt.range_count(cons);
+            cnt = range_count(cons);
             kd_cache.emplace(key, cnt);
           }
         }
@@ -259,12 +266,48 @@ void RandomPlantedForest::purify_fast_exact_family(
   acc.sort_merge();
 }
 
-// Unified purifier entry: mode 1 = grid path, mode 2 = fast exact path (weighted rectangles, see rects.hpp)
-void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int mode)
+// Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index.
+// after_batch(start, batch) runs on the calling thread after each batch.
+static void run_families(
+    size_t n_families,
+    unsigned threads_to_use,
+    const std::function<void(size_t)> &fn,
+    const std::function<void(size_t, size_t)> &after_batch
+)
 {
-  if (sample_size == 0 || X.empty())
-    throw std::runtime_error("Cannot purify: no training data available.");
+  for (size_t start = 0; start < n_families; start += (size_t)threads_to_use) {
+    size_t batch = std::min<size_t>((size_t)threads_to_use, n_families - start);
+    if (batch == 1)
+      fn(start);
+    else {
+      std::vector<std::thread> threads(batch);
+      std::vector<std::exception_ptr> errors(batch);
+      for (size_t i = 0; i < batch; ++i) {
+        // an exception escaping a std::thread would terminate R
+        threads[i] = std::thread(
+            [&fn, &errors, i](size_t f) {
+              try {
+                fn(f);
+              } catch (...) {
+                errors[i] = std::current_exception();
+              }
+            },
+            start + i
+        );
+      }
+      for (auto &th : threads)
+        if (th.joinable())
+          th.join();
+      for (auto &e : errors)
+        if (e)
+          std::rethrow_exception(e);
+    }
+    after_batch(start, batch);
+  }
+}
 
+unsigned RandomPlantedForest::purify_threads(int nthreads_param)
+{
   // Determine threads: if user provided >0, use it; otherwise default to
   // min(object-configured nthreads, hardware concurrency)
   unsigned int threads_to_use = 0;
@@ -277,52 +320,89 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     threads_to_use = std::min(obj, eff_avail);
   }
 
-  // Below the fit's order, the higher-order components stay zero, so they no longer sum to the forest's prediction
-  const bool capped = maxp_interaction > 0 && maxp_interaction < std::min(max_interaction, feature_size);
-
   if (threads_to_use > 1) {
     unsigned int avail = std::thread::hardware_concurrency();
     if (avail > 0 && threads_to_use > avail) {
       warn("Requested " + std::to_string(threads_to_use) + " threads but only " + std::to_string(avail) + " available");
     }
   }
-  threads_to_use = std::max(1u, threads_to_use);
+  return std::max(1u, threads_to_use);
+}
 
-  // Runs fn(family index) for all families, at most threads_to_use at a time, in batches of increasing index.
-  // after_batch(start, batch) runs on the calling thread after each batch.
-  auto run_families = [this, threads_to_use](
-                          const std::function<void(size_t)> &fn, const std::function<void(size_t, size_t)> &after_batch
-                      ) {
-    for (size_t start = 0; start < this->tree_families.size(); start += (size_t)threads_to_use) {
-      size_t batch = std::min<size_t>((size_t)threads_to_use, this->tree_families.size() - start);
-      if (batch == 1)
-        fn(start);
-      else {
-        std::vector<std::thread> threads(batch);
-        std::vector<std::exception_ptr> errors(batch);
-        for (size_t i = 0; i < batch; ++i) {
-          // an exception escaping a std::thread would terminate R
-          threads[i] = std::thread(
-              [&fn, &errors, i](size_t f) {
-                try {
-                  fn(f);
-                } catch (...) {
-                  errors[i] = std::current_exception();
-                }
-              },
-              start + i
-          );
-        }
-        for (auto &th : threads)
-          if (th.joinable())
-            th.join();
-        for (auto &e : errors)
-          if (e)
-            std::rethrow_exception(e);
-      }
-      after_batch(start, batch);
-    }
+// Unified purifier entry: mode 1 = grid path, mode 2 = fast exact path (weighted rectangles, see rects.hpp)
+void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int mode)
+{
+  if (sample_size == 0 || X.empty())
+    throw std::runtime_error("Cannot purify: no training data available.");
+  const unsigned threads_to_use = purify_threads(nthreads_param);
+
+  if (mode == 2) {
+    purify_mode2(maxp_interaction, threads_to_use, nullptr);
+    return;
+  }
+
+  // Below the fit's order, the higher-order components stay zero, so they no longer sum to the forest's prediction
+  const bool capped = maxp_interaction > 0 && maxp_interaction < std::min(max_interaction, feature_size);
+  // Drop the store of an earlier mode-2 purification. The forest counts as unpurified until the new components are in
+  // place.
+  rect_forest_.reset();
+  purified = false;
+  purify_capped = false;
+  purify_cap = 0;
+  run_families(
+      this->tree_families.size(),
+      threads_to_use,
+      [this, maxp_interaction](size_t f) { this->purify_3_family(this->tree_families[f], maxp_interaction); },
+      [](size_t, size_t) {}
+  );
+  purified = true;
+  purify_capped = capped;
+  purify_cap = capped ? maxp_interaction : 0;
+}
+
+// The OOB sums of purify_oob(), for the families of even (h = 0) and odd (h = 1) index
+struct RandomPlantedForest::OobSums {
+  size_t n = 0;
+  int vs = 1;
+  // S (1-based, ascending) -> per half the sum over the half's OOB families of f_S at each training row (n x vs)
+  std::map<std::vector<int>, std::array<std::vector<double>, 2>> sums;
+  std::array<std::vector<double>, 2> intercept; // per half: the sum of the families' intercepts (n x vs)
+  std::vector<int> count;                       // n x 2: the number of OOB families of each half
+  std::vector<int32_t> cells;                   // n x p: the cells of the training rows
+  // One family's components at its OOB rows, between their evaluation and their addition to the sums
+  struct Family {
+    std::vector<int> rows;
+    std::vector<std::vector<int>> sets;
+    std::vector<std::vector<double>> vals; // per component: rows.size() x vs
+    std::vector<double> intercept;
   };
+  std::vector<Family> slots;
+
+  void add(const Family &fam, int h)
+  {
+    const size_t m = fam.rows.size();
+    for (size_t k = 0; k < fam.sets.size(); ++k) {
+      auto &half = sums[fam.sets[k]][h];
+      if (half.empty())
+        half.assign(n * vs, 0.0);
+      const double *v = fam.vals[k].data();
+      for (size_t r = 0; r < m; ++r)
+        for (int c = 0; c < vs; ++c)
+          half[(size_t)fam.rows[r] * vs + c] += v[r * vs + c];
+    }
+    for (size_t r = 0; r < m; ++r) {
+      const size_t i = (size_t)fam.rows[r];
+      for (int c = 0; c < vs; ++c)
+        intercept[h][i * vs + c] += fam.intercept[c];
+      count[i * 2 + h] += 1;
+    }
+  }
+};
+
+void RandomPlantedForest::purify_mode2(int maxp_interaction, unsigned threads_to_use, OobSums *oob)
+{
+  // Below the fit's order, the higher-order components stay zero, so they no longer sum to the forest's prediction
+  const bool capped = maxp_interaction > 0 && maxp_interaction < std::min(max_interaction, feature_size);
 
   // Drop the store of an earlier mode-2 purification first: it is not read here, and holding both would double the
   // memory. The forest counts as unpurified until the new components are in place.
@@ -331,18 +411,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   purify_capped = false;
   purify_cap = 0;
 
-  if (mode != 2) {
-    run_families(
-        [this, maxp_interaction](size_t f) { this->purify_3_family(this->tree_families[f], maxp_interaction); },
-        [](size_t, size_t) {}
-    );
-    purified = true;
-    purify_capped = capped;
-    purify_cap = capped ? maxp_interaction : 0;
-    return;
-  }
-
-  // Mode 2. Drop the dense grids of an earlier mode-1 purification.
+  // Drop the dense grids of an earlier mode-1 purification.
   for (auto &fam : this->tree_families)
     for (auto &tree : fam)
       tree.second->GridLeaves = LeafGrid();
@@ -366,22 +435,68 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     c.shrink_to_fit();
   }
 
-  std::vector<int> all_idx(sample_size);
-  std::iota(all_idx.begin(), all_idx.end(), 0);
-  rpf_kd::KDTree kdt(&X, all_idx, feature_size);
+  // The range counts: from one k-d tree over all features, or (purify_oob()) from per-subset k-d trees, which give the
+  // same integers faster (subset_count.hpp)
+  rpf_kd::KDTree kdt;
+  std::unique_ptr<rpf_cnt::SubsetCounter> counter;
+  if (oob)
+    counter.reset(new rpf_cnt::SubsetCounter(&X, feature_size));
+  else {
+    std::vector<int> all_idx(sample_size);
+    std::iota(all_idx.begin(), all_idx.end(), 0);
+    kdt.build(&X, all_idx, feature_size);
+  }
+
+  const size_t stride = (size_t)std::max(1, feature_size);
+  if (oob) {
+    oob->n = (size_t)sample_size;
+    oob->vs = (int)value_size;
+    for (int h = 0; h < 2; ++h)
+      oob->intercept[h].assign(oob->n * value_size, 0.0);
+    oob->count.assign(oob->n * 2, 0);
+    oob->cells.assign(oob->n * stride, 0);
+    for (size_t i = 0; i < oob->n; ++i)
+      for (int d = 0; d < feature_size; ++d)
+        oob->cells[i * stride + d] = forest->cell(d, X[i][d]);
+    oob->slots.assign(threads_to_use, OobSums::Family());
+  }
 
   // Families are merged in index order through a binary counter (pairwise merges of equal size), so the result
   // does not depend on the number of threads and the working set stays near the size of the merged result.
+  // With oob, each family's components are first evaluated at its OOB rows (on its thread) and then added to the
+  // sums in family order (on the calling thread), so the sums do not depend on the number of threads either.
   std::vector<std::pair<int, rpf_rect::Accumulator>> stack;
   std::vector<rpf_rect::Accumulator> batch_acc(threads_to_use);
   run_families(
+      this->tree_families.size(),
+      threads_to_use,
       [&](size_t f) {
-        this->purify_fast_exact_family(
-            this->tree_families[f], maxp_interaction, kdt, forest->cuts, batch_acc[f % threads_to_use]
-        );
+        rpf_rect::Accumulator &acc = batch_acc[f % threads_to_use];
+        this->purify_fast_exact_family(this->tree_families[f], maxp_interaction, kdt, forest->cuts, acc, counter.get());
+        if (!oob)
+          return;
+        OobSums::Family &fam = oob->slots[f % threads_to_use];
+        fam = OobSums::Family();
+        const std::vector<uint8_t> &inb = this->inbag_[f];
+        for (size_t i = 0; i < oob->n; ++i)
+          if (inb[i] == 0)
+            fam.rows.push_back((int)i);
+        std::vector<int32_t> cells(fam.rows.size() * stride);
+        for (size_t r = 0; r < fam.rows.size(); ++r)
+          std::copy_n(oob->cells.begin() + (size_t)fam.rows[r] * stride, stride, cells.begin() + r * stride);
+        for (const auto &c : acc.comps)
+          fam.sets.push_back(c.first);
+        forest->eval_accumulator(acc, cells.data(), stride, fam.rows.size(), (int)value_size, fam.vals);
+        fam.intercept = acc.intercept;
+        if (fam.intercept.empty())
+          fam.intercept.assign(value_size, 0.0);
       },
-      [&](size_t, size_t batch) {
+      [&](size_t start, size_t batch) {
         for (size_t i = 0; i < batch; ++i) {
+          if (oob) {
+            oob->add(oob->slots[i], (int)((start + i) % 2));
+            oob->slots[i] = OobSums::Family();
+          }
           stack.emplace_back(0, std::move(batch_acc[i]));
           batch_acc[i] = rpf_rect::Accumulator();
           while (stack.size() >= 2 && stack[stack.size() - 2].first == stack.back().first) {
@@ -402,6 +517,60 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   purified = true;
   purify_capped = capped;
   purify_cap = capped ? maxp_interaction : 0;
+}
+
+OobComponents RandomPlantedForest::purify_oob(int maxp_interaction, int nthreads_param)
+{
+  if (sample_size == 0 || X.empty())
+    throw std::runtime_error("Cannot purify: no training data available.");
+  bool ok = inbag_.size() == tree_families.size() && !tree_families.empty();
+  for (const auto &inb : inbag_)
+    ok = ok && inb.size() == (size_t)sample_size;
+  if (!ok)
+    throw std::invalid_argument("The forest has no in-bag counts.");
+  OobSums oob;
+  purify_mode2(maxp_interaction, purify_threads(nthreads_param), &oob);
+
+  // To column-major matrices; each component's sums are freed once copied.
+  const size_t n = oob.n, vs = value_size, K = oob.sums.size();
+  OobComponents out;
+  out.sum0.assign(n * K * vs, 0.0);
+  out.sum1.assign(n * K * vs, 0.0);
+  size_t k = 0;
+  for (auto it = oob.sums.begin(); it != oob.sums.end(); it = oob.sums.erase(it), ++k) {
+    out.sets.push_back(it->first);
+    for (int h = 0; h < 2; ++h) {
+      const std::vector<double> &half = it->second[h];
+      if (half.empty())
+        continue;
+      std::vector<double> &dst = h == 0 ? out.sum0 : out.sum1;
+      for (size_t c = 0; c < vs; ++c)
+        for (size_t i = 0; i < n; ++i)
+          dst[(k * vs + c) * n + i] = half[i * vs + c];
+    }
+  }
+  out.intercept0.assign(n * vs, 0.0);
+  out.intercept1.assign(n * vs, 0.0);
+  out.count.assign(n * 2, 0);
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t c = 0; c < vs; ++c) {
+      out.intercept0[c * n + i] = oob.intercept[0][i * vs + c];
+      out.intercept1[c * n + i] = oob.intercept[1][i * vs + c];
+    }
+    out.count[i] = oob.count[i * 2];
+    out.count[n + i] = oob.count[i * 2 + 1];
+  }
+  return out;
+}
+
+void RandomPlantedForest::set_inbag(std::vector<std::vector<uint8_t>> inbag)
+{
+  if (inbag.size() != tree_families.size())
+    throw std::invalid_argument("In-bag counts: one vector per tree family expected.");
+  for (const auto &inb : inbag)
+    if (inb.size() != (size_t)sample_size)
+      throw std::invalid_argument("In-bag counts: one count per training row expected.");
+  inbag_ = std::move(inbag);
 }
 
 // The components of purify(mode = 2) of one family on the dense grid over the family's cut points, in the format of

@@ -478,14 +478,7 @@ struct PurifiedForest {
       comp.S = it->first;
       comp.constant = it->second.first;
       for (auto &g : it->second.second) {
-        Group grp;
-        for (size_t b = 0; b < comp.S.size(); ++b)
-          if (g.first & (1 << b)) {
-            grp.pos.push_back((int)b);
-            grp.feat.push_back(comp.S[b] - 1);
-          }
-        grp.rects = std::move(g.second);
-        grp.rects.drop_zeros();
+        Group grp = make_group(comp.S, g.first, std::move(g.second));
         if (grp.rects.size() == 0)
           continue;
         n_rects += grp.rects.size();
@@ -509,6 +502,51 @@ struct PurifiedForest {
         threads.emplace_back(work);
       for (auto &th : threads)
         th.join();
+    }
+  }
+
+  // The group of component S for the features of mask jmask (over the positions of S), its exact zeros dropped
+  static Group make_group(const std::vector<int> &S, int jmask, RectList rects)
+  {
+    Group grp;
+    for (size_t b = 0; b < S.size(); ++b)
+      if (jmask & (1 << b)) {
+        grp.pos.push_back((int)b);
+        grp.feat.push_back(S[b] - 1);
+      }
+    grp.rects = std::move(rects);
+    grp.rects.drop_zeros();
+    return grp;
+  }
+
+  // The components of acc (e.g. one family's, sorted and merged; acc is not changed) at n points, in the cells of
+  // this forest: out[k] (n x vs, row-major) for the k-th component of acc.comps. cells is n x stride, row-major,
+  // indexed by 0-based feature. The groups are indexed as build_from() does, one component at a time.
+  void eval_accumulator(
+      const Accumulator &acc,
+      const int32_t *cells,
+      size_t stride,
+      size_t n,
+      int vs,
+      std::vector<std::vector<double>> &out
+  ) const
+  {
+    out.assign(acc.comps.size(), std::vector<double>());
+    size_t k = 0;
+    for (const auto &c : acc.comps) {
+      Component comp;
+      comp.S = c.first;
+      comp.constant = c.second.first;
+      for (const auto &g : c.second.second) {
+        Group grp = make_group(comp.S, g.first, g.second);
+        if (grp.rects.size() == 0)
+          continue;
+        build_group(grp, vs);
+        comp.groups.push_back(std::move(grp));
+      }
+      out[k].assign(n * (size_t)vs, 0.0);
+      add_component_rows(comp, cells, stride, n, out[k].data(), vs);
+      ++k;
     }
   }
 

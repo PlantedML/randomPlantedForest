@@ -1115,6 +1115,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
 
   // sample data points with replacement
   int sample_index;
+  init_inbag(n);
   std::vector<std::vector<double>> samples_X;
   std::vector<std::vector<double>> samples_Y;
 
@@ -1130,6 +1131,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     // bagging/subsampling
     for (size_t i = 0; i < (size_t)sample_size; ++i) {
       sample_index = rpf_utils::rng_randint(0, (int)sample_size);
+      add_inbag(n, sample_index);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
     }

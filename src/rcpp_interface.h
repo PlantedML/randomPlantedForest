@@ -234,6 +234,68 @@ public:
   void set_purify_capped(bool capped) { core.set_purify_capped(capped); }
   int get_purify_cap() { return core.get_purify_cap(); }
   void set_purify_cap(int cap) { core.set_purify_cap(cap); }
+  // In-bag counts: an n x ntrees integer matrix (how often each training row is in each family's bootstrap sample)
+  Rcpp::IntegerMatrix inbag()
+  {
+    const auto &inb = core.get_inbag();
+    const int n = core.get_sample_size();
+    if (inb.empty())
+      Rcpp::stop(
+          "The forest has no in-bag counts. If it was restored with rpf_unmarshal(), marshal it with "
+          "include_data = TRUE."
+      );
+    Rcpp::IntegerMatrix out(n, (int)inb.size());
+    for (size_t f = 0; f < inb.size(); ++f)
+      std::copy(inb[f].begin(), inb[f].end(), out.begin() + f * (size_t)n);
+    return out;
+  }
+  void set_inbag(const Rcpp::IntegerMatrix &x)
+  {
+    std::vector<std::vector<uint8_t>> inb((size_t)x.ncol());
+    for (int f = 0; f < x.ncol(); ++f)
+      for (int i = 0; i < x.nrow(); ++i) {
+        const int c = x(i, f);
+        if (c < 0 || c > 255)
+          Rcpp::stop("In-bag counts must lie in 0..255.");
+        inb[(size_t)f].push_back((uint8_t)c);
+      }
+    core.set_inbag(std::move(inb));
+  }
+  // purify(maxp_interaction, nthreads, 2), and the out-of-bag components of the training rows (see OobComponents)
+  Rcpp::List purify_oob(int maxp_interaction, int nthreads)
+  {
+    if (core.get_X().empty())
+      Rcpp::stop(
+          "Cannot purify: no training data available. If this forest was "
+          "restored with rpf_unmarshal(), marshal it with include_data = TRUE."
+      );
+    if (core.get_inbag().empty())
+      Rcpp::stop(
+          "The forest has no in-bag counts. If it was restored with rpf_unmarshal(), marshal it with "
+          "include_data = TRUE."
+      );
+    OobComponents o = core.purify_oob(maxp_interaction, nthreads);
+    const int n = core.get_sample_size(), vs = core.get_value_size(), K = (int)o.sets.size();
+    Rcpp::List sets(K);
+    for (int k = 0; k < K; ++k)
+      sets[k] = Rcpp::IntegerVector(o.sets[k].begin(), o.sets[k].end());
+    auto num = [n](std::vector<double> &v, int ncol) {
+      Rcpp::NumericMatrix m(n, ncol);
+      std::copy(v.begin(), v.end(), m.begin());
+      std::vector<double>().swap(v);
+      return m;
+    };
+    Rcpp::IntegerMatrix count(n, 2);
+    std::copy(o.count.begin(), o.count.end(), count.begin());
+    return Rcpp::List::create(
+        Rcpp::Named("sets") = sets,
+        Rcpp::Named("sum0") = num(o.sum0, K * vs),
+        Rcpp::Named("sum1") = num(o.sum1, K * vs),
+        Rcpp::Named("intercept0") = num(o.intercept0, vs),
+        Rcpp::Named("intercept1") = num(o.intercept1, vs),
+        Rcpp::Named("count") = count
+    );
+  }
 
 private:
   Core core;

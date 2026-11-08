@@ -25,6 +25,7 @@ void RandomPlantedForest::fit()
   std::vector<Leaf> initial_leaves{initial_leaf};
 
   this->tree_families = std::vector<TreeFamily>(n_trees);
+  this->inbag_.assign((size_t)std::max(0, n_trees), std::vector<uint8_t>());
 
   // Per-tree seeds come from the binding's RNG (R's, via seed_source) so a seed
   // set there reproduces the fit regardless of threading mode.
