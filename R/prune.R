@@ -1136,6 +1136,21 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
       )
     )
   }
+  if (!is.null(x$tune)) {
+    st <- x$tune$settings
+    lines <- c(
+      sprintf(
+        "Tuned out of bag (rpf(tune = )): %d forests; chosen split_try = %d, t_try = %s, min_leaf_rows = %d, splits = %d.",
+        nrow(x$tune$search),
+        st$split_try,
+        format(st$t_try),
+        st$min_leaf_rows,
+        st$splits
+      ),
+      "",
+      lines
+    )
+  }
   if (!is.null(x$display)) {
     lines <- c(lines, "", format_display(x, n_show))
   }
