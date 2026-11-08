@@ -23,7 +23,8 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
       .method("get_grid_leaves", &T::get_grid_leaves)
       .method("set_grid_leaves", &T::set_grid_leaves)
       .method("is_purified", &T::is_purified)
-      .method("is_purify_capped", &T::is_purify_capped);
+      .method("is_purify_capped", &T::is_purify_capped)
+      .method("set_purify_capped", &T::set_purify_capped);
 }
 
 RCPP_MODULE(mod_rpf)

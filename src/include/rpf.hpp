@@ -123,6 +123,8 @@ public:
   bool is_purified();
   // Whether the last purify() computed the components only up to an order below max_interaction.
   bool is_purify_capped() const;
+  // Restore that state after set_grid_leaves() (serialization path).
+  void set_purify_capped(bool capped);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
