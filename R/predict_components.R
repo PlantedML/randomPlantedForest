@@ -37,6 +37,11 @@
 #' by `predictors`.
 #' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
 #' which can be used to disassemble `m`, as names include both term and target level.
+#' - `remainder` (`numeric`): Only if `m` leaves out components of the forest: if `max_interaction`
+#' (lowered to the number of `predictors`) is below that of the [`rpf`] object, or if the forest was purified
+#' with a `maxp_interaction` below it (see [purify()]). The prediction minus `intercept` and `m`'s row sums,
+#' so that the three sum to the prediction.
+#' For multiclass classification, one column per target level.
 #'
 #' @export
 #' @importFrom hardhat forge

@@ -34,6 +34,11 @@ For multiclass classification, one value per target level, named by \code{target
 by \code{predictors}.
 \item \code{target_levels} (\code{character}): For multiclass classification only: Vector of target levels
 which can be used to disassemble \code{m}, as names include both term and target level.
+\item \code{remainder} (\code{numeric}): Only if \code{m} leaves out components of the forest: if \code{max_interaction}
+(lowered to the number of \code{predictors}) is below that of the \code{\link{rpf}} object, or if the forest was purified
+with a \code{maxp_interaction} below it (see \code{\link[=purify]{purify()}}). The prediction minus \code{intercept} and \code{m}'s row sums,
+so that the three sum to the prediction.
+For multiclass classification, one column per target level.
 }
 }
 \description{

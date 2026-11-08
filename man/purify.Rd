@@ -15,8 +15,10 @@ is_purified(x)
 \item{...}{Reserved for future expansion.}
 
 \item{maxp_interaction}{\verb{[integer(1) | NULL: NULL]}: Highest interaction order to purify.
-Higher-order components are set to zero, but still influence lower orders
-during purification, and \code{\link[=predict_components]{predict_components()}} then returns zero for them.
+Higher-order components are not computed, but still influence lower orders
+during purification, which are the same as when purifying all orders.
+\code{\link[=predict_components]{predict_components()}} then returns zero for the higher orders and their sum as \code{remainder}.
+\link[=predict.rpf]{predict()} still returns the whole forest's prediction.
 \code{NULL} purifies all orders.}
 
 \item{mode}{\verb{[integer(1): 2]}: Purification algorithm: \code{2} is the fast exact KD-tree
