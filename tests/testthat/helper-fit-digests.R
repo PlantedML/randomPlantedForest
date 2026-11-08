@@ -7,7 +7,7 @@
 #   component names; separately predict() after purify().
 #
 # Every argument whose default may change is given explicitly (max_interaction, ntrees, splits, split_try, t_try,
-# loss); the deterministic fits use ntrees = 1. Digests hold per platform only (libm and
+# loss), and options(randomPlantedForest.exact_draw = TRUE); the deterministic fits use ntrees = 1. Digests hold per platform only (libm and
 # std::uniform_int_distribution differ between platforms), so the test pins them for macOS arm64.
 
 port_digest_data <- function() {
@@ -70,6 +70,9 @@ port_purified_numbers <- function(fit, newdata, type = NULL) {
 
 # all numbers, by digest name
 port_fit_numbers_all <- function() {
+  # the exact draw of "leaves" candidates, as master (its default may change)
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old), add = TRUE)
   d <- port_digest_data()
   nd <- d[1:40, ]
   fo <- y ~ x1 + x2 + x3 + x4 + x5
