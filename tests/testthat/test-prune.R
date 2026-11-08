@@ -17,7 +17,7 @@ test_that("CV pruning keeps the true components and drops the false ones", {
   d <- prune_sim()
   fit <- prune_fit(d)
   fold_id <- rep_len(1:5, nrow(d$x))
-  pr <- prune_components(fit, d$x, d$y, fold_id = fold_id, seed = 3)
+  pr <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3)
 
   expect_s3_class(pr, "rpf_pruned")
   expect_setequal(names(pr$beta), c("x1", "x2:x3"))
@@ -39,13 +39,13 @@ test_that("CV pruning keeps the true components and drops the false ones", {
   expect_gte(pr$cv$tau[pr$cv$one_se], pr$tau)
 
   # the 1-SE rule picks the marked candidate
-  pr1 <- prune_components(fit, d$x, d$y, fold_id = fold_id, seed = 3, select = "1se")
+  pr1 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, select = "1se")
   expect_identical(pr1$cv, pr$cv)
   one <- pr$cv[pr$cv$one_se, ]
   expect_equal(c(pr1$rule, pr1$tau), c(one$rule, one$tau))
 
   # reproducible with the same folds and seed
-  pr2 <- prune_components(fit, d$x, d$y, fold_id = fold_id, seed = 3)
+  pr2 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3)
   expect_identical(pr2$cv, pr$cv)
   expect_identical(pr2$beta, pr$beta)
 })
@@ -53,8 +53,8 @@ test_that("CV pruning keeps the true components and drops the false ones", {
 test_that("the result does not depend on nthreads", {
   d <- prune_sim()
   fold_id <- rep_len(1:3, nrow(d$x))
-  pr1 <- prune_components(prune_fit(d), d$x, d$y, fold_id = fold_id, seed = 3, nthreads = 1)
-  pr2 <- prune_components(prune_fit(d), d$x, d$y, fold_id = fold_id, seed = 3, nthreads = 2)
+  pr1 <- prune_components(prune_fit(d), d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, nthreads = 1)
+  pr2 <- prune_components(prune_fit(d), d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, nthreads = 2)
   expect_identical(pr2$cv, pr1$cv)
   expect_identical(pr2$beta, pr1$beta)
   expect_identical(pr2$components, pr1$components)
@@ -69,6 +69,8 @@ test_that("predict() is the intercept plus the scaled kept components", {
   fit <- prune_fit(d)
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.01)
   expect_null(pr$cv)
+  expect_null(pr$oob)
+  expect_null(pr$select_by)
   expect_null(pr$seed)
   expect_null(pr$fold_id)
   expect_identical(pr$rule, "R")
@@ -140,7 +142,7 @@ test_that("the formula interface takes the outcome from data, and print() works"
   df <- data.frame(d$x, y = d$y)
   set.seed(5)
   fit <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 5, splits = 20)
-  pr <- prune_components(fit, df, rule = "D", tau = c(0, 0.01), folds = 3, seed = 1)
+  pr <- prune_components(fit, df, rule = "D", tau = c(0, 0.01), select_by = "cv", folds = 3, seed = 1)
   expect_equal(nrow(pr$cv), 2)
   expect_length(unique(pr$fold_id), 3)
   expect_identical(pr$seed, 1L)
@@ -155,13 +157,22 @@ test_that("the formula interface takes the outcome from data, and print() works"
   expect_identical(output, format(pr))
 
   # without a seed, one is drawn and stored, and it reproduces the CV
-  pr1 <- prune_components(fit, df, rule = "R", tau = c(0, 0.01), folds = 3)
-  pr2 <- prune_components(fit, df, rule = "R", tau = c(0, 0.01), folds = 3, seed = pr1$seed)
+  pr1 <- prune_components(fit, df, rule = "R", tau = c(0, 0.01), select_by = "cv", folds = 3)
+  pr2 <- prune_components(fit, df, rule = "R", tau = c(0, 0.01), select_by = "cv", folds = 3, seed = pr1$seed)
   expect_identical(pr2$fold_id, pr1$fold_id)
   expect_identical(pr2$cv, pr1$cv)
 
   # the outcome may also be given as y
-  pr3 <- prune_components(fit, df[, colnames(d$x)], d$y, rule = "D", tau = c(0, 0.01), folds = 3, seed = 1)
+  pr3 <- prune_components(
+    fit,
+    df[, colnames(d$x)],
+    d$y,
+    rule = "D",
+    tau = c(0, 0.01),
+    select_by = "cv",
+    folds = 3,
+    seed = 1
+  )
   expect_identical(pr3$cv, pr$cv)
 })
 
@@ -171,7 +182,7 @@ test_that("factor predictors are coded per fold, as rpf() codes them", {
   df$y <- d$y + c(a = 0, b = 1, c = -1, d = 2)[as.character(df$g)]
   set.seed(5)
   fit <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30)
-  pr <- prune_components(fit, df, folds = 3, seed = 2)
+  pr <- prune_components(fit, df, select_by = "cv", folds = 3, seed = 2)
   expect_true("g" %in% names(pr$beta))
   expect_equal(nrow(predict(pr, df)), 300)
   # a fold fit is rpf() on the fold's rows, with the same seed
@@ -257,7 +268,7 @@ test_that("the fold fits use all parameters of the forest", {
       splits = 40,
       interaction_constraints = list("x1", c("x2", "x3"), "x4")
     )
-    pr <- prune_components(cfit, d$x, d$y, fold_id = rep_len(1:3, nrow(d$x)), seed = 3)
+    pr <- prune_components(cfit, d$x, d$y, select_by = "cv", fold_id = rep_len(1:3, nrow(d$x)), seed = 3)
     # at most x1, ..., x4 and x2:x3 in every fold
     expect_true(all(pr$cv$n_kept <= 5))
     expect_true(all(pr$components$component %in% c("x1", "x2", "x3", "x4", "x2:x3")))
@@ -268,7 +279,10 @@ test_that("a deterministic forest is pruned by CV", {
   d <- prune_sim(n = 200)
   set.seed(5)
   fit <- rpf(d$x, d$y, max_interaction = 2, ntrees = 1, splits = 20, deterministic = TRUE)
+  # it has no out-of-bag rows: the default scores by CV
   pr <- prune_components(fit, d$x, d$y, folds = 3, seed = 1)
+  expect_identical(pr$select_by, "cv")
+  expect_null(pr$oob)
   expect_equal(nrow(pr$cv), 16)
   expect_equal(nrow(predict(pr, d$x)), 200)
 })
@@ -286,6 +300,7 @@ test_that("bad input gives clear errors", {
   expect_error(prune_components(fit, d$x, d$y, tau = c(0, 0)))
   expect_error(prune_components(fit, d$x, d$y, rule = "X"))
   expect_error(prune_components(fit, d$x, d$y, select = "max"))
+  expect_error(prune_components(fit, d$x, d$y, select_by = "bag"))
   expect_error(prune_components(fit, d$x, d$y, fold_id = rep(1, 100)), "at least two distinct folds")
   expect_error(prune_components(fit, d$x, d$y, fold_id = 1:3))
   expect_error(prune_components(fit, d$x, d$y, folds = 1))

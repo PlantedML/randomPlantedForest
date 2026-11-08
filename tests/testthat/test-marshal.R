@@ -373,6 +373,10 @@ test_that("a pruned forest marshaled with its data can be pruned again", {
   again <- prune_components(restored$fit, d$x, d$y, rule = "R", tau = 0.01)
   expect_identical(again$beta, pr$beta)
   expect_identical(again$components, pr$components)
+  # the in-bag counts come along: the out-of-bag choice is the same
+  oob_again <- prune_components(restored$fit, d$x, d$y, rule = "R", tau = c(0, 0.01), seed = 1)
+  expect_identical(oob_again$select_by, "oob")
+  expect_identical(oob_again$oob, prune_components(d$fit, d$x, d$y, rule = "R", tau = c(0, 0.01), seed = 1)$oob)
   # without its data, the restored forest still predicts, but cannot be pruned again
   plain <- rpf_unmarshal(rpf_marshal(pr))
   expect_identical(predict(plain, d$x), predict(pr, d$x))
