@@ -17,7 +17,7 @@ test_that("CV pruning keeps the true components and drops the false ones", {
   d <- prune_sim()
   fit <- prune_fit(d)
   fold_id <- rep_len(1:5, nrow(d$x))
-  pr <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3)
+  pr <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, select = "min")
 
   expect_s3_class(pr, "rpf_pruned")
   expect_setequal(names(pr$beta), c("x1", "x2:x3"))
@@ -38,14 +38,19 @@ test_that("CV pruning keeps the true components and drops the false ones", {
   expect_equal(chosen$cv_rmse, min(pr$cv$cv_rmse))
   expect_gte(pr$cv$tau[pr$cv$one_se], pr$tau)
 
-  # the 1-SE rule picks the marked candidate
-  pr1 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, select = "1se")
+  # the 1-SE rule (the default) picks the marked candidate; R's coefficients under CV are fitted in sample
+  pr1 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3)
+  expect_identical(pr1$select, "1se")
   expect_identical(pr1$cv, pr$cv)
   one <- pr$cv[pr$cv$one_se, ]
   expect_equal(c(pr1$rule, pr1$tau), c(one$rule, one$tau))
+  direct <- prune_components(fit, d$x, d$y, rule = pr1$rule, tau = pr1$tau, select_by = "cv")
+  expect_identical(pr1$beta, direct$beta)
+  expect_identical(pr1$intercept, direct$intercept)
+  expect_no_match(format(pr1), "fitted out of bag")
 
   # reproducible with the same folds and seed
-  pr2 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3)
+  pr2 <- prune_components(fit, d$x, d$y, select_by = "cv", fold_id = fold_id, seed = 3, select = "min")
   expect_identical(pr2$cv, pr$cv)
   expect_identical(pr2$beta, pr$beta)
 })
@@ -70,10 +75,13 @@ test_that("predict() is the intercept plus the scaled kept components", {
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.01)
   expect_null(pr$cv)
   expect_null(pr$oob)
-  expect_null(pr$select_by)
   expect_null(pr$seed)
   expect_null(pr$fold_id)
   expect_identical(pr$rule, "R")
+  # a given R: no choice, but its coefficients are fitted out of bag (test-prune-oob-refit.R)
+  expect_identical(pr$select_by, "oob")
+  expect_output(print(pr), "fitted out of bag")
+  expect_output(print(pr), "Given, not chosen")
 
   new <- as.data.frame(d$x[1:50, ])
   comp <- predict_components(fit, new)$m
@@ -106,10 +114,15 @@ test_that("predict() is the intercept plus the scaled kept components", {
   expect_error(predict_components(pr, new, max_interactions = 1), class = "rlib_error_dots_nonempty")
   expect_error(predict(pr, new, type = "numeric"), class = "rlib_error_dots_nonempty")
 
-  # the refit is least squares of y on the kept components
+  # with select_by = "cv" the refit is least squares of y on the kept components (in sample)
+  pin <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.01, select_by = "cv")
+  expect_null(pin$select_by)
+  expect_null(pin$cv)
+  expect_identical(names(pin$beta), names(pr$beta))
+  expect_no_match(format(pin), "fitted out of bag")
   own <- predict_components(fit, as.data.frame(d$x))$m
-  ls <- stats::lm.fit(cbind(1, as.matrix(own[, names(pr$beta), with = FALSE])), d$y)$coefficients
-  expect_equal(unname(c(pr$intercept, pr$beta)), unname(ls), tolerance = 1e-8)
+  ls <- stats::lm.fit(cbind(1, as.matrix(own[, names(pin$beta), with = FALSE])), d$y)$coefficients
+  expect_equal(unname(c(pin$intercept, pin$beta)), unname(ls), tolerance = 1e-8)
 })
 
 test_that("rule D with tau = 0 is the unpruned forest", {
@@ -132,9 +145,13 @@ test_that("a threshold above every share keeps no component: the intercept or th
   expect_false(any(pd$components$kept))
   expect_equal(predict(pd, new)$.pred, rep(pd$intercept, 5))
   expect_equal(ncol(predict_components(pd, new)$m), 0)
+  # R: the mean of y over the rows with out-of-bag families (fitted out of bag), or over all rows (in sample)
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.99)
-  expect_equal(pr$intercept, mean(d$y))
+  use <- rowSums(fit$fit$purify_oob(0L, 1L)$count) > 0
+  expect_equal(pr$intercept, mean(d$y[use]))
   expect_output(print(pr), "Kept: +0")
+  pin <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.99, select_by = "cv")
+  expect_equal(pin$intercept, mean(d$y))
 })
 
 test_that("the formula interface takes the outcome from data, and print() works", {

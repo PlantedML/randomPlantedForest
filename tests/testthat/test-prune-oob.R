@@ -188,8 +188,10 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   }
   fit <- oob_fit(d)
   fold_id <- rep_len(1:5, nrow(d$x))
+  # the default: the largest tau within one SE of the lowest corrected OOB MSE
   pr <- prune_components(fit, d$x, d$y, select_by = "oob", fold_id = fold_id, seed = 3)
   expect_s3_class(pr, "rpf_pruned")
+  expect_identical(pr$select, "1se")
   expect_identical(pr$select_by, "oob")
   expect_null(pr$cv)
   expect_setequal(names(pr$beta), c("x1", "x2:x3"))
@@ -197,21 +199,26 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   expect_equal(attr(pr$oob, "n_rows"), nrow(d$x))
   expect_equal(sum(pr$oob$min), 1)
   expect_equal(sum(pr$oob$one_se), 1)
-  chosen <- pr$oob[pr$oob$min, ]
+  chosen <- pr$oob[pr$oob$one_se, ]
   expect_equal(c(chosen$rule, chosen$tau), c(pr$rule, pr$tau))
-  expect_equal(chosen$oob_rmse, min(pr$oob$oob_rmse))
-  expect_gte(pr$oob$tau[pr$oob$one_se], pr$tau)
+  best <- pr$oob[pr$oob$min, ]
+  expect_equal(best$oob_rmse, min(pr$oob$oob_rmse))
+  expect_lte(chosen$oob_rmse^2, best$oob_rmse^2 + best$se_mse)
+  expect_gte(pr$tau, best$tau)
+  expect_true(all(pr$oob$tau[pr$oob$oob_rmse^2 <= best$oob_rmse^2 + best$se_mse] <= pr$tau))
 
-  # the final model is the chosen rule and tau applied to the forest (as without a choice)
+  # the final model is the chosen rule and tau applied to the forest, as without a choice (R's coefficients fitted on
+  # the OOB components in both, below)
   direct <- prune_components(oob_fit(d), d$x, d$y, rule = pr$rule, tau = pr$tau)
+  expect_identical(pr$components, direct$components)
+  expect_identical(pr$sets, direct$sets)
   expect_identical(pr$beta, direct$beta)
   expect_identical(pr$intercept, direct$intercept)
-  expect_identical(pr$components, direct$components)
   expect_identical(predict(pr, d$x), predict(direct, d$x))
 
-  # the OOB RMSEs by hand: D = OOB intercept + kept OOB components; R = coefficients fitted on the forest's own
-  # components outside the fold, applied to the OOB components of the fold. Raw: the mean squared error; corrected:
-  # minus (1/m - 1/B) v per row, v from the means over the even and the odd families
+  # the OOB RMSEs by hand: D = OOB intercept + kept OOB components; R = coefficients fitted on the OOB components
+  # outside the fold, applied to the OOB components of the fold. Raw: the mean squared error; corrected: minus
+  # (1/m - 1/B) v per row, v from the means over the even and the odd families
   f2 <- oob_fit(d)
   o <- f2$fit$purify_oob(0L, 1L)
   m0 <- o$count[, 1]
@@ -220,7 +227,6 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   expect_true(all(m0 > 0 & m1 > 0))
   nm <- vapply(o$sets, function(s) paste(colnames(d$x)[s], collapse = ":"), "")
   colnames(o$sum0) <- colnames(o$sum1) <- nm
-  own <- predict_components(f2, d$x)$m
   share <- stats::setNames(pr$components$share, pr$components$component)
   rmse <- function(g, g0, g1) {
     e2 <- (d$y - g)^2
@@ -239,11 +245,12 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
     row_d <- pr$oob$rule == "D" & pr$oob$tau == tau
     expect_equal(pr$oob$oob_rmse_raw[row_d], unname(g_d["raw"]), tolerance = 1e-12)
     expect_equal(pr$oob$oob_rmse[row_d], unname(g_d["corrected"]), tolerance = 1e-12)
+    F_oob <- (S0 + S1) / m
     g <- g0 <- g1 <- numeric(nrow(d$x))
     for (k in 1:5) {
       te <- fold_id == k
-      cf <- stats::lm.fit(cbind(1, as.matrix(own[!te, kept, with = FALSE])), d$y[!te])$coefficients
-      g[te] <- cbind(1, (S0[te, , drop = FALSE] + S1[te, , drop = FALSE]) / m[te]) %*% cf
+      cf <- stats::lm.fit(cbind(1, F_oob[!te, , drop = FALSE]), d$y[!te])$coefficients
+      g[te] <- cbind(1, F_oob[te, , drop = FALSE]) %*% cf
       g0[te] <- cbind(1, S0[te, , drop = FALSE] / m0[te]) %*% cf
       g1[te] <- cbind(1, S1[te, , drop = FALSE] / m1[te]) %*% cf
     }
@@ -253,11 +260,22 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
     expect_equal(pr$oob$oob_rmse[row_r], unname(g_r["corrected"]), tolerance = 1e-10)
   }
   expect_true(all(pr$oob$oob_rmse <= pr$oob$oob_rmse_raw))
-  expect_output(print(pr), "Chosen by out-of-bag error \\(lowest OOB RMSE; R refitted in 5 folds, seed 3\\)")
-  pr1 <- prune_components(oob_fit(d), d$x, d$y, fold_id = fold_id, seed = 3, select = "1se")
-  expect_identical(pr1$oob, pr$oob)
-  expect_equal(c(pr1$rule, pr1$tau), unlist(pr$oob[pr$oob$one_se, c("rule", "tau")], use.names = FALSE))
-  expect_output(print(pr1), "1-SE rule")
+  # here R is chosen: its coefficients are least squares of y on the kept OOB components of every row
+  expect_identical(pr$rule, "R")
+  kept <- names(pr$beta)
+  F_oob <- (o$sum0[, kept, drop = FALSE] + o$sum1[, kept, drop = FALSE]) / m
+  cf <- stats::lm.fit(cbind(1, F_oob), d$y)$coefficients
+  expect_equal(unname(c(pr$intercept, pr$beta)), unname(cf), tolerance = 1e-10)
+  expect_equal(pr$components$beta[pr$components$kept], unname(pr$beta[pr$components$component[pr$components$kept]]))
+  expect_output(print(pr), "Chosen by out-of-bag error \\(1-SE rule; R refitted in 5 folds, seed 3\\)")
+  expect_output(print(pr), "fitted out of bag")
+
+  # select = "min": the same table, the lowest corrected OOB RMSE (here more components)
+  pr_min <- prune_components(oob_fit(d), d$x, d$y, fold_id = fold_id, seed = 3, select = "min")
+  expect_identical(pr_min$oob, pr$oob)
+  expect_equal(c(pr_min$rule, pr_min$tau), c(best$rule, best$tau))
+  expect_gte(length(pr_min$beta), length(pr$beta))
+  expect_output(print(pr_min), "lowest OOB RMSE")
 })
 
 test_that("the least squares of the OOB folds equal the final model's", {

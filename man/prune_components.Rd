@@ -11,7 +11,7 @@ prune_components(
   ...,
   rule = c("D", "R"),
   tau = c(0, 1e-04, 3e-04, 0.001, 0.003, 0.01, 0.03, 0.1),
-  select = c("min", "1se"),
+  select = c("1se", "min"),
   select_by = c("oob", "cv"),
   folds = 5L,
   fold_id = NULL,
@@ -38,11 +38,12 @@ per kept component.}
 \item{tau}{\verb{[numeric: c(0, 1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1)]}: The thresholds to consider, as shares of
 the variance of the prediction (\code{0.01} = 1\%), each at least 0 and below 1.}
 
-\item{select}{\verb{[character(1): "min"]}: How the pair is chosen: \code{"min"} (the lowest RMSE) or \code{"1se"} (the largest
-\code{tau} within one standard error of it).}
+\item{select}{\verb{[character(1): "1se"]}: How the pair is chosen: \code{"1se"} (the largest \code{tau} within one standard
+error of the lowest RMSE) or \code{"min"} (the lowest RMSE).}
 
-\item{select_by}{\verb{[character(1): "oob"]}: How the candidates are scored: \code{"oob"} (out of bag, from one
-purification of \code{object} and no refits) or \code{"cv"} (K-fold CV with refits of the forest); see Details.}
+\item{select_by}{\verb{[character(1): "oob"]}: How the candidates are scored, and R's coefficients fitted: \code{"oob"} (out
+of bag, from one purification of \code{object} and no refits) or \code{"cv"} (K-fold CV with refits of the forest; R's
+coefficients in sample); see Details.}
 
 \item{folds}{\verb{[integer(1): 5]}: The number of folds, used if \code{fold_id} is \code{NULL}: of the CV, or out of bag of R's
 refit and of the SE.}
@@ -66,7 +67,8 @@ An object of class \code{rpf_pruned}, a list with elements:
 \item \code{fit}: \code{object} (purified).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
 \item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}).
-\item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}).
+\item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
+\code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
 \item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows: \code{component} (its
 name, as in \code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
@@ -76,8 +78,8 @@ name, as in \code{\link[=predict_components]{predict_components()}}), \code{orde
 of rows with an OOB family.
 \item \code{cv}: \code{NULL} unless the pair was chosen by CV; otherwise a \code{data.frame} with one row per candidate: \code{rule}, \code{tau},
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
-\item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{select_by}, \code{fold_id} and \code{seed} are \code{NULL} if no choice was
-made).
+\item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
+given rule and \code{tau}, \code{select_by} is \code{"oob"} if R's coefficients were fitted out of bag, otherwise \code{NULL}.
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
@@ -98,17 +100,23 @@ are available:
 \item \code{"D"} (drop): the prediction is \code{f_0} plus the kept components. \code{rule = "D"} with \code{tau = 0} is the unpruned
 forest.
 \item \code{"R"} (drop and refit): the prediction is \code{alpha + sum(beta_S * f_S)} over the kept components, with the
-intercept \code{alpha} and the coefficients \code{beta_S} by least squares of \code{y} on the kept components over the training
-rows (the minimum-norm solution if the components are collinear). The components themselves are not changed,
-only their scale.
+intercept \code{alpha} and the coefficients \code{beta_S} by least squares of \code{y} on the kept components (the minimum-norm
+solution if the components are collinear). The components themselves are not changed, only their scale. With
+\code{select_by = "oob"} (the default, see below), the least squares use each training row's out-of-bag components
+instead of the forest's own, for a chosen and for a given rule and \code{tau}. The forest's own components have fitted
+the training rows' noise, so least squares on them scale the components up (on California housing the three-way
+interactions by about 1.3, where new data wants about 0.9). With \code{select_by = "cv"}, and where the default falls
+back to it (see below), the least squares use the forest's own components on the training rows.
 }
 
 \strong{The choice.} If more than one pair of \code{rule} and \code{tau} is given (the default: both rules and the grid 0, 0.01\%,
 0.03\%, 0.1\%, 0.3\%, 1\%, 3\%, 10\%), the pair is chosen by its out-of-bag (\code{select_by = "oob"}, the default) or
-cross-validated (\code{"cv"}) RMSE. With \code{select = "min"}, the pair with the lowest RMSE is chosen (ties, up to a
-relative \code{1e-12}: the larger \code{tau}, then \code{"D"}). With \code{select = "1se"}, the largest \code{tau} whose MSE is within one
+cross-validated (\code{"cv"}) RMSE. With \code{select = "1se"} (the default), the largest \code{tau} whose MSE is within one
 standard error of the minimum is chosen (the SE is the standard deviation of the per-fold MSEs of the minimum,
-divided by \code{sqrt(K)}), and at that \code{tau} the rule with the lower RMSE.
+divided by \code{sqrt(K)}), and at that \code{tau} the rule with the lower RMSE. With \code{select = "min"}, the pair with the
+lowest RMSE is chosen (ties, up to a relative \code{1e-12}: the larger \code{tau}, then \code{"D"}). \code{"1se"} gives sparse models:
+with \code{"R"} fitted out of bag the out-of-bag error changes little over a range of \code{tau}, and \code{"min"} keeps small
+components that add nothing on new data.
 
 \strong{Out of bag} (\code{select_by = "oob"}). Every tree family of \code{object} is grown on a bootstrap sample of the training
 rows, and the purification works family by family. So \code{object} is purified once more (as \code{\link[=purify]{purify()}} does), and on
@@ -119,15 +127,16 @@ enters its OOB components.
 \itemize{
 \item The kept components of every \code{tau} are those of the final model (the shares of \code{object} on the training rows).
 \item \code{"D"} is scored by the OOB intercept plus the kept OOB components.
-\item For \code{"R"}, \code{alpha} and \code{beta_S} are fitted as for the final model, by least squares on the components of
-\code{object}, but only on the rows outside each of K folds (\code{folds}, \code{fold_id}, \code{seed}). They are scored with the OOB
-components of the fold's rows, so that no row scores coefficients fitted on it.
+\item For \code{"R"}, \code{alpha} and \code{beta_S} are fitted as for the final model, by least squares on the OOB components, but
+only on the rows outside each of K folds (\code{folds}, \code{fold_id}, \code{seed}). They are scored with the OOB components of
+the fold's rows, so that no row scores coefficients fitted on it. The final model's are fitted on all rows with
+at least one OOB family.
 \item An OOB mean averages \code{m_i} families (about 37\% of \code{B = ntrees}), the final model all \code{B}, so the OOB prediction
 scatters more around its expectation. The OOB MSE is therefore corrected: per row it subtracts
 \code{(1 / m_i - 1 / B) * v_i}, with \code{v_i} the across-family variance of the candidate's prediction, estimated from
 the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
-mean estimate of the other rows). Without the correction, the noise of the OOB components (amplified by
-\code{beta_S > 1}) makes \code{"R"} look worse than it is. The uncorrected values are reported as \code{oob_rmse_raw}.
+mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
+look worse than they are. The uncorrected values are reported as \code{oob_rmse_raw}.
 \item The OOB RMSE is taken over the rows with at least one OOB family, the SE for \code{"1se"} from the per-fold MSEs.
 \item With few families the OOB means average only one to a few families, and many rows have none (16\% at 4
 families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned \code{"D"} was
@@ -136,7 +145,11 @@ families with a 3-way interaction), and the OOB choice was as good as the CV's o
 (within 0.4\% in test error, or better by 7-10\% where the CV's fold fits choose poorly). Below 10 families
 (\code{ntrees}), the default \code{select_by} scores by CV instead (with a message); an explicit \code{select_by = "oob"} warns.
 \item A deterministic forest has no out-of-bag rows, and a forest restored by \code{\link[=rpf_unmarshal]{rpf_unmarshal()}} from a blob made by an
-earlier version has no in-bag counts: with the default \code{select_by}, they are scored by CV instead.
+earlier version has no in-bag counts (with a message): with the default \code{select_by}, they are scored by CV
+instead.
+\item A given rule \code{"R"} and \code{tau} (no choice) is fitted on the OOB components too, with the same fallbacks: below 10
+families or without in-bag counts its coefficients are fitted in sample (with a message), and so they are for a
+deterministic forest. A given \code{"D"} needs no OOB components.
 \item Factor predictors are coded by the outcome of all training rows: their levels are ordered by the mean outcome
 (regression), by the share of the second class (binary classification) or by the first principal component of
 the class proportions (three or more classes; Coppersmith, Hong and Hosking 1999). So a row's own outcome enters
@@ -148,13 +161,13 @@ the other folds (after \code{set.seed(seed)}, the same for every fold), its comp
 on those rows, and every candidate is scored on the held-out fold. The CV RMSE is \code{sqrt(sum(SSE_k) / n)}, summing
 the squared errors over the K folds.
 
-The chosen pair is then applied to \code{object} itself (not refitted): its components and shares on \code{data}, and for
-\code{"R"} the least squares on \code{data}. \code{data} and \code{y} must therefore be the rows \code{object} was trained on, in the order
-of the fit (checked).
+The chosen (or given) pair is then applied to \code{object} itself (not refitted): its components and shares on \code{data},
+and for \code{"R"} the least squares on the OOB components of \code{data}'s rows (out of bag) or on its components on \code{data}
+(by CV). \code{data} and \code{y} must therefore be the rows \code{object} was trained on, in the order of the fit (checked).
 
 \strong{Purification.} \code{object} is purified in place at all orders, as \code{\link[=purify]{purify()}} does, if it is not purified yet. This
 does not change its predictions. A forest purified with a \code{maxp_interaction} below its order is purified again at
-all orders, with a message: the pruning needs every component. The out-of-bag choice purifies \code{object} (again) in
+all orders, with a message: the pruning needs every component. The out-of-bag path purifies \code{object} (again) in
 mode 2, which gives the same components (a mode-1 purification's up to rounding).
 
 \strong{Random numbers.} The folds are drawn after \code{set.seed(seed)}, and the CV's fold fits after it too. Afterwards the
@@ -176,16 +189,20 @@ x <- matrix(runif(600 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
 fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50)
 
-# Rule and threshold chosen out of bag (no refits)
+# Rule and threshold chosen out of bag (no refits): the largest tau within one SE
+# of the lowest error
 pruned <- prune_components(fit, x, y, seed = 1)
 pruned
 pruned$oob
+
+# ... or the lowest error
+prune_components(fit, x, y, select = "min", seed = 1)
 
 # ... or by 5-fold CV
 pruned_cv <- prune_components(fit, x, y, select_by = "cv", seed = 1)
 pruned_cv$cv
 
-# A given rule and threshold: no CV
+# A given rule and threshold: no choice; R's coefficients are still fitted out of bag
 prune_components(fit, x, y, rule = "R", tau = 0.01)
 
 predict(pruned, x[1:5, ])

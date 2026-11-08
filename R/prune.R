@@ -14,16 +14,22 @@
 #' - `"D"` (drop): the prediction is `f_0` plus the kept components. `rule = "D"` with `tau = 0` is the unpruned
 #'   forest.
 #' - `"R"` (drop and refit): the prediction is `alpha + sum(beta_S * f_S)` over the kept components, with the
-#'   intercept `alpha` and the coefficients `beta_S` by least squares of `y` on the kept components over the training
-#'   rows (the minimum-norm solution if the components are collinear). The components themselves are not changed,
-#'   only their scale.
+#'   intercept `alpha` and the coefficients `beta_S` by least squares of `y` on the kept components (the minimum-norm
+#'   solution if the components are collinear). The components themselves are not changed, only their scale. With
+#'   `select_by = "oob"` (the default, see below), the least squares use each training row's out-of-bag components
+#'   instead of the forest's own, for a chosen and for a given rule and `tau`. The forest's own components have fitted
+#'   the training rows' noise, so least squares on them scale the components up (on California housing the three-way
+#'   interactions by about 1.3, where new data wants about 0.9). With `select_by = "cv"`, and where the default falls
+#'   back to it (see below), the least squares use the forest's own components on the training rows.
 #'
 #' **The choice.** If more than one pair of `rule` and `tau` is given (the default: both rules and the grid 0, 0.01%,
 #' 0.03%, 0.1%, 0.3%, 1%, 3%, 10%), the pair is chosen by its out-of-bag (`select_by = "oob"`, the default) or
-#' cross-validated (`"cv"`) RMSE. With `select = "min"`, the pair with the lowest RMSE is chosen (ties, up to a
-#' relative `1e-12`: the larger `tau`, then `"D"`). With `select = "1se"`, the largest `tau` whose MSE is within one
+#' cross-validated (`"cv"`) RMSE. With `select = "1se"` (the default), the largest `tau` whose MSE is within one
 #' standard error of the minimum is chosen (the SE is the standard deviation of the per-fold MSEs of the minimum,
-#' divided by `sqrt(K)`), and at that `tau` the rule with the lower RMSE.
+#' divided by `sqrt(K)`), and at that `tau` the rule with the lower RMSE. With `select = "min"`, the pair with the
+#' lowest RMSE is chosen (ties, up to a relative `1e-12`: the larger `tau`, then `"D"`). `"1se"` gives sparse models:
+#' with `"R"` fitted out of bag the out-of-bag error changes little over a range of `tau`, and `"min"` keeps small
+#' components that add nothing on new data.
 #'
 #' **Out of bag** (`select_by = "oob"`). Every tree family of `object` is grown on a bootstrap sample of the training
 #' rows, and the purification works family by family. So `object` is purified once more (as [purify()] does), and on
@@ -33,15 +39,16 @@
 #' enters its OOB components.
 #' - The kept components of every `tau` are those of the final model (the shares of `object` on the training rows).
 #' - `"D"` is scored by the OOB intercept plus the kept OOB components.
-#' - For `"R"`, `alpha` and `beta_S` are fitted as for the final model, by least squares on the components of
-#'   `object`, but only on the rows outside each of K folds (`folds`, `fold_id`, `seed`). They are scored with the OOB
-#'   components of the fold's rows, so that no row scores coefficients fitted on it.
+#' - For `"R"`, `alpha` and `beta_S` are fitted as for the final model, by least squares on the OOB components, but
+#'   only on the rows outside each of K folds (`folds`, `fold_id`, `seed`). They are scored with the OOB components of
+#'   the fold's rows, so that no row scores coefficients fitted on it. The final model's are fitted on all rows with
+#'   at least one OOB family.
 #' - An OOB mean averages `m_i` families (about 37% of `B = ntrees`), the final model all `B`, so the OOB prediction
 #'   scatters more around its expectation. The OOB MSE is therefore corrected: per row it subtracts
 #'   `(1 / m_i - 1 / B) * v_i`, with `v_i` the across-family variance of the candidate's prediction, estimated from
 #'   the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
-#'   mean estimate of the other rows). Without the correction, the noise of the OOB components (amplified by
-#'   `beta_S > 1`) makes `"R"` look worse than it is. The uncorrected values are reported as `oob_rmse_raw`.
+#'   mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
+#'   look worse than they are. The uncorrected values are reported as `oob_rmse_raw`.
 #' - The OOB RMSE is taken over the rows with at least one OOB family, the SE for `"1se"` from the per-fold MSEs.
 #' - With few families the OOB means average only one to a few families, and many rows have none (16% at 4
 #'   families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned `"D"` was
@@ -50,7 +57,11 @@
 #'   (within 0.4% in test error, or better by 7-10% where the CV's fold fits choose poorly). Below 10 families
 #'   (`ntrees`), the default `select_by` scores by CV instead (with a message); an explicit `select_by = "oob"` warns.
 #' - A deterministic forest has no out-of-bag rows, and a forest restored by [rpf_unmarshal()] from a blob made by an
-#'   earlier version has no in-bag counts: with the default `select_by`, they are scored by CV instead.
+#'   earlier version has no in-bag counts (with a message): with the default `select_by`, they are scored by CV
+#'   instead.
+#' - A given rule `"R"` and `tau` (no choice) is fitted on the OOB components too, with the same fallbacks: below 10
+#'   families or without in-bag counts its coefficients are fitted in sample (with a message), and so they are for a
+#'   deterministic forest. A given `"D"` needs no OOB components.
 #' - Factor predictors are coded by the outcome of all training rows: their levels are ordered by the mean outcome
 #'   (regression), by the share of the second class (binary classification) or by the first principal component of
 #'   the class proportions (three or more classes; Coppersmith, Hong and Hosking 1999). So a row's own outcome enters
@@ -61,13 +72,13 @@
 #' on those rows, and every candidate is scored on the held-out fold. The CV RMSE is `sqrt(sum(SSE_k) / n)`, summing
 #' the squared errors over the K folds.
 #'
-#' The chosen pair is then applied to `object` itself (not refitted): its components and shares on `data`, and for
-#' `"R"` the least squares on `data`. `data` and `y` must therefore be the rows `object` was trained on, in the order
-#' of the fit (checked).
+#' The chosen (or given) pair is then applied to `object` itself (not refitted): its components and shares on `data`,
+#' and for `"R"` the least squares on the OOB components of `data`'s rows (out of bag) or on its components on `data`
+#' (by CV). `data` and `y` must therefore be the rows `object` was trained on, in the order of the fit (checked).
 #'
 #' **Purification.** `object` is purified in place at all orders, as [purify()] does, if it is not purified yet. This
 #' does not change its predictions. A forest purified with a `maxp_interaction` below its order is purified again at
-#' all orders, with a message: the pruning needs every component. The out-of-bag choice purifies `object` (again) in
+#' all orders, with a message: the pruning needs every component. The out-of-bag path purifies `object` (again) in
 #' mode 2, which gives the same components (a mode-1 purification's up to rounding).
 #'
 #' **Random numbers.** The folds are drawn after `set.seed(seed)`, and the CV's fold fits after it too. Afterwards the
@@ -93,10 +104,11 @@
 #'   per kept component.
 #' @param tau `[numeric: c(0, 1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1)]`: The thresholds to consider, as shares of
 #'   the variance of the prediction (`0.01` = 1%), each at least 0 and below 1.
-#' @param select `[character(1): "min"]`: How the pair is chosen: `"min"` (the lowest RMSE) or `"1se"` (the largest
-#'   `tau` within one standard error of it).
-#' @param select_by `[character(1): "oob"]`: How the candidates are scored: `"oob"` (out of bag, from one
-#'   purification of `object` and no refits) or `"cv"` (K-fold CV with refits of the forest); see Details.
+#' @param select `[character(1): "1se"]`: How the pair is chosen: `"1se"` (the largest `tau` within one standard
+#'   error of the lowest RMSE) or `"min"` (the lowest RMSE).
+#' @param select_by `[character(1): "oob"]`: How the candidates are scored, and R's coefficients fitted: `"oob"` (out
+#'   of bag, from one purification of `object` and no refits) or `"cv"` (K-fold CV with refits of the forest; R's
+#'   coefficients in sample); see Details.
 #' @param folds `[integer(1): 5]`: The number of folds, used if `fold_id` is `NULL`: of the CV, or out of bag of R's
 #'   refit and of the SE.
 #' @param fold_id `[vector | NULL: NULL]`: The fold of every training row: a vector of length `nrow(data)` with at
@@ -113,7 +125,8 @@
 #' - `fit`: `object` (purified).
 #' - `rule`, `tau`: the chosen rule and threshold.
 #' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`).
-#' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`).
+#' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
+#'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
 #' - `components`: a `data.frame` of every nonzero component of `object` on the training rows: `component` (its
 #'   name, as in [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
@@ -123,8 +136,8 @@
 #'   of rows with an OOB family.
 #' - `cv`: `NULL` unless the pair was chosen by CV; otherwise a `data.frame` with one row per candidate: `rule`, `tau`,
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
-#' - `select`, `select_by`, `fold_id`, `seed`: as used (`select_by`, `fold_id` and `seed` are `NULL` if no choice was
-#'   made).
+#' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
+#'   given rule and `tau`, `select_by` is `"oob"` if R's coefficients were fitted out of bag, otherwise `NULL`.
 #'
 #' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
 #'
@@ -138,16 +151,20 @@
 #' y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
 #' fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50)
 #'
-#' # Rule and threshold chosen out of bag (no refits)
+#' # Rule and threshold chosen out of bag (no refits): the largest tau within one SE
+#' # of the lowest error
 #' pruned <- prune_components(fit, x, y, seed = 1)
 #' pruned
 #' pruned$oob
+#'
+#' # ... or the lowest error
+#' prune_components(fit, x, y, select = "min", seed = 1)
 #'
 #' # ... or by 5-fold CV
 #' pruned_cv <- prune_components(fit, x, y, select_by = "cv", seed = 1)
 #' pruned_cv$cv
 #'
-#' # A given rule and threshold: no CV
+#' # A given rule and threshold: no choice; R's coefficients are still fitted out of bag
 #' prune_components(fit, x, y, rule = "R", tau = 0.01)
 #'
 #' predict(pruned, x[1:5, ])
@@ -158,7 +175,7 @@ prune_components <- function(
   ...,
   rule = c("D", "R"),
   tau = c(0, 1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1),
-  select = c("min", "1se"),
+  select = c("1se", "min"),
   select_by = c("oob", "cv"),
   folds = 5L,
   fold_id = NULL,
@@ -197,15 +214,24 @@ prune_components <- function(
   # the shares, R's coefficients and the out-of-bag rows are those of the training rows
   prune_check_training_rows(object, tr)
   cand <- expand.grid(tau = sort(tau), rule = rule, stringsAsFactors = FALSE)[, c("rule", "tau")]
-  # how the candidates are scored; NULL for a given rule and tau
-  select_by <- if (nrow(cand) > 1) prune_select_by(object, select_by, default_select_by)
-  # the out-of-bag choice purifies the forest itself, on the way to its out-of-bag components
+  # a choice among the candidates, or a given rule and tau
+  choose <- nrow(cand) > 1
+  # How the candidates are scored, "oob" or "cv", and so whether R's coefficients are fitted on the out-of-bag
+  # components or in sample. A given R is fitted out of bag too, with the choice's fallbacks; a given D, or a given R
+  # fitted in sample, has none (NULL)
+  select_by <- if (choose || cand$rule == "R") prune_select_by(object, select_by, default_select_by, given = !choose)
+  if (!choose && identical(select_by, "cv")) {
+    select_by <- NULL
+  }
+  # the out-of-bag path purifies the forest itself, on the way to its out-of-bag components
   prune_check_purified(object, nthreads, purify = !identical(select_by, "oob"))
 
   cv <- NULL
   oob <- NULL
   dec <- NULL
-  if (!is.null(select_by)) {
+  # the out-of-bag components that R's final coefficients are fitted on, if out of bag
+  oob_fit <- NULL
+  if (choose) {
     if (is.null(seed)) {
       seed <- sample.int(.Machine$integer.max, 1L)
     }
@@ -231,6 +257,8 @@ prune_components <- function(
       sel <- prune_oob(object, tr, cand, fold_id, nthreads, verbose)
       oob <- sel$table
       dec <- sel$dec
+      oob_fit <- sel$oob_fit
+      rm(sel)
       table <- oob
     }
     choice <- table[table[[c(min = "min", "1se" = "one_se")[[select]]]], ]
@@ -241,12 +269,20 @@ prune_components <- function(
     tau_sel <- cand$tau
     fold_id <- NULL
     seed <- NULL
+    if (identical(select_by, "oob")) {
+      # a given R: the out-of-bag components for its coefficients, as the choice fits them (no scores, no folds)
+      sel <- prune_oob(object, tr, NULL, NULL, nthreads, verbose)
+      dec <- sel$dec
+      oob_fit <- sel$oob_fit
+      rm(sel)
+    }
   }
 
-  # The chosen rule and tau on the forest itself, on all training rows (the out-of-bag choice has decomposed it)
+  # The chosen rule and tau on the forest itself, on all training rows (the out-of-bag path has decomposed it). R's
+  # coefficients: on the out-of-bag components with select_by = "oob", as each candidate was scored; else in sample
   dec <- dec %||% prune_decompose(object, tr$predictors, rep(TRUE, n), nthreads = nthreads)
   sets <- dec$sets[dec$nonzero]
-  rf <- prune_fit_rule(rule_sel, tau_sel, dec, tr$y)
+  rf <- prune_fit_rule(rule_sel, tau_sel, dec, tr$y, oob = oob_fit)
 
   components <- data.frame(
     component = names(dec$share),
@@ -451,13 +487,19 @@ prune_lstsq_qr <- function(X, y) {
   as.numeric(qr.coef(q, y))
 }
 
-# The kept components of rule and tau, and (alpha, beta) on the decomposition's own rows
-prune_fit_rule <- function(rule, tau, dec, y_own) {
+# The kept components of rule and tau, and R's (alpha, beta) by least squares on the decomposition's own rows; with
+# `oob` (chosen out of bag: prune_oob_score()'s `oob_fit`, list(F = the out-of-bag components of the rows with OOB
+# families, columns as names(dec$share), y = their outcome)) on the out-of-bag components instead
+prune_fit_rule <- function(rule, tau, dec, y_own, oob = NULL) {
   kept <- names(dec$share)[dec$share >= tau]
   if (rule == "D") {
     return(list(alpha = dec$intercept, beta = stats::setNames(rep(1, length(kept)), kept)))
   }
-  coef <- prune_lstsq(cbind(1, dec$own[, kept, drop = FALSE]), y_own)
+  coef <- if (is.null(oob)) {
+    prune_lstsq(cbind(1, dec$own[, kept, drop = FALSE]), y_own)
+  } else {
+    prune_lstsq(cbind(1, oob$F[, match(kept, names(dec$share)), drop = FALSE]), oob$y)
+  }
   list(alpha = coef[1], beta = stats::setNames(coef[-1], kept))
 }
 
@@ -563,10 +605,12 @@ prune_choose <- function(rmse, se_mse, cand) {
 # on the out-of-bag choice is as good as the CV's or better)
 prune_oob_min_ntrees <- 10L
 
-# How the candidates are scored. An explicit select_by is used as given (out of bag with a warning below
-# prune_oob_min_ntrees families). The default is out of bag, but CV for a deterministic forest (no out-of-bag rows),
-# a forest without in-bag counts (restored from a blob of an earlier version) and below prune_oob_min_ntrees families.
-prune_select_by <- function(object, select_by, default) {
+# How the candidates are scored, and so how R's coefficients are fitted ("oob": on the out-of-bag components; "cv": in
+# sample). An explicit select_by is used as given (out of bag with a warning below prune_oob_min_ntrees families). The
+# default is out of bag, but CV for a deterministic forest (no out-of-bag rows), a forest without in-bag counts
+# (restored from a blob of an earlier version) and below prune_oob_min_ntrees families. given: for a given rule R
+# (no candidates to score), whose coefficients are then fitted in sample (the messages say so).
+prune_select_by <- function(object, select_by, default, given = FALSE) {
   if (select_by == "cv") {
     return("cv")
   }
@@ -574,7 +618,11 @@ prune_select_by <- function(object, select_by, default) {
   if (default && deterministic) {
     return("cv")
   }
-  instead <- "the candidates are scored by CV ({.code select_by = \"cv\"}) instead of out of bag."
+  instead <- if (given) {
+    "R's coefficients are fitted in sample instead of out of bag."
+  } else {
+    "the candidates are scored by CV ({.code select_by = \"cv\"}) instead of out of bag."
+  }
   if (default && inherits(try(object$fit$inbag(), silent = TRUE), "try-error")) {
     cli::cli_inform(paste("{.arg object} has no in-bag counts (restored from a blob of an earlier version):", instead))
     return("cv")
@@ -597,8 +645,9 @@ prune_select_by <- function(object, select_by, default) {
 
 # Out-of-bag (OOB) choice among the candidates (rule, tau), from one purification of `object` and no refits.
 # `object` is purified (mode 2, all orders, as purify() does) and, on the way, every family's components are evaluated
-# at the training rows outside its bootstrap sample (purify_oob()). Returns prune_oob_score()'s table and the forest's
-# decomposition on its training rows.
+# at the training rows outside its bootstrap sample (purify_oob()). Returns prune_oob_score()'s table, the forest's
+# decomposition on its training rows and the out-of-bag components for R's final fit (`oob_fit`). With cand = NULL
+# (a given rule R), no table: only `dec` and `oob_fit`.
 prune_oob <- function(object, tr, cand, fold_id, nthreads, verbose, call = rlang::caller_env()) {
   t0 <- proc.time()[["elapsed"]]
   # `tr` are the training rows (checked by prune_components())
@@ -635,10 +684,12 @@ prune_oob <- function(object, tr, cand, fold_id, nthreads, verbose, call = rlang
 # on its training rows `dec` (prune_decompose()). feature_names: the predictors' names; y_all: the training outcome;
 # n_trees: the number of families. The kept components of each tau come from the forest's own shares (those of the
 # final model). D is scored with the OOB intercept and components. R's (alpha, beta) are fitted as the final model's,
-# by least squares on the forest's own components, but on the rows outside each fold (prune_lstsq_qr()), and scored
-# with the OOB components of the fold's rows. Rows without an OOB family are left out. The MSE is corrected for the
-# OOB means' larger across-family variance (see below). Returns the table, `dec` and `info` (rows used, mean number of
-# OOB families per row).
+# by least squares on the OOB components (not the forest's own, which have fitted the training rows' noise), but on
+# the rows outside each fold (prune_lstsq_qr()), and scored with the OOB components of the fold's rows. Rows without
+# an OOB family are left out. The MSE is corrected for the OOB means' larger across-family variance (see below).
+# Returns the table, `dec`, `oob_fit` (list(F = the OOB components, y = the outcome) of the rows with OOB families,
+# for R's final fit by prune_fit_rule()) and `info` (rows used, mean number of OOB families per row). With
+# cand = NULL (a given rule R) nothing is scored and the table is NULL.
 prune_oob_score <- function(
   o,
   dec,
@@ -681,6 +732,15 @@ prune_oob_score <- function(
   i1 <- o$intercept1[use, 1]
   rm(o)
   F_oob <- (S0 + S1) / m
+  # a given rule R (cand = NULL, no candidates to score): only the OOB components for its coefficients
+  if (is.null(cand)) {
+    return(list(
+      table = NULL,
+      dec = dec,
+      oob_fit = list(F = F_oob, y = y_all[use]),
+      info = list(n_use = n_use, mean_m = mean(m))
+    ))
+  }
   I_oob <- (i0 + i1) / m
   # the means over each half (0 where a half has no OOB family)
   F0 <- S0 / pmax(m0, 1)
@@ -763,8 +823,13 @@ prune_oob_score <- function(
     table
   }
 
-  # R's coefficients are fitted as the final model's are, on the forest's own components
-  list(table = score(dec$own[use, , drop = FALSE]), dec = dec, info = list(n_use = n_use, mean_m = mean(m)))
+  # R's coefficients are fitted as the final model's are, on the OOB components
+  list(
+    table = score(F_oob),
+    dec = dec,
+    oob_fit = list(F = F_oob, y = y),
+    info = list(n_use = n_use, mean_m = mean(m))
+  )
 }
 
 # The kept components (scaled by beta) on new data, as a matrix with one named column per component
@@ -875,6 +940,10 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
   checkmate::assert_int(n_show, lower = 0)
   cmp <- x$components
   rule_name <- c(D = "D (drop)", R = "R (drop + refit one coefficient per component)")[[x$rule]]
+  # chosen out of bag, R's coefficients were fitted on the out-of-bag components
+  if (x$rule == "R" && identical(x$select_by, "oob")) {
+    rule_name <- sub(")$", ", fitted out of bag)", rule_name)
+  }
   how <- if (!is.null(x$oob)) {
     sprintf(
       "Chosen by out-of-bag error (%s; R refitted in %d folds, seed %d) among %d candidates.",
