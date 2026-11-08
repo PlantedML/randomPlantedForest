@@ -49,6 +49,13 @@
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
   The default `min_leaf_rows = 1` fits the same models as before, bit for bit.
+* `rpf(tune = TRUE)` tunes out of bag in one call (regression): the greediness of the split search (`split_try` and `t_try`, on the ladder of the new `greediness_ladder()`) and `min_leaf_rows`.
+  Every forest of the search has `splits` chosen out of bag and is pruned by `prune_components()` with its defaults, and the forest whose pruned model has the lowest corrected out-of-bag error wins; the display (`max_panels`) is applied once, to the chosen model.
+  The search is coordinate-wise, about 10 forests: the ladder from 10 / 0.4 to 1 / 0.0125, then `min_leaf_rows` 1, 5, 20 and 100, then the two ladder neighbours of the chosen point.
+  `tune = "quick"` grows two forests, 3 / 0.1 and 1 / 0.025, and the new `tune_control()` sets your own search.
+  The result is the chosen forest's pruned model, with the search table in `$tune`.
+  On 48 data sets (44 synthetic, 4 splits of California housing) the full search had 10.8% lower test error than 10 / 0.4 and 2.8% lower than 5-fold cross-validation over the same settings, at 1/24 of its cost; the quick preset had 9.4% lower test error. Those studies scored each forest with the pruning's choice of the time (the lowest out-of-bag error, R's coefficients in sample), not with the sparse default used here.
+  The default stays `tune = FALSE`.
 * `options(randomPlantedForest.exact_draw = FALSE)` draws the split candidates of regression with `split_structure = "leaves"` from a tree of weights kept up to date between rounds, instead of one random number per possible split in every round (`?rpf`, "The draw of candidates for `leaves`").
   This fits about 2.5 times as fast on larger data, for example 218 s → 86 s at 1 thread on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
   It draws from the same distribution and leaves out the same candidates under `min_leaf_rows`, but with other random numbers, so the same seed gives another forest.
