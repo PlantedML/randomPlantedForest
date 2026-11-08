@@ -7,6 +7,10 @@
   `rpf_boxes()` returns the leaves as a data frame.
   Requires `ggplot2`, and `patchwork` for `type = "boxes"`.
   The "Getting started" vignette uses it to show how a tree family is built and what purification does.
+* `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
+  Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
+  Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
+  The default `min_leaf_rows = 1` fits the same models as before, bit for bit.
 
 ## Bug fixes
 
