@@ -29,6 +29,8 @@ std::vector<GridFamilyExport> list_to_grid(const Rcpp::List &grid);
 Rcpp::List rects_to_list(const rpf_rect::PurifiedForest *pf);
 rpf_rect::PurifiedForest list_to_rects(const Rcpp::List &x, int value_size);
 Rcpp::List purify_stats_to_list(const PurifyStats &st);
+Rcpp::List oob_path_to_list(const OobPath &o);
+Rcpp::List adaptive_stats_to_list(const AdaptiveStats &st);
 
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
@@ -316,20 +318,26 @@ public:
   {
     if (!core.has_oob_path())
       Rcpp::stop("The forest has no OOB path: fit it with `oob_path`.");
-    OobPath o = core.oob_path();
-    const int n = core.get_sample_size(), ncol = (int)(o.checkpoints.size() * core.get_value_size());
-    Rcpp::NumericMatrix s0(n, ncol), s1(n, ncol);
-    std::copy(o.sum0.begin(), o.sum0.end(), s0.begin());
-    std::copy(o.sum1.begin(), o.sum1.end(), s1.begin());
-    Rcpp::IntegerMatrix count(n, 2);
-    std::copy(o.count.begin(), o.count.end(), count.begin());
-    return Rcpp::List::create(
-        Rcpp::Named("checkpoints") = Rcpp::IntegerVector(o.checkpoints.begin(), o.checkpoints.end()),
-        Rcpp::Named("sum0") = s0,
-        Rcpp::Named("sum1") = s1,
-        Rcpp::Named("count") = count
+    return oob_path_to_list(core.oob_path());
+  }
+  // The adaptive fit (regression): the next fit() grows to `checkpoints` (the last one the forest's splits) and calls
+  // stopper(c, path) at each checkpoint c (1-based) with the OOB path there (as oob_path() gives it, one column); it
+  // returns 0 to grow on or the index of the chosen checkpoint (see AdaptiveStopper)
+  void set_adaptive(
+      const Rcpp::IntegerVector &checkpoints, Rcpp::Function stopper, int patience, double floor, double pause_gb
+  )
+  {
+    core.set_adaptive(
+        Rcpp::as<std::vector<int>>(checkpoints),
+        [stopper](size_t c, const OobPath &path) -> int {
+          return Rcpp::as<int>(stopper((int)c + 1, oob_path_to_list(path)));
+        },
+        patience,
+        floor,
+        pause_gb
     );
   }
+  Rcpp::List adaptive_stats() { return adaptive_stats_to_list(core.adaptive_stats()); }
 
 private:
   Core core;

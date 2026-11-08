@@ -336,10 +336,46 @@ List purify_stats_to_list(const PurifyStats &st)
   );
 }
 
+// checkpoints, the n x (checkpoints * value_size) sums sum0 / sum1 (column-major, as R's matrices) and the n x 2 count
+List oob_path_to_list(const OobPath &o)
+{
+  const int n = (int)(o.count.size() / 2);
+  const int ncol = n > 0 ? (int)(o.sum0.size() / (size_t)n) : 0;
+  NumericMatrix s0(n, ncol), s1(n, ncol);
+  std::copy(o.sum0.begin(), o.sum0.end(), s0.begin());
+  std::copy(o.sum1.begin(), o.sum1.end(), s1.begin());
+  IntegerMatrix count(n, 2);
+  std::copy(o.count.begin(), o.count.end(), count.begin());
+  return List::create(
+      Named("checkpoints") = IntegerVector(o.checkpoints.begin(), o.checkpoints.end()),
+      Named("sum0") = s0,
+      Named("sum1") = s1,
+      Named("count") = count
+  );
+}
+
+List adaptive_stats_to_list(const AdaptiveStats &st)
+{
+  return List::create(
+      Named("pilot_bound") = st.pilot_bound,
+      Named("growths") = st.growths,
+      Named("regrowths") = st.regrowths,
+      Named("splits_grown") = st.splits_grown,
+      Named("pauses") = st.pauses,
+      Named("resumes") = st.resumes,
+      Named("max_paused_gb") = st.max_paused_gb,
+      Named("seconds_grow") = st.seconds_grow,
+      Named("seconds_stopper") = st.seconds_stopper,
+      Named("seconds_rebuild") = st.seconds_rebuild,
+      Named("bound_trace") = IntegerVector(st.bound_trace.begin(), st.bound_trace.end())
+  );
+}
+
 void connect_to_r(RandomPlantedForest &core)
 {
   core.verbose_out = &Rcout;
   core.seed_source = seed_from_r;
+  core.check_interrupt = [] { Rcpp::checkUserInterrupt(); };
 }
 
 NumericVector leaves_draw_counts(

@@ -39,13 +39,16 @@ void RandomPlantedForest::fit()
   unsigned int threads_to_use = static_cast<unsigned int>(nthreads);
   if (threads_to_use == 0)
     threads_to_use = 1;
-  if (threads_to_use > 1) {
-    if (threads_to_use > std::thread::hardware_concurrency()) {
-      warn(
-          "Requested " + std::to_string(threads_to_use) + " threads but only " +
-          std::to_string(std::thread::hardware_concurrency()) + " available"
-      );
-    }
+  if (threads_to_use > 1 && threads_to_use > std::thread::hardware_concurrency()) {
+    warn(
+        "Requested " + std::to_string(threads_to_use) + " threads but only " +
+        std::to_string(std::thread::hardware_concurrency()) + " available"
+    );
+  }
+  if (alone_) {
+    // the adaptive fit (oob_path.cpp): one family at a time, then the forest at the chosen number of splits
+    fit_alone(initial_leaves);
+  } else if (threads_to_use > 1) {
     for (int start = 0; start < n_trees; start += (int)threads_to_use) {
       int batch = std::min<int>((int)threads_to_use, n_trees - start);
       if (batch <= 0)

@@ -527,11 +527,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
-    std::shared_ptr<PathTracker> path = path_start(n);
+    std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
-      if (path)
-        path_step(*path, split_count);
+      if (path && !path_step(*path, split_count))
+        break;
       curr_split = this->calcOptimalSplit_resTrees(samples_Y, samples_X, possible_trees, curr_family);
       if (path && !std::isinf(curr_split.min_sum))
         path_split(*path, curr_split);
@@ -747,11 +747,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     } leaves_scratch_guard;
     tls_leaves_scratch_ptr = &leaves_scratch;
 
-    std::shared_ptr<PathTracker> path = path_start(n);
+    std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
-      if (path)
-        path_step(*path, split_count);
+      if (path && !path_step(*path, split_count))
+        break;
 
       if (split_structure_mode_ == 4)
         curr_split = this->calcOptimalSplit_hist(samples_Y, samples_X, possible_splits, curr_family);
@@ -900,11 +900,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
 
-  std::shared_ptr<PathTracker> path = path_start(n);
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
-    if (path)
-      path_step(*path, split_count);
+    if (path && !path_step(*path, split_count))
+      break;
     if (split_structure_mode_ == 2)
       curr_split = this->calcOptimalSplit_curTrees1(samples_Y, samples_X, possible_splits, curr_family);
     else
