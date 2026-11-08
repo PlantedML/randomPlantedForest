@@ -27,7 +27,8 @@ interaction term, representing the functional decomposition of the prediction.
 All components together with the intercept sum up
 to the prediction.
 For multiclass classification, the number of output columns is multiplied by
-the number of levels in the outcome.
+the number of \code{target_levels}: the levels of the outcome, or for \code{loss = "logit"}
+all levels but the first (the reference level).
 \item \code{intercept} (\code{numeric}): Expected value of the prediction.
 For multiclass classification, one value per target level, named by \code{target_levels}.
 \item \code{x} (\code{\link[data.table:data.table]{data.table}}): Copy of \code{new_data} containing predictors selected
@@ -50,6 +51,10 @@ Extracts all possible components up to \code{max_interaction} degrees,
 up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
 Optionally \code{predictors} can be specified to only include components including the given variables.
 If \code{max_interaction} is greater than \code{length(predictors)}, the \code{max_interaction} will be lowered accordingly.
+
+All components are evaluated in one pass over the rows of \code{new_data}.
+Components that the purified forest does not hold, such as sets of predictors
+that never appear together in a tree, are zero columns.
 
 The components are only unique for a purified forest.
 An unpurified forest is purified in place on first use with the defaults of \code{\link[=purify]{purify()}}.

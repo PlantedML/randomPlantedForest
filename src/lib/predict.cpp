@@ -609,3 +609,98 @@ RandomPlantedForest::predict_vector(const std::vector<double> &feature_vec, cons
   }
   return predictions;
 }
+
+std::vector<std::vector<int>> RandomPlantedForest::purified_components() const
+{
+  if (!purified)
+    throw std::invalid_argument("The forest is not purified.");
+  std::set<std::vector<int>> sets;
+  if (rect_forest_) {
+    for (const auto &c : rect_forest_->comps)
+      sets.insert(c.first);
+  } else {
+    // mode 1: the trees of the families hold the purified grids (including the subsets of the grown trees)
+    for (const auto &family : tree_families)
+      for (const auto &tree : family) {
+        std::vector<int> S;
+        for (int d : tree.first)
+          if (d > 0)
+            S.push_back(d);
+        if (!S.empty())
+          sets.insert(S);
+      }
+  }
+  return std::vector<std::vector<int>>(sets.begin(), sets.end());
+}
+
+std::vector<double> RandomPlantedForest::predict_components(
+    const double *X, int n, int p, const std::vector<std::vector<int>> &sets, int nthreads
+)
+{
+  if (p != feature_size)
+    throw std::invalid_argument("Feature vector has wrong dimension.");
+  const size_t vs = value_size, K = sets.size();
+  std::vector<std::vector<int>> S(sets);
+  for (auto &s : S) {
+    std::sort(s.begin(), s.end());
+    if (s.empty() || s.front() < 1 || s.back() > feature_size || std::adjacent_find(s.begin(), s.end()) != s.end())
+      throw std::invalid_argument("A component must be a set of distinct features in 1..p.");
+  }
+  std::vector<double> out((size_t)n * K * vs, 0.0); // column-major: out[(k * vs + c) * n + row]
+  if (n == 0 || K == 0)
+    return out;
+
+  if (!(purified && rect_forest_)) {
+    // leaf scan (unpurified) or mode-1 grids; a purified forest's components without a tree are zero
+    std::set<std::set<int>> trees;
+    for (const auto &family : tree_families)
+      for (const auto &tree : family)
+        trees.insert(tree.first);
+    std::vector<double> sub;
+    for (size_t k = 0; k < K; ++k) {
+      const std::set<int> comp(S[k].begin(), S[k].end());
+      if (purified && !trees.count(comp))
+        continue;
+      sub.resize((size_t)n * S[k].size());
+      for (size_t q = 0; q < S[k].size(); ++q)
+        std::copy(X + (size_t)(S[k][q] - 1) * n, X + (size_t)S[k][q] * n, sub.begin() + q * (size_t)n);
+      std::vector<double> r = predict_matrix(sub.data(), n, (int)S[k].size(), comp, nthreads);
+      std::copy(r.begin(), r.end(), out.begin() + k * vs * (size_t)n);
+    }
+    return out;
+  }
+
+  // Rectangle store: per chunk of rows the cells of all features are computed once, then the components are the
+  // outer loop. The same sums in the same order as predict_matrix.
+  const rpf_rect::PurifiedForest &pf = *rect_forest_;
+  std::vector<const rpf_rect::Component *> comps(K, nullptr);
+  for (size_t k = 0; k < K; ++k) {
+    auto it = pf.comps.find(S[k]);
+    if (it != pf.comps.end())
+      comps[k] = &it->second;
+  }
+  unsigned int threads = nthreads > 0 ? (unsigned int)nthreads : (unsigned int)std::max(1, this->nthreads);
+  threads = std::min(threads, std::max(1u, std::thread::hardware_concurrency()));
+  double *res = out.data();
+  parallel_rows(n, threads, [&](int begin, int end) {
+    const size_t chunk = 2048, stride = (size_t)std::max(1, feature_size);
+    std::vector<int32_t> cells(chunk * stride, 0);
+    std::vector<double> acc(chunk * vs);
+    for (int r0 = begin; r0 < end; r0 += (int)chunk) {
+      const size_t m = (size_t)std::min(end - r0, (int)chunk);
+      for (int f = 0; f < feature_size; ++f)
+        for (size_t i = 0; i < m; ++i)
+          cells[i * stride + f] = pf.cell(f, X[(size_t)f * n + r0 + i]);
+      for (size_t k = 0; k < K; ++k) {
+        if (!comps[k])
+          continue;
+        std::fill(acc.begin(), acc.end(), 0.0);
+        pf.add_component_rows(*comps[k], cells.data(), stride, m, acc.data(), (int)vs);
+        for (size_t c = 0; c < vs; ++c)
+          for (size_t i = 0; i < m; ++i)
+            res[(k * vs + c) * (size_t)n + r0 + i] = acc[i * vs + c] / n_trees;
+      }
+    }
+  });
+  return out;
+}

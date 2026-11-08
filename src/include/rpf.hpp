@@ -4,7 +4,8 @@
 //
 // Key entry points:
 // - ctor(params): configure; set_data(Y, X) loads data; fit() trains
-// - predict_matrix/predict_vector(): batch/single predictions
+// - predict_matrix/predict_vector(): batch/single predictions;
+//   predict_components(): many components in one pass
 // - purify(): optional post-processing to orthogonalize components
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
@@ -121,6 +122,14 @@ public:
   // Returns column-major n x value_size.
   std::vector<double> predict_matrix(const double *X, int n, int p, const std::set<int> &components, int nthreads = 0);
   Matrix2D predict_vector(const std::vector<double> &X, const std::set<int> &components);
+  // The components with the feature sets `sets` (1-based) at the n rows of column-major X (n x p, all features), in
+  // one pass. Returns column-major n x (sets.size() * value_size), column k * value_size + c for set k and class c;
+  // each column equals predict_matrix() of that component. The components a purified forest does not store are
+  // zero and not evaluated.
+  std::vector<double>
+  predict_components(const double *X, int n, int p, const std::vector<std::vector<int>> &sets, int nthreads = 0);
+  // The feature sets (1-based) of the components a purified forest stores; every other component is zero.
+  std::vector<std::vector<int>> purified_components() const;
   // Optional post-processing to redistribute effects across component orders.
   void purify_1();
   void purify_2();

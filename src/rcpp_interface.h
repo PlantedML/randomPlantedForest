@@ -146,6 +146,25 @@ public:
     std::copy(pred.begin(), pred.end(), out.begin());
     return out;
   }
+  // sets: a list of 1-based feature indices per component
+  Rcpp::NumericMatrix predict_components_matrix(const Rcpp::NumericMatrix &X, const Rcpp::List sets, int nthreads)
+  {
+    std::vector<std::vector<int>> S;
+    for (R_xlen_t k = 0; k < sets.size(); ++k)
+      S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
+    std::vector<double> pred = core.predict_components(REAL(X), X.nrow(), X.ncol(), S, nthreads);
+    Rcpp::NumericMatrix out(X.nrow(), (int)(S.size() * core.get_value_size()));
+    std::copy(pred.begin(), pred.end(), out.begin());
+    return out;
+  }
+  Rcpp::List purified_components()
+  {
+    std::vector<std::vector<int>> sets = core.purified_components();
+    Rcpp::List out(sets.size());
+    for (size_t i = 0; i < sets.size(); ++i)
+      out[(R_xlen_t)i] = Rcpp::IntegerVector(sets[i].begin(), sets[i].end());
+    return out;
+  }
   Rcpp::NumericMatrix predict_vector(const Rcpp::NumericVector &X, const Rcpp::NumericVector components)
   {
     return from_matrix2d(core.predict_vector(Rcpp::as<std::vector<double>>(X), to_int_set(components)));

@@ -8,6 +8,10 @@
 #' Optionally `predictors` can be specified to only include components including the given variables.
 #' If `max_interaction` is greater than `length(predictors)`, the `max_interaction` will be lowered accordingly.
 #'
+#' All components are evaluated in one pass over the rows of `new_data`.
+#' Components that the purified forest does not hold, such as sets of predictors
+#' that never appear together in a tree, are zero columns.
+#'
 #' The components are only unique for a purified forest.
 #' An unpurified forest is purified in place on first use with the defaults of [purify()].
 #' For other settings, such as more threads, call [purify()] before `predict_components()`.
@@ -30,7 +34,8 @@
 #' All components together with the intercept sum up
 #' to the prediction.
 #' For multiclass classification, the number of output columns is multiplied by
-#' the number of levels in the outcome.
+#' the number of `target_levels`: the levels of the outcome, or for `loss = "logit"`
+#' all levels but the first (the reference level).
 #' - `intercept` (`numeric`): Expected value of the prediction.
 #' For multiclass classification, one value per target level, named by `target_levels`.
 #' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
@@ -113,17 +118,13 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table
   new_data_dt <- data.table::as.data.table(new_data)
 
-  # iterate over 1 through max_interaction, get all subsets of predictors,
-  # extract the component for each combination and append them column wise
-  all_components <- lapply(seq_len(max_interaction), function(i) {
-    combinations <- utils::combn(predictors, i, simplify = FALSE)
-    components <- lapply(combinations, function(x) {
-      .predict_single_component(object, new_data_matrix, x)
-    })
-    do.call(cbind, args = components)
-  })
-
-  all_components <- do.call(cbind, args = all_components)
+  # all subsets of predictors up to max_interaction, extracted in one pass (the components the purified forest does
+  # not store are zero columns)
+  combinations <- unlist(
+    lapply(seq_len(max_interaction), function(i) utils::combn(predictors, i, simplify = FALSE)),
+    recursive = FALSE
+  )
+  all_components <- .predict_components(object, new_data_matrix, combinations)
   # Get intercept (scalar), using only one row of x as input as we don't need it repeated
   intercept <- .predict_single_component(
     object,
@@ -164,6 +165,29 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   }
 
   class(ret) <- c("glex", "rpf_components", class(ret))
+  ret
+}
+
+#' Internal function to extract several components in one pass
+#'
+#' The components consisting of each of the predictor sets `sets` (a list of character vectors), at the rows of the
+#' preprocessed matrix `new_data` (all predictors, as from `preprocess_predictors_predict()`). Only the components the
+#' purified forest stores are evaluated; the others are zero. Each column equals `.predict_single_component()`.
+#'
+#' @noRd
+#' @keywords internal
+#' @return A n x `length(sets)` `matrix()` (times the number of model levels for multiclass), named as
+#'   `.predict_single_component()` names its columns.
+.predict_components <- function(object, new_data, sets) {
+  idx <- lapply(sets, function(s) sort.int(match(s, colnames(new_data))))
+  ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
+  out_names <- vapply(sets, function(s) paste0(sort(s), collapse = ":"), character(1))
+  if (length(levels(object$blueprint$ptypes$outcomes[[1]])) > 2) {
+    # (model levels: multiclass logit has no column for the reference level)
+    model_levels <- model_outcome_levels(object)
+    out_names <- paste0(rep(out_names, each = length(model_levels)), "__class:", model_levels)
+  }
+  colnames(ret) <- out_names
   ret
 }
 
