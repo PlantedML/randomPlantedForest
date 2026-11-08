@@ -32,6 +32,7 @@ rpf(x, ...)
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 )
 
@@ -57,6 +58,7 @@ rpf(x, ...)
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 )
 
@@ -82,6 +84,7 @@ rpf(x, ...)
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 )
 
@@ -107,6 +110,7 @@ rpf(x, ...)
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 )
 }
@@ -229,9 +233,21 @@ predictors keep the order of their levels instead of being ordered by the
 outcome. \code{FALSE} orders every factor by the outcome, \code{TRUE} keeps the level
 order of every factor, and a character vector keeps it for the named
 factor predictors only. See "Factor predictors" below.}
+
+\item{oob_path}{\verb{[logical(1) | integer: FALSE]}: Whether to track the
+out-of-bag (OOB) error along the splits (regression only, not with
+\code{deterministic = TRUE}). \code{TRUE} evaluates it at the checkpoints of
+\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} for \code{splits}, four per doubling; an increasing
+integer vector in \verb{1..splits} gives the checkpoints. The fitted forest is
+the same as without. See Details.}
 }
 \value{
-Object of class \code{"rpf"} with model object contained in \verb{$fit}.
+Object of class \code{"rpf"} with model object contained in \verb{$fit}. With
+\code{oob_path}, \verb{$oob_path} holds the OOB path: a data frame with one row per
+checkpoint, \code{splits}, the corrected and the plain OOB root mean squared
+error (\code{oob_rmse}, \code{oob_rmse_raw}), and the standard errors of the two mean
+squared errors (\code{se_mse}, \code{se_mse_raw}). Its attribute \code{n_rows} is the
+number of training rows with an OOB tree family.
 }
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
@@ -352,6 +368,38 @@ seed, because the integer sampling of the C++ standard library
 (\code{std::uniform_int_distribution}) differs between implementations, such as
 libc++ and libstdc++.
 }
+
+\subsection{The out-of-bag path}{
+
+With the same seed, the forest grown with \code{k} splits is exactly the first
+\code{k} splits of every tree family of a forest grown with more: nothing in the
+fit depends on the total number of splits. Each family is grown on a
+bootstrap sample, so every training row is out of bag for the families that
+did not draw it (about 37\% of them). With \code{oob_path}, each family's
+prediction at its OOB rows is updated split by split while it grows, and
+copied at each checkpoint. So one fit gives the OOB error of every forest
+with fewer splits, for example to choose \code{splits} without cross-validation.
+This costs \code{2 * nrow(x) * length(checkpoints)} doubles and a little time;
+the fit itself is unchanged.
+
+The OOB prediction of a row is the mean over its OOB families, and the plain
+error (\code{oob_rmse_raw}) is the root mean squared error of these predictions
+over the rows with an OOB family. That mean averages fewer families than the
+forest, so the plain error overstates the forest's error by the families'
+extra variance, more so with more splits. The corrected error (\code{oob_rmse})
+subtracts this excess, \code{(1 / m_i - 1 / ntrees) * v_i} for row \code{i} with \code{m_i}
+OOB families, where \code{v_i} is the variance across families estimated from the
+OOB means over the families of even and of odd index,
+\code{v_i = (g_even - g_odd)^2 / (1 / m_even + 1 / m_odd)}; this is also the
+correction of \code{\link[=prune_components]{prune_components()}}' OOB choice. A row whose OOB families
+are all even or all odd is not corrected here (\code{prune_components()} gives
+it the mean estimate of the other rows): about 2\% of the rows at 20
+families, 18\% at 10 and over half at 4 (none at 50), so with few families
+the corrected error is biased upwards. Factor levels are ordered by the mean
+outcome of all training rows, so a row's own outcome enters the ordering its
+OOB families split on, and the OOB error is somewhat optimistic with factor
+predictors, most so with many levels.
+}
 }
 \examples{
 # Regression with formula
@@ -368,6 +416,11 @@ cars <- mtcars
 cars$gear <- factor(cars$gear, levels = c(3, 4, 5))
 rpfit <- rpf(mpg ~ gear + wt, data = cars, keep_level_order = "gear")
 rpfit$factor_levels
+
+# The out-of-bag error along the splits, from one fit
+set.seed(1)
+rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE)
+rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 }
 \references{
 Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a

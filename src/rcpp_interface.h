@@ -98,6 +98,17 @@ public:
   {
     connect_to_r(core);
   }
+  // Params-only with interaction constraints: configured for set_data() + fit() (the OOB path, the adaptive fit).
+  RcppForest(const Rcpp::NumericVector parameters, const Rcpp::List constraints)
+      : core(make_rpf(parameters, constraints))
+  {
+    connect_to_r(core);
+  }
+  RcppForest(const std::string loss, const Rcpp::NumericVector parameters, const Rcpp::List constraints)
+      : core(make_cpf(loss, parameters, false, constraints))
+  {
+    connect_to_r(core);
+  }
 
   void set_data(const Rcpp::NumericMatrix &samples_Y, const Rcpp::NumericMatrix &samples_X)
   {
