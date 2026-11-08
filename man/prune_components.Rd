@@ -281,5 +281,6 @@ shown
 shown$display$forms
 }
 \seealso{
-\code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}.
+\code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}; \code{\link[=rpf]{rpf()}} with \code{prune = TRUE} fits and prunes in one
+call.
 }

@@ -203,7 +203,8 @@
 #'
 #' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
 #'
-#' @seealso [predict.rpf_pruned()], [predict_components()], [purify()].
+#' @seealso [predict.rpf_pruned()], [predict_components()], [purify()]; [rpf()] with `prune = TRUE` fits and prunes in one
+#'   call.
 #' @export
 #'
 #' @examples
@@ -283,10 +284,45 @@ prune_components <- function(
   nthreads <- as.integer(nthreads %||% object$params$nthreads)
   checkmate::assert_flag(verbose)
 
-  tr <- prune_training_data(object, data, y)
+  prune_run(
+    object,
+    prune_training_data(object, data, y),
+    max_panels = max_panels,
+    rule = rule,
+    tau = tau,
+    select = select,
+    select_by = select_by,
+    default_select_by = default_select_by,
+    folds = folds,
+    fold_id = fold_id,
+    seed = seed,
+    nthreads = nthreads,
+    verbose = verbose
+  )
+}
+
+# The pruning of prune_components() on the checked arguments: `tr` holds the training rows (prune_training_data()),
+# `default_select_by` whether `select_by` was left at its default. rpf(prune = TRUE) calls it with the rows it was
+# fitted on. Errors are reported against `call`.
+prune_run <- function(
+  object,
+  tr,
+  max_panels,
+  rule,
+  tau,
+  select,
+  select_by,
+  default_select_by,
+  folds,
+  fold_id,
+  seed,
+  nthreads,
+  verbose,
+  call = rlang::caller_env()
+) {
   n <- length(tr$y)
   # the shares, R's coefficients and the out-of-bag rows are those of the training rows
-  prune_check_training_rows(object, tr)
+  prune_check_training_rows(object, tr, call = call)
   cand <- expand.grid(tau = sort(tau), rule = rule, stringsAsFactors = FALSE)[, c("rule", "tau")]
   # a choice among the candidates, or a given rule and tau
   choose <- nrow(cand) > 1
@@ -324,7 +360,7 @@ prune_components <- function(
     } else {
       checkmate::assert_atomic_vector(fold_id, any.missing = FALSE, len = n)
       if (length(unique(fold_id)) < 2) {
-        cli::cli_abort("{.arg fold_id} must have at least two distinct folds.")
+        cli::cli_abort("{.arg fold_id} must have at least two distinct folds.", call = call)
       }
     }
     if (select_by == "cv") {
