@@ -1,5 +1,6 @@
-# cur_trees_1: deterministic mode evaluates every sampled candidate, and leaves are drawn in proportion to their
-# available thresholds (the incremental sampling weights after a split agree with a full rebuild).
+# Regression split structures: deterministic mode evaluates every sampled candidate (cur_trees_1) and spreads its
+# thresholds over each leaf (res_trees, cur_trees_2); cur_trees_1 draws leaves in proportion to their available
+# thresholds (the incremental sampling weights after a split agree with a full rebuild).
 
 # Low-level parameter vector: max_interaction, ntrees, splits, split_try, t_try, purify, deterministic,
 # nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure
@@ -50,5 +51,47 @@ test_that("cur_trees_1 draws only leaves with an available threshold (ties)", {
   for (fam in fit$get_model()) {
     i <- which(vapply(fam$variables, function(v) identical(as.numeric(v), 1), TRUE))
     expect_equal(length(fam$intervals[[i]]), 2 * splits)
+  }
+})
+
+# Friedman 1 with 5 features; one deterministic family
+det_data <- function() {
+  set.seed(8)
+  gen <- function(n) data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n), x4 = runif(n), x5 = runif(n))
+  f <- function(X) 10 * sin(pi * X$x1 * X$x2) + 20 * (X$x3 - 0.5)^2 + 10 * X$x4 + 5 * X$x5
+  X <- gen(600)
+  Xt <- gen(2000)
+  list(X = X, y = f(X) + rnorm(600), Xt = Xt, ft = f(Xt))
+}
+
+test_that("deterministic cur_trees_1, res_trees and cur_trees_2 fit as well as the other structures", {
+  d <- det_data()
+  for (ss in c("cur_trees_1", "res_trees", "cur_trees_2")) {
+    fit <- rpf(
+      x = d$X,
+      y = d$y,
+      max_interaction = 2,
+      ntrees = 1,
+      splits = 100,
+      deterministic = TRUE,
+      split_structure = ss
+    )
+    # before the fix: 75-95% of Var f unexplained (cur_trees_1 split only x1; res_trees and cur_trees_2 tried only
+    # the lowest thresholds of each leaf)
+    mse <- mean((predict(fit, d$Xt)$.pred - d$ft)^2) / var(d$ft)
+    expect_lt(mse, 0.15, label = paste(ss, "test MSE / Var f"))
+    # the main-effect split points are not piled up at the bottom of each feature
+    m <- fit$fit$get_model()[[1]]
+    low <- unlist(lapply(seq_along(m$variables), function(t) {
+      v <- as.numeric(m$variables[[t]])
+      if (length(v) != 1 || v == 0) {
+        return(NULL)
+      }
+      b <- vapply(m$intervals[[t]], function(iv) iv[1, v], numeric(1))
+      b <- b[b > min(d$X[[v]])]
+      b < stats::quantile(d$X[[v]], 0.05)
+    }))
+    expect_gt(length(low), 10)
+    expect_lt(mean(low), 0.25, label = paste(ss, "share of split points below the 5% quantile"))
   }
 })

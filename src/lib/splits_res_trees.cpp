@@ -197,32 +197,37 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
     for (size_t i = 0; i < buckets.size(); ++i)
       if (buckets[i].total > 0.0)
         rpf_utils::fenwick_add(bucket_bit, i + 1, buckets[i].total);
-    auto fenwick_prefix_sum = [&](const std::vector<double> &bit, size_t idx1) -> double {
-      double s = 0.0;
-      while (idx1 > 0) {
-        s += bit[idx1 - 1];
-        idx1 -= idx1 & (~idx1 + 1);
-      }
-      return s;
-    };
 
     const double total_all0 = std::accumulate(buckets.begin(), buckets.end(), 0.0, [](double s, const Bucket &b) {
       return s + std::max(0.0, b.total);
     });
     double bucket_total_all = total_all0;
     size_t draws = std::min((size_t)this->split_try, (size_t)std::llround(total_all0));
+    // Deterministic: the split_try thresholds evenly spread over all (dimension, leaf, threshold) triples of this
+    // candidate, in bucket, leaf and threshold order (the analogue of drawing them uniformly without replacement)
+    std::vector<int> det_targets;
+    std::vector<double> det_bucket_start;
+    if (this->deterministic) {
+      det_targets = compute_even_spread_indices(0, (int)std::llround(total_all0), draws);
+      double start = 0.0;
+      for (const auto &b : buckets) {
+        det_bucket_start.push_back(start);
+        start += std::max(0.0, b.total);
+      }
+    }
+    // deterministic: the selected leaf, and its threshold counted from the leaf's left bound
+    int det_offset = 0;
+    size_t det_leaf = 0;
 
     for (size_t t = 0; t < draws; ++t) {
       // Select a bucket according to current totals
       size_t b_idx;
       if (this->deterministic) {
-        if (total_all0 <= 0.0)
+        if (t >= det_targets.size())
           break;
-        double step = total_all0 / (double)draws;
-        double target = step * (t + 0.5);
-        if (target >= total_all0)
-          target = std::max(0.0, total_all0 - 1.0);
-        b_idx = rpf_utils::fenwick_find_by_prefix(bucket_bit, target);
+        const double g = (double)det_targets[t];
+        b_idx =
+            (size_t)(std::upper_bound(det_bucket_start.begin(), det_bucket_start.end(), g) - det_bucket_start.begin());
         if (b_idx == 0)
           continue;
         --b_idx;
@@ -246,22 +251,22 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       // Sample a leaf in the bucket via local Fenwick
       double r_leaf;
       if (this->deterministic) {
-        double step = (total_all0 <= 0.0) ? 0.0 : (total_all0 / (double)draws);
-        double target_global = step * (t + 0.5);
-        if (target_global >= total_all0)
-          target_global = std::max(0.0, total_all0 - 1.0);
-        double before = fenwick_prefix_sum(bucket_bit, b_idx);
-        double inside = target_global - before;
-        if (inside < 0.0)
-          inside = 0.0;
-        if (inside >= bucket.total)
-          inside = std::max(0.0, bucket.total - 1.0);
-        r_leaf = inside;
+        // The leaf holding global threshold g in the bucket's original leaf order (weights before this round)
+        double inside = (double)det_targets[t] - det_bucket_start[b_idx];
+        const std::vector<double> &wts0 = *(bucket.wts_src);
+        size_t li = 0;
+        while (li + 1 < wts0.size() && inside >= wts0[li]) {
+          inside -= wts0[li];
+          ++li;
+        }
+        det_offset = (int)inside;
+        det_leaf = li;
+        r_leaf = 0.0;
       } else {
         r_leaf = rng_runif(0.0, std::max(0.0, bucket.total));
       }
       const std::vector<double> &bit_view = bucket.has_local ? bucket.bit : *(bucket.bit_src);
-      size_t leaf_idx_sel = rpf_utils::fenwick_find_by_prefix(bit_view, r_leaf);
+      size_t leaf_idx_sel = this->deterministic ? det_leaf + 1 : rpf_utils::fenwick_find_by_prefix(bit_view, r_leaf);
       if (leaf_idx_sel == 0)
         continue;
       leaf_idx_sel -= 1;
@@ -311,35 +316,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       // Select threshold index within [left, right) avoiding repeats
       int s_idx = -1;
       if (this->deterministic) {
-        int range = state.right - state.left;
-        int remaining_here = (int)wts_view[leaf_idx_sel];
-        int guess = state.left + (int)(((double)state.used_count + 0.5) / ((double)remaining_here + 0.5) * range);
-        if (guess >= state.right)
-          guess = state.right - 1;
-        int lo = guess, hi = guess;
-        bool found = false;
-        while (lo >= state.left || hi < state.right) {
-          if (lo >= state.left && (state.used_flags.empty() || !state.used_flags[lo - state.left])) {
-            s_idx = lo;
-            found = true;
-            break;
-          }
-          if (hi < state.right && (state.used_flags.empty() || !state.used_flags[hi - state.left])) {
-            s_idx = hi;
-            found = true;
-            break;
-          }
-          --lo;
-          ++hi;
-        }
-        if (!found) {
-          for (int p = state.left; p < state.right; ++p) {
-            if (state.used_flags.empty() || !state.used_flags[p - state.left]) {
-              s_idx = p;
-              break;
-            }
-          }
-        }
+        s_idx = state.left + det_offset;
+        if (s_idx >= state.right)
+          continue;
       } else {
         do {
           s_idx = rng_randint(state.left, state.right);
