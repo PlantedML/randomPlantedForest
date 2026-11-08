@@ -33,10 +33,12 @@ required to store or transfer fitted models.
 Training data is only included with \code{include_data = TRUE}; without it, a
 restored forest can predict (including purified prediction if the forest
 was purified before marshaling) but can never be purified afterwards.
+With it, the in-bag counts of the bootstrap samples are stored too, so that
+\code{\link[=prune_components]{prune_components()}} can choose out of bag after restoring.
 
 A pruned forest from \code{\link[=prune_components]{prune_components()}} (class \code{rpf_pruned}) is marshaled
 the same way: its forest as above, and the pruning (rule, coefficients,
-components, CV table) as it is. The restored model predicts as before;
+components, the table of the choice) as it is. The restored model predicts as before;
 its forest is purified, so it needs no training data for that.
 }
 \examples{

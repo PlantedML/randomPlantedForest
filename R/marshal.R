@@ -8,10 +8,12 @@
 #' Training data is only included with `include_data = TRUE`; without it, a
 #' restored forest can predict (including purified prediction if the forest
 #' was purified before marshaling) but can never be purified afterwards.
+#' With it, the in-bag counts of the bootstrap samples are stored too, so that
+#' [prune_components()] can choose out of bag after restoring.
 #'
 #' A pruned forest from [prune_components()] (class `rpf_pruned`) is marshaled
 #' the same way: its forest as above, and the pruning (rule, coefficients,
-#' components, CV table) as it is. The restored model predicts as before;
+#' components, the table of the choice) as it is. The restored model predicts as before;
 #' its forest is purified, so it needs no training data for that.
 #'
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
@@ -58,6 +60,9 @@ rpf_marshal <- function(x, include_data = FALSE) {
     grid = if (purified && length(rects) == 0) x$fit$get_grid_leaves(),
     rects = if (length(rects) > 0) rects,
     data = if (include_data) x$fit$get_data(),
+    # the in-bag counts (n x ntrees, 0..255) for prune_components(select_by = "oob"); none in a forest restored
+    # from a blob without them
+    inbag = if (include_data) tryCatch(as.raw(x$fit$inbag()), error = function(e) NULL),
     # $forest (export_forest = TRUE) duplicates $model; rebuilt on unmarshal
     had_forest = !is.null(x$forest)
   )
@@ -107,6 +112,14 @@ rpf_unmarshal <- function(blob) {
     fit$set_training_data(as.matrix(state$data$Y), as.matrix(state$data$X))
   }
   fit$set_model(state$model)
+  # NULL without include_data, and in blobs from versions before the field existed
+  if (!is.null(state$inbag)) {
+    n <- state$dims$sample_size
+    if (!is.raw(state$inbag) || length(state$inbag) != n * length(state$model)) {
+      cli::cli_abort("Corrupt {.cls rpf_marshaled} blob: the in-bag counts do not match the forest.")
+    }
+    fit$set_inbag(matrix(as.integer(state$inbag), nrow = n))
+  }
   if (state$purified) {
     if (length(state$rects) > 0) {
       fit$set_purified_rects(state$rects)

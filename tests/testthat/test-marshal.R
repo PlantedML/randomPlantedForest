@@ -110,6 +110,32 @@ test_that("include_data = TRUE allows purify after restore", {
   expect_identical(predict(restored, mtcars), predict(fit, mtcars))
 })
 
+test_that("include_data = TRUE stores the in-bag counts", {
+  set.seed(3)
+  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 6, max_interaction = 2)
+  ib <- fit$fit$inbag()
+  blob <- rpf_marshal(fit, include_data = TRUE)
+  expect_type(blob$fit_state$inbag, "raw")
+  restored <- rpf_unmarshal(blob)
+  expect_identical(restored$fit$inbag(), ib)
+  # the out-of-bag components after restoring are those of the original forest
+  expect_identical(restored$fit$purify_oob(0L, 1L), fit$fit$purify_oob(0L, 1L))
+
+  # without the data, no counts: a restored forest cannot be purified anyway
+  plain <- rpf_marshal(fit)
+  expect_null(plain$fit_state$inbag)
+  expect_error(rpf_unmarshal(plain)$fit$inbag(), "include_data = TRUE")
+  # a blob with data from a version without the field restores without counts
+  old <- blob
+  old$fit_state$inbag <- NULL
+  expect_error(rpf_unmarshal(old)$fit$inbag(), "no in-bag counts")
+  expect_error(rpf_unmarshal(old)$fit$purify_oob(0L, 1L), "no in-bag counts")
+  # corrupt counts are rejected
+  bad <- blob
+  bad$fit_state$inbag <- bad$fit_state$inbag[-1]
+  expect_error(rpf_unmarshal(bad), "in-bag counts do not match")
+})
+
 test_that("purify on a data-free restored forest errors informatively", {
   fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   restored <- rpf_unmarshal(rpf_marshal(fit))
