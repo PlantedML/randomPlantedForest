@@ -147,10 +147,12 @@ the number of predictors are reduced to it.}
 \item{ntrees}{\verb{[integer(1): 50]}: Number of tree families, i.e. the size of the forest.
 Each family is grown on a bootstrap sample and predictions are averaged.}
 
-\item{splits}{\verb{[integer(1): 30]}: Number of split rounds per tree family. The main tuning
+\item{splits}{\verb{[integer(1) | NULL: 30]}: Number of split rounds per tree family. The main tuning
 parameter: more splits fit more complex functions. A round splits the best of its
 candidates; near saturation, when every candidate's leaf is too small to split, a
-round can make no split.}
+round can make no split. \code{NULL} chooses it out of bag while the forest grows
+(regression, not with \code{deterministic = TRUE}; otherwise \code{NULL} means 30). See
+"Choosing \code{splits} out of bag" in Details.}
 
 \item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
 sampled; one of \code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
@@ -239,7 +241,9 @@ out-of-bag (OOB) error along the splits (regression only, not with
 \code{deterministic = TRUE}). \code{TRUE} evaluates it at the checkpoints of
 \code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} for \code{splits}, four per doubling; an increasing
 integer vector in \verb{1..splits} gives the checkpoints. The fitted forest is
-the same as without. See Details.}
+the same as without. See Details. With \code{splits = NULL} the path of the
+checkpoints grown is stored either way, and only \code{TRUE} or \code{FALSE} is
+allowed.}
 }
 \value{
 Object of class \code{"rpf"} with model object contained in \verb{$fit}. With
@@ -247,7 +251,11 @@ Object of class \code{"rpf"} with model object contained in \verb{$fit}. With
 checkpoint, \code{splits}, the corrected and the plain OOB root mean squared
 error (\code{oob_rmse}, \code{oob_rmse_raw}), and the standard errors of the two mean
 squared errors (\code{se_mse}, \code{se_mse_raw}). Its attribute \code{n_rows} is the
-number of training rows with an OOB tree family.
+number of training rows with an OOB tree family. With \code{splits = NULL},
+\verb{$params$splits} is the chosen number of splits, \verb{$oob_path} the path of
+the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{splits},
+\code{stopped_at} (the number of splits where growing stopped) and \code{capped}
+(whether it stopped at the cap while the error was still falling).
 }
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
@@ -404,6 +412,35 @@ proportions (three or more classes). So a row's own outcome enters the
 ordering its OOB families split on, and the OOB error is somewhat optimistic
 with factor predictors, most so with many levels.
 }
+
+\subsection{Choosing \code{splits} out of bag}{
+
+With \code{splits = NULL} (regression, not deterministic), the number of splits
+is chosen while the forest grows, by the corrected OOB error of the
+out-of-bag path. The families grow to checkpoints, four per doubling of the
+splits (\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} up to 25,600), and the forest's corrected
+error is followed checkpoint by checkpoint. Growing stops once the lowest
+error is one doubling of the splits back (for example, no new minimum from
+100 to 200 splits), or at 25,600 splits, with a warning if the error was
+still falling there. The result is the forest at the lowest error (ties go
+to fewer splits): the forest that \code{rpf()} with that many \code{splits} and the
+same seed returns. On 52 data sets (44 synthetic, 8 splits of California
+housing) this chose the same \code{splits} as the lowest error along a fixed
+budget of 3,200 splits on 50 of them, and a later, lower minimum on the
+other two, while growing 0.72 of the splits.
+
+The families grow one at a time, \code{nthreads} together, each to the stop
+estimated from the families grown before it. A grown family keeps only its
+OOB predictions at the checkpoints and a record of its splits (40 bytes a
+split), from which the chosen forest is rebuilt, without a refit. A family
+that reaches the estimate waits there with its growing state while the
+waiting families fit in \code{getOption("randomPlantedForest.adaptive_pause_gb", 1)} GB, so that it can grow on cheaply if the stop comes later; otherwise
+it is freed, and grown again from its seed if needed. The option trades
+memory for time; the fit depends neither on it nor on \code{nthreads}. Growing
+all families together would hold every family's growing state until the
+stop: about 18 GB on California housing (16,512 rows) at 200 families and
+\code{max_interaction = 3}, where the fit one family at a time peaks at 3.5 GB.
+}
 }
 \examples{
 # Regression with formula
@@ -425,6 +462,12 @@ rpfit$factor_levels
 set.seed(1)
 rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE)
 rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
+
+# The number of splits chosen out of bag while growing
+set.seed(1)
+rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
+rpfit
+rpfit$params$splits
 }
 \references{
 Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a

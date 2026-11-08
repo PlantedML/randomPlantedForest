@@ -51,6 +51,18 @@ format.rpf <- function(x, ...) {
       degree,
       "."
     )
+    # splits = NULL: chosen out of bag while growing
+    oob <- x$splits_oob
+    if (!is.null(oob)) {
+      rmse <- format(signif(x$oob_path$oob_rmse[match(oob$splits, x$oob_path$splits)], 4))
+      cli::cli_alert_info(
+        "{.arg splits} chosen out of bag (lowest corrected OOB RMSE {rmse}); growing stopped at
+        {.val {oob$stopped_at}} split{?s}."
+      )
+      if (oob$capped) {
+        cli::cli_alert_warning("Growing stopped at the cap while the out-of-bag error was still falling.")
+      }
+    }
     if (is_purified(x)) {
       cli::cli_alert_success("Forest is purified.")
     } else {

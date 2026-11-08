@@ -37,36 +37,45 @@ oob_path_checkpoints <- function(splits) {
 # one the pruning gives its unpruned model (rule D at tau = 0) by those rows' correction, by more with fewer families.
 oob_path_table <- function(path, y, ntrees, call = rlang::caller_env()) {
   y <- as.numeric(y)
-  m0 <- path$count[, 1]
-  m1 <- path$count[, 2]
-  m <- m0 + m1
-  ok <- m > 0
-  both <- m0 > 0 & m1 > 0
-  n_ok <- sum(ok)
+  n_ok <- sum(path$count[, 1] + path$count[, 2] > 0)
   if (n_ok == 0) {
     cli::cli_abort("No training row is out of bag for any tree family.", call = call)
   }
   cp <- path$checkpoints
-  out <- data.frame(
-    splits = as.integer(cp),
-    oob_rmse = NA_real_,
-    oob_rmse_raw = NA_real_,
-    se_mse = NA_real_,
-    se_mse_raw = NA_real_
-  )
+  points <- matrix(NA_real_, length(cp), 4)
   for (c in seq_along(cp)) {
-    s0 <- path$sum0[, c]
-    s1 <- path$sum1[, c]
-    e2 <- (y - (s0 + s1) / m)^2
-    v <- numeric(length(y))
-    v[both] <- (s0[both] / m0[both] - s1[both] / m1[both])^2 / (1 / m0[both] + 1 / m1[both])
-    corr <- e2 - (1 / m - 1 / ntrees) * v
-    out$oob_rmse[c] <- sqrt(max(mean(corr[ok]), 0))
-    out$oob_rmse_raw[c] <- sqrt(mean(e2[ok]))
-    out$se_mse[c] <- stats::sd(corr[ok]) / sqrt(n_ok)
-    out$se_mse_raw[c] <- stats::sd(e2[ok]) / sqrt(n_ok)
+    points[c, ] <- oob_path_point(path$sum0[, c], path$sum1[, c], path$count, y, ntrees)
   }
-  attr(out, "n_rows") <- n_ok
+  oob_path_frame(cp, points, n_ok)
+}
+
+# One checkpoint of the OOB path, over the rows with an OOB family: the corrected and the plain OOB mean squared
+# error and their standard errors, from s0 / s1, the rows' OOB predictions summed over the families of even / odd
+# index, and count, the number of OOB families of each half (see rpf()'s details)
+oob_path_point <- function(s0, s1, count, y, ntrees) {
+  m0 <- count[, 1]
+  m1 <- count[, 2]
+  m <- m0 + m1
+  ok <- m > 0
+  both <- m0 > 0 & m1 > 0
+  n_ok <- sum(ok)
+  e2 <- (y - (s0 + s1) / m)^2
+  v <- numeric(length(y))
+  v[both] <- (s0[both] / m0[both] - s1[both] / m1[both])^2 / (1 / m0[both] + 1 / m1[both])
+  corr <- e2 - (1 / m - 1 / ntrees) * v
+  c(mean(corr[ok]), mean(e2[ok]), stats::sd(corr[ok]) / sqrt(n_ok), stats::sd(e2[ok]) / sqrt(n_ok))
+}
+
+# The table from the checkpoints' oob_path_point() rows
+oob_path_frame <- function(checkpoints, points, n_rows) {
+  out <- data.frame(
+    splits = as.integer(checkpoints),
+    oob_rmse = sqrt(pmax(points[, 1], 0)),
+    oob_rmse_raw = sqrt(points[, 2]),
+    se_mse = points[, 3],
+    se_mse_raw = points[, 4]
+  )
+  attr(out, "n_rows") <- n_rows
   out
 }
 
