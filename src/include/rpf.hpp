@@ -40,6 +40,7 @@ struct RPFParams {
   bool delete_leaves = true;
   int split_structure_mode = 3; /**< 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist */
   int min_leaf_rows = 1;        /**< rows on each side of every split; > 1 only for leaves (mode 3) */
+  bool exact_draw = true;       /**< leaves: the exact draw of candidates (false: the fast draw, LeavesSampler) */
 };
 
 // Forest export for serialization: one entry per tree family.
@@ -208,6 +209,9 @@ protected:
   // exponential‐decay rate for split age
   double split_decay_rate_;
   size_t max_candidates_;
+  // leaves: draw the candidates exactly (one random number per pool entry), or by the fast draw
+  // (LeavesSampler): the same distribution, other random numbers, so other fits
+  bool exact_draw_ = true;
   // LRU cap for per-leaf per-feature caches
   size_t leaf_feature_cache_cap_ = 64;
   // track each split candidate and how long it’s sat unchosen

@@ -136,6 +136,25 @@
 #'   pairs (with probability proportional to its number of available thresholds), then
 #'   uniformly sampling one threshold within that pair.
 #'
+#' ## The draw of candidates for `leaves`
+#'
+#' For regression with `split_structure = "leaves"`, the global option
+#' `randomPlantedForest.exact_draw` chooses how the candidates are drawn.
+#' With `TRUE` (the default), every possible split gets a random number in
+#' every round. With `FALSE`, the candidates are drawn from a Fenwick tree
+#' over the weights, kept up to date between rounds, which costs a few random
+#' numbers per candidate instead. Both draw from the same distribution, but
+#' with other random numbers, so the same seed gives another (equally good)
+#' forest. With `min_leaf_rows`, both leave out the same candidates: those
+#' whose leaf has no threshold with that many rows on each side. The fast draw
+#' pays off on large data with many splits. The option is read when the forest
+#' is fitted and stored in `params$exact_draw`; it does not affect
+#' classification or the other split structures.
+#'
+#' ```r
+#' options(randomPlantedForest.exact_draw = FALSE)
+#' ```
+#'
 #' @references
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
 #' directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
@@ -462,7 +481,8 @@ rpf_bridge <- function(
     epsilon = epsilon,
     deterministic = deterministic,
     nthreads = nthreads,
-    purify = purify
+    purify = purify,
+    exact_draw = rpf_exact_draw(call = call)
   )
 
   fit <- rpf_impl(
@@ -499,10 +519,25 @@ new_rpf <- function(fit, blueprint, ...) {
   )
 }
 
+# The draw of candidates for split_structure = "leaves": the option
+# randomPlantedForest.exact_draw (TRUE, the default: the exact draw; FALSE: the
+# fast draw, the same distribution with other random numbers).
+rpf_exact_draw <- function(call = rlang::caller_env()) {
+  exact_draw <- getOption("randomPlantedForest.exact_draw", TRUE)
+  if (!rlang::is_bool(exact_draw)) {
+    cli::cli_abort(
+      "The option {.code randomPlantedForest.exact_draw} must be {.code TRUE} or {.code FALSE}.",
+      call = call
+    )
+  }
+  exact_draw
+}
+
 # Assemble the positional parameter vector for the C++ constructors.
-# 14 elements for regression (+ min_leaf_rows), 15 (+ delta, epsilon) for
-# classification. Models saved before min_leaf_rows existed have no such entry
-# in their params and were fitted with 1.
+# 15 elements for regression (+ min_leaf_rows, exact_draw), 15 (+ delta,
+# epsilon) for classification, which has neither. Models saved before these
+# options existed have no such entries in their params and were fitted with
+# min_leaf_rows = 1 and the exact draw.
 rpf_param_vector <- function(params, mode) {
   split_mode <- switch(
     params$split_structure,
@@ -530,7 +565,7 @@ rpf_param_vector <- function(params, mode) {
   if (mode == "classification") {
     base <- c(base, params$delta, params$epsilon)
   } else {
-    base <- c(base, if (is.null(params$min_leaf_rows)) 1L else params$min_leaf_rows)
+    base <- c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
   }
   base
 }
