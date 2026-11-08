@@ -33,7 +33,8 @@ void RandomPlantedForest::purify_fast_exact_family(
     const rpf_kd::KDTree &kdt,
     const std::vector<std::vector<double>> &cuts,
     rpf_rect::Accumulator &acc,
-    const rpf_cnt::SubsetCounter *counter
+    const rpf_cnt::SubsetCounter *counter,
+    const std::set<std::vector<int>> *only
 ) const
 {
   auto range_count = [&](const std::vector<rpf_kd::RangeConstraint> &c) -> size_t {
@@ -138,6 +139,9 @@ void RandomPlantedForest::purify_fast_exact_family(
           S.push_back(Tvec[b]);
           spos.push_back(b);
         }
+      // only the components asked for
+      if (only && !only->count(S))
+        continue;
       auto &entry = acc.comps[S];
       if (entry.first.empty())
         entry.first.assign(value_size, 0.0);
@@ -162,6 +166,15 @@ void RandomPlantedForest::purify_fast_exact_family(
         }
         terms.push_back(std::move(t));
       }
+    }
+    // only: the weights of the j that some term needs; a tree with no term is skipped
+    std::vector<char> need_j;
+    if (only) {
+      if (terms.empty())
+        continue;
+      need_j.assign((size_t)1 << tdim, 0);
+      for (const auto &t : terms)
+        need_j[t.jmask] = 1;
     }
 
     std::vector<std::vector<double>> contrib((size_t)1 << tdim);
@@ -203,6 +216,8 @@ void RandomPlantedForest::purify_fast_exact_family(
       std::fill(has_contrib.begin(), has_contrib.end(), 0);
       for (int jmask = 0; jmask < (1 << tdim); ++jmask) {
         if (popcount32((unsigned)jmask) > maxp_interaction)
+          continue;
+        if (only && !need_j[jmask])
           continue;
         std::set<int> U;
         cons.clear();
@@ -268,7 +283,7 @@ void RandomPlantedForest::purify_fast_exact_family(
 
 // Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index.
 // after_batch(start, batch) runs on the calling thread after each batch.
-static void run_families(
+void run_families(
     size_t n_families,
     unsigned threads_to_use,
     const std::function<void(size_t)> &fn,

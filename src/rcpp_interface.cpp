@@ -398,3 +398,177 @@ NumericVector leaves_draw_counts(
   );
   return NumericVector(counts.begin(), counts.end());
 }
+
+// ---- The panel form of purified components (coarsen.hpp)
+
+rpf_coarse::Spec list_to_spec(const List &sp)
+{
+  rpf_coarse::Spec s;
+  s.S = as<std::vector<int>>(sp["S"]);
+  s.C = as<std::vector<int>>(sp["C"]);
+  List cuts = sp["cuts"];
+  for (R_xlen_t i = 0; i < cuts.size(); ++i)
+    s.cuts.push_back(as<std::vector<double>>(cuts[i]));
+  return s;
+}
+
+std::vector<rpf_coarse::Spec> list_to_specs(const List &specs)
+{
+  std::vector<rpf_coarse::Spec> out;
+  for (R_xlen_t k = 0; k < specs.size(); ++k)
+    out.push_back(list_to_spec(specs[k]));
+  return out;
+}
+
+static List cuts_to_list(const std::vector<std::vector<double>> &cuts)
+{
+  List out(cuts.size());
+  for (size_t i = 0; i < cuts.size(); ++i)
+    out[(R_xlen_t)i] = NumericVector(cuts[i].begin(), cuts[i].end());
+  return out;
+}
+
+static std::vector<std::vector<double>> list_to_cuts(const List &x)
+{
+  std::vector<std::vector<double>> out;
+  for (R_xlen_t i = 0; i < x.size(); ++i)
+    out.push_back(as<std::vector<double>>(x[i]));
+  return out;
+}
+
+// The stored form as plain R data: S, cfeat, ccuts, dfeat, dcuts (features 1-based), box (R x 2m: lo, then hi, in
+// forest cells of dcuts), w (R x cells), n_trees
+List form_to_list(const rpf_coarse::Form &f)
+{
+  const rpf_rect::RectList &rl = f.rects;
+  const int m = rl.m, nc = rl.vs;
+  const size_t R = rl.size();
+  IntegerMatrix box((int)R, 2 * m);
+  NumericMatrix w((int)R, nc);
+  for (size_t r = 0; r < R; ++r) {
+    for (int q = 0; q < m; ++q) {
+      box((int)r, q) = rl.lo(r)[q];
+      box((int)r, m + q) = rl.hi(r)[q];
+    }
+    for (int c = 0; c < nc; ++c)
+      w((int)r, c) = rl.w[r * nc + c];
+  }
+  return List::create(
+      Named("S") = IntegerVector(f.S.begin(), f.S.end()),
+      Named("cfeat") = IntegerVector(f.cfeat.begin(), f.cfeat.end()),
+      Named("ccuts") = cuts_to_list(f.ccuts),
+      Named("dfeat") = IntegerVector(f.dfeat.begin(), f.dfeat.end()),
+      Named("dcuts") = cuts_to_list(f.dcuts),
+      Named("box") = box,
+      Named("w") = w,
+      Named("n_trees") = f.n_trees
+  );
+}
+
+rpf_coarse::Form list_to_form(const List &x)
+{
+  rpf_coarse::Form f;
+  f.S = as<std::vector<int>>(x["S"]);
+  f.cfeat = as<std::vector<int>>(x["cfeat"]);
+  f.dfeat = as<std::vector<int>>(x["dfeat"]);
+  f.ccuts = list_to_cuts(x["ccuts"]);
+  f.dcuts = list_to_cuts(x["dcuts"]);
+  f.n_trees = as<int>(x["n_trees"]);
+  IntegerMatrix box = x["box"];
+  NumericMatrix w = x["w"];
+  const int m = (int)f.dfeat.size(), nc = w.ncol();
+  const size_t R = (size_t)w.nrow();
+  if (box.ncol() != 2 * m || (size_t)box.nrow() != R)
+    stop("Corrupt coarsened component.");
+  f.rects = rpf_rect::RectList(m, nc);
+  std::vector<int32_t> l(std::max(1, m)), h(std::max(1, m));
+  std::vector<double> wr(nc);
+  for (size_t r = 0; r < R; ++r) {
+    for (int q = 0; q < m; ++q) {
+      l[q] = box((int)r, q);
+      h[q] = box((int)r, m + q);
+    }
+    for (int c = 0; c < nc; ++c)
+      wr[c] = w((int)r, c);
+    f.rects.push(l.data(), h.data(), wr.data(), 1.0);
+  }
+  return f;
+}
+
+// One component's panel form: S, form ("absent", "asis", "coarsened"), forest_panels, var_forest, seconds; if
+// coarsened also C, q, cuts, cells, var_kept, g (the training-row values), candidates (a data.frame: combo (1-based),
+// q, cells, var_kept), stored (form_to_list()) and n_eval (candidates evaluated by difference array, by k-d index)
+List selected_to_list(const rpf_coarse::Selected &R)
+{
+  List o = List::create(
+      Named("S") = IntegerVector(R.S.begin(), R.S.end()),
+      Named("form") = R.form == 0 ? "absent" : (R.form == 1 ? "asis" : "coarsened"),
+      Named("forest_panels") = R.forest_panels,
+      Named("var_forest") = R.var_forest,
+      Named("seconds") = R.seconds
+  );
+  if (R.form != 2)
+    return o;
+  IntegerVector cfeat, q(R.q.begin(), R.q.end());
+  for (size_t a = 0; a < R.cpos.size(); ++a)
+    cfeat.push_back(R.S[R.cpos[a]]);
+  const size_t nc = R.cands.size();
+  IntegerVector cc(nc), ccells(nc);
+  NumericVector cvk(nc);
+  CharacterVector cq(nc);
+  for (size_t a = 0; a < nc; ++a) {
+    cc[a] = R.cands[a].combo + 1;
+    ccells[a] = R.cands[a].cells;
+    cvk[a] = R.cands[a].var_kept;
+    std::string s;
+    for (size_t b = 0; b < R.cands[a].q.size(); ++b)
+      s += (b ? "," : "") + std::to_string(R.cands[a].q[b]);
+    cq[a] = s;
+  }
+  int cells = 1;
+  for (const auto &t : R.cuts)
+    cells *= (int)t.size() + 1;
+  o["C"] = cfeat;
+  o["q"] = q;
+  o["cuts"] = cuts_to_list(R.cuts);
+  o["cells"] = cells;
+  o["var_kept"] = R.var_kept;
+  o["g"] = NumericVector(R.g.begin(), R.g.end());
+  o["candidates"] = DataFrame::create(
+      Named("combo") = cc,
+      Named("q") = cq,
+      Named("cells") = ccells,
+      Named("var_kept") = cvk,
+      Named("stringsAsFactors") = false
+  );
+  o["stored"] = form_to_list(R.stored);
+  o["n_eval"] = IntegerVector::create(R.n_diff, R.n_kd);
+  return o;
+}
+
+// A stored form built once for point queries: an external pointer (NULL after serialization)
+SEXP rpf_coarse_build(const List stored)
+{
+  return XPtr<rpf_coarse::Model>(new rpf_coarse::Model(list_to_form(stored)), true);
+}
+
+NumericVector rpf_coarse_eval(SEXP model, const NumericMatrix &X)
+{
+  XPtr<rpf_coarse::Model> M(model);
+  if (M.get() == nullptr)
+    stop("The built coarsened component is gone (e.g. after saveRDS()).");
+  std::vector<double> v = M->eval(REAL(X), X.nrow(), X.ncol());
+  return NumericVector(v.begin(), v.end());
+}
+
+bool rpf_coarse_valid(SEXP model)
+{
+  return TYPEOF(model) == EXTPTRSXP && R_ExternalPtrAddr(model) != nullptr;
+}
+
+NumericVector rpf_coarse_predict(const List stored, const NumericMatrix &X)
+{
+  rpf_coarse::Model M(list_to_form(stored));
+  std::vector<double> v = M.eval(REAL(X), X.nrow(), X.ncol());
+  return NumericVector(v.begin(), v.end());
+}

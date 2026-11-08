@@ -9,6 +9,7 @@ prune_components(
   data,
   y = NULL,
   ...,
+  max_panels = 10,
   rule = c("D", "R"),
   tau = c(0, 1e-04, 3e-04, 0.001, 0.003, 0.01, 0.03, 0.1),
   select = c("1se", "min"),
@@ -31,6 +32,10 @@ may contain the outcome.}
 of a formula or recipe fit.}
 
 \item{...}{Reserved for future expansion. Unknown arguments are an error.}
+
+\item{max_panels}{\verb{[numeric(1): 10]}: The display: the most heat maps a kept component of three or more predictors
+may need; such a component is coarsened to at most \code{max_panels} heat maps, and the model is pruned again (see
+Details). A whole number of at least 1, or \code{Inf} for no display (the first pruning's model).}
 
 \item{rule}{\verb{[character: c("D", "R")]}: The rules to consider: \code{"D"} drops, \code{"R"} drops and refits one coefficient
 per kept component.}
@@ -80,6 +85,16 @@ of rows with an OOB family.
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
 given rule and \code{tau}, \code{select_by} is \code{"oob"} if R's coefficients were fitted out of bag, otherwise \code{NULL}.
+\item With the display (finite \code{max_panels}), these describe the second pruning: its candidates are the components the
+first pruning kept, with their shares after coarsening, and \code{oob} is its table. \code{components} also has \code{form}
+(\code{"full"} for one or two predictors, \code{"asis"} if its own cut points need at most \code{max_panels} heat maps,
+\code{"coarsened"}; \code{NA} if not kept by the first pruning) and \code{heat_maps}. The element \code{display} is a list:
+\code{max_panels}; \code{first}, the first pruning's model (without \code{fit}); \code{coarse}, per coarsened component (named as the
+components): \code{S}, \code{C} (the coarse predictors), \code{q}, \code{cuts} (per coarse predictor), \code{cells}, \code{var_kept} (the share
+of the component's variance kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's
+coarse set, \code{q}, cells and variance kept) and \code{stored} (what prediction needs; no training data); \code{forms}, per
+component of three or more predictors the first pruning kept, its form, heat maps and variance kept; \code{second}
+(whether a second pruning ran); \code{seconds} (the time of each step).
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
@@ -87,7 +102,9 @@ Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_compon
 \description{
 Drops the small components of a regression forest's functional decomposition and, optionally, refits one
 coefficient per kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
-without refits, or by K-fold cross-validation on the training rows.
+without refits, or by K-fold cross-validation on the training rows. By default every kept interaction of three or
+more predictors is then coarsened so that it can be shown in at most \code{max_panels} heat maps, and the model is pruned
+again.
 }
 \details{
 The forest is decomposed into its purified components \code{f_S}, one per set \code{S} of predictors (see \code{\link[=purify]{purify()}} and
@@ -165,6 +182,33 @@ The chosen (or given) pair is then applied to \code{object} itself (not refitted
 and for \code{"R"} the least squares on the OOB components of \code{data}'s rows (out of bag) or on its components on \code{data}
 (by CV). \code{data} and \code{y} must therefore be the rows \code{object} was trained on, in the order of the fit (checked).
 
+\strong{The display} (\code{max_panels}, default 10; \code{Inf} switches it off). A component of two predictors is one heat map.
+A kept component \code{f_S} of three or more predictors is shown as heat maps over two of its predictors, one per cell of
+the others. If its own cut points need more than \code{max_panels} such heat maps, it is coarsened:
+\itemize{
+\item Two predictors of \code{S} stay at full resolution. Each other predictor \code{k} is cut into \code{q_k} intervals of equal
+numbers of training rows (ties merged), with \code{prod(q) <= max_panels}; \code{q_k = 1} averages \code{k} out. Only the
+maximal \code{q} vectors (no \code{q_k} can grow) are considered; they are listed directly, not searched among all
+\verb{max_panels^(|S| - 2)} vectors.
+\item Within a cell, \code{f_S} is averaged over the coarse predictors with the product of their training marginals. This
+keeps the component's means along each predictor, so it stays purified.
+\item Of all choices of the two full predictors and the \code{q} vector, the one keeping the largest share of the variance
+of \code{f_S} on the training rows is taken (ties: the first in lexicographic order).
+}
+
+Then the same rule prunes again, on the components the first pruning kept, with the coarsened ones in place of the
+originals: chosen out of bag, with the same candidates and folds, scored with each family's coarsened components at
+its out-of-bag rows (R's coefficients out of bag); a given rule and \code{tau}, or a pair chosen by CV, is applied again as
+it is (R's coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated,
+as it would need the display in every fold's refit). The prediction then uses the coarsened components, so the
+pruning judges the model that is shown. In simulations (48 data sets) this second pruning had 0.49\% lower test
+error than pruning and then coarsening, and 0.57\% lower than not coarsening; on California housing (50 families,
+order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
+the first pruning's.
+The display costs about as much again as the out-of-bag pruning: one restricted purification for the coarsened
+components' candidates and one for their out-of-bag values; the stored coarsened components take a few MB each on
+16,000 rows.
+
 \strong{Purification.} \code{object} is purified in place at all orders, as \code{\link[=purify]{purify()}} does, if it is not purified yet. This
 does not change its predictions. A forest purified with a \code{maxp_interaction} below its order is purified again at
 all orders, with a message: the pruning needs every component. The out-of-bag path purifies \code{object} (again) in
@@ -206,6 +250,13 @@ pruned_cv$cv
 prune_components(fit, x, y, rule = "R", tau = 0.01)
 
 predict(pruned, x[1:5, ])
+
+# A three-way interaction, shown in at most 4 heat maps
+y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
+fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
+shown
+shown$display$coarse
 }
 \seealso{
 \code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}.

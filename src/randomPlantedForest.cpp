@@ -42,6 +42,11 @@ RCPP_MODULE(mod_rpf)
 {
   // internal, for tests: inclusion counts of the two draws of split_structure = "leaves"
   Rcpp::function("rpf_leaves_draw_counts", &leaves_draw_counts);
+  // a coarsened component from its stored form (prune_components(max_panels = ))
+  Rcpp::function("rpf_coarse_build", &rpf_coarse_build);
+  Rcpp::function("rpf_coarse_eval", &rpf_coarse_eval);
+  Rcpp::function("rpf_coarse_valid", &rpf_coarse_valid);
+  Rcpp::function("rpf_coarse_predict", &rpf_coarse_predict);
 
   Rcpp::class_<RcppRPF> rpf("RandomPlantedForest");
   rpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector>()
@@ -54,6 +59,10 @@ RCPP_MODULE(mod_rpf)
       .method("oob_path", &RcppRPF::oob_path)
       .method("set_adaptive", &RcppRPF::set_adaptive)
       .method("adaptive_stats", &RcppRPF::adaptive_stats);
+  // the panel form of purified components (regression only)
+  rpf.method("coarsen_select", &RcppRPF::coarsen_select)
+      .method("coarsen_oob", &RcppRPF::coarsen_oob)
+      .method("coarsen_eval", &RcppRPF::coarsen_eval);
 
   Rcpp::class_<RcppCPF> cpf("ClassificationRPF");
   cpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, std::string, const Rcpp::NumericVector>()

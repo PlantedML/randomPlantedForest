@@ -13,7 +13,8 @@
 #'
 #' A pruned forest from [prune_components()] (class `rpf_pruned`) is marshaled
 #' the same way: its forest as above, and the pruning (rule, coefficients,
-#' components, the table of the choice) as it is. The restored model predicts as before;
+#' components, the table of the choice, the display's coarsened components) as it is. The restored model predicts as
+#' before;
 #' its forest is purified, so it needs no training data for that.
 #'
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
@@ -37,6 +38,10 @@ rpf_marshal <- function(x, include_data = FALSE) {
     # the forest as for an rpf; the pruning is plain R data
     out <- unclass(x)
     out$fit <- rpf_marshal(x$fit, include_data = include_data)
+    # the display's built indices are rebuilt from the stored forms when needed
+    if (!is.null(out$display)) {
+      out$display$cache <- NULL
+    }
     return(structure(out, class = "rpf_pruned_marshaled"))
   }
   checkmate::assert_class(x, "rpf")
@@ -80,6 +85,9 @@ rpf_unmarshal <- function(blob) {
   if (inherits(blob, "rpf_pruned_marshaled")) {
     out <- unclass(blob)
     out$fit <- rpf_unmarshal(blob$fit)
+    if (!is.null(out$display)) {
+      out$display$cache <- new.env(parent = emptyenv())
+    }
     return(structure(out, class = "rpf_pruned"))
   }
   checkmate::assert_class(blob, "rpf_marshaled")

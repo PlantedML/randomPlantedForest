@@ -32,6 +32,19 @@ Rcpp::List purify_stats_to_list(const PurifyStats &st);
 Rcpp::List oob_path_to_list(const OobPath &o);
 Rcpp::List adaptive_stats_to_list(const AdaptiveStats &st);
 
+// The panel form of purified components (coarsen.hpp): specs list(S, C, cuts) in, results as R lists out
+rpf_coarse::Spec list_to_spec(const Rcpp::List &sp);
+std::vector<rpf_coarse::Spec> list_to_specs(const Rcpp::List &specs);
+Rcpp::List selected_to_list(const rpf_coarse::Selected &R);
+Rcpp::List form_to_list(const rpf_coarse::Form &f);
+rpf_coarse::Form list_to_form(const Rcpp::List &x);
+// A coarsened component's values at the rows of X (all features) from its stored form: built once (an external
+// pointer, NULL after serialization) and evaluated many times, or in one step
+SEXP rpf_coarse_build(const Rcpp::List stored);
+Rcpp::NumericVector rpf_coarse_eval(SEXP model, const Rcpp::NumericMatrix &X);
+bool rpf_coarse_valid(SEXP model);
+Rcpp::NumericVector rpf_coarse_predict(const Rcpp::List stored, const Rcpp::NumericMatrix &X);
+
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
 
@@ -338,6 +351,35 @@ public:
     );
   }
   Rcpp::List adaptive_stats() { return adaptive_stats_to_list(core.adaptive_stats()); }
+  // The panel form of purified components (regression; coarsen.hpp). sets: a list of 1-based feature sets
+  Rcpp::List coarsen_select(const Rcpp::List sets, int P, int nthreads)
+  {
+    std::vector<std::vector<int>> S;
+    for (R_xlen_t k = 0; k < sets.size(); ++k)
+      S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
+    std::vector<rpf_coarse::Selected> res = core.coarsen_select(S, P, nthreads);
+    Rcpp::List out(res.size());
+    for (size_t i = 0; i < res.size(); ++i) {
+      out[(R_xlen_t)i] = selected_to_list(res[i]);
+      res[i] = rpf_coarse::Selected();
+    }
+    return out;
+  }
+  // specs: a list of list(S, C, cuts); returns list(sum0, sum1), n x length(specs)
+  Rcpp::List coarsen_oob(const Rcpp::List specs, int nthreads)
+  {
+    rpf_coarse::OobSums o = core.coarsen_oob(list_to_specs(specs), nthreads);
+    const int n = core.get_sample_size(), K = (int)specs.size();
+    Rcpp::NumericMatrix sum0(n, K), sum1(n, K);
+    std::copy(o.sum0.begin(), o.sum0.end(), sum0.begin());
+    std::copy(o.sum1.begin(), o.sum1.end(), sum1.begin());
+    return Rcpp::List::create(Rcpp::Named("sum0") = sum0, Rcpp::Named("sum1") = sum1);
+  }
+  Rcpp::NumericVector coarsen_eval(const Rcpp::List spec, const Rcpp::NumericMatrix &X)
+  {
+    std::vector<double> v = core.coarsen_eval(list_to_spec(spec), REAL(X), X.nrow(), X.ncol());
+    return Rcpp::NumericVector(v.begin(), v.end());
+  }
 
 private:
   Core core;

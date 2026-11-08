@@ -196,8 +196,9 @@ test_that("a given R falls back to in-sample coefficients where the choice falls
 test_that("the default 1se rule is never larger than min, on the same scores", {
   d <- oobr_data(seed = 2)
   fit <- oobr_fit(d)
-  p1 <- prune_components(fit, d$x, d$y, seed = 3)
-  pm <- prune_components(fit, d$x, d$y, seed = 3, select = "min")
+  # without the display, whose second pruning chooses among different kept sets
+  p1 <- prune_components(fit, d$x, d$y, seed = 3, max_panels = Inf)
+  pm <- prune_components(fit, d$x, d$y, seed = 3, select = "min", max_panels = Inf)
   expect_identical(p1$oob, pm$oob)
   expect_identical(c(p1$rule, p1$tau), unlist(p1$oob[p1$oob$one_se, c("rule", "tau")], use.names = FALSE))
   expect_identical(c(pm$rule, pm$tau), unlist(pm$oob[pm$oob$min, c("rule", "tau")], use.names = FALSE))

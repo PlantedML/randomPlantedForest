@@ -13,6 +13,8 @@
 //   one fit (`lib/oob_path.cpp`)
 // - set_adaptive(): the next fit() chooses the number of splits out of bag
 //   while growing, one family at a time (`lib/oob_path.cpp`)
+// - coarsen_select(), coarsen_oob(), coarsen_eval(): the panel form of
+//   purified components (coarsen.hpp, lib/coarsen.cpp)
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
 //   for serialization
@@ -29,6 +31,7 @@
 #include "trees.hpp"
 #include "kdtree.hpp"
 #include "rects.hpp"
+#include "coarsen.hpp"
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -124,6 +127,16 @@ struct AdaptiveStats {
 namespace rpf_cnt {
 class SubsetCounter;
 }
+
+// Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index;
+// after_batch(start, batch) runs on the calling thread after each batch. An exception in fn is rethrown on the calling
+// thread. (lib/purify.cpp)
+void run_families(
+    size_t n_families,
+    unsigned threads_to_use,
+    const std::function<void(size_t)> &fn,
+    const std::function<void(size_t, size_t)> &after_batch
+);
 
 class RandomPlantedForest {
 
@@ -232,6 +245,18 @@ public:
       const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
   );
   AdaptiveStats adaptive_stats() const;
+  // The panel form of purified components (coarsen.hpp, lib/coarsen.cpp). The forest must be purified in mode 2,
+  // hold its training data, and have value size 1 (regression).
+  // coarsen_select(): for each set S (1-based) of order >= 3, the panels the forest's f_S needs (forest_panels) and,
+  // if more than P, every candidate (coarse features C, maximal q vector, equal-mass cuts) scored by the variance kept
+  // on the training rows; the best one, its training-row values and its stored form.
+  std::vector<rpf_coarse::Selected> coarsen_select(const std::vector<std::vector<int>> &sets, int P, int nthreads);
+  // coarsen_oob(): each family's coarsened components at its out-of-bag rows, summed as purify_oob() sums (needs the
+  // in-bag counts).
+  rpf_coarse::OobSums coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads);
+  // coarsen_eval(): the forest's f_S coarsened on any C (possibly empty: f_S itself) at the n rows of column-major X
+  // (n x p, all features).
+  std::vector<double> coarsen_eval(const rpf_coarse::Spec &spec, const double *X, int n, int p);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -249,15 +274,20 @@ protected:
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
   // Internal per-family worker for fast exact purifier (mode 2); adds the family's components to `acc`. The range
-  // counts come from `counter` if given (the same integers), from `kdt` otherwise.
+  // counts come from `counter` if given (the same integers), from `kdt` otherwise. With `only`, only those components
+  // (1-based feature sets) are produced.
   void purify_fast_exact_family(
       const TreeFamily &curr_family,
       int maxp_interaction,
       const rpf_kd::KDTree &kdt,
       const std::vector<std::vector<double>> &cuts,
       rpf_rect::Accumulator &acc,
-      const rpf_cnt::SubsetCounter *counter = nullptr
+      const rpf_cnt::SubsetCounter *counter = nullptr,
+      const std::set<std::vector<int>> *only = nullptr
   ) const;
+  // The components `only` as the families write them (purify_fast_exact_family() restricted to them), merged over
+  // the families in index order as purify_mode2() merges them: the store's rectangles before its index
+  rpf_rect::Accumulator merged_components(const std::set<std::vector<int>> &only, int nthreads) const;
   // Components of the last mode-2 purification as weighted rectangles (null after mode 1 or before purify)
   std::shared_ptr<rpf_rect::PurifiedForest> rect_forest_;
   // Threads for purify(): nthreads_param if > 0, otherwise min(the forest's nthreads, the hardware concurrency)
