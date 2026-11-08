@@ -40,6 +40,11 @@
   `print()` shows the chosen `splits` and where growing stopped.
   A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
   The default stays `splits = 30`.
+* `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression): the forest is purified and pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
+  The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
+  With `splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.
+  `prune = TRUE` is an error for classification and with `deterministic = TRUE`, and `purify` is not used with it.
+  The default stays `prune = FALSE`, which returns the forest as before.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
