@@ -2,14 +2,26 @@
 % Please edit documentation in R/predict_components.R
 \name{predict_components}
 \alias{predict_components}
+\alias{predict_components.rpf}
 \title{Extract predicted components from a Random Planted Forest}
 \usage{
-predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
+predict_components(object, new_data, ...)
+
+\method{predict_components}{rpf}(
+  object,
+  new_data,
+  max_interaction = NULL,
+  predictors = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
 \item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
+
+\item{...}{Not currently used, but required for extensibility. Unknown
+arguments are an error.}
 
 \item{max_interaction}{\verb{[integer(1) | NULL: NULL]}: Maximum degree of
 interactions to consider. \code{NULL} uses the \code{max_interaction} parameter from the \code{\link{rpf}} object.

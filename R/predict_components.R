@@ -85,8 +85,14 @@
 #'   prediction = predict(rpfit, test)
 #' )
 #'
-predict_components <- function(object, new_data, max_interaction = NULL, predictors = NULL) {
-  checkmate::assert_class(object, classes = "rpf")
+predict_components <- function(object, new_data, ...) {
+  UseMethod("predict_components")
+}
+
+#' @rdname predict_components
+#' @export
+predict_components.rpf <- function(object, new_data, max_interaction = NULL, predictors = NULL, ...) {
+  rlang::check_dots_empty()
   check_rpf_alive(object)
 
   # if max_interaction is not provided, we use the max from the rpf model fit
