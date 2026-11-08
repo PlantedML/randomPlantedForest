@@ -19,6 +19,12 @@
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
 
+## Performance
+
+* `predict()` is about 3x faster for forests that are not purified, with bitwise the same predictions.
+  From 512 rows on, each tree of more than 64 leaves gets an index of its leaves (a k-d tree, built per call), so a row is tested only against the leaves that may hold it instead of against every leaf.
+  On California housing (100 tree families, `max_interaction = 3`, 4,128 rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s instead of 1.26 s at 8 threads; with `delete_leaves = FALSE`, 2.9 s instead of 10.7 s and 0.71 s instead of 2.07 s.
+
 # randomPlantedForest 0.5.0
 
 ## Breaking changes
