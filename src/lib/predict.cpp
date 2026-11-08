@@ -7,14 +7,49 @@
 #include <limits>
 #include <thread>
 
+// Prediction from the rectangle components of purify(mode = 2): {-1} the intercept, {0} the whole forest, otherwise
+// the component S = component_index, with X holding the features of S in ascending order.
+std::vector<double>
+RandomPlantedForest::predict_single_rect(const std::vector<double> &X, const std::set<int> &component_index) const
+{
+  const rpf_rect::PurifiedForest &pf = *rect_forest_;
+  const int vs = (int)value_size;
+  std::vector<double> total_res(value_size, 0);
+  if (component_index == std::set<int>{-1}) {
+    total_res = pf.intercept;
+  } else if (component_index == std::set<int>{0}) {
+    std::vector<int32_t> cells(feature_size);
+    for (int d = 0; d < feature_size; ++d)
+      cells[d] = pf.cell(d, X[d]);
+    total_res = pf.intercept;
+    for (const auto &c : pf.comps)
+      pf.add_component(c.second, cells.data(), total_res.data(), vs);
+  } else {
+    std::vector<int> S(component_index.begin(), component_index.end());
+    auto it = pf.comps.find(S);
+    if (it != pf.comps.end()) {
+      std::vector<int32_t> cells(feature_size, 0);
+      for (size_t i = 0; i < S.size(); ++i)
+        cells[S[i] - 1] = pf.cell(S[i] - 1, X[i]);
+      pf.add_component(it->second, cells.data(), total_res.data(), vs);
+    }
+  }
+  return total_res / n_trees;
+}
+
 // predict single feature vector
 std::vector<double> RandomPlantedForest::predict_single(const std::vector<double> &X, std::set<int> component_index)
 {
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-  // After a capped purify() the grids hold only the low orders: the whole forest is predicted from the leaves,
-  // which purification leaves unchanged
-  if (!purified || (purify_capped && component_index == std::set<int>{0})) {
+  // After a capped purify() the purified components hold only the low orders: the whole forest is predicted from the
+  // leaves, which purification leaves unchanged
+  const bool from_leaves = !purified || (purify_capped && component_index == std::set<int>{0});
+
+  if (!from_leaves && rect_forest_)
+    return predict_single_rect(X, component_index);
+
+  if (from_leaves) {
     // consider all components
     if (component_index == std::set<int>{0}) {
       for (auto &tree_family : this->tree_families) {
@@ -368,9 +403,57 @@ RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::se
   const bool all_components = component_index == std::set<int>{0};
   const bool intercept_only = component_index == std::set<int>{-1};
 
-  // After a capped purify() the grids hold only the low orders: the whole forest is predicted from the leaves below,
-  // which purification leaves unchanged
-  if (purified && !(purify_capped && all_components)) {
+  // After a capped purify() the purified components hold only the low orders: the whole forest is predicted from the
+  // leaves below, which purification leaves unchanged
+  const bool from_leaves = !purified || (purify_capped && all_components);
+
+  if (!from_leaves && rect_forest_) {
+    // Components of purify(mode = 2): rectangles (rects.hpp). Same sums in the same order as predict_single_rect.
+    const rpf_rect::PurifiedForest &pf = *rect_forest_;
+    std::vector<const rpf_rect::Component *> comps;
+    std::vector<int> col_feature; // 0-based feature of each column of X
+    if (all_components) {
+      for (const auto &c : pf.comps)
+        comps.push_back(&c.second);
+      for (int d = 0; d < feature_size; ++d)
+        col_feature.push_back(d);
+    } else if (!intercept_only) {
+      std::vector<int> S(component_index.begin(), component_index.end());
+      auto it = pf.comps.find(S);
+      if (it != pf.comps.end())
+        comps.push_back(&it->second);
+      for (int d : S)
+        col_feature.push_back(d - 1);
+    }
+    const bool with_intercept = all_components || intercept_only;
+    const double *x = X;
+    parallel_rows(n, threads, [&](int begin, int end) {
+      const size_t chunk = 2048, stride = (size_t)std::max(1, feature_size);
+      std::vector<int32_t> cells(chunk * stride, 0);
+      std::vector<double> acc(chunk * vs);
+      for (int r0 = begin; r0 < end; r0 += (int)chunk) {
+        const size_t m = (size_t)std::min(end - r0, (int)chunk);
+        for (size_t q = 0; q < col_feature.size(); ++q) {
+          const int f = col_feature[q];
+          for (size_t i = 0; i < m; ++i)
+            cells[i * stride + f] = pf.cell(f, x[q * (size_t)n + r0 + i]);
+        }
+        std::fill(acc.begin(), acc.end(), 0.0);
+        if (with_intercept)
+          for (size_t i = 0; i < m; ++i)
+            for (size_t k = 0; k < vs; ++k)
+              acc[i * vs + k] = pf.intercept[k];
+        for (const auto *comp : comps)
+          pf.add_component_rows(*comp, cells.data(), stride, m, acc.data(), (int)vs);
+        for (size_t i = 0; i < m; ++i)
+          for (size_t k = 0; k < vs; ++k)
+            res[k * (size_t)n + r0 + i] = acc[i * vs + k] / n_trees;
+      }
+    });
+    return out;
+  }
+
+  if (!from_leaves) {
     // Purified trees are grids: per tree dimension, binary-search the cell
     // boundaries. Matching trees are resolved once here, not per row.
     struct GridTree {

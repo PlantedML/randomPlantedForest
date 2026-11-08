@@ -6,8 +6,9 @@
 // - ctor(params): configure; set_data(Y, X) loads data; fit() trains
 // - predict_matrix/predict_vector(): batch/single predictions
 // - purify(): optional post-processing to orthogonalize components
-// - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(): export and
-//   restore the forest for serialization
+// - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
+//   get_purified_rects()/set_purified_rects(): export and restore the forest
+//   for serialization
 // - verbose_out / seed_source: injected by the binding (console, RNG)
 //
 // Implementation notes:
@@ -19,6 +20,8 @@
 #define RPF_H
 
 #include "trees.hpp"
+#include "kdtree.hpp"
+#include "rects.hpp"
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -62,6 +65,13 @@ struct GridFamilyExport {
   std::vector<GridTreeExport> trees;
 };
 
+// Sizes of the rectangle store of purify(mode = 2), for diagnostics.
+struct PurifyStats {
+  bool rectangles = false; /**< whether the forest holds a rectangle store */
+  double n_components = 0, n_rects = 0, n_groups = 0, n_index_nodes = 0, n_table_cells = 0;
+  double bytes = 0; /**< bytes allocated for the rectangles, tables and indices */
+};
+
 class RandomPlantedForest {
 
 public:
@@ -93,9 +103,18 @@ public:
   // Export and restore tree structure (serialization path).
   std::vector<FamilyExport> get_model() const;
   void set_model(const std::vector<FamilyExport> &model);
-  // Export and restore per-tree purified grids; restoring sets purified = true.
+  // Export and restore per-tree purified grids (mode 1); restoring sets purified = true.
   std::vector<GridFamilyExport> get_grid_leaves() const;
   void set_grid_leaves(const std::vector<GridFamilyExport> &grid);
+  // Export and restore the rectangle components of purify(mode = 2) (nullptr if there are none); restoring sets
+  // purified = true.
+  const rpf_rect::PurifiedForest *get_purified_rects() const { return purified ? rect_forest_.get() : nullptr; }
+  void set_purified_rects(rpf_rect::PurifiedForest pf);
+  // The purified grids of one tree family (0-based), as one element of get_grid_leaves(): the stored grids of mode 1,
+  // or the components of mode 2 evaluated on the family's grid (this needs the training data).
+  GridFamilyExport get_grid_family(int family) const;
+  // Sizes of the rectangle store of purify(mode = 2), for diagnostics; `rectangles` is false without one.
+  PurifyStats purify_stats() const;
   // Predict n rows of column-major X (n x p). `components = {0}` means the full
   // model, `{-1}` the intercept; otherwise a set of component indices with X
   // holding only those columns. `nthreads = 0` uses the forest's own setting.
@@ -141,8 +160,17 @@ protected:
   void warn(const std::string &msg);
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
-  // Internal per-family worker for fast exact purifier (mode 2)
-  void purify_fast_exact_family(TreeFamily &curr_family, int maxp_interaction);
+  // Internal per-family worker for fast exact purifier (mode 2); adds the family's components to `acc`
+  void purify_fast_exact_family(
+      const TreeFamily &curr_family,
+      int maxp_interaction,
+      const rpf_kd::KDTree &kdt,
+      const std::vector<std::vector<double>> &cuts,
+      rpf_rect::Accumulator &acc
+  ) const;
+  // Components of the last mode-2 purification as weighted rectangles (null after mode 1 or before purify)
+  std::shared_ptr<rpf_rect::PurifiedForest> rect_forest_;
+  GridFamilyExport family_grid_from_rects(size_t f) const;
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */
   int max_interaction; /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
@@ -169,6 +197,7 @@ protected:
   // prediction: predict() of the whole forest then scans the leaves, which purification leaves unchanged
   bool purify_capped = false;
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
+  std::vector<double> predict_single_rect(const std::vector<double> &X, const std::set<int> &component_index) const;
   void L2_loss(Split &split);
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
   struct SplitCandidate;

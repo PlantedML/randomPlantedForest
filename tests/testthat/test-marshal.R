@@ -143,7 +143,7 @@ test_that("corrupt blobs error instead of reading out of bounds", {
 
   # Purified grid: values matrix with wrong dimensions
   pfit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
-  purify(pfit)
+  purify(pfit, mode = 1L)
   # trees[[1]] is the null tree whose 1x1 values matrix is legitimately tiny;
   # corrupt a real component tree instead
   pblob <- rpf_marshal(pfit)
@@ -189,4 +189,38 @@ test_that("a purification capped by maxp_interaction survives the round trip", {
   expect_identical(predict(restored, mtcars), p0)
   expect_true(restored$fit$is_purify_capped())
   expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+})
+
+test_that("purified round-trip keeps mode 1 grids and mode 2 rectangles apart", {
+  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 3)
+  purify(fit, mode = 1L)
+  blob <- rpf_marshal(fit)
+  expect_null(blob$fit_state$rects)
+  expect_false(is.null(blob$fit_state$grid))
+  comp1 <- predict_components(fit, mtcars)
+  expect_identical(predict_components(rpf_unmarshal(blob), mtcars), comp1)
+
+  fit$fit$purify_threads(0L, 0L, 2L) # purify() is a no-op on a purified fit
+  blob <- rpf_marshal(fit)
+  expect_null(blob$fit_state$grid)
+  expect_false(is.null(blob$fit_state$rects))
+  comp2 <- predict_components(fit, mtcars)
+  expect_equal(as.matrix(comp2$m), as.matrix(comp1$m), tolerance = 1e-10)
+  restored <- rpf_unmarshal(blob)
+  expect_identical(predict_components(restored, mtcars), comp2)
+  expect_identical(predict(restored, mtcars), predict(fit, mtcars))
+  expect_identical(restored$fit$purify_stats(), fit$fit$purify_stats())
+
+  # rpf_boxes() computes a family's grid from the training data
+  expect_error(rpf_boxes(restored), "include_data = TRUE")
+  with_data <- rpf_unmarshal(rpf_marshal(fit, include_data = TRUE))
+  expect_identical(rpf_boxes(with_data, family = 2L), rpf_boxes(fit, family = 2L))
+
+  # a corrupt store is rejected: point an index leaf of a two-feature group past its rectangles
+  bad <- blob
+  comps <- bad$fit_state$rects$components
+  i <- which(lengths(lapply(comps, `[[`, "S")) == 2)[1]
+  j <- which(vapply(comps[[i]]$groups, function(g) length(g$ids) > 0, logical(1)))[1]
+  bad$fit_state$rects$components[[i]]$groups[[j]]$ids[1] <- 1e6L
+  expect_error(rpf_unmarshal(bad), "Corrupt purified components")
 })

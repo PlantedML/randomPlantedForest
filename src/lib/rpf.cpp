@@ -171,6 +171,7 @@ void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
   }
   purified = false;
   purify_capped = false;
+  rect_forest_.reset();
 }
 
 std::vector<FamilyExport> RandomPlantedForest::get_model() const
@@ -195,29 +196,38 @@ std::vector<FamilyExport> RandomPlantedForest::get_model() const
 std::vector<GridFamilyExport> RandomPlantedForest::get_grid_leaves() const
 {
   std::vector<GridFamilyExport> families;
-  for (const auto &family : tree_families) {
-    GridFamilyExport fam;
-    bool lim_captured = false;
-    for (const auto &tree : family) {
-      if (!lim_captured) {
-        // lim_list is identical for every tree in a family; store once
-        fam.lim_list = tree.second->GridLeaves.lim_list;
-        lim_captured = true;
-      }
-      const auto &vals = tree.second->GridLeaves.values;
-      const auto &flat = vals.flat();
-      GridTreeExport t;
-      t.variables = tree.first;
-      t.dims = vals.dims;
-      t.values.assign(flat.size(), std::vector<double>(value_size, 0.0));
-      for (size_t e = 0; e < flat.size(); ++e)
-        for (size_t p = 0; p < value_size && p < flat[e].size(); ++p)
-          t.values[e][p] = flat[e][p];
-      fam.trees.push_back(std::move(t));
-    }
-    families.push_back(std::move(fam));
-  }
+  for (size_t f = 0; f < tree_families.size(); ++f)
+    families.push_back(get_grid_family((int)f));
   return families;
+}
+
+GridFamilyExport RandomPlantedForest::get_grid_family(int family) const
+{
+  if (family < 0 || (size_t)family >= tree_families.size())
+    throw std::invalid_argument("No tree family " + std::to_string(family) + ".");
+  // mode 2 keeps no grids: evaluate its components on the family's grid
+  if (purified && rect_forest_)
+    return family_grid_from_rects((size_t)family);
+  GridFamilyExport fam;
+  bool lim_captured = false;
+  for (const auto &tree : tree_families[(size_t)family]) {
+    if (!lim_captured) {
+      // lim_list is identical for every tree in a family; store once
+      fam.lim_list = tree.second->GridLeaves.lim_list;
+      lim_captured = true;
+    }
+    const auto &vals = tree.second->GridLeaves.values;
+    const auto &flat = vals.flat();
+    GridTreeExport t;
+    t.variables = tree.first;
+    t.dims = vals.dims;
+    t.values.assign(flat.size(), std::vector<double>(value_size, 0.0));
+    for (size_t e = 0; e < flat.size(); ++e)
+      for (size_t p = 0; p < value_size && p < flat[e].size(); ++p)
+        t.values[e][p] = flat[e][p];
+    fam.trees.push_back(std::move(t));
+  }
+  return fam;
 }
 
 void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &grid)
@@ -246,9 +256,46 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
       it->second->GridLeaves.lim_list = grid[i].lim_list;
     }
   }
+  rect_forest_.reset();
   purified = true;
   // a full purification unless set_purify_capped() says otherwise
   purify_capped = false;
+}
+
+void RandomPlantedForest::set_purified_rects(rpf_rect::PurifiedForest pf)
+{
+  if ((int)pf.cuts.size() != feature_size || pf.intercept.size() != value_size)
+    throw std::invalid_argument("Purified components do not match the forest's dimensions.");
+  pf.validate((int)value_size);
+  for (auto &fam : tree_families)
+    for (auto &tree : fam)
+      tree.second->GridLeaves = LeafGrid();
+  rect_forest_ = std::make_shared<rpf_rect::PurifiedForest>(std::move(pf));
+  purified = true;
+  // a full purification unless set_purify_capped() says otherwise
+  purify_capped = false;
+}
+
+PurifyStats RandomPlantedForest::purify_stats() const
+{
+  PurifyStats st;
+  if (!purified || !rect_forest_)
+    return st;
+  const auto &pf = *rect_forest_;
+  st.rectangles = true;
+  st.n_components = (double)pf.comps.size();
+  st.n_rects = (double)pf.n_rects;
+  for (const auto &c : pf.comps)
+    for (const auto &g : c.second.groups) {
+      st.n_groups += 1;
+      st.n_index_nodes += (double)g.index.nodes.size();
+      st.n_table_cells += (double)(g.table.size() / std::max<size_t>(1, value_size));
+      st.bytes +=
+          (double)(g.rects.box.capacity() * sizeof(int32_t) + g.rects.w.capacity() * sizeof(double) +
+                   g.table.capacity() * sizeof(double) + g.index.nodes.capacity() * sizeof(rpf_rect::KdIndex::Node) +
+                   g.index.csts.capacity() * sizeof(double) + g.index.ids.capacity() * sizeof(int));
+    }
+  return st;
 }
 
 // --------------- calcOptimalSplit per mode ---------------

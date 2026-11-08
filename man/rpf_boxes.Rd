@@ -39,6 +39,9 @@ After \code{\link[=purify]{purify()}}, they are the cells of the purified grid, 
 non-overlapping set per component of the functional decomposition.
 As \code{\link[=purify]{purify()}} modifies the forest in place, extract the unpurified boxes
 before purifying.
+After \code{purify(mode = 2)}, the default, the cells are computed from the
+training data, so a forest restored by \code{\link[=rpf_unmarshal]{rpf_unmarshal()}} needs to have been
+marshaled with \code{include_data = TRUE}.
 
 Factor predictors are encoded as integer codes in the order of
 \code{x$factor_levels}, with a box covering the codes \code{c} with
