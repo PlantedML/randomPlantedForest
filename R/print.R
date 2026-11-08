@@ -65,6 +65,10 @@ format.rpf <- function(x, ...) {
     ) {
       cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")
     }
+    if (!is.null(params$interaction_constraints)) {
+      sets <- vapply(params$interaction_constraints, function(s) paste0("{", paste(s, collapse = ", "), "}"), "")
+      cli::cli_text("{.field Interaction constraints}: {.var {sets}}")
+    }
 
     cli::cli_h3("Tree growing")
     print_params(params[c(

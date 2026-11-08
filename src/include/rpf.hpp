@@ -41,6 +41,9 @@ struct RPFParams {
   int split_structure_mode = 3; /**< 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist */
   int min_leaf_rows = 1;        /**< rows on each side of every split; > 1 only for leaves (mode 3) */
   bool exact_draw = true;       /**< leaves: the exact draw of candidates (false: the fast draw, LeavesSampler) */
+  /** Allowed feature sets (1-based): a tree on the features T is grown only if T is a subset of one of them.
+   *  Empty = unrestricted (only max_interaction applies). */
+  std::vector<std::set<int>> interaction_constraints;
 };
 
 // Forest export for serialization: one entry per tree family.
@@ -146,8 +149,12 @@ protected:
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */
   int max_interaction; /**< Maximum level of interaction determining maximum number of split dimensions for a tree */
-  int n_trees;         /**< Number of trees generated per family */
-  int n_splits;        /**< Number of performed splits for each tree family */
+  std::vector<std::set<int>> interaction_constraints_; /**< allowed feature sets (1-based); empty = unrestricted */
+  // Whether a tree with these split dims (0 = the null tree, ignored) may be grown: at most
+  // max_interaction dims and, if constraints are given, a subset of an allowed set.
+  bool dims_allowed(const std::set<int> &dims) const;
+  int n_trees;               /**< Number of trees generated per family */
+  int n_splits;              /**< Number of performed splits for each tree family */
   std::vector<int> n_leaves; /**< */
   double t_try = 0.4;        /**< */
   int split_try = 10;        /**< */

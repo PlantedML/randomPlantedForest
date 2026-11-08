@@ -34,11 +34,18 @@ RCPP_MODULE(mod_rpf)
 
   Rcpp::class_<RcppRPF> rpf("RandomPlantedForest");
   rpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector>()
+      .constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector, const Rcpp::List>()
       .constructor<const Rcpp::NumericVector>();
   expose_methods(rpf);
 
   Rcpp::class_<RcppCPF> cpf("ClassificationRPF");
   cpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, std::string, const Rcpp::NumericVector>()
+      .constructor<
+          const Rcpp::NumericMatrix,
+          const Rcpp::NumericMatrix,
+          std::string,
+          const Rcpp::NumericVector,
+          const Rcpp::List>()
       .constructor<std::string, const Rcpp::NumericVector>();
   expose_methods(cpf);
 }

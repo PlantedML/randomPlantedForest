@@ -43,6 +43,19 @@
 #'   without a threshold that keeps this many rows on each side are not drawn
 #'   as split candidates. Only for regression with `split_structure = "leaves"`; `1`
 #'   (no limit) otherwise.
+#' @param interaction_constraints `[list | NULL: NULL]`: Feature sets that restrict which
+#'   interactions the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`.
+#'   Each set is given by predictor names or by column indices: with `x`, the
+#'   columns of `x`; with a formula, the predictors in the order the formula
+#'   names them (`y ~ .`: the order of the columns of `data`); with a recipe,
+#'   names only (its steps decide the columns). A tree on the predictors `T` is
+#'   grown only if `T` is a subset of one of the sets, as with xgboost's
+#'   interaction constraints. The subsets of a set stay allowed, so the forest
+#'   keeps the main effects it grows a pair from. A predictor in no set is not
+#'   used. Applies together with `max_interaction`: set `max_interaction = 0` to
+#'   let the sets alone decide. `NULL` means no constraint. One use is to refit
+#'   the forest on the effects a first fit found, e.g. after dropping its small
+#'   components.
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
 #'   regression, the only supported loss, and `"exponential"` for classification.
 #'   Classification also supports `"logit"`, which gives similar results but is
@@ -194,6 +207,7 @@ rpf.formula <- function(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -213,6 +227,12 @@ rpf.formula <- function(
   }
   blueprint <- hardhat::default_formula_blueprint(intercept = FALSE, indicators = "none")
   processed <- hardhat::mold(formula, data, blueprint = blueprint)
+  # column indices refer to the predictors in the formula's order (the model matrix puts factors last)
+  interaction_constraints <- constraint_indices_to_names(
+    interaction_constraints,
+    labels = attr(stats::terms(formula, data = data), "term.labels"),
+    columns = colnames(processed$predictors)
+  )
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
@@ -225,6 +245,7 @@ rpf.formula <- function(
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
     min_leaf_rows = min_leaf_rows,
+    interaction_constraints = interaction_constraints,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -251,6 +272,7 @@ rpf.data.frame <- function(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -275,6 +297,7 @@ rpf.data.frame <- function(
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
     min_leaf_rows = min_leaf_rows,
+    interaction_constraints = interaction_constraints,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -301,6 +324,7 @@ rpf.matrix <- function(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -325,6 +349,7 @@ rpf.matrix <- function(
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
     min_leaf_rows = min_leaf_rows,
+    interaction_constraints = interaction_constraints,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -351,6 +376,7 @@ rpf.recipe <- function(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -363,6 +389,10 @@ rpf.recipe <- function(
   rlang::check_dots_empty()
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
+  # the recipe's steps decide the predictor columns: indices have no user-given order to refer to
+  if (is.list(interaction_constraints) && any(vapply(interaction_constraints, is.numeric, logical(1)))) {
+    cli::cli_abort("With a recipe, give {.arg interaction_constraints} by predictor names, not column indices.")
+  }
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
@@ -375,6 +405,7 @@ rpf.recipe <- function(
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
     min_leaf_rows = min_leaf_rows,
+    interaction_constraints = interaction_constraints,
     loss = loss,
     delta = delta,
     epsilon = epsilon,
@@ -401,6 +432,7 @@ rpf_bridge <- function(
   split_decay_rate,
   delete_leaves,
   min_leaf_rows,
+  interaction_constraints,
   loss,
   delta,
   epsilon,
@@ -465,6 +497,13 @@ rpf_bridge <- function(
     ))
   }
 
+  interaction_constraints <- check_interaction_constraints(
+    interaction_constraints,
+    colnames(predictors$predictors_matrix),
+    max_interaction,
+    call = call
+  )
+
   params <- list(
     loss = loss,
     ntrees = ntrees,
@@ -476,6 +515,7 @@ rpf_bridge <- function(
     max_candidates = max_candidates,
     delete_leaves = delete_leaves,
     min_leaf_rows = as.integer(min_leaf_rows),
+    interaction_constraints = interaction_constraints,
     split_structure = split_structure,
     delta = delta,
     epsilon = epsilon,
@@ -577,11 +617,122 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"), params) {
   mode <- match.arg(mode)
   pars <- rpf_param_vector(params, mode)
 
-  if (mode == "classification") {
-    fit <- new(ClassificationRPF, Y, X, params$loss, pars)
+  if (is.null(params$interaction_constraints)) {
+    if (mode == "classification") {
+      fit <- new(ClassificationRPF, Y, X, params$loss, pars)
+    } else {
+      fit <- new(RandomPlantedForest, Y, X, pars)
+    }
   } else {
-    fit <- new(RandomPlantedForest, Y, X, pars)
+    # allowed feature sets as 1-based column indices
+    constraints <- lapply(params$interaction_constraints, match, table = colnames(X))
+    if (mode == "classification") {
+      fit <- new(ClassificationRPF, Y, X, params$loss, pars, constraints)
+    } else {
+      fit <- new(RandomPlantedForest, Y, X, pars, constraints)
+    }
   }
 
   fit
+}
+
+# Formula interface: translate the sets given by column indices into predictor names, index i referring to the
+# i-th predictor of the formula (`labels`, its term labels; `y ~ .` gives the data's column order). The model matrix
+# (`columns`) orders the predictors differently: hardhat puts factors last. Sets of names are left as they are;
+# check_interaction_constraints() validates everything else.
+constraint_indices_to_names <- function(interaction_constraints, labels, columns, call = rlang::caller_env()) {
+  if (!is.list(interaction_constraints)) {
+    return(interaction_constraints)
+  }
+  lapply(seq_along(interaction_constraints), function(i) {
+    s <- interaction_constraints[[i]]
+    if (!is.numeric(s) || length(s) == 0 || anyNA(s)) {
+      return(s)
+    }
+    if (any(s != round(s)) || any(s < 1) || any(s > length(labels))) {
+      cli::cli_abort(
+        paste(
+          "{.code interaction_constraints[[{i}]]} must contain indices between 1 and {length(labels)}",
+          "of the formula's predictors (or predictor names)."
+        ),
+        call = call
+      )
+    }
+    nm <- labels[s]
+    if (!all(nm %in% columns)) {
+      bad <- nm[!nm %in% columns]
+      cli::cli_abort(
+        c(
+          "{.code interaction_constraints[[{i}]]}: the formula's predictor{?s} {.val {bad}} {?is/are} not a single model column.",
+          "i" = "Give the sets by column names: {.val {columns}}."
+        ),
+        call = call
+      )
+    }
+    nm
+  })
+}
+
+# Validate `interaction_constraints` and convert it to a list of sorted, unique predictor
+# names (NULL stays NULL: no constraint).
+check_interaction_constraints <- function(interaction_constraints, feature_names, max_interaction, call) {
+  if (is.null(interaction_constraints)) {
+    return(NULL)
+  }
+  p <- length(feature_names)
+  if (!is.list(interaction_constraints) || length(interaction_constraints) == 0) {
+    cli::cli_abort(
+      c(
+        "{.arg interaction_constraints} must be {.code NULL} or a non-empty list of feature sets.",
+        "i" = "For example {.code list(c(\"x1\", \"x2\"), \"x3\")}."
+      ),
+      call = call
+    )
+  }
+  sets <- lapply(seq_along(interaction_constraints), function(i) {
+    s <- interaction_constraints[[i]]
+    if (length(s) == 0 || anyNA(s)) {
+      cli::cli_abort(
+        "{.code interaction_constraints[[{i}]]} must be a non-empty vector without {.code NA}.",
+        call = call
+      )
+    }
+    if (is.character(s)) {
+      unknown <- setdiff(s, feature_names)
+      if (length(unknown) > 0) {
+        cli::cli_abort(
+          c(
+            "{.code interaction_constraints[[{i}]]} names unknown predictor{?s} {.val {unknown}}.",
+            "i" = "The predictors are {.val {feature_names}}."
+          ),
+          call = call
+        )
+      }
+      idx <- match(s, feature_names)
+    } else if (is.numeric(s)) {
+      if (any(s != round(s)) || any(s < 1) || any(s > p)) {
+        cli::cli_abort(
+          "{.code interaction_constraints[[{i}]]} must contain column indices between 1 and {p} (or predictor names).",
+          call = call
+        )
+      }
+      idx <- as.integer(s)
+    } else {
+      cli::cli_abort(
+        "{.code interaction_constraints[[{i}]]} must be predictor names or column indices, not {.obj_type_friendly {s}}.",
+        call = call
+      )
+    }
+    feature_names[sort(unique(idx))]
+  })
+  if (max(lengths(sets)) > max_interaction) {
+    cli::cli_inform(c(
+      "i" = paste(
+        "{.arg interaction_constraints} has a set of {max(lengths(sets))} predictors,",
+        "but {.arg max_interaction} is {max_interaction}."
+      ),
+      " " = "Trees use at most {max_interaction} predictor{?s}."
+    ))
+  }
+  sets
 }
