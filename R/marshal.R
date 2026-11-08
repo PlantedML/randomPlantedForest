@@ -128,7 +128,7 @@ rpf_is_valid <- function(x) {
   !inherits(try(x$fit$is_purified(), silent = TRUE), "try-error")
 }
 
-check_rpf_alive <- function(x) {
+check_rpf_alive <- function(x, call = rlang::caller_env()) {
   if (!rpf_is_valid(x)) {
     cli::cli_abort(
       c(
@@ -136,7 +136,7 @@ check_rpf_alive <- function(x) {
         "i" = "Most likely it was saved with {.fn saveRDS} and restored with {.fn readRDS}.",
         "i" = "Use {.code blob <- rpf_marshal(x)} before saving and {.code rpf_unmarshal(blob)} after loading, see {.help rpf_marshal}."
       ),
-      call = rlang::caller_env()
+      call = call
     )
   }
   invisible(x)

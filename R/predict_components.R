@@ -21,7 +21,14 @@
 #' Depending on the number of predictors and `max_interaction`, the number of components will
 #' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
 #'
+#' @section Pruned forests:
+#' For an `rpf_pruned` object from [prune_components()], `m` holds only the kept components, each scaled by its
+#' coefficient `beta_S`, and `intercept` is the pruned model's intercept `alpha`, so that they sum to
+#' [`predict()`][predict.rpf_pruned] of the pruned model. Components that are not kept are absent, not zero columns.
+#' If `predictors` or `max_interaction` leave out kept components, their sum is returned as `remainder`.
+#'
 #' @inheritParams predict.rpf
+#' @param object `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from [prune_components()].
 #' @param predictors `[character | NULL: NULL]`: Vector of one or more names of the forest's predictors
 #'   to extract components for. These are the columns the forest was fitted on: with a formula, its terms,
 #'   such as `log(x1)`.
