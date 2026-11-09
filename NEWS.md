@@ -40,7 +40,7 @@
   `print()` shows the chosen `splits` and where growing stopped.
   A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
   The default stays `splits = 30`.
-* `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression): the forest is purified and pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
+* `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
   The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
   With `splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.
   `prune = TRUE` is an error for classification and with `deterministic = TRUE`, and `purify` is not used with it.
@@ -145,6 +145,11 @@
   Purification at `max_interaction = 3` and above no longer runs out of memory: on California housing (16,512 rows, 50 tree families, 94,138 leaves) order 3 takes 6 s and 0.25 GB with 4 threads, where it was stopped at 6 GB before, and the full order (8) takes 40 s and 2.3 GB.
   The components equal those of `mode = 1` up to rounding, and `rpf_marshal()` stores the rectangles.
 * `predict_components()` evaluates all components in one pass over the rows of `new_data`, and skips those the forest does not hold, instead of one pass per component: on a 10-feature full-order fit (1,023 components, 636 of them not held), 5,000 rows take 0.5 s instead of 2.0 s.
+* `prune_components()`, and so `rpf(prune = TRUE)` and `rpf(tune = )`, no longer build the purified store of all components.
+  Each tree family is purified in turn, its components are evaluated at the training rows (and out of bag) and then freed, and the pruned model stores the pieces of its kept components only, from which `predict()` and `predict_components()` evaluate them.
+  `purify()` keeps every piece of every component, which grows steeply with the order: on California housing (16,512 rows, 200 tree families, 8 threads) the whole call `rpf(splits = NULL, prune = TRUE)` at `max_interaction = 8` (all predictors) was stopped at 12 GB while purifying, and now finishes with a peak of 6.4 GB of physical memory, most of it the coarsened components of the display; at order 3 it peaks at 2.3 GB instead of 3.2 GB, in the same time.
+  The pruned models are the same up to rounding: on 136 pruned models of 36 forests (simulated and benchmark data, orders 2 to 10) the choices, the kept components and the display are the same, and test predictions agree to 3e-15 of their scale.
+  The forest in the result is left unpurified (call `purify()` for all its components), and an earlier purification of it is no longer redone.
 * A fitted forest takes about 40% less memory: the split search's per-leaf caches are kept apart from the leaves and freed when a tree family is finished, so a leaf takes 80 instead of 232 bytes; finished classification forests now also drop their training rows and caches.
   On California housing (`max_interaction = 3`, 10,000 splits, 200 tree families) the fitted forest falls from 821 MB to 490 MB and the fit's peak resident memory from about 1.9 GB to 1.6 GB, in the same time.
   Fitted models are bitwise unchanged.
