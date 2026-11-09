@@ -235,3 +235,97 @@ test_that("with a recipe, interaction_constraints takes names only", {
   expect_true(all(unlist(tree_dims(fit)) %in% 1:2))
   expect_error(rpf(rec, dat, interaction_constraints = list(1:2)), "by predictor names")
 })
+
+# The paths added after interaction_constraints (the OOB path, splits = NULL, the fast draw, min_leaf_rows,
+# classification's leaves draw, the pruning's refits) configure the forest in other ways: the sets must hold in each.
+ic_fit <- function(y, ..., ntrees = 6, exact_draw = TRUE, seed = 5) {
+  old <- options(randomPlantedForest.exact_draw = exact_draw)
+  on.exit(options(old))
+  set.seed(seed)
+  rpf(X_ic, y, max_interaction = 0, ntrees = ntrees, split_try = 5, t_try = 0.5, ...)
+}
+ic_sets <- list(c("x1", "x2"), c("x3", "x4"), "x5")
+ic_idx <- list(1:2, 3:4, 5)
+expect_constrained <- function(fit, info = NULL) {
+  dims <- tree_dims(fit)
+  expect_true(length(dims) > 0, info = info)
+  expect_true(all(vapply(dims, allowed, logical(1), sets = ic_idx)), info = info)
+  expect_true(any(vapply(dims, function(d) identical(d, 1:2), logical(1))), info = info)
+}
+
+test_that("the OOB path grows the constrained forest, regression and classification", {
+  for (y in list(y_ic, yc_ic)) {
+    for (ss in c("leaves", "cur_trees_1", "res_trees")) {
+      info <- paste(class(y), ss)
+      f <- ic_fit(y, splits = 80, split_structure = ss, interaction_constraints = ic_sets)
+      p <- ic_fit(y, splits = 80, split_structure = ss, interaction_constraints = ic_sets, oob_path = TRUE)
+      expect_constrained(p, info)
+      expect_identical(p$fit$get_model(), f$fit$get_model(), info = info)
+      expect_false(is.null(p$oob_path), info = info)
+    }
+  }
+})
+
+test_that("splits = NULL grows the constrained forest: the fixed constrained fit at the chosen splits", {
+  for (y in list(y_ic, yc_ic)) {
+    for (ss in c("leaves", "cur_trees_2")) {
+      info <- paste(class(y), ss)
+      a <- ic_fit(y, splits = NULL, split_structure = ss, interaction_constraints = ic_sets)
+      expect_constrained(a, info)
+      f <- ic_fit(y, splits = a$params$splits, split_structure = ss, interaction_constraints = ic_sets)
+      expect_identical(a$fit$get_model(), f$fit$get_model(), info = info)
+    }
+  }
+})
+
+test_that("the fast draw and min_leaf_rows keep the constraint, regression and classification leaves", {
+  for (y in list(y_ic, yc_ic)) {
+    for (loss in if (is.factor(y)) c("L2", "logit") else "L2") {
+      info <- paste(class(y), loss)
+      fast <- ic_fit(y, splits = 80, loss = loss, interaction_constraints = ic_sets, exact_draw = FALSE)
+      expect_constrained(fast, info)
+      expect_false(fast$params$exact_draw)
+      rows <- ic_fit(y, splits = 80, loss = loss, interaction_constraints = ic_sets, min_leaf_rows = 5)
+      expect_constrained(rows, info)
+      both <- ic_fit(
+        y,
+        splits = 80,
+        loss = loss,
+        interaction_constraints = ic_sets,
+        min_leaf_rows = 5,
+        exact_draw = FALSE
+      )
+      expect_constrained(both, info)
+      # one set holding all predictors is no constraint, also on these paths
+      free <- ic_fit(y, splits = 80, loss = loss, min_leaf_rows = 5, exact_draw = FALSE)
+      all1 <- ic_fit(
+        y,
+        splits = 80,
+        loss = loss,
+        min_leaf_rows = 5,
+        exact_draw = FALSE,
+        interaction_constraints = list(colnames(X_ic))
+      )
+      expect_identical(all1$fit$get_model(), free$fit$get_model(), info = info)
+    }
+  }
+})
+
+test_that("the pruned model of a constrained forest has only allowed components (OOB and CV)", {
+  all_allowed <- function(m) {
+    sets <- lapply(strsplit(m$components$component, ":", fixed = TRUE), match, table = colnames(X_ic))
+    expect_false(anyNA(unlist(sets)))
+    expect_true(all(vapply(sets, allowed, logical(1), sets = ic_idx)))
+    expect_true(all(vapply(m$sets, allowed, logical(1), sets = ic_idx)))
+  }
+  for (y in list(y_ic, yc_ic)) {
+    # 12 families: chosen out of bag
+    p <- ic_fit(y, splits = 80, ntrees = 12, interaction_constraints = ic_sets, prune = TRUE)
+    expect_identical(p$select_by, "oob")
+    expect_s3_class(p, "rpf_pruned")
+    all_allowed(p)
+  }
+  f <- ic_fit(y_ic, splits = 80, ntrees = 12, interaction_constraints = ic_sets)
+  cv <- prune_components(f, X_ic, y_ic, select_by = "cv", folds = 3, seed = 2)
+  all_allowed(cv)
+})
