@@ -6,8 +6,8 @@
 // per candidate made the logit losses cost O(sample size) per candidate.
 //
 // `logit` (the default classification loss) also reads the terms of the current weights, which do not depend on the
-// candidate, from LogitTerms (cpf.hpp), and skips the log() of terms whose y is 0: per individual and candidate it takes
-// K exponentials and one logarithm (one-hot Y) instead of 2K exponentials and 2K + 2 logarithms.
+// candidate, from LogitTerms (cpf.hpp), and skips the log() of terms whose y is 0: per individual and candidate it
+// takes K exponentials and one logarithm (one-hot Y) instead of 2K exponentials and 2K + 2 logarithms.
 #include "cpf.hpp"
 
 namespace {
@@ -107,8 +107,6 @@ void ClassificationRPF::logit_loss(Split &split)
   std::for_each(M_b.begin(), M_b.end(), [this](double &M) { M = std::min(std::max(delta, M), 1 - delta); });
   double M_sp = std::min(std::max(delta, split.M_sp), 1 - delta);
   double M_bp = std::min(std::max(delta, split.M_bp), 1 - delta);
-  std::vector<double> W_s_mean = calcMean(*split.W, split.I_s);
-  std::vector<double> W_b_mean = calcMean(*split.W, split.I_b);
   const std::vector<std::vector<double>> &Wm = *split.W, &Ym = *split.Y;
   const std::vector<int> &I_s = split.I_s, &I_b = split.I_b;
   const size_t n_s = I_s.size(), n = n_s + I_b.size(), K = value_size, K1 = K + 1;
@@ -121,11 +119,19 @@ void ClassificationRPF::logit_loss(Split &split)
   W_new.resize(n * K);
   W_new_den.resize(n);
   for (size_t p = 0; p < K; ++p) {
+    // the mean weight of each side, as calcMean() sums and divides it (without its index checks)
+    double W_s_mean = 0, W_b_mean = 0;
+    for (size_t j = 0; j < n_s; ++j)
+      W_s_mean += Wm[inds[j]][p];
+    for (size_t j = n_s; j < n; ++j)
+      W_b_mean += Wm[inds[j]][p];
+    W_s_mean /= (int)n_s;
+    W_b_mean /= (int)(n - n_s);
     const double c_s = log(M_s[p] / M_sp), c_b = log(M_b[p] / M_bp);
     for (size_t j = 0; j < n_s; ++j)
-      W_new[j * K + p] = exp(Wm[inds[j]][p] + c_s - W_s_mean[p]);
+      W_new[j * K + p] = exp(Wm[inds[j]][p] + c_s - W_s_mean);
     for (size_t j = n_s; j < n; ++j)
-      W_new[j * K + p] = exp(Wm[inds[j]][p] + c_b - W_b_mean[p]);
+      W_new[j * K + p] = exp(Wm[inds[j]][p] + c_b - W_b_mean);
   }
   // 1 + the sum of each individual's exponentials
   for (size_t j = 0; j < n; ++j)
