@@ -26,7 +26,7 @@ forms) follows briefly at the end.
 set.seed(1)
 x <- matrix(runif(300 * 3, -1, 1), ncol = 3, dimnames = list(NULL, paste0("x", 1:3)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(300, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30)
+fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30, prune = FALSE)
 prune_components(fit, x, y, rule = "R", tau = 0.01)
 }
 \seealso{

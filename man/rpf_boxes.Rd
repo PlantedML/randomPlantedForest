@@ -21,7 +21,8 @@ e.g. \code{"x1:x2"}, or \code{"(Intercept)"}.
 \item \code{order}: The number of variables of the tree, \code{0} for the intercept.
 \item \code{box}: The index of the box within its tree.
 \item \code{value}: The value of the box. For multiclass classification, one
-column \verb{value_<class>} per outcome level instead.
+column \verb{value_<class>} per outcome level instead (for \code{loss = "logit"},
+per level but the first, the reference, whose score is 0).
 \item \verb{<variable>_lower}, \verb{<variable>_upper} for every predictor: The bounds of
 the box, \code{NA} for variables the tree does not use.
 }
@@ -48,7 +49,7 @@ Factor predictors are encoded as integer codes in the order of
 \verb{lower <= c < upper}.
 }
 \examples{
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
 head(rpf_boxes(rpfit))
 }
 \seealso{
