@@ -53,11 +53,13 @@ tune_control(search = c(5, 7), min_leaf_rows = 1, neighbours = FALSE)
 \donttest{
 # A small search: two points of greediness, then two leaf sizes
 set.seed(1)
+x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
 tuned <- rpf(
-  mpg ~ .,
-  data = mtcars,
+  x,
+  y,
   ntrees = 10,
-  tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 3), neighbours = FALSE)
+  tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 )
 tuned$tune$search
 }

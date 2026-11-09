@@ -435,7 +435,9 @@
 #' \donttest{
 #' # Tuning out of bag: the quick preset, two forests
 #' set.seed(1)
-#' tuned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, tune = "quick")
+#' x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+#' y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
+#' tuned <- rpf(x, y, ntrees = 10, tune = "quick")
 #' tuned$tune$search
 #' }
 rpf <- function(x, ...) {
