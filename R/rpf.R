@@ -194,32 +194,52 @@
 #' @details
 #' ## Choosing parameters
 #'
-#' Start with `max_interaction` and `splits`. `max_interaction` sets which
-#' effects the model can represent: `1` for an additive model, `2` (the
-#' default) to add pairwise interactions, which can still be plotted as
-#' heatmaps. Higher values are more flexible, but slower and the components are
-#' harder to interpret. `splits` sets how closely the model
-#' follows the data and is the parameter to tune. With a higher
-#' `max_interaction`, splits are spread over more possible components, so tune
-#' both together.
+#' The defaults were chosen on 44 simulated data sets and California housing
+#' (regression) and carried over to classification.
 #'
-#' `ntrees` averages over bootstrap samples to reduce variance and fitting and
-#' prediction time grow linearly with it. The default is lower than the
-#' usual 500 trees of a random forest because each tree family is itself a
-#' complete model, a sum of trees covering all components, rather than a
-#' single tree. Averaging therefore stops paying off sooner, usually after a
-#' few dozen families. The split search parameters
-#' (`split_structure`, `split_try`, `t_try`, `max_candidates`,
-#' `split_decay_rate`) trade speed for a more thorough search.
+#' `max_interaction` sets which effects the model can represent: `1` for an
+#' additive model, `2` to add pairwise interactions, `3` (the default)
+#' three-way interactions. Order 3 had 15% lower test error than order 2 on
+#' the simulated sets and 1.5% lower on California housing. Higher orders gain
+#' only where the truth has such interactions, cost much more time (no limit
+#' was 11 to 41 times slower on California housing, and worse there), and the
+#' pruned model rarely keeps a component of more than three predictors, so it
+#' is shown in at most `max_panels` heat maps anyway. With a higher
+#' `max_interaction`, splits are spread over more possible components.
+#'
+#' `splits` sets how closely the model follows the data. By default it is
+#' chosen out of bag while the forest grows (see "Choosing `splits` out of
+#' bag"), so it need not be tuned.
+#'
+#' `ntrees` averages over bootstrap samples to reduce variance, and fitting and
+#' prediction time grow linearly with it. Each tree family is itself a complete
+#' model, a sum of trees covering all components, rather than a single tree,
+#' but averaging more of them still pays off: the test error fell by about 2%
+#' per doubling of the families up to 200 on the simulated sets, and the
+#' pruned models were sparser (California housing: 34 instead of 47 kept
+#' components at 200 instead of 50 families). Hence the default of 200, at the
+#' price of time; use fewer for a quick look.
+#'
+#' The split search parameters (`split_structure`, `split_try`, `t_try`,
+#' `max_candidates`, `split_decay_rate`) trade speed for a more thorough, more
+#' greedy search. For `"leaves"`, a less greedy search is better: 3 thresholds
+#' per candidate and 10% of the possible splits per round (the default) had
+#' 5.7% to 6.8% lower test error than 10 and 40% (the default of the other
+#' structures, and of `"leaves"` before). `tune` searches this greediness out of
+#' bag.
 #'
 #' For classification, `"exponential"` (the default) and `"logit"` fit on the
-#' link scale and are transformed to probabilities, `"exponential"` being faster.
-#' With more than two classes `"exponential"` is the multiclass exponential
-#' loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): with one score per class,
-#' summing to 0, a row's weight is `exp(-g)`, `g` the score of its class, and
-#' the probabilities are the softmax of the scores.
-#' `"L1"` and `"L2"` fit class indicators directly and their probabilities are
-#' truncated to `[0, 1]`.
+#' link scale and are transformed to probabilities. With more than two classes
+#' `"exponential"` is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
+#' and Hastie, 2009): with one score per class, summing to 0, a row's weight is
+#' `exp(-g)`, `g` the score of its class, and the probabilities are the softmax
+#' of the scores. With `splits` chosen out of bag and the forest pruned (the
+#' defaults), `"exponential"` was as accurate as `"logit"` in simulations and
+#' about 2.5 times as fast. Nothing bounds its scores once a tree family's
+#' bootstrap sample is separated, though, so with a large fixed `splits` its
+#' log-loss can grow with the splits, where `"logit"`'s does not. `"L1"` and
+#' `"L2"` fit class indicators directly and their probabilities are truncated
+#' to `[0, 1]`.
 #'
 #' ## Factor predictors
 #'
@@ -281,22 +301,23 @@
 #' With `split_structure = "leaves"` (regression and classification), the
 #' global option `randomPlantedForest.exact_draw` chooses how the candidates
 #' are drawn.
-#' With `TRUE` (the default), every possible split gets a random number in
-#' every round. With `FALSE`, the candidates are drawn from a Fenwick tree
+#' With `FALSE` (the default), the candidates are drawn from a Fenwick tree
 #' over the weights, kept up to date between rounds, which costs a few random
-#' numbers per candidate instead. Both draw from the same distribution, but
-#' with other random numbers, so the same seed gives another (equally good)
-#' forest. Ties between equally good candidates may go to different candidates
-#' under the two draws, so with many splits, near saturation, their fits differ
-#' in distribution, though not in accuracy. With `min_leaf_rows`, both leave
-#' out the same candidates: those
-#' whose leaf has no threshold with that many rows on each side. The fast draw
-#' pays off on large data with many splits. The option is read when the forest
+#' numbers per candidate. With `TRUE`, the exact draw of earlier versions,
+#' every possible split gets a random number in every round. Both draw from
+#' the same distribution, but with other random numbers, so the same seed gives
+#' another (equally good) forest. Ties between equally good candidates may go
+#' to different candidates under the two draws, so with many splits, near
+#' saturation, their fits differ in distribution, though not in accuracy. With
+#' `min_leaf_rows`, both leave out the same candidates: those whose leaf has no
+#' threshold with that many rows on each side. The fast draw is about 2.5 times
+#' as fast on large data with many splits. The option is read when the forest
 #' is fitted and stored in `params$exact_draw`; it does not affect the other
-#' split structures.
+#' split structures. To reproduce a fit of version 0.5.0, set it and give
+#' 0.5.0's defaults (see the last example):
 #'
 #' ```r
-#' options(randomPlantedForest.exact_draw = FALSE)
+#' options(randomPlantedForest.exact_draw = TRUE)
 #' ```
 #'
 #' ## Reproducibility
@@ -377,7 +398,7 @@
 #'
 #' ## Pruning
 #'
-#' With `prune = TRUE`, `rpf()` fits the forest, then prunes its components
+#' By default (`prune = NULL`, or `TRUE`), `rpf()` fits the forest, then prunes its components
 #' with [prune_components()] at that function's defaults, on the
 #' training rows: the rule and the threshold are chosen out of bag (by
 #' cross-validation below 10 tree families, with a message), the sparse choice
@@ -391,8 +412,8 @@
 #' `tau`, `select`, `select_by`, folds or seed), fit with `prune = FALSE` and call
 #' [prune_components()]. Together with `splits = NULL`, one call chooses the
 #' number of splits out of bag, prunes and returns the model to show. Pruning
-#' needs out-of-bag rows, so `prune = TRUE` is an error with
-#' `deterministic = TRUE`.
+#' needs out-of-bag rows, so with `deterministic = TRUE` `prune = NULL` means
+#' `FALSE` and `prune = TRUE` is an error.
 #'
 #' ## Classification
 #'
@@ -440,7 +461,7 @@
 #' at the chosen settings from that state.
 #'
 #' On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
-#' search had 10.8% lower test error than `rpf()`'s 10 / 0.4 (no family of data
+#' search had 10.8% lower test error than 10 / 0.4 (the default of earlier versions; no family of data
 #' sets worse than +0.9%), and 2.8% lower than 5-fold cross-validation over the
 #' same settings at 1/24 of its cost; the quick preset had 9.4% lower test
 #' error (worst +0.4%). In those studies a forest was scored with the pruning's
@@ -461,14 +482,28 @@
 #' \doi{10.1023/A:1009869804967}
 #'
 #' @examples
-#' # Regression with formula
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
+#' # The default: splits chosen out of bag, pruned, every component shown
+#' set.seed(1)
+#' model <- rpf(mpg ~ ., data = mtcars)
+#' model
+#' predict(model, mtcars[1:3, ])
 #'
-#' # Regression with x and y, allowing pairwise interactions
-#' rpfit <- rpf(x = mtcars[, c("cyl", "wt", "hp")], y = mtcars$mpg, max_interaction = 2)
+#' # Classification, the same steps
+#' set.seed(1)
+#' model <- rpf(Species ~ ., data = iris, ntrees = 50)
+#' predict(model, iris[c(1, 51, 101), ], type = "prob")
 #'
-#' # Classification
-#' rpfit <- rpf(Species ~ ., data = iris, loss = "exponential")
+#' # The forest instead of the pruned model, with x and y, pairwise interactions
+#' # and a fixed number of splits
+#' set.seed(1)
+#' rpfit <- rpf(
+#'   x = mtcars[, c("cyl", "wt", "hp")],
+#'   y = mtcars$mpg,
+#'   max_interaction = 2,
+#'   splits = 30,
+#'   prune = FALSE
+#' )
+#' rpfit
 #'
 #' # A factor that keeps its level order: splits separate neighbouring levels
 #' cars <- mtcars
@@ -478,19 +513,25 @@
 #'
 #' # The out-of-bag error along the splits, from one fit
 #' set.seed(1)
-#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE)
+#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE, prune = FALSE)
 #' rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 #'
-#' # The number of splits chosen out of bag while growing
+#' \donttest{
+#' # The forest of earlier versions (0.5.0): their defaults and the exact draw
+#' old <- options(randomPlantedForest.exact_draw = TRUE)
 #' set.seed(1)
-#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
-#' rpfit
-#' rpfit$params$splits
-#'
-#' # The whole pipeline: splits chosen out of bag, pruned
-#' set.seed(1)
-#' pruned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL, prune = TRUE)
-#' pruned
+#' rpfit <- rpf(
+#'   mpg ~ cyl + wt,
+#'   data = mtcars,
+#'   max_interaction = 2,
+#'   ntrees = 50,
+#'   splits = 30,
+#'   split_try = 10,
+#'   t_try = 0.4,
+#'   prune = FALSE
+#' )
+#' options(old)
+#' }
 #'
 #' \donttest{
 #' # Tuning out of bag: the quick preset, two forests

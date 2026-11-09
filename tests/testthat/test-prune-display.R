@@ -9,6 +9,9 @@ pd_data <- function(n = 400, p = 6, seed = 1) {
 }
 
 pd_fit <- function(d, max_interaction = ncol(d$x), nthreads = 1L) {
+  # the exact draw: the tests below loop over this fit's coarsened components (fewer with the fast draw)
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   set.seed(2)
   rpf_050(
     d$x,

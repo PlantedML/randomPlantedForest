@@ -3,7 +3,8 @@
 #' The points of greediness that `rpf(tune = )` searches: pairs of `split_try` (thresholds evaluated per split
 #' candidate) and `t_try` (share of the possible splits drawn as candidates in each round), greediest first. Each step
 #' down the ladder halves `t_try` and `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125, except the
-#' first, which takes `t_try` from 1 to 0.8. Row 3 is [rpf()]'s default, 10 / 0.4.
+#' first, which takes `t_try` from 1 to 0.8. Row 3 is the other split structures' default, 10 / 0.4; row 5 is
+#' [rpf()]'s default for `split_structure = "leaves"`, 3 / 0.1.
 #'
 #' @return A `data.frame` with columns `split_try` and `t_try`, one row per point, greediest first.
 #' @seealso [tune_control()], [rpf()]

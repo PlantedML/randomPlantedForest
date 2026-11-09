@@ -31,7 +31,7 @@
   `rpf_boxes()` returns the leaves as a data frame.
   Requires `ggplot2`, and `patchwork` for `type = "boxes"`.
   The "Getting started" vignette uses it to show how a tree family is built and what purification does.
-* `prune_components()` prunes the purified components of a regression forest.
+* `prune_components()` prunes the purified components of a forest (regression or classification; see the classification entry below).
   A component is kept if its share of the variance of the prediction on the training rows is at least `tau`.
   Rule `"D"` drops the others; rule `"R"` also refits the intercept and one coefficient per kept component by least squares, which changes their scale but not their shape.
   The rule and `tau` are chosen out of bag by default (`select_by = "oob"`), without refitting: one purification evaluates every tree family's components at the training rows outside its bootstrap sample, and each candidate is scored by its out-of-bag RMSE, corrected for the extra variance of averaging fewer families.
@@ -47,31 +47,32 @@
   Every fit records how often each training row is in each family's bootstrap sample (fits are unchanged), and `rpf_marshal(include_data = TRUE)` stores these in-bag counts.
   On 44 synthetic data sets with known sparse structure, the pruned models kept no false component (except five tiny main effects on one additive set) and 111 of the 113 true interactions, and their test error was 15% lower than that of the unpruned forest tuned by CV, lower on 42 of the 44 sets.
   The result, of class `rpf_pruned`, has methods for `predict()`, `predict_components()` (now an S3 generic) and `print()`, and works with `rpf_marshal()`, `rpf_unmarshal()` and `bundle()`.
-* `rpf(oob_path = TRUE)` gives the out-of-bag error along the splits from one regression fit, in `$oob_path`.
+* `rpf(oob_path = TRUE)` gives the out-of-bag error along the splits from one fit, in `$oob_path` (for classification the loss's criterion, see below).
   With the same seed, the forest with `k` splits is exactly the first `k` splits of a forest with more, so while each tree family grows, its prediction at the training rows outside its bootstrap sample is updated split by split.
   The table has the plain and the corrected out-of-bag RMSE (the correction of `prune_components()`) at four checkpoints per doubling of the splits (`oob_path_checkpoints()`), or at given ones.
   On 52 data sets, choosing `splits` by the lowest corrected error among the values of a cross-validation grid did as well as 5-fold cross-validation over that grid (test error 0.06% lower on average), at 0.9 of its cost.
   The fitted forest is the same as without `oob_path`, which is off by default.
-* `rpf(splits = NULL)` chooses the number of splits out of bag while the forest grows (regression).
+* `rpf(splits = NULL)` chooses the number of splits out of bag while the forest grows (regression and classification).
   The forest's corrected out-of-bag error is followed at four checkpoints per doubling of the splits, growing stops once its lowest value is one doubling back (at most 25,600 splits), and the forest at the lowest error is returned: the forest that `rpf()` with that many `splits` and the same seed gives.
   On 52 data sets this chose the same `splits` as the lowest error along a fixed budget of 3,200 splits on 50, and a later, lower minimum on the other two, while growing 0.72 of the splits.
   The tree families grow one at a time, `nthreads` together, and keep only their out-of-bag predictions and a 40-byte record per split, from which the chosen forest is rebuilt without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1 GB) bounds the memory of families waiting for the stop.
   `print()` shows the chosen `splits` and where growing stopped.
+  It is the new default (see Breaking changes).
   A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
-  The default stays `splits = 30`.
-* `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
+  A family waiting for the stop pauses at most one doubling past the first families' estimate and grows on if the stop comes later, so a flat out-of-bag curve no longer makes every family grow far past the stop: a three-class fit with the defaults on 100 rows takes 12 s instead of 35 s, with the same forest.
+* `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression and classification): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
   The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
   With `splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.
   `prune = TRUE` is an error with `deterministic = TRUE`, and `purify` is not used with it.
-  The default stays `prune = FALSE`, which returns the forest as before.
+  It is the new default (`prune = NULL`, see Breaking changes); `prune = FALSE` returns the forest as before.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
-  Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
+  Values above 1 need `split_structure = "leaves"` (for classification see below); the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
   The default `min_leaf_rows = 1` fits the same models as before, bit for bit.
 * Classification with `split_structure = "leaves"` (the default) takes `min_leaf_rows` and the fast draw of split candidates (`options(randomPlantedForest.exact_draw = FALSE)`) as regression does.
   Both use regression's draw: the same candidates are left out, and a classification fit with `loss = "L2"` on a 0/1 response is the regression fit, bit for bit, with either option.
-  With the defaults (`min_leaf_rows = 1`, the exact draw) classification fits are unchanged, bit for bit.
-* `rpf(tune = TRUE)` tunes out of bag in one call (regression): the greediness of the split search (`split_try` and `t_try`, on the ladder of the new `greediness_ladder()`) and `min_leaf_rows`.
+  With `min_leaf_rows = 1` and the exact draw (the default before this version) classification fits are unchanged, bit for bit.
+* `rpf(tune = TRUE)` tunes out of bag in one call (regression and classification): the greediness of the split search (`split_try` and `t_try`, on the ladder of the new `greediness_ladder()`) and `min_leaf_rows`.
   Every forest of the search has `splits` chosen out of bag and is pruned by `prune_components()` with its defaults, and the forest whose pruned model has the lowest corrected out-of-bag error wins; the display (`max_panels`) is applied once, to the chosen model.
   The search is coordinate-wise, about 10 forests: the ladder from 10 / 0.4 to 1 / 0.0125, then `min_leaf_rows` 1, 5, 20 and 100, then the two ladder neighbours of the chosen point.
   `tune = "quick"` grows two forests, 3 / 0.1 and 1 / 0.025, and the new `tune_control()` sets your own search.
@@ -84,11 +85,11 @@
   A component is kept or dropped for all classes, sized by its variance summed over the score columns centred across the classes; rule `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per score column (least squares for the Brier score, maximum likelihood for the log-loss), out of bag; the display chooses one panel form per component for all classes.
   The pruned model's `predict()` takes `type` as `predict.rpf()` does, and its `predict_components()` has one column per component and class.
   With two classes and `loss = "L2"`, every choice is that of the regression pipeline on the 0/1 response, bit for bit.
-  Fits with the defaults are unchanged.
+  With the new defaults (see Breaking changes) a classification fit takes all these steps.
 * `options(randomPlantedForest.exact_draw = FALSE)` draws the split candidates of regression with `split_structure = "leaves"` from a tree of weights kept up to date between rounds, instead of one random number per possible split in every round (`?rpf`, "The draw of candidates for `leaves`").
   This fits about 2.5 times as fast on larger data, for example 218 s → 86 s at 1 thread on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
   It draws from the same distribution and leaves out the same candidates under `min_leaf_rows`, but with other random numbers, so the same seed gives another forest.
-  The default `TRUE` fits the same models as before, bit for bit.
+  `TRUE` (the default before this version) fits the same models as before, bit for bit.
 * `rpf()` gains `interaction_constraints`, a list of feature sets that restricts which interactions the forest may form, as in xgboost: a tree on the predictors `T` is grown only if `T` is a subset of one of the sets.
   The sets are given by predictor names or column indices (with a formula, indices follow the formula's predictors; with a recipe, names only).
   They apply together with `max_interaction`, for every `split_structure`, in regression and classification, and `print()` shows them.

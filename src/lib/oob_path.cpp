@@ -190,7 +190,11 @@ OobPath RandomPlantedForest::oob_path() const
 //    holding its growing state with the per-leaf caches freed) while the paused families fit in the pause budget
 //    (`pause_gb`; their size is estimated), and otherwise finishes: its growing state is freed. When the bound rises,
 //    the paused families below it grow on (cheaply); the finished ones are grown again from their seed (the same
-//    splits, further) once every family has been grown.
+//    splits, further) once every family has been grown. A family pauses at most `patience` checkpoints (one doubling)
+//    past the pilot's bound: on a flat OOB curve the estimate from part of the families keeps finding new minima and
+//    would grow every family far past the stop (a three-class logit forest of 200 families on 100 rows grew 2.7 times
+//    the splits it needed), while a paused family that falls short of the stop grows on cheaply in step 3. A family
+//    that cannot pause grows to the uncapped estimate, as a regrowth from its seed is not cheap.
 // 3. The stopper is then called checkpoint by checkpoint with the OOB path there (the families' predictions summed in
 //    family order, as fit() sums them). Where it goes on past the bound, the families grow further first (to the
 //    earliest stop the curve so far allows).
@@ -243,6 +247,8 @@ struct RandomPlantedForest::AloneFit {
   // with many families paused the system time of those wake-ups was many times the fit's, also at nthreads = 1
   std::unique_ptr<std::condition_variable[]> paused_cv;
   std::atomic<size_t> bound{0}; // a family grows to this many checkpoints (read at each checkpoint)
+  std::atomic<size_t> bound_free{
+      0}; // the estimate without the cap on pausing (phase 2), for families that cannot pause
   std::atomic<bool> cancel{false};
   std::exception_ptr err;
   std::vector<Family> fam;
@@ -392,13 +398,17 @@ struct RandomPlantedForest::AloneFit {
     }
   }
 
-  // After a family is counted (under the lock): the bound moves to the new estimate, and the finished families short
-  // of it are queued to grow again (the paused ones resume on their own)
+  // After a family is counted (under the lock): the bound moves to the new estimate, at most `patience` checkpoints
+  // past the pilot's bound (bound_free keeps the estimate itself), and the finished families short of it are queued to
+  // grow again (the paused ones resume on their own)
   void after_count()
   {
     if (!estimating || pilot_on)
       return;
-    const size_t need = estimate();
+    size_t need = estimate();
+    bound_free = need;
+    if (stats.pilot_bound > 0)
+      need = std::min(need, (size_t)stats.pilot_bound + (size_t)patience);
     bound = need;
     for (size_t b = 0; b < fam.size(); ++b)
       if (fam[b].state == 2 && fam[b].reached < need) {
@@ -492,10 +502,12 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     }
     std::unique_lock<std::mutex> lk(A.m);
     AloneFit::Family &F = A.fam[n];
-    // no room to pause: finish one checkpoint past the bound (growing a checkpoint further costs a fifth more splits;
-    // falling short of the stop, a regrowth from the seed)
-    if (A.paused_bytes + bytes > A.pause_budget || !trk.fam)
-      return c + 1 < A.bound.load() + 1 && !A.cancel;
+    // no room to pause: finish one checkpoint past the bound, uncapped while the bound is estimated (growing a
+    // checkpoint further costs a fifth more splits; falling short of the stop, a regrowth from the seed)
+    if (A.paused_bytes + bytes > A.pause_budget || !trk.fam) {
+      const size_t to = A.estimating ? std::max(A.bound.load(), A.bound_free.load()) : A.bound.load();
+      return c + 1 < to + 1 && !A.cancel;
+    }
     // pause: the predictions so far go to the family's record (the stopper reads them there), the bound is estimated
     // again, and the thread gives up its permit until the bound rises past it (or the fit ends)
     F.snaps.resize(std::max(F.snaps.size(), trk.csnaps.size()));

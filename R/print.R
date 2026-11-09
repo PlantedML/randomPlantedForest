@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
+#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
 print.rpf <- function(x, ...) {
   cat(format(x, ...), sep = "\n")
   invisible(x)
@@ -152,7 +152,7 @@ print_params <- function(params) {
 #' @export
 #' @examples
 #'
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE)
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE, prune = FALSE)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {

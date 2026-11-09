@@ -37,7 +37,7 @@
 #' @seealso [plot.rpf()] to plot the boxes.
 #' @export
 #' @examples
-#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10)
+#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
 #' head(rpf_boxes(rpfit))
 rpf_boxes <- function(x, family = 1L, ...) {
   checkmate::assert_class(x, "rpf")
@@ -209,7 +209,7 @@ grid_boxes <- function(family) {
 #' @importFrom rlang .data
 #' @export
 #' @examplesIf rlang::is_installed(c("ggplot2", "patchwork"))
-#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10)
+#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10, prune = FALSE)
 #' plot(rpfit)
 #' purify(rpfit)
 #' plot(rpfit, type = "boxes")

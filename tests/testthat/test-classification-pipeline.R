@@ -377,6 +377,36 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
   expect_equal(ns$crit_centred_var(crit, M1), ns$crit_centred_var(crit, M3), tolerance = 1e-12)
 })
 
+test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
+  skip_on_cran()
+  # the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the families kept finding
+  # new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A family pauses at most one
+  # doubling past the first family's estimate and grows on when the stop comes later, so each grows to the stop.
+  d <- cp_data(300)
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
+  set.seed(8)
+  f <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
+  st <- f$fit$adaptive_stats()
+  expect_identical(f$params$splits, 168L)
+  expect_identical(f$splits_oob$stopped_at, 336L)
+  expect_lte(st$splits_grown, 1.2 * 10 * 336)
+  # the same forest as the fixed fit at the chosen splits
+  set.seed(8)
+  g <- rpf(
+    d$x,
+    d$ym,
+    loss = "logit",
+    max_interaction = 3,
+    ntrees = 10,
+    split_try = 10,
+    t_try = 0.4,
+    splits = 168,
+    prune = FALSE
+  )
+  expect_identical(f$fit$get_model(), g$fit$get_model())
+})
+
 test_that("the OOB path of a classification forest: prefix property, splits = NULL = the fixed fit", {
   skip_on_cran()
   d <- cp_data(300)

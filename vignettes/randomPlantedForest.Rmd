@@ -28,7 +28,7 @@ Its defining feature is that the maximum order of interaction between predictors
 library(randomPlantedForest)
 ```
 
-## Fitting a regression forest
+## Fitting a regression model
 
 To see what the model recovers, we simulate data where the true components are known.
 The outcome depends on `x1`, `x2` and `x3` through main effects of different shapes and on `x1` and `x2` jointly through a product interaction with `x4` having no effect at all:
@@ -59,19 +59,39 @@ sim$y <- 1 +
   rnorm(n, sd = 0.3)
 ```
 
-```{r fit-regression}
-rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50)
-rpfit
+```{r fit-default}
+model <- rpf(y ~ ., data = sim, nthreads = 2)
+model
 ```
 
-`max_interaction = 2` restricts the forest to main effects and two-way interactions.
-This is the central tuning choice of the method: lower values give a more interpretable, more constrained model, while `max_interaction = 0` allows interactions of any order.
-`ntrees` sets the number of tree families in the ensemble.
+With its defaults, `rpf()` does three things in one call:
+
+1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while the families grow: by the error on the training rows that a family's bootstrap sample left out (out of bag), stopping once more splits no longer help (`splits = NULL`).
+2. It prunes the forest's components with `prune_components()`: a component is kept if its share of the variance of the prediction is large enough, and the kept components get one refitted coefficient each, the threshold again chosen out of bag (`prune = NULL`, that is `TRUE`).
+3. It shows every kept component of three predictors in at most 10 heat maps (`max_panels = 10`), coarsening it if needed, and prunes again.
+
+The result is the pruned model.
+Here it keeps the three main effects and the `x1:x2` interaction, and drops `x4` and the other interactions, which the data do not have.
+`predict_components()` gives every kept component as it enters the prediction (see "Decomposing predictions" below):
+
+```{r components-default}
+names(predict_components(model, new_data = sim)$m)
+```
 
 Prediction works as usual:
 
 ```{r predict-regression}
-predict(rpfit, new_data = head(sim))
+predict(model, new_data = head(sim))
+```
+
+`prune = FALSE` returns the forest itself, with all its components, as earlier versions did.
+`max_interaction` is the central choice of the method: lower values give a more constrained model, `max_interaction = 0` allows interactions of any order.
+`ntrees` sets the number of tree families, and `splits = <number>` fixes the number of splits instead of choosing it.
+The forest below is restricted to main effects and two-way interactions:
+
+```{r fit-regression}
+rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50, prune = FALSE)
+rpfit
 ```
 
 Note that `rpf()` does not handle missing values: rows containing `NA` must be imputed or removed beforehand (see the `recipes` section below for one way to do this as part of the model specification).
@@ -85,7 +105,7 @@ New trees grow from existing ones by splitting on an additional variable, and `m
 To look at one family, we fit a forest with a single, small family to the same data:
 
 ```{r fit-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
-small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10)
+small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10, prune = FALSE)
 plot(small)
 ```
 
@@ -108,6 +128,7 @@ plot(small, type = "boxes")
 Now each panel is one component: the main effects resemble the true shapes, `x1:x2` shows the sign pattern of a product, and the root value is the intercept, close to the true value of 1.
 Averaging these components over all tree families gives the decomposition of the whole forest, which `predict_components()` computes.
 With a single family and few splits the estimates are coarse, which is why the next section uses the forest of 50 families fitted above.
+The pruned model's components are the same averages over its families, but only the kept ones, each multiplied by its coefficient.
 
 ## Decomposing predictions
 
@@ -117,6 +138,7 @@ $$\hat{m}(x) = \hat{m}_0 + \sum_k \hat{m}_k(x_k) + \sum_{k < l} \hat{m}_{kl}(x_k
 
 `predict_components()` returns exactly this decomposition: an intercept and one column per main effect and interaction term, evaluated on the supplied data.
 The forest is *purified* internally to make the decomposition unique, which is why the print method above reports the purification state.
+For the pruned model, `predict_components(model, new_data = sim)` returns the kept components in the same form.
 
 ```{r components}
 components <- predict_components(rpfit, new_data = sim)
@@ -205,12 +227,13 @@ We illustrate with the `penguins` data from `palmerpenguins`, removing missing v
 ```{r classif-binary, eval = has_suggests}
 penguins <- na.omit(palmerpenguins::penguins)
 
-rpfit_sex <- rpf(sex ~ ., data = penguins, ntrees = 50)
+rpfit_sex <- rpf(sex ~ ., data = penguins, nthreads = 2)
 
 predict(rpfit_sex, head(penguins), type = "prob")
 predict(rpfit_sex, head(penguins), type = "class")
 ```
 
+A classification model goes through the same steps as a regression model: the number of splits is chosen out of bag and the components are pruned, both by the log-loss of the predicted probabilities.
 With the default `loss = "exponential"` (or `"logit"`), `type = "link"` additionally gives raw predictions on the log-odds scale.
 
 ### Multiclass
@@ -218,14 +241,14 @@ With the default `loss = "exponential"` (or `"logit"`), `type = "link"` addition
 Multiclass classification works the same way: probability predictions contain one column per class:
 
 ```{r classif-multiclass, eval = has_suggests}
-rpfit_species <- rpf(species ~ ., data = penguins, ntrees = 50)
+rpfit_species <- rpf(species ~ ., data = penguins, nthreads = 2)
 
 predict(rpfit_species, head(penguins), type = "prob")
 predict(rpfit_species, head(penguins), type = "class")
 ```
 
-The default loss for classification is `"exponential"`, which gives proper probability estimates.
-`"logit"` gives similar results but is slower, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
+The default loss for classification is `"exponential"`, which gives proper probability estimates (with more than two classes it is the multiclass exponential loss SAMME).
+`"logit"` gives similar results after pruning but is slower, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
 Note that with `loss = "logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
 
 ## Using `recipes`
@@ -243,7 +266,7 @@ rec <- recipe(body_mass_g ~ ., data = peng_raw) |>
   step_impute_median(all_numeric_predictors()) |>
   step_impute_mode(all_nominal_predictors())
 
-rpfit_rec <- rpf(rec, data = peng_raw, ntrees = 50)
+rpfit_rec <- rpf(rec, data = peng_raw, nthreads = 2)
 
 predict(rpfit_rec, head(peng_raw))
 ```
@@ -275,6 +298,7 @@ all.equal(
 )
 ```
 
+Pruned models are saved the same way: `rpf_marshal(model)`.
 Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method wrapping the same mechanism is available via `bundle::bundle()` and `bundle::unbundle()`.
 
 ```{r cleanup, include = FALSE}
