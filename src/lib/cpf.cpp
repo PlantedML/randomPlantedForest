@@ -1409,6 +1409,30 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       case LossType::exponential: {
 
+        // K >= 3 classes, SAMME (cpf.hpp): the step from the class shares the criterion left in M_s / M_b, clamped
+        // to [epsilon, 1 - epsilon]; each row's one weight times exp(-a_c), c its class
+        if (value_size > 1) {
+          samme_step(curr_split.M_s, epsilon, update_s);
+          samme_step(curr_split.M_b, epsilon, update_b);
+          std::vector<double> fac_s(value_size), fac_b(value_size);
+          for (size_t k = 0; k < value_size; ++k) {
+            fac_s[k] = exp(-update_s[k]);
+            fac_b[k] = exp(-update_b[k]);
+          }
+          for (int individual : curr_split.leaf_index->individuals) {
+            const std::vector<double> &y = samples_Y[individual];
+            size_t k = 0;
+            while (k + 1 < value_size && !(y[k] > 0))
+              ++k;
+            const double f =
+                samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point ? fac_s[k] : fac_b[k];
+            for (double &w : weights[individual])
+              w *= f;
+          }
+          break;
+        }
+
+        // binary
         std::vector<double> sum_s = curr_split.M_s;
         std::vector<double> sum_b = curr_split.M_b;
 

@@ -120,6 +120,12 @@
 * `predict()` after `purify(maxp_interaction = k)` with `k` below the fit's `max_interaction` returns the forest's prediction.
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
+* `loss = "exponential"`, the default for classification, is with more than two classes the multiclass exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split criterion, the leaf step and the weights all come from the one loss `exp(-y.f / K)`.
+  Each row has one weight, `exp(-g)` with `g` its class's score, and a leaf moves the scores by `log(p_k) - mean_j log(p_j)`, with `p` its weighted class shares (clamped as before by `delta` for the criterion and `epsilon` for the step); `predict()` takes the softmax of the scores as before.
+  Previously each class had its own one-vs-rest weights, and its step was `log(p_k / p_0)` with `p_0 = 1 - sum_k p_k` mixing shares under the different weights; it is 0 at the start and was clamped to `epsilon`, so every class's score rose by a common `log(1 / epsilon)` that the softmax ignores but the weights did not.
+  The weights then no longer matched the probabilities `predict()` gives (by factors up to 10^10 in small tests).
+  With `splits` chosen out of bag (`splits = NULL`) and the forest pruned (`prune = TRUE`; order 3, 200 families, `split_try = 3`, `t_try = 0.1`, the fast draw) on two simulated three-class data sets, the pruned model's test log-loss was 0.022 and 0.036 above logit's; it is now 0.061 below and 0.003 above, with 15 and 25 splits chosen instead of 21–25 and 238–400, and on the larger set (4,000 rows) the fit is four times as fast.
+  Fitted models change for `loss = "exponential"` with more than two classes only; binary fits are unchanged.
 * `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
 * `predict_components()` returns a `remainder` whenever `m` leaves out components of the forest, also when `predictors` leaves out some of the fit's predictors at the fit's `max_interaction`.
   Previously the intercept and `m` then did not sum to the prediction.

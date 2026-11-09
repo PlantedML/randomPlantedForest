@@ -116,6 +116,18 @@ private:
   void exponential_loss(Split &split);
   void exponential_loss_2(Split &split);
   void exponential_loss_3(Split &split);
+  // The exponential loss for K >= 3 classes (value_size = K score columns, the classes coded 1 / -1): SAMME (Zhu, Zou,
+  // Rosset and Hastie 2009), the loss exp(-y.f / K) with y_k = 1 for the row's class and -1 / (K - 1) otherwise, and
+  // sum_k f_k = 0. The forest stores g = f / (K - 1), so predict()'s softmax of g is the loss's population link. Then
+  // y.f / K = g_c (c the row's class), and every row has one weight w = exp(-g_c), kept in each of its K columns. A
+  // leaf with the class weight sums W_k and shares p_k = W_k / W is moved by the minimiser of sum_k W_k exp(-a_k) over
+  // sum_k a_k = 0: a_k = log p_k - mean_j log p_j. samme_loss() is the split criterion: per side, the loss change
+  // sum_k W_k exp(-a_k) - W at the shares clamped to [delta, 1 - delta]; it leaves the shares in M_s / M_b. The update
+  // (create_tree_family) takes the step from the shares clamped to [epsilon, 1 - epsilon] and multiplies each row's
+  // weight by exp(-a_c). Binary data keep the code of exponential_loss(), which is this loss for K = 2.
+  void samme_loss(Split &split);
+  // a_k = log c(p_k) - mean_j log c(p_j), with c the clamp to [clamp, 1 - clamp]
+  void samme_step(const std::vector<double> &share, double clamp, std::vector<double> &a) const;
   bool keep_weights_ = false;
   std::vector<KeptWeights> kept_weights_;
 };

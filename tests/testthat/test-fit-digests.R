@@ -2,9 +2,10 @@
 # (helper-fit-digests.R) must give these digests bitwise. They were computed with master at 6db527c and re-pinned
 # where a fix moved the fits: the regression structures (`cur_trees_1`, and `cur_trees_2` / `res_trees` with
 # `deterministic = TRUE`; #78), the purified fits (`purify(mode = 2)` on a leaf's lower bound, #76; `predict()`
-# after a capped purification, #77), every classification fit (#84), and the purified components of `purify(mode = 2)`
-# as weighted rectangles, which add the same terms in another order (rounding level). A change meant to leave every
-# fit as it was keeps them all, and a change that moves fits re-pins exactly those.
+# after a capped purification, #77), every classification fit (#84), the purified components of `purify(mode = 2)`
+# as weighted rectangles, which add the same terms in another order (rounding level), and the three-class
+# exponential fits (`loss3_exponential`, `pur_cls3_*`: SAMME, the multiclass exponential loss). A change meant to
+# leave every fit as it was keeps them all, and a change that moves fits re-pins exactly those.
 #
 # The digests depend on the platform's floating point and random integers (libm's exp and log draw the candidates),
 # so they are checked only where they were computed: macOS on arm64.
@@ -43,7 +44,7 @@ test_that("small fits are bitwise as pinned", {
     loss3_L1 = "843dbb7d5d6bafd8eeea3bf3c67487d2",
     loss3_L2 = "05d608d4ff10164f09ff56353c399223",
     loss3_logit = "305b7853bd96e566572be447023b34d1",
-    loss3_exponential = "04b5ee5e76a1ae620126dd83c68a3fcc",
+    loss3_exponential = "20aaee6ce07ccef144fb77fd850c1ae1",
     pur_reg_components = "8bf9507e8cb6ea716ec1315c58a5de81",
     pur_reg_names = "42622b48bfaa4d8b2d366e09a55c3899",
     pur_reg_predict = "e6f84aa30eedf710528f06e78974a9ea",
@@ -59,9 +60,9 @@ test_that("small fits are bitwise as pinned", {
     pur_cls_components = "1da10984ebf6bde075fb877c2eb167aa",
     pur_cls_names = "794adb1c06fff2ed25b9afca6d9c654c",
     pur_cls_predict = "9b7da7d5f47b8478986d69a7f281c344",
-    pur_cls3_components = "979e3a9c7367e18d9f0ca20fc00615f8",
+    pur_cls3_components = "e7c9d981ddb11fe795b3fa5e21faeafa",
     pur_cls3_names = "28a2f21ce2d5f51e5a2bb15a2eee3069",
-    pur_cls3_predict = "3d509c4a21d950b1733b8cada7b846f5"
+    pur_cls3_predict = "7ee185c1a3f17f3d90cd6a0a174a6982"
   )
   got <- port_fit_digests()
   expect_identical(names(got), names(expected))

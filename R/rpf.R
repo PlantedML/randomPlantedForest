@@ -69,7 +69,8 @@
 #'   the forest on the effects a first fit found, e.g. after dropping its small
 #'   components.
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
-#'   regression, the only supported loss, and `"exponential"` for classification.
+#'   regression, the only supported loss, and `"exponential"` for classification
+#'   (with more than two classes the multiclass exponential loss SAMME).
 #'   Classification also supports `"logit"`, which gives similar results but is
 #'   slower, and `"L1"` and `"L2"`, which fit class indicators directly and do
 #'   not yield proper probability estimates.
@@ -193,6 +194,10 @@
 #'
 #' For classification, `"exponential"` (the default) and `"logit"` fit on the
 #' link scale and are transformed to probabilities, `"exponential"` being faster.
+#' With more than two classes `"exponential"` is the multiclass exponential
+#' loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): with one score per class,
+#' summing to 0, a row's weight is `exp(-g)`, `g` the score of its class, and
+#' the probabilities are the softmax of the scores.
 #' `"L1"` and `"L2"` fit class indicators directly and their probabilities are
 #' truncated to `[0, 1]`.
 #'

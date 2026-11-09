@@ -206,7 +206,8 @@ the forest on the effects a first fit found, e.g. after dropping its small
 components.}
 
 \item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
-regression, the only supported loss, and \code{"exponential"} for classification.
+regression, the only supported loss, and \code{"exponential"} for classification
+(with more than two classes the multiclass exponential loss SAMME).
 Classification also supports \code{"logit"}, which gives similar results but is
 slower, and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do
 not yield proper probability estimates.}
@@ -342,6 +343,10 @@ few dozen families. The split search parameters
 
 For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
 link scale and are transformed to probabilities, \code{"exponential"} being faster.
+With more than two classes \code{"exponential"} is the multiclass exponential
+loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): with one score per class,
+summing to 0, a row's weight is \code{exp(-g)}, \code{g} the score of its class, and
+the probabilities are the softmax of the scores.
 \code{"L1"} and \code{"L2"} fit class indicators directly and their probabilities are
 truncated to \verb{[0, 1]}.
 }
