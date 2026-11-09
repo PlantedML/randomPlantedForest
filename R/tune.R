@@ -59,6 +59,7 @@ greediness_ladder <- function() {
 #' tuned <- rpf(
 #'   x,
 #'   y,
+#'   max_interaction = 2,
 #'   ntrees = 10,
 #'   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 #' )
