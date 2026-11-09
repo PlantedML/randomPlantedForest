@@ -66,7 +66,7 @@ model
 
 With its defaults, `rpf()` does three things in one call:
 
-1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while the families grow: by the error on the training rows that a family's bootstrap sample left out (out of bag), stopping once more splits no longer help (`splits = NULL`).
+1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while the families grow: by the error on the training rows that a family's bootstrap sample left out (out of bag), stopping once more splits no longer help (`n_splits = NULL`).
 2. It prunes the forest's components with `prune_components()`: a component is kept if its share of the variance of the prediction is large enough, either as it is or with one refitted coefficient per kept component; the rule and the threshold are again chosen out of bag (`prune = NULL`, that is `TRUE`).
 3. It shows every kept component of three predictors in at most 10 heat maps (`max_panels = 10`), coarsening it if needed, and prunes again.
 
@@ -86,11 +86,11 @@ predict(model, new_data = head(sim))
 
 `prune = FALSE` returns the forest itself, with all its components, as earlier versions did.
 `max_interaction` is the central choice of the method: lower values give a more constrained model, `max_interaction = 0` allows interactions of any order.
-`ntrees` sets the number of tree families, and `splits = <number>` fixes the number of splits instead of choosing it.
+`n_families` sets the number of tree families, and `n_splits = <number>` fixes the number of splits instead of choosing it.
 The forest below is restricted to main effects and two-way interactions:
 
 ```{r fit-regression}
-rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50, prune = FALSE)
+rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 50, prune = FALSE)
 rpfit
 ```
 
@@ -98,14 +98,14 @@ Note that `rpf()` does not handle missing values: rows containing `NA` must be i
 
 ## Inside a tree family
 
-The forest averages `ntrees` tree families.
+The forest averages `n_families` tree families.
 Unlike a single CART tree, a family consists of several trees, each splitting on its own set of variables, and it predicts a point by adding up the values of all leaves containing it.
 New trees grow from existing ones by splitting on an additional variable, and `max_interaction = 2` limits each tree to at most two variables.
 
 To look at one family, we fit a forest with a single, small family to the same data:
 
 ```{r fit-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
-small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10, prune = FALSE)
+small <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 1, n_splits = 10, prune = FALSE)
 plot(small)
 ```
 
