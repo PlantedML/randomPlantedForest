@@ -8,9 +8,9 @@ oob_sim <- function(n = 400, seed = 11) {
   list(x = x, y = y)
 }
 
-oob_fit <- function(d, max_interaction = 2, ntrees = 20, ...) {
+oob_fit <- function(d, max_interaction = 2, n_families = 20, ...) {
   set.seed(5)
-  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 40, ...)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, n_families = n_families, n_splits = 40, ...)
 }
 
 # One family's purified component f_S at the rows of X, directly from its leaves (mode 2's formula):
@@ -63,8 +63,8 @@ family_prediction <- function(fam, X) {
 
 test_that("the in-bag counts are the bootstrap samples", {
   d <- oob_sim(n = 150)
-  for (structure in c("leaves", "res_trees", "cur_trees_1", "cur_trees_2", "hist")) {
-    fit <- oob_fit(d, ntrees = 6, split_structure = structure)
+  for (structure in c("leaf", "target_tree_then_leaf", "tree_then_leaf", "tree_then_all_leaves", "leaf_binned")) {
+    fit <- oob_fit(d, n_families = 6, split_structure = structure)
     ib <- fit$fit$inbag()
     expect_identical(dim(ib), c(150L, 6L))
     expect_true(is.integer(ib))
@@ -72,23 +72,23 @@ test_that("the in-bag counts are the bootstrap samples", {
     # about 37% of the rows are out of bag in each family
     expect_true(all(abs(colMeans(ib == 0) - exp(-1)) < 0.15))
   }
-  det <- oob_fit(d, ntrees = 1, deterministic = TRUE)
+  det <- oob_fit(d, n_families = 1, deterministic = TRUE)
   expect_true(all(det$fit$inbag() == 1))
   # classification records them too
   set.seed(5)
-  cfit <- rpf_050(d$x, factor(d$y > 1), ntrees = 4, splits = 10)
+  cfit <- rpf_050(d$x, factor(d$y > 1), n_families = 4, n_splits = 10)
   expect_true(all(colSums(cfit$fit$inbag()) == 150))
 })
 
 test_that("OOB rows are really out of bag: their outcome does not change the family", {
   d <- oob_sim(n = 150)
-  fit <- oob_fit(d, ntrees = 8)
+  fit <- oob_fit(d, n_families = 8)
   ib <- fit$fit$inbag()
   # a row that is out of bag in some families and in bag in others
   i <- which(rowSums(ib == 0) >= 2 & rowSums(ib > 0) >= 2)[1]
   d2 <- d
   d2$y[i] <- d2$y[i] + 100
-  fit2 <- oob_fit(d2, ntrees = 8)
+  fit2 <- oob_fit(d2, n_families = 8)
   expect_identical(fit2$fit$inbag(), ib)
   m1 <- fit$fit$get_model()
   m2 <- fit2$fit$get_model()
@@ -107,7 +107,7 @@ test_that("the OOB sums equal a per-family evaluation from the leaves", {
   x <- matrix(runif(n * 3), n, 3, dimnames = list(NULL, paste0("x", 1:3)))
   y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(n, sd = 0.3)
   set.seed(11)
-  fit <- rpf_050(x, y, max_interaction = 3, ntrees = 5, splits = 12)
+  fit <- rpf_050(x, y, max_interaction = 3, n_families = 5, n_splits = 12)
   ib <- fit$fit$inbag()
   mod <- fit$fit$get_model()
   o <- fit$fit$purify_oob(0L, 1L)
@@ -143,7 +143,7 @@ test_that("the OOB sums equal a per-family evaluation from the leaves", {
   expect_equal(o$intercept1[, 1] + rowSums(o$sum1), pred1, tolerance = 1e-12)
   # all families together are the forest's components
   set.seed(11)
-  fit_all <- rpf_050(x, y, max_interaction = 3, ntrees = 5, splits = 12)
+  fit_all <- rpf_050(x, y, max_interaction = 3, n_families = 5, n_splits = 12)
   purify(fit_all)
   brute_all <- sapply(seq_along(sets), function(k) {
     Reduce(`+`, lapply(mod, function(fam) family_component(fam, sets[[k]], x, x))) / length(mod)
@@ -184,7 +184,7 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   # with 20 families (7 OOB families per row) the OOB components are too noisy to tell R(1%) from R(0) here
   oob_fit <- function(d) {
     set.seed(5)
-    rpf_050(d$x, d$y, max_interaction = 2, ntrees = 100, splits = 40)
+    rpf_050(d$x, d$y, max_interaction = 2, n_families = 100, n_splits = 40)
   }
   fit <- oob_fit(d)
   fold_id <- rep_len(1:5, nrow(d$x))
@@ -315,9 +315,9 @@ test_that("OOB pruning does not depend on nthreads, is the default, and CV is st
 
 test_that("OOB pruning gives clear errors; a deterministic forest falls back to CV by default", {
   d <- oob_sim(n = 150)
-  fit <- oob_fit(d, ntrees = 5)
+  fit <- oob_fit(d, n_families = 5)
   expect_error(prune_components(fit, d$x[150:1, ], d$y[150:1], select_by = "oob"), "training rows")
-  det <- oob_fit(d, ntrees = 1, deterministic = TRUE)
+  det <- oob_fit(d, n_families = 1, deterministic = TRUE)
   expect_error(prune_components(det, d$x, d$y, select_by = "oob"), "deterministic")
   expect_silent(pr <- prune_components(det, d$x, d$y, folds = 3, seed = 1))
   expect_identical(pr$select_by, "cv")

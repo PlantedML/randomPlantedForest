@@ -2,19 +2,33 @@
 # thresholds over each leaf (res_trees, cur_trees_2); cur_trees_1 draws leaves in proportion to their available
 # thresholds (the incremental sampling weights after a split agree with a full rebuild).
 
-# Low-level parameter vector: max_interaction, ntrees, splits, split_try, t_try, purify, deterministic,
-# nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure
+# Low-level parameter vector: max_interaction, n_families, n_splits, n_try_split_points, share_candidates, purify,
+# deterministic, nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure
 low_params <- function(
   mode,
   max_interaction = 2,
-  ntrees = 3,
-  splits = 25,
-  split_try = 5,
-  t_try = 0.4,
+  n_families = 3,
+  n_splits = 25,
+  n_try_split_points = 5,
+  share_candidates = 0.4,
   deterministic = 0,
   delete_leaves = 1
 ) {
-  c(max_interaction, ntrees, splits, split_try, t_try, 0, deterministic, 1, 0, 0.1, 50, delete_leaves, mode)
+  c(
+    max_interaction,
+    n_families,
+    n_splits,
+    n_try_split_points,
+    share_candidates,
+    0,
+    deterministic,
+    1,
+    0,
+    0.1,
+    50,
+    delete_leaves,
+    mode
+  )
 }
 
 tree_dims <- function(fit) {
@@ -27,14 +41,14 @@ test_that("deterministic cur_trees_1 evaluates every sampled candidate", {
   n <- 100
   X <- matrix(runif(n * 3), n)
   Y <- matrix(sin(2 * pi * X[, 2]) + X[, 3], ncol = 1)
-  fit <- new(RandomPlantedForest, Y, X, low_params(2, ntrees = 1, splits = 20, deterministic = 1))
+  fit <- new(RandomPlantedForest, Y, X, low_params(2, n_families = 1, n_splits = 20, deterministic = 1))
   expect_true(all(c(2, 3) %in% tree_dims(fit)))
   mse <- mean((fit$predict_matrix(X, 0, 1L) - Y)^2)
   expect_lt(mse, 0.5 * var(Y[, 1]))
 })
 
 test_that("cur_trees_1 draws only leaves with an available threshold (ties)", {
-  # One feature with 10 distinct values, one draw per round (split_try = 1). The root leaf can always be split,
+  # One feature with 10 distinct values, one draw per round (n_try_split_points = 1). The root leaf can always be split,
   # so if leaves are weighted by their available thresholds every round finds a split; with delete_leaves = 0
   # each split adds two leaves to the tree {1}.
   set.seed(2)
@@ -46,7 +60,15 @@ test_that("cur_trees_1 draws only leaves with an available threshold (ties)", {
     RandomPlantedForest,
     Y,
     X,
-    low_params(2, max_interaction = 1, ntrees = 5, splits = splits, split_try = 1, t_try = 1, delete_leaves = 0)
+    low_params(
+      2,
+      max_interaction = 1,
+      n_families = 5,
+      n_splits = splits,
+      n_try_split_points = 1,
+      share_candidates = 1,
+      delete_leaves = 0
+    )
   )
   for (fam in fit$get_model()) {
     i <- which(vapply(fam$variables, function(v) identical(as.numeric(v), 1), TRUE))
@@ -66,13 +88,13 @@ det_data <- function() {
 
 test_that("deterministic cur_trees_1, res_trees and cur_trees_2 fit as well as the other structures", {
   d <- det_data()
-  for (ss in c("cur_trees_1", "res_trees", "cur_trees_2")) {
+  for (ss in c("tree_then_leaf", "target_tree_then_leaf", "tree_then_all_leaves")) {
     fit <- rpf_050(
       x = d$X,
       y = d$y,
       max_interaction = 2,
-      ntrees = 1,
-      splits = 100,
+      n_families = 1,
+      n_splits = 100,
       deterministic = TRUE,
       split_structure = ss
     )

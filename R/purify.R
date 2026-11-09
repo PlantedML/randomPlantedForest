@@ -56,7 +56,7 @@
 #' @export
 #' @importFrom rlang %||%
 #' @examples
-#' rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
+#' rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, n_families = 10, prune = FALSE)
 #' is_purified(rpfit)
 #' purify(rpfit)
 #' is_purified(rpfit)

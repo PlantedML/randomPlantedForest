@@ -6,14 +6,14 @@ to_sim <- function(n = 300, seed = 1) {
   x <- cbind(x1 = runif(n, -1, 1), x2 = runif(n, -1, 1), x3 = runif(n, -1, 1))
   list(x = x, y = x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(n, sd = 0.3))
 }
-to_ladder <- data.frame(split_try = c(10L, 5L, 3L, 1L), t_try = c(0.4, 0.2, 0.1, 0.025))
+to_ladder <- data.frame(n_try_split_points = c(10L, 5L, 3L, 1L), share_candidates = c(0.4, 0.2, 0.1, 0.025))
 to_tune <- function(d, search = 2:3, min_leaf_rows = c(1L, 20L), neighbours = TRUE, ladder = to_ladder, seed = 3, ...) {
   set.seed(seed)
   rpf(
     d$x,
     d$y,
     max_interaction = 2,
-    ntrees = 10,
+    n_families = 10,
     tune = tune_control(ladder = ladder, search = search, min_leaf_rows = min_leaf_rows, neighbours = neighbours),
     ...
   )
@@ -43,23 +43,23 @@ test_that("rpf(tune = ) returns the pruned model of the chosen settings", {
   fin <- tab[tab$final, ]
   expect_equal(nrow(fin), 1L)
   s <- r$tune$settings
-  expect_identical(s, as.list(fin[c("split_try", "t_try", "min_leaf_rows", "splits")]))
+  expect_identical(s, as.list(fin[c("n_try_split_points", "share_candidates", "min_leaf_rows", "n_splits")]))
   # the final forest is the chosen setting's
   pf <- r$fit$params
-  expect_identical(pf$split_try, s$split_try)
-  expect_identical(pf$t_try, s$t_try)
+  expect_identical(pf$split_try, s$n_try_split_points)
+  expect_identical(pf$t_try, s$share_candidates)
   expect_identical(pf$min_leaf_rows, s$min_leaf_rows)
-  expect_identical(pf$splits, s$splits)
-  expect_identical(r$fit$splits_oob$splits, s$splits)
+  expect_identical(pf$splits, s$n_splits)
+  expect_identical(r$fit$splits_oob$n_splits, s$n_splits)
   expect_true(is.finite(fin$oob_rmse) && fin$oob_rmse > 0)
   expect_s3_class(r$tune$control, "rpf_tune_control")
   # the display ran on the chosen model (max_panels = 10 by default)
   expect_false(is.null(r$display))
 })
 
-test_that("a one-point search equals set.seed(s); rpf(splits = NULL, prune = TRUE) at that point", {
+test_that("a one-point search equals set.seed(s); rpf(n_splits = NULL, prune = TRUE) at that point", {
   d <- to_sim()
-  one <- data.frame(split_try = 5L, t_try = 0.2)
+  one <- data.frame(n_try_split_points = 5L, share_candidates = 0.2)
   for (m in c(1L, 20L)) {
     r <- to_tune(d, ladder = one, search = 1, min_leaf_rows = m, seed = 11)
     after_tune <- .Random.seed
@@ -69,10 +69,10 @@ test_that("a one-point search equals set.seed(s); rpf(splits = NULL, prune = TRU
       d$x,
       d$y,
       max_interaction = 2,
-      ntrees = 10,
-      splits = NULL,
-      split_try = 5L,
-      t_try = 0.2,
+      n_families = 10,
+      n_splits = NULL,
+      n_try_split_points = 5L,
+      share_candidates = 0.2,
       min_leaf_rows = m,
       prune = TRUE
     )
@@ -89,10 +89,10 @@ test_that("a one-point search equals set.seed(s); rpf(splits = NULL, prune = TRU
       d$x,
       d$y,
       max_interaction = 2,
-      ntrees = 10,
-      splits = NULL,
-      split_try = 5L,
-      t_try = 0.2,
+      n_families = 10,
+      n_splits = NULL,
+      n_try_split_points = 5L,
+      share_candidates = 0.2,
       min_leaf_rows = m,
       prune = TRUE,
       max_panels = Inf
@@ -107,7 +107,7 @@ test_that("a one-point search equals set.seed(s); rpf(splits = NULL, prune = TRU
     i0 <- which(p0$oob$rule == "D" & p0$oob$tau == 0)
     expect_identical(r$tune$search$oob_rmse_forest, p0$oob$oob_rmse[i0])
     path <- p0$fit$oob_path
-    expect_gte(path$oob_rmse[match(p0$fit$params$splits, path$splits)], r$tune$search$oob_rmse_forest * (1 - 1e-12))
+    expect_gte(path$oob_rmse[match(p0$fit$params$splits, path$n_splits)], r$tune$search$oob_rmse_forest * (1 - 1e-12))
   }
 })
 
@@ -115,22 +115,22 @@ test_that("a one-point search passes split_structure to the forest", {
   d <- to_sim()
   r <- to_tune(
     d,
-    ladder = data.frame(split_try = 5L, t_try = 0.2),
+    ladder = data.frame(n_try_split_points = 5L, share_candidates = 0.2),
     search = 1,
     min_leaf_rows = 1,
     seed = 11,
-    split_structure = "cur_trees_1"
+    split_structure = "tree_then_leaf"
   )
   set.seed(11)
   p <- rpf(
     d$x,
     d$y,
     max_interaction = 2,
-    ntrees = 10,
-    splits = NULL,
-    split_try = 5L,
-    t_try = 0.2,
-    split_structure = "cur_trees_1",
+    n_families = 10,
+    n_splits = NULL,
+    n_try_split_points = 5L,
+    share_candidates = 0.2,
+    split_structure = "tree_then_leaf",
     prune = TRUE
   )
   expect_identical(r$fit$params$split_structure, "cur_trees_1")
@@ -142,35 +142,43 @@ test_that("the search table is complete: every forest of the three steps, each s
   d <- to_sim()
   r <- to_tune(d)
   tab <- r$tune$search
-  key <- paste(tab$split_try, tab$t_try, tab$min_leaf_rows)
+  key <- paste(tab$n_try_split_points, tab$share_candidates, tab$min_leaf_rows)
   expect_false(anyDuplicated(key) > 0)
   # step 1: the searched points at the first m
   expect_length(r$tune$steps$step1$candidates, 2L)
   expect_true(all(tab$min_leaf_rows[tab$step == 1] == 1L))
-  expect_setequal(tab$t_try[tab$step == 1], to_ladder$t_try[2:3])
+  expect_setequal(tab$share_candidates[tab$step == 1], to_ladder$share_candidates[2:3])
   expect_equal(sum(tab$chosen_step1, na.rm = TRUE), 1L)
   i1 <- which(tab$chosen_step1)
   # step 2: every m at the chosen point
   expect_length(r$tune$steps$step2$candidates, 2L)
-  at_i1 <- tab$split_try == tab$split_try[i1] & tab$t_try == tab$t_try[i1]
+  at_i1 <- tab$n_try_split_points == tab$n_try_split_points[i1] & tab$share_candidates == tab$share_candidates[i1]
   expect_setequal(tab$min_leaf_rows[at_i1], c(1L, 20L))
   expect_equal(sum(tab$chosen_step2, na.rm = TRUE), 1L)
   m2 <- tab$min_leaf_rows[which(tab$chosen_step2)]
   # step 3: the chosen point's ladder neighbours at the chosen m are there
-  li <- match(paste(tab$split_try[i1], tab$t_try[i1]), paste(to_ladder$split_try, to_ladder$t_try))
+  li <- match(
+    paste(tab$n_try_split_points[i1], tab$share_candidates[i1]),
+    paste(to_ladder$n_try_split_points, to_ladder$share_candidates)
+  )
   nb <- intersect(c(li - 1L, li + 1L), seq_len(nrow(to_ladder)))
   for (j in nb) {
     expect_true(any(
-      tab$split_try == to_ladder$split_try[j] & tab$t_try == to_ladder$t_try[j] & tab$min_leaf_rows == m2
+      tab$n_try_split_points == to_ladder$n_try_split_points[j] &
+        tab$share_candidates == to_ladder$share_candidates[j] &
+        tab$min_leaf_rows == m2
     ))
   }
   expect_equal(sum(tab$chosen_step3, na.rm = TRUE), 1L)
   expect_true(tab$final[which(tab$chosen_step3)])
   expect_equal(sum(tab$final), 1L)
-  expect_true(all(is.finite(tab$oob_rmse) & tab$splits >= 1 & tab$stopped_at >= tab$splits))
+  expect_true(all(is.finite(tab$oob_rmse) & tab$n_splits >= 1 & tab$stopped_at >= tab$n_splits))
   # each step chose the lowest score among its candidates (ties: greedier, larger m)
   keys <- paste0(
-    match(paste(tab$split_try, tab$t_try), paste(to_ladder$split_try, to_ladder$t_try)),
+    match(
+      paste(tab$n_try_split_points, tab$share_candidates),
+      paste(to_ladder$n_try_split_points, to_ladder$share_candidates)
+    ),
     "_",
     tab$min_leaf_rows
   )
@@ -211,18 +219,18 @@ test_that("TRUE and \"quick\" are the documented controls; the quick preset grow
   expect_identical(resolve(TRUE, NULL), tune_control())
   q <- resolve("quick", NULL)
   expect_identical(q, tune_control(search = c(5, 7), min_leaf_rows = 1, neighbours = FALSE))
-  expect_identical(q$ladder$split_try[q$search], c(3L, 1L))
-  expect_identical(q$ladder$t_try[q$search], c(0.1, 0.025))
+  expect_identical(q$ladder$n_try_split_points[q$search], c(3L, 1L))
+  expect_identical(q$ladder$share_candidates[q$search], c(0.1, 0.025))
   expect_identical(tune_control()$search, 3:8)
-  expect_identical(tune_control()$ladder[3, "t_try"], 0.4)
+  expect_identical(tune_control()$ladder[3, "share_candidates"], 0.4)
   expect_identical(tune_control()$ladder, greediness_ladder())
 
   skip_on_cran()
   d <- to_sim()
   set.seed(2)
-  r <- rpf(d$x, d$y, max_interaction = 2, ntrees = 10, tune = "quick")
+  r <- rpf(d$x, d$y, max_interaction = 2, n_families = 10, tune = "quick")
   tab <- r$tune$search
-  expect_identical(tab$t_try, c(0.1, 0.025))
+  expect_identical(tab$share_candidates, c(0.1, 0.025))
   expect_identical(tab$min_leaf_rows, c(1L, 1L))
   expect_identical(names(r$tune$steps), "step1")
   expect_identical(which(tab$final), which.min(tab$oob_rmse))
@@ -234,9 +242,9 @@ test_that("the formula interface tunes the same as x/y; print() and marshal show
   df <- data.frame(d$x, y = d$y)
   ctl <- tune_control(ladder = to_ladder, search = 2:3, min_leaf_rows = 1L, neighbours = FALSE)
   set.seed(5)
-  a <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 10, tune = ctl)
+  a <- rpf(y ~ ., data = df, max_interaction = 2, n_families = 10, tune = ctl)
   set.seed(5)
-  b <- rpf(d$x, d$y, max_interaction = 2, ntrees = 10, tune = ctl)
+  b <- rpf(d$x, d$y, max_interaction = 2, n_families = 10, tune = ctl)
   cols <- setdiff(names(a$tune$search), "seconds")
   expect_identical(a$tune$search[cols], b$tune$search[cols])
   expect_identical(predict(a, df)$.pred, predict(b, d$x)$.pred)
@@ -249,25 +257,25 @@ test_that("the formula interface tunes the same as x/y; print() and marshal show
 
 test_that("rpf(tune = ) and tune_control() check their arguments", {
   d <- to_sim(n = 100)
-  f <- function(...) rpf_050(d$x, d$y, ntrees = 10, ...)
+  f <- function(...) rpf_050(d$x, d$y, n_families = 10, ...)
   expect_error(f(tune = "full"), "tune")
   expect_error(f(tune = NA), "tune")
-  expect_error(f(tune = TRUE, split_try = 3), "split_try")
-  expect_error(f(tune = TRUE, t_try = 0.1), "t_try")
+  expect_error(f(tune = TRUE, n_try_split_points = 3), "n_try_split_points")
+  expect_error(f(tune = TRUE, share_candidates = 0.1), "share_candidates")
   expect_error(f(tune = TRUE, min_leaf_rows = 5), "min_leaf_rows")
   # even the default value: the message says that tune searches it
   msg <- tryCatch(f(tune = TRUE, min_leaf_rows = 1), error = conditionMessage)
   msg <- gsub("\\s+", " ", cli::ansi_strip(msg))
   expect_match(msg, "searches", fixed = TRUE)
   expect_match(msg, "don't give `min_leaf_rows`, even at its default", fixed = TRUE)
-  expect_error(f(tune = TRUE, splits = 30), "splits")
+  expect_error(f(tune = TRUE, n_splits = 30), "splits")
   expect_error(f(tune = TRUE, prune = FALSE), "prune")
   expect_error(f(tune = TRUE, deterministic = TRUE), "deterministic")
-  expect_error(rpf(d$x, d$y, ntrees = 5, tune = TRUE), "at least 10")
-  expect_error(f(tune = TRUE, split_structure = "hist"), "min_leaf_rows")
+  expect_error(rpf(d$x, d$y, n_families = 5, tune = TRUE), "at least 10")
+  expect_error(f(tune = TRUE, split_structure = "leaf_binned"), "min_leaf_rows")
   expect_error(f(tune = "quick", oob_path = 1:3), "oob_path")
-  expect_error(tune_control(ladder = data.frame(a = 1)), "split_try")
-  expect_error(tune_control(ladder = data.frame(split_try = 1, t_try = 0)), "positive")
+  expect_error(tune_control(ladder = data.frame(a = 1)), "n_try_split_points")
+  expect_error(tune_control(ladder = data.frame(n_try_split_points = 1, share_candidates = 0)), "positive")
   expect_error(tune_control(search = 11), "search")
   expect_error(tune_control(search = c(3, 3)), "search")
   expect_error(tune_control(min_leaf_rows = 0), "min_leaf_rows")

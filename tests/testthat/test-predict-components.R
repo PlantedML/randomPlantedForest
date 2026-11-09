@@ -159,7 +159,7 @@ test_that(".predict_single_component is consistent with predictor order", {
 })
 
 test_that("duplicated rows get the same components as their originals", {
-  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, n_families = 10)
   idx <- c(3, 1, 3, 2, 1, 1)
 
   once <- predict_components(rp, mtcars[1:3, ])
@@ -172,7 +172,7 @@ test_that("duplicated rows get the same components as their originals", {
 test_that("predict_components() takes a matrix and leaves a data.frame new_data unchanged", {
   set.seed(54)
   x <- as.matrix(mtcars[, 2:6])
-  fit <- rpf_050(x, mtcars$mpg, max_interaction = 2, ntrees = 8, splits = 30)
+  fit <- rpf_050(x, mtcars$mpg, max_interaction = 2, n_families = 8, n_splits = 30)
   nd <- mtcars[1:12, 2:6]
   nd_before <- nd
 

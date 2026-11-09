@@ -25,7 +25,7 @@ rect_newdata <- function(dat, n = 300) {
 
 fit_rect <- function(dat, max_interaction, ...) {
   set.seed(47)
-  rpf_050(y ~ x1 + x2 + x3 + x4, data = dat, max_interaction = max_interaction, ntrees = 12, splits = 40, ...)
+  rpf_050(y ~ x1 + x2 + x3 + x4, data = dat, max_interaction = max_interaction, n_families = 12, n_splits = 40, ...)
 }
 
 expect_same_components <- function(a, b, tol = 1e-10) {
@@ -87,7 +87,7 @@ test_that("mode 2 equals mode 1 for multiclass classification (value_size > 1)",
   for (loss in c("L2", "logit")) {
     fits <- lapply(1:2, function(i) {
       set.seed(48)
-      rpf_050(y ~ x1 + x2 + x3, data = dat, max_interaction = 3, ntrees = 8, splits = 30, loss = loss)
+      rpf_050(y ~ x1 + x2 + x3, data = dat, max_interaction = 3, n_families = 8, n_splits = 30, loss = loss)
     })
     pred_unpurified <- predict(fits[[2]], nd, type = "numeric")
     purify(fits[[1]], mode = 1L)

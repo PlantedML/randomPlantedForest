@@ -10,7 +10,7 @@ prune_sim <- function(n = 400, seed = 11) {
 
 prune_fit <- function(d, ...) {
   set.seed(5)
-  rpf_050(d$x, d$y, max_interaction = 2, ntrees = 20, splits = 40, ...)
+  rpf_050(d$x, d$y, max_interaction = 2, n_families = 20, n_splits = 40, ...)
 }
 
 test_that("CV pruning keeps the true components and drops the false ones", {
@@ -161,7 +161,7 @@ test_that("the formula interface takes the outcome from data, and print() works"
   d <- prune_sim(n = 200)
   df <- data.frame(d$x, y = d$y)
   set.seed(5)
-  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, ntrees = 5, splits = 20)
+  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, n_families = 5, n_splits = 20)
   pr <- prune_components(fit, df, rule = "D", tau = c(0, 0.01), select_by = "cv", folds = 3, seed = 1)
   expect_equal(nrow(pr$cv), 2)
   expect_length(unique(pr$fold_id), 3)
@@ -201,7 +201,7 @@ test_that("factor predictors are coded per fold, as rpf() codes them", {
   df <- data.frame(d$x, g = factor(sample(letters[1:4], 300, replace = TRUE)))
   df$y <- d$y + c(a = 0, b = 1, c = -1, d = 2)[as.character(df$g)]
   set.seed(5)
-  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30)
+  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, n_families = 10, n_splits = 30)
   pr <- prune_components(fit, df, select_by = "cv", folds = 3, seed = 2)
   expect_true("g" %in% names(pr$beta))
   expect_equal(nrow(predict(pr, df)), 300)
@@ -211,7 +211,7 @@ test_that("factor predictors are coded per fold, as rpf() codes them", {
   tr <- ns$prune_training_data(fit, df, NULL)
   refit <- ns$prune_refit(fit, tr$predictors, tr$y, rows, seed = 7, nthreads = 1L)
   set.seed(7)
-  direct <- rpf_050(y ~ ., data = df[rows, ], max_interaction = 2, ntrees = 10, splits = 30)
+  direct <- rpf_050(y ~ ., data = df[rows, ], max_interaction = 2, n_families = 10, n_splits = 30)
   expect_identical(refit$factor_levels, direct$factor_levels)
   expect_identical(predict(refit, df), predict(direct, df))
 })
@@ -239,7 +239,7 @@ test_that("predict_components() selects the right components with a factor befor
   df <- data.frame(g = factor(sample(letters[1:3], 300, replace = TRUE)), x1 = runif(300), x2 = runif(300))
   df$y <- 2 * (df$g == "b") + df$x1 + df$x1 * df$x2 + rnorm(300, sd = 0.2)
   set.seed(5)
-  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30)
+  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, n_families = 10, n_splits = 30)
   pr <- prune_components(fit, df, rule = "D", tau = 0)
   all_m <- predict_components(pr, df)$m
   for (p in list("x1", "g", c("g", "x2"))) {
@@ -258,11 +258,11 @@ test_that("the fold fits use all parameters of the forest", {
   d <- prune_sim(n = 300)
   args <- list(
     max_interaction = 3,
-    ntrees = 4,
-    splits = 25,
-    split_structure = "res_trees",
-    split_try = 4,
-    t_try = 0.7,
+    n_families = 4,
+    n_splits = 25,
+    split_structure = "target_tree_then_leaf",
+    n_try_split_points = 4,
+    share_candidates = 0.7,
     max_candidates = 20,
     split_decay_rate = 0.3,
     delete_leaves = FALSE
@@ -284,8 +284,8 @@ test_that("the fold fits use all parameters of the forest", {
       d$x,
       d$y,
       max_interaction = 2,
-      ntrees = 20,
-      splits = 40,
+      n_families = 20,
+      n_splits = 40,
       interaction_constraints = list("x1", c("x2", "x3"), "x4")
     )
     pr <- prune_components(cfit, d$x, d$y, select_by = "cv", fold_id = rep_len(1:3, nrow(d$x)), seed = 3)
@@ -298,7 +298,7 @@ test_that("the fold fits use all parameters of the forest", {
 test_that("a deterministic forest is pruned by CV", {
   d <- prune_sim(n = 200)
   set.seed(5)
-  fit <- rpf_050(d$x, d$y, max_interaction = 2, ntrees = 1, splits = 20, deterministic = TRUE)
+  fit <- rpf_050(d$x, d$y, max_interaction = 2, n_families = 1, n_splits = 20, deterministic = TRUE)
   # it has no out-of-bag rows: the default scores by CV
   pr <- prune_components(fit, d$x, d$y, folds = 3, seed = 1)
   expect_identical(pr$select_by, "cv")
@@ -332,7 +332,7 @@ test_that("bad input gives clear errors", {
   # a classification forest is pruned (here by CV: 5 families), on its factor outcome
   yc <- factor(d$y > 1)
   set.seed(1)
-  cfit <- rpf_050(d$x, yc, ntrees = 5, splits = 10)
+  cfit <- rpf_050(d$x, yc, n_families = 5, n_splits = 10)
   expect_s3_class(suppressMessages(prune_components(cfit, d$x, yc, max_panels = Inf)), "rpf_pruned")
   expect_error(prune_components(cfit, d$x, as.numeric(yc)), "factor outcome")
   expect_error(prune_components(fit, d$x, yc), "numeric outcome")
@@ -390,7 +390,7 @@ test_that("model_share of a three-class model is its share of the centred scores
   s <- 2 * x[, 1] + 3 * x[, 2] * x[, 3] + rnorm(300, sd = 0.3)
   y <- cut(s, quantile(s, c(0, 1 / 3, 2 / 3, 1)), include.lowest = TRUE, labels = c("a", "b", "c"))
   set.seed(4)
-  fit <- rpf_050(x, y, max_interaction = 2, ntrees = 10, splits = 30)
+  fit <- rpf_050(x, y, max_interaction = 2, n_families = 10, n_splits = 30)
   pr <- prune_components(fit, x, y, rule = "R", tau = 0.01, max_panels = Inf)
   k <- pr$components$kept
   ms <- pr$components$model_share[k]

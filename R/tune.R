@@ -1,20 +1,20 @@
 #' The greediness ladder of the out-of-bag tuning
 #'
-#' The points of greediness that `rpf(tune = )` searches: pairs of `split_try` (thresholds evaluated per split
-#' candidate) and `t_try` (share of the possible splits drawn as candidates in each round), greediest first. Each step
-#' down the ladder halves `t_try` and `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125, except the
-#' first, which takes `t_try` from 1 to 0.8. Row 3 is the other split structures' default, 10 / 0.4; row 5 is
-#' [rpf()]'s default for `split_structure = "leaves"`, 3 / 0.1.
+#' The points of greediness that `rpf(tune = )` searches: pairs of `n_try_split_points` (split points tried per split
+#' candidate) and `share_candidates` (share of the possible splits drawn as candidates in each round), greediest
+#' first. Each step down the ladder halves `share_candidates` and `n_try_split_points` (rounded up, at least 1), from
+#' 40 / 1 to 1 / 0.003125, except the first, which takes `share_candidates` from 1 to 0.8. Row 3 is the other split
+#' structures' default, 10 / 0.4; row 5 is [rpf()]'s default for `split_structure = "leaf"`, 3 / 0.1.
 #'
-#' @return A `data.frame` with columns `split_try` and `t_try`, one row per point, greediest first.
+#' @return A `data.frame` with columns `n_try_split_points` and `share_candidates`, one row per point, greediest first.
 #' @seealso [tune_control()], [rpf()]
 #' @export
 #' @examples
 #' greediness_ladder()
 greediness_ladder <- function() {
   data.frame(
-    split_try = c(40L, 20L, 10L, 5L, 3L, 2L, 1L, 1L, 1L, 1L),
-    t_try = c(1, 0.8, 0.4, 0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625, 0.003125)
+    n_try_split_points = c(40L, 20L, 10L, 5L, 3L, 2L, 1L, 1L, 1L, 1L),
+    share_candidates = c(1, 0.8, 0.4, 0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625, 0.003125)
   )
 }
 
@@ -26,7 +26,7 @@ greediness_ladder <- function() {
 #' 2. every `min_leaf_rows` at the point chosen in step 1 (skipped if only one is given);
 #' 3. the two ladder neighbours of that point at the `min_leaf_rows` chosen in step 2 (if `neighbours`).
 #'
-#' Every forest has its number of splits chosen out of bag while it grows (as `rpf(splits = NULL)`) and is pruned
+#' Every forest has its number of splits chosen out of bag while it grows (as `rpf(n_splits = NULL)`) and is pruned
 #' by [prune_components()] with its defaults, without the display. A step chooses, among all forests grown at the
 #' coordinate it varies, the one whose pruned model has the lowest corrected out-of-bag RMSE (ties: the greedier
 #' point, the larger `min_leaf_rows`). Step 3 chooses among every forest grown at the chosen `min_leaf_rows`, so with
@@ -35,12 +35,13 @@ greediness_ladder <- function() {
 #' `rpf(tune = TRUE)` is `tune_control()`, and `rpf(tune = "quick")` is
 #' `tune_control(search = c(5, 7), min_leaf_rows = 1, neighbours = FALSE)`: two forests, 3 / 0.1 and 1 / 0.025.
 #'
-#' @param ladder `[data.frame: greediness_ladder()]`: The points of greediness, greediest first: columns `split_try`
-#'   (whole numbers, at least 1) and `t_try` (in `(0, 1]`).
+#' @param ladder `[data.frame: greediness_ladder()]`: The points of greediness, greediest first: columns
+#'   `n_try_split_points` (whole numbers, at least 1) and `share_candidates` (in `(0, 1]`). The column names of 0.5.0,
+#'   `split_try` and `t_try`, still work, with a deprecation warning.
 #' @param search `[integer: 3:8]`: The rows of `ladder` searched in step 1 (on the default ladder from 10 / 0.4 to
 #'   1 / 0.0125).
 #' @param min_leaf_rows `[integer: c(1, 5, 20, 100)]`: The values of [rpf()]'s `min_leaf_rows` searched in step 2;
-#'   the first one is that of step 1. Values above 1 need `split_structure = "leaves"`.
+#'   the first one is that of step 1. Values above 1 need `split_structure = "leaf"`.
 #' @param neighbours `[logical(1): TRUE]`: Whether to run step 3.
 #'
 #' @return An object of class `rpf_tune_control`, a list with the four settings, for `rpf(tune = )`.
@@ -60,7 +61,7 @@ greediness_ladder <- function() {
 #'   x,
 #'   y,
 #'   max_interaction = 2,
-#'   ntrees = 10,
+#'   n_families = 10,
 #'   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 #' )
 #' tuned$tune$search
@@ -72,13 +73,25 @@ tune_control <- function(
   neighbours = TRUE
 ) {
   checkmate::assert_data_frame(ladder, min.rows = 1)
-  if (!all(c("split_try", "t_try") %in% names(ladder))) {
-    cli::cli_abort("{.arg ladder} needs the columns {.code split_try} and {.code t_try}.")
+  ladder <- ladder_renamed(ladder)
+  if (!all(c("n_try_split_points", "share_candidates") %in% names(ladder))) {
+    cli::cli_abort("{.arg ladder} needs the columns {.code n_try_split_points} and {.code share_candidates}.")
   }
-  checkmate::assert_integerish(ladder$split_try, lower = 1, any.missing = FALSE, .var.name = "ladder$split_try")
-  checkmate::assert_numeric(ladder$t_try, lower = 0, upper = 1, any.missing = FALSE, .var.name = "ladder$t_try")
-  if (any(ladder$t_try <= 0)) {
-    cli::cli_abort("{.code ladder$t_try} must be positive.")
+  checkmate::assert_integerish(
+    ladder$n_try_split_points,
+    lower = 1,
+    any.missing = FALSE,
+    .var.name = "ladder$n_try_split_points"
+  )
+  checkmate::assert_numeric(
+    ladder$share_candidates,
+    lower = 0,
+    upper = 1,
+    any.missing = FALSE,
+    .var.name = "ladder$share_candidates"
+  )
+  if (any(ladder$share_candidates <= 0)) {
+    cli::cli_abort("{.code ladder$share_candidates} must be positive.")
   }
   checkmate::assert_integerish(search, lower = 1, any.missing = FALSE, min.len = 1, unique = TRUE)
   if (any(search > nrow(ladder))) {
@@ -88,13 +101,43 @@ tune_control <- function(
   checkmate::assert_flag(neighbours)
   structure(
     list(
-      ladder = data.frame(split_try = as.integer(ladder$split_try), t_try = as.numeric(ladder$t_try)),
+      ladder = data.frame(
+        n_try_split_points = as.integer(ladder$n_try_split_points),
+        share_candidates = as.numeric(ladder$share_candidates)
+      ),
       search = sort(as.integer(search)),
       min_leaf_rows = as.integer(min_leaf_rows),
       neighbours = neighbours
     ),
     class = "rpf_tune_control"
   )
+}
+
+# A ladder with the old column names (split_try, t_try): renamed, with a deprecation warning; both names are an error
+ladder_renamed <- function(ladder, call = rlang::caller_env()) {
+  old <- intersect(c("split_try", "t_try"), names(ladder))
+  if (length(old) == 0) {
+    return(ladder)
+  }
+  new <- unname(renamed_args[old])
+  both <- old[new %in% names(ladder)]
+  if (length(both) > 0) {
+    both_new <- unname(renamed_args[both])
+    cli::cli_abort(
+      "{.arg ladder} has old and new column names ({.code {c(both, both_new)}}): give one.",
+      call = call
+    )
+  }
+  names(ladder)[match(old, names(ladder))] <- new
+  cli::cli_warn(
+    c(
+      "{.fn tune_control}: the column names {.code split_try} and {.code t_try} of randomPlantedForest 0.5.0 are deprecated.",
+      "i" = "Name the columns of {.arg ladder} {.code n_try_split_points} and {.code share_candidates}."
+    ),
+    class = c("rpf_deprecated", "lifecycle_warning_deprecated"),
+    call = call
+  )
+  ladder
 }
 
 # rpf()'s `tune`: NULL (no tuning) or an rpf_tune_control
@@ -119,27 +162,27 @@ tune_resolve <- function(tune, call) {
 
 # Which of the settings that `tune` takes over the user gave in the call of an rpf() method (its environment)
 tune_given <- function(env) {
-  args <- c("splits", "split_try", "t_try", "min_leaf_rows", "prune")
+  args <- c("n_splits", "n_try_split_points", "share_candidates", "min_leaf_rows", "prune")
   # an argument given as NULL counts as not given (NULL is the default of each)
   vapply(args, function(a) !eval(call("missing", as.name(a)), env) && !is.null(get(a, envir = env)), logical(1))
 }
 
 # The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none
 # of the settings the search chooses given
-tune_check_call <- function(control, given, splits, prune, deterministic, ntrees, split_structure, call) {
+tune_check_call <- function(control, given, n_splits, prune, deterministic, n_families, split_structure, call) {
   if (deterministic) {
     cli::cli_abort(
       "{.arg tune} needs out-of-bag rows: it is not available with {.code deterministic = TRUE}.",
       call = call
     )
   }
-  set <- intersect(c("split_try", "t_try", "min_leaf_rows"), names(given)[given])
+  set <- intersect(c("n_try_split_points", "share_candidates", "min_leaf_rows"), names(given)[given])
   if (length(set) > 0) {
     cli::cli_abort(
       c(
         paste(
-          "{.arg tune} searches {.arg split_try} and {.arg t_try} (the greediness ladder) and {.arg min_leaf_rows}:",
-          "don't give {.arg {set}}, even at {?its/their} default{?s}."
+          "{.arg tune} searches {.arg n_try_split_points} and {.arg share_candidates} (the greediness ladder)",
+          "and {.arg min_leaf_rows}: don't give {.arg {set}}, even at {?its/their} default{?s}."
         ),
         "i" = paste(
           "Set the values to search with {.fn tune_control}, for example {.code tune_control(min_leaf_rows = 1)}",
@@ -149,9 +192,9 @@ tune_check_call <- function(control, given, splits, prune, deterministic, ntrees
       call = call
     )
   }
-  if (given[["splits"]] && !is.null(splits)) {
+  if (given[["n_splits"]] && !is.null(n_splits)) {
     cli::cli_abort(
-      "{.arg tune} chooses {.arg splits} out of bag ({.code splits = NULL}): don't give a number.",
+      "{.arg tune} chooses {.arg n_splits} out of bag ({.code n_splits = NULL}): don't give a number.",
       call = call
     )
   }
@@ -161,19 +204,19 @@ tune_check_call <- function(control, given, splits, prune, deterministic, ntrees
       call = call
     )
   }
-  if (ntrees < prune_oob_min_ntrees) {
+  if (n_families < prune_oob_min_ntrees) {
     cli::cli_abort(
       c(
-        "{.arg tune} needs at least {prune_oob_min_ntrees} tree families, not {ntrees}.",
+        "{.arg tune} needs at least {prune_oob_min_ntrees} tree families, not {n_families}.",
         "i" = "Every forest is pruned out of bag, which needs out-of-bag rows of several families."
       ),
       call = call
     )
   }
-  if (split_structure != "leaves" && any(control$min_leaf_rows > 1)) {
+  if (split_structure != "leaf" && any(control$min_leaf_rows > 1)) {
     cli::cli_abort(
       c(
-        "{.arg tune} searches {.arg min_leaf_rows} above 1, which needs {.code split_structure = \"leaves\"}.",
+        "{.arg tune} searches {.arg min_leaf_rows} above 1, which needs {.code split_structure = \"leaf\"}.",
         "i" = "Use {.code tune = tune_control(min_leaf_rows = 1)} with {.code split_structure = \"{split_structure}\"}."
       ),
       call = call
@@ -182,18 +225,19 @@ tune_check_call <- function(control, given, splits, prune, deterministic, ntrees
   invisible(TRUE)
 }
 
-# The search of rpf(tune = ) on rpf_bridge()'s checked arguments (`params` with splits = NA: chosen out of bag).
+# The search of rpf(tune = ) on rpf_bridge()'s checked arguments (`params` with splits = NA: chosen out of bag; the
+# params keep the old names, see renamed_args).
 #
-# Every forest is grown from the random number state on entry, by the fit of rpf(splits = NULL) at its point of the
+# Every forest is grown from the random number state on entry, by the fit of rpf(n_splits = NULL) at its point of the
 # ladder and min_leaf_rows, and pruned by prune_components()' defaults without the display (rpf_prune(), max_panels =
 # Inf), which draws its seed from the stream after the fit as rpf(prune = TRUE) does. Its score is the corrected OOB
 # RMSE of that pruned model, the score prune_components() chose it by. The chosen forest is then pruned again from the
-# same state, now with the display at `max_panels`: so a one-point search returns what set.seed(s); rpf(splits = NULL,
+# same state, now with the display at `max_panels`: so a one-point search returns what set.seed(s); rpf(n_splits = NULL,
 # prune = TRUE, ...) returns, and leaves the stream where that call leaves it.
 #
 # Returns the rpf_pruned model of the chosen forest, with `tune`: `search` (tune_oob_table()), `steps` (each step's
-# candidates and choice, as keys "<ladder row>_<min_leaf_rows>"), `settings` (the chosen split_try, t_try,
-# min_leaf_rows, splits), `control` and `seconds`.
+# candidates and choice, as keys "<ladder row>_<min_leaf_rows>"), `settings` (the chosen n_try_split_points,
+# share_candidates, min_leaf_rows, n_splits), `control` and `seconds`.
 tune_run <- function(processed, outcomes, predictors, params, control, max_panels, export_forest, call) {
   ladder <- control$ladder
   t_all <- proc.time()[["elapsed"]]
@@ -211,8 +255,8 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
   fit_at <- function(i, m) {
     assign(".Random.seed", rng0, envir = globalenv())
     p <- params
-    p$split_try <- ladder$split_try[i]
-    p$t_try <- ladder$t_try[i]
+    p$split_try <- ladder$n_try_split_points[i]
+    p$t_try <- ladder$share_candidates[i]
     p$min_leaf_rows <- as.integer(m)
     withCallingHandlers(
       rpf_fit(
@@ -251,10 +295,10 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
     rows[[k]] <<- list(
       ladder = i,
       step = step,
-      split_try = ladder$split_try[i],
-      t_try = ladder$t_try[i],
+      n_try_split_points = ladder$n_try_split_points[i],
+      share_candidates = ladder$share_candidates[i],
       min_leaf_rows = as.integer(m),
-      splits = as.integer(res$params$splits),
+      n_splits = as.integer(res$params$splits),
       stopped_at = as.integer(res$splits_oob$stopped_at),
       capped = isTRUE(res$splits_oob$capped),
       oob_rmse_forest = oob_table_rmse(pr$oob)[j0],
@@ -335,7 +379,7 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
     cli::cli_warn(
       c(
         "The chosen forest stopped growing at the cap ({fr$stopped_at} splits) while its out-of-bag error was still falling.",
-        "i" = "A fit with more {.arg splits} and {.code oob_path = TRUE} shows whether more splits help."
+        "i" = "A fit with more {.arg n_splits} and {.code oob_path = TRUE} shows whether more splits help."
       ),
       call = call
     )
@@ -343,7 +387,7 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
   pruned$tune <- list(
     search = tune_oob_table(rows, steps, final),
     steps = steps,
-    settings = fr[c("split_try", "t_try", "min_leaf_rows", "splits")],
+    settings = fr[c("n_try_split_points", "share_candidates", "min_leaf_rows", "n_splits")],
     control = control,
     seconds = proc.time()[["elapsed"]] - t_all
   )
@@ -367,10 +411,10 @@ tune_oob_choose <- function(mse, simpler) {
 tune_oob_table <- function(rows, steps, final) {
   cols <- c(
     "step",
-    "split_try",
-    "t_try",
+    "n_try_split_points",
+    "share_candidates",
     "min_leaf_rows",
-    "splits",
+    "n_splits",
     "stopped_at",
     "capped",
     "oob_rmse_forest",

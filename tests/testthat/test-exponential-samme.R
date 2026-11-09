@@ -21,11 +21,11 @@ samme_family <- function(d, structure, deterministic) {
     data = d,
     loss = "exponential",
     max_interaction = 3,
-    ntrees = 1,
-    splits = 40,
+    n_families = 1,
+    n_splits = 40,
     split_structure = structure,
-    split_try = 3,
-    t_try = 0.3,
+    n_try_split_points = 3,
+    share_candidates = 0.3,
     deterministic = deterministic,
     prune = FALSE
   )
@@ -42,7 +42,7 @@ samme_family <- function(d, structure, deterministic) {
 }
 
 test_that("multiclass exponential (SAMME): each row's weight is exp(-g_c) of its predicted scores", {
-  structures <- c("leaves", "cur_trees_1", "cur_trees_2", "res_trees", "hist")
+  structures <- c("leaf", "tree_then_leaf", "tree_then_all_leaves", "target_tree_then_leaf", "leaf_binned")
   for (K in 3:4) {
     d <- samme_data(K)
     for (s in structures) {
@@ -67,7 +67,7 @@ test_that("multiclass exponential (SAMME): each row's weight is exp(-g_c) of its
 test_that("binary exponential: the weight is exp(-y g / 2) of the predicted score (master's code)", {
   d <- samme_data(2)
   for (det in c(FALSE, TRUE)) {
-    f <- samme_family(d, "leaves", det)
+    f <- samme_family(d, "leaf", det)
     expect_identical(dim(f$w), c(nrow(d), 1L))
     y <- ifelse(f$class == 2, 1, -1)
     expect_lt(max(abs(f$w[, 1] / exp(-y * f$g[, 1] / 2) - 1)), 1e-12)
@@ -83,10 +83,10 @@ test_that("the multiclass exponential's first leaf step is SAMME's: log p_k - me
     data = d,
     loss = "exponential",
     max_interaction = 1,
-    ntrees = 1,
-    splits = 1,
-    split_try = 3,
-    t_try = 1,
+    n_families = 1,
+    n_splits = 1,
+    n_try_split_points = 3,
+    share_candidates = 1,
     deterministic = TRUE,
     prune = FALSE
   )

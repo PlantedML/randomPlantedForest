@@ -39,7 +39,7 @@ test_that("purification does not alter predictions (with effect)", {
   test <- mtcars[21:32, 1:4]
 
   set.seed(23)
-  rpfit <- rpf_050(mpg ~ ., data = train, max_interaction = 3, ntrees = 30)
+  rpfit <- rpf_050(mpg ~ ., data = train, max_interaction = 3, n_families = 30)
   pred_pre <- predict(rpfit, test)
 
   # Not purified
@@ -56,7 +56,7 @@ test_that("purification does not alter predictions (with effect)", {
 })
 
 test_that("purify() purifies in place, returns invisibly and rejects unknown arguments", {
-  rp <- rpf_050(mpg ~ cyl + wt + hp, data = mtcars, max_interaction = 2, ntrees = 5)
+  rp <- rpf_050(mpg ~ cyl + wt + hp, data = mtcars, max_interaction = 2, n_families = 5)
   expect_false(is_purified(rp))
   expect_invisible(purify(rp))
   expect_true(is_purified(rp))
@@ -71,7 +71,7 @@ test_that("purify(maxp_interaction = k) keeps predict(), and predict_components(
   Xt <- X[1:100, ]
   for (mode in 1:2) {
     set.seed(1)
-    fit <- rpf_050(x = X, y = y, max_interaction = 4, ntrees = 10, splits = 60)
+    fit <- rpf_050(x = X, y = y, max_interaction = 4, n_families = 10, n_splits = 60)
     p0 <- predict(fit, Xt)
     purify(fit, maxp_interaction = 2, mode = mode)
     # the whole forest's prediction, not the intercept plus the components of order <= 2
@@ -92,7 +92,7 @@ test_that("purify(maxp_interaction = k) keeps predict(), and predict_components(
 
 test_that("purify(maxp_interaction = k) keeps predict() for multiclass classification", {
   set.seed(5)
-  fit <- rpf_050(Species ~ ., data = iris, max_interaction = 3, ntrees = 10, loss = "L2")
+  fit <- rpf_050(Species ~ ., data = iris, max_interaction = 3, n_families = 10, loss = "L2")
   p0 <- predict(fit, iris, type = "numeric")
   purify(fit, maxp_interaction = 1)
   expect_identical(predict(fit, iris, type = "numeric"), p0)

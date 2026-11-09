@@ -3,9 +3,9 @@ test_that("C-level functionality works", {
   train <- mtcars[1:20, ]
   test <- mtcars[21:32, ]
 
-  ntrees <- 35
+  n_families <- 35
   set.seed(23)
-  rpfit <- rpf_050(mpg ~ ., data = train, max_interaction = 3, ntrees = ntrees)
+  rpfit <- rpf_050(mpg ~ ., data = train, max_interaction = 3, n_families = n_families)
   pred <- predict(rpfit, test)
 
   mse <- rpfit$fit$MSE(as.matrix(pred$.pred), as.matrix(test$mpg))
@@ -17,7 +17,7 @@ test_that("C-level functionality works", {
 
   mod <- rpfit$fit$get_model()
   expect_true(inherits(mod, "list"))
-  expect_equal(length(mod), ntrees) # length is number of trees
+  expect_equal(length(mod), n_families) # length is number of trees
 
   # FIXME: Cosmetic issue but should be addressed at some point
   # This should be assignable instead of printing to stdout

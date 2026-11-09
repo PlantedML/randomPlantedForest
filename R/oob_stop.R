@@ -1,4 +1,4 @@
-# The adaptive fit of rpf(splits = NULL): the number of splits chosen out of bag while growing.
+# The adaptive fit of rpf(n_splits = NULL): the number of splits chosen out of bag while growing.
 #
 # The families grow to checkpoints (four per doubling of the splits, up to a cap). At each checkpoint the C++ fit
 # (fit_alone() in oob_path.cpp) passes the OOB path there to the stopper made here: the families' predictions at their
@@ -6,7 +6,7 @@
 # forest's corrected OOB error (for classification its criterion: criterion.R) and decides whether growing goes on;
 # the C++ fit then returns the forest at the checkpoint it chose.
 
-# The engine of rpf(splits = NULL) (not deterministic): grows to `checkpoints` (the last one is the cap) and stops once
+# The engine of rpf(n_splits = NULL) (not deterministic): grows to `checkpoints` (the last one is the cap) and stops once
 # the lowest corrected OOB error is `patience` doublings of the splits back (round(4 * patience) checkpoints: four per
 # doubling by default), or once it has improved by at most `tolerance` paired standard errors over the last `patience`
 # doublings (a plateau; tolerance 0: no plateau stop), and at least `floor` splits are grown; or at the cap. The forest
@@ -59,14 +59,17 @@ tune_splits_oob <- function(
     )
   )
   if (isTRUE(st$no_oob)) {
-    cli::cli_abort("No training row is out of bag for any tree family: {.code splits = NULL} needs some.", call = call)
+    cli::cli_abort(
+      "No training row is out of bag for any tree family: {.code n_splits = NULL} needs some.",
+      call = call
+    )
   }
   res <- st$result()
   if (res$capped) {
     cli::cli_warn(
       c(
         "Growing stopped at the cap ({res$stopped_at} splits) while the out-of-bag error was still falling.",
-        "i" = "A fit with more {.arg splits} and {.code oob_path = TRUE} shows whether more splits help."
+        "i" = "A fit with more {.arg n_splits} and {.code oob_path = TRUE} shows whether more splits help."
       ),
       call = call
     )

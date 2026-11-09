@@ -7,7 +7,7 @@
 #'
 #' By default, `rpf()` returns the pruned model that can be shown, in one call:
 #' 1. it grows 200 tree families of up to three-way interactions, with the
-#'    number of splits chosen out of bag while they grow (`splits = NULL`);
+#'    number of splits chosen out of bag while they grow (`n_splits = NULL`);
 #' 2. it prunes the forest's components by [prune_components()] with its
 #'    defaults (`prune = NULL`): the sparse rule, chosen out of bag;
 #' 3. it coarsens every kept component of three or more predictors to at most
@@ -16,7 +16,7 @@
 #' The result, of class `rpf_pruned`, has methods for
 #' [`predict()`][predict.rpf_pruned], [predict_components()] and `print()`.
 #' `prune = FALSE` returns the forest (class `rpf`) instead, and
-#' `splits = <number>` fits a fixed number of splits.
+#' `n_splits = <number>` fits a fixed number of splits.
 #'
 #' @param x,y `[data.frame | matrix | recipe]`, `[numeric | factor]`:
 #'   Predictors and outcome for the x/y interface.
@@ -26,8 +26,9 @@
 #'   `y` is the outcome vector: __numeric__ for regression, __factor__ for
 #'   classification. A numeric outcome must be finite. A factor outcome needs at
 #'   least two classes; levels that do not occur are dropped with a warning.
-#' @param ... Not currently used, but required for extensibility. Unknown
-#'   (e.g. misspelled) arguments are an error.
+#' @param ... Only the old names of renamed arguments (`ntrees`, `splits`,
+#'   `split_try`, `t_try`), deprecated: they work, with a warning. Any other
+#'   (e.g. misspelled) argument is an error. See "Renamed arguments" in Details.
 #' @param formula `[formula]`: A formula with the outcome on the left-hand side and the
 #'   predictors on the right-hand side, e.g. `y ~ x1 + x2`. Interaction terms
 #'   such as `x1:x2` or `x1 * x2` are an error: they would add a predictor named
@@ -42,24 +43,26 @@
 #'   split on. `1` fits main effects only (an additive model), `2` adds
 #'   pairwise interactions, `3` (the default) three-way interactions, and so on. `0` uses all predictors and values above
 #'   the number of predictors are reduced to it.
-#' @param ntrees `[integer(1): 200]`: Number of tree families, i.e. the size of the forest.
-#'   Each family is grown on a bootstrap sample and predictions are averaged.
-#' @param splits `[integer(1) | NULL: NULL]`: Number of split rounds per tree family. The main tuning
+#' @param n_families `[integer(1): 200]`: Number of tree families, i.e. the size of the forest.
+#'   Each family is grown on a bootstrap sample and predictions are averaged. Was `ntrees`.
+#' @param n_splits `[integer(1) | NULL: NULL]`: Number of split rounds per tree family. The main tuning
 #'   parameter: more splits fit more complex functions. A round splits the best of its
 #'   candidates; near saturation, when every candidate's leaf is too small to split, a
 #'   round can make no split. `NULL` (the default) chooses it out of bag while the forest
 #'   grows (with `deterministic = TRUE`, which has no out-of-bag rows, `NULL` means 30). See
-#'   "Choosing `splits` out of bag" in Details.
-#' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
-#'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
-#'   or `"res_trees"`. See Details.
-#' @param split_try `[integer(1) | NULL: NULL]`: Number of thresholds evaluated per split
-#'   candidate. `NULL` means 3 for `split_structure = "leaves"` and 10 for the
-#'   other structures.
-#' @param t_try `[numeric(1) | NULL: NULL]`: Proportion in `(0, 1]` of all possible splits sampled
-#'   as candidates in each round, capped at `max_candidates`. `NULL` means 0.1
-#'   for `split_structure = "leaves"` and 0.4 for the other structures. See
-#'   "Choosing parameters" in Details.
+#'   "Choosing `n_splits` out of bag" in Details. Was `splits`.
+#' @param split_structure `[character(1): "leaf"]`: How split candidates are formed and
+#'   sampled; one of `"leaf"`, `"leaf_binned"`, `"tree_then_leaf"`,
+#'   `"tree_then_all_leaves"` or `"target_tree_then_leaf"`. See Details. The
+#'   names of 0.5.0 (`"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
+#'   `"res_trees"`) still work, with a deprecation warning.
+#' @param n_try_split_points `[integer(1) | NULL: NULL]`: Number of split points (thresholds)
+#'   tried per split candidate. `NULL` means 3 for `split_structure = "leaf"` and 10 for
+#'   the other structures. Was `split_try`.
+#' @param share_candidates `[numeric(1) | NULL: NULL]`: Share in `(0, 1]` of all possible
+#'   splits drawn as candidates in each round, capped at `max_candidates`. `NULL`
+#'   means 0.1 for `split_structure = "leaf"` and 0.4 for the other structures.
+#'   See "Choosing parameters" in Details. Was `t_try`.
 #' @param max_candidates `[integer(1): 50]`: Maximum number of split candidates per round.
 #' @param split_decay_rate `[numeric(1): 0.1]`: Down-weights possible splits that were
 #'   sampled as candidates but not chosen. Each such round ages a split by one,
@@ -70,7 +73,7 @@
 #' @param min_leaf_rows `[integer(1): 1]`: Minimum number of rows of the
 #'   bootstrap sample on each side of every split, so in every leaf. Leaves
 #'   without a threshold that keeps this many rows on each side are not drawn
-#'   as split candidates. Only for `split_structure = "leaves"` (regression and
+#'   as split candidates. Only for `split_structure = "leaf"` (regression and
 #'   classification); `1` (no limit) otherwise.
 #' @param interaction_constraints `[list | NULL: NULL]`: Feature sets that restrict which
 #'   interactions the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`.
@@ -115,12 +118,14 @@
 #'   pruned again (the `max_panels` of [prune_components()]). A whole number of
 #'   at least 1, or `Inf` for no coarsening.
 #' @param tune `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether
-#'   to tune the greediness (`split_try`, `t_try`) and `min_leaf_rows` out of
-#'   bag (not with `deterministic = TRUE`, at least 10 tree families). `TRUE` runs the full search ([tune_control()]), `"quick"` the
+#'   to tune the greediness (`n_try_split_points`, `share_candidates`) and
+#'   `min_leaf_rows` out of bag (not with `deterministic = TRUE`, at least 10
+#'   tree families). `TRUE` runs the full search ([tune_control()]), `"quick"` the
 #'   two-forest preset, and a [tune_control()] object your own. Every forest of
-#'   the search has `splits` chosen out of bag and is pruned, so `tune` implies
-#'   `splits = NULL` and `prune = TRUE`, and giving `split_try`, `t_try` or
-#'   `min_leaf_rows` with it is an error. See "Tuning out of bag" in Details.
+#'   the search has `n_splits` chosen out of bag and is pruned, so `tune` implies
+#'   `n_splits = NULL` and `prune = TRUE`, and giving `n_try_split_points`,
+#'   `share_candidates` or `min_leaf_rows` with it is an error. See "Tuning out
+#'   of bag" in Details.
 #' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
 #'   [predict_components()] requires, with the defaults of [purify()]. For other
 #'   settings, call [purify()] after fitting instead. Not used with
@@ -132,9 +137,9 @@
 #'   `$fit$forest`). If `FALSE`, it is `NULL`, which saves memory.
 #' @param deterministic `[logical(1): FALSE]`: Whether to fit without randomness: no
 #'   bootstrap, the first `max_candidates` possible splits as candidates
-#'   (`t_try` and `split_decay_rate` are ignored) and evenly spaced thresholds. The result does not
-#'   depend on the seed, and all tree families are identical, so use
-#'   `ntrees = 1`. There are no out-of-bag rows, so `splits = NULL` means 30
+#'   (`share_candidates` and `split_decay_rate` are ignored) and evenly spaced thresholds. The
+#'   result does not depend on the seed, and all tree families are identical, so use
+#'   `n_families = 1`. There are no out-of-bag rows, so `n_splits = NULL` means 30
 #'   and `prune = NULL` means `FALSE`. Mainly useful for testing and debugging.
 #' @param keep_level_order `[logical(1) | character: FALSE]`: Which factor
 #'   predictors keep the order of their levels instead of being ordered by the
@@ -144,47 +149,49 @@
 #' @param oob_path `[logical(1) | integer: FALSE]`: Whether to track the
 #'   out-of-bag (OOB) error along the splits (not with
 #'   `deterministic = TRUE`). `TRUE` evaluates it at the checkpoints of
-#'   [oob_path_checkpoints()] for `splits`, four per doubling; an increasing
-#'   integer vector in `1..splits` gives the checkpoints. The fitted forest is
-#'   the same as without. See Details. With `splits = NULL` the path of the
+#'   [oob_path_checkpoints()] for `n_splits`, four per doubling; an increasing
+#'   integer vector in `1..n_splits` gives the checkpoints. The fitted forest is
+#'   the same as without. See Details. With `n_splits = NULL` the path of the
 #'   checkpoints grown is stored either way, and only `TRUE` or `FALSE` is
 #'   allowed.
 #'
 #' @return With the defaults, an object of class `rpf_pruned` (see below). With
 #'   `prune = FALSE`, an object of class `"rpf"` with model object contained in `$fit`. With
 #'   `oob_path`, `$oob_path` holds the OOB path: a data frame with one row per
-#'   checkpoint, `splits`, the corrected and the plain OOB root mean squared
+#'   checkpoint, `n_splits`, the corrected and the plain OOB root mean squared
 #'   error (`oob_rmse`, `oob_rmse_raw`), and the standard errors of the two mean
 #'   squared errors (`se_mse`, `se_mse_raw`). Its attribute `n_rows` is the
 #'   number of training rows with an OOB tree family. For classification with
 #'   `loss = "logit"` or `"exponential"`, or more than two classes, the columns
 #'   are the mean corrected and plain criterion (`oob_loss`, `oob_loss_raw`) and
 #'   their standard errors (`se_loss`, `se_loss_raw`), and the attribute
-#'   `criterion` names it (see "Classification" in Details). With `splits = NULL`,
-#'   `$params$splits` is the chosen number of splits, `$oob_path` the path of
-#'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
+#'   `criterion` names it (see "Classification" in Details). With `n_splits = NULL`,
+#'   `$params$splits` is the chosen number of splits (`$params` keeps the names
+#'   of 0.5.0, see "Renamed arguments" in Details), `$oob_path` the path of
+#'   the checkpoints grown, and `$splits_oob` a list with the chosen `n_splits`,
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
 #'   (whether it stopped at the cap while the error was still falling, neither
 #'   stop rule reached).
 #'   When pruning (the default), an object of class `rpf_pruned` (see
 #'   [prune_components()]), whose element `fit` is the forest (not purified),
 #'   with the elements above: the pruned model's OOB path is `$fit$oob_path`, and
-#'   with `splits = NULL` the chosen number of splits `$fit$params$splits` and
+#'   with `n_splits = NULL` the chosen number of splits `$fit$params$splits` and
 #'   the stop `$fit$splits_oob`.
 #'   With `tune`, the `rpf_pruned` model of the chosen forest, with an element
 #'   `tune`: `search`, the search table (one row per forest grown, in the order
-#'   grown: `step`, `split_try`, `t_try`, `min_leaf_rows`, the chosen `splits`,
-#'   `stopped_at`, `capped`, the forest's corrected OOB RMSE `oob_rmse_forest`
-#'   (as the pruning scores it: its rule `"D"` at `tau = 0`, which keeps every
-#'   nonzero component; the OOB path's `oob_rmse` at the chosen `splits` leaves
-#'   the rows without OOB families of both halves uncorrected and is higher),
+#'   grown: `step`, `n_try_split_points`, `share_candidates`, `min_leaf_rows`,
+#'   the chosen `n_splits`, `stopped_at`, `capped`, the forest's corrected OOB
+#'   RMSE `oob_rmse_forest` (as the pruning scores it: its rule `"D"` at
+#'   `tau = 0`, which keeps every nonzero component; the OOB path's `oob_rmse` at
+#'   the chosen `n_splits` leaves the rows without OOB families of both halves
+#'   uncorrected and is higher),
 #'   its pruned model's `rule`, `tau`, `n_kept` and corrected OOB RMSE
 #'   `oob_rmse` (the score; for classification both are the square root of the
 #'   mean corrected criterion), `seconds`, whether each step chose it
 #'   (`chosen_step1`, `chosen_step2`, `chosen_step3`; `NA` if not a candidate of
 #'   the step) and `final`); `steps`, each step's candidates and choice;
-#'   `settings`, the chosen `split_try`, `t_try`, `min_leaf_rows` and `splits`;
-#'   `control`, the [tune_control()] used; and `seconds`.
+#'   `settings`, the chosen `n_try_split_points`, `share_candidates`,
+#'   `min_leaf_rows` and `n_splits`; `control`, the [tune_control()] used; and `seconds`.
 #' @export
 #' @importFrom methods new
 #' @importFrom hardhat mold
@@ -208,11 +215,11 @@
 #' is shown in at most `max_panels` heat maps anyway. With a higher
 #' `max_interaction`, splits are spread over more possible components.
 #'
-#' `splits` sets how closely the model follows the data. By default it is
-#' chosen out of bag while the forest grows (see "Choosing `splits` out of
+#' `n_splits` sets how closely the model follows the data. By default it is
+#' chosen out of bag while the forest grows (see "Choosing `n_splits` out of
 #' bag"), so it need not be tuned.
 #'
-#' `ntrees` averages over bootstrap samples to reduce variance, and fitting and
+#' `n_families` averages over bootstrap samples to reduce variance, and fitting and
 #' prediction time grow linearly with it. Each tree family is itself a complete
 #' model, a sum of trees covering all components, rather than a single tree,
 #' but averaging more of them still pays off: the test error fell by about 2%
@@ -221,23 +228,23 @@
 #' components at 200 instead of 50 families). Hence the default of 200, at the
 #' price of time; use fewer for a quick look.
 #'
-#' The split search parameters (`split_structure`, `split_try`, `t_try`,
-#' `max_candidates`, `split_decay_rate`) trade speed for a more thorough, more
-#' greedy search. For `"leaves"`, a less greedy search is better: 3 thresholds
-#' per candidate and 10% of the possible splits per round (the default) had
-#' 5.7% to 6.8% lower test error than 10 and 40% (the default of the other
-#' structures, and of `"leaves"` before). `tune` searches this greediness out of
-#' bag.
+#' The split search parameters (`split_structure`, `n_try_split_points`,
+#' `share_candidates`, `max_candidates`, `split_decay_rate`) trade speed for a
+#' more thorough, more greedy search. For `"leaf"`, a less greedy search is
+#' better: 3 split points per candidate and 10% of the possible splits per
+#' round (the default) had 5.7% to 6.8% lower test error than 10 and 40% (the
+#' default of the other structures, and of `"leaf"` before). `tune` searches
+#' this greediness out of bag.
 #'
 #' For classification, `"exponential"` (the default) and `"logit"` fit on the
 #' link scale and are transformed to probabilities. With more than two classes
 #' `"exponential"` is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
 #' and Hastie, 2009): with one score per class, summing to 0, a row's weight is
 #' `exp(-g)`, `g` the score of its class, and the probabilities are the softmax
-#' of the scores. With `splits` chosen out of bag and the forest pruned (the
+#' of the scores. With `n_splits` chosen out of bag and the forest pruned (the
 #' defaults), `"exponential"` was as accurate as `"logit"` in simulations and
 #' about twice as fast. Nothing bounds its scores once a tree family's
-#' bootstrap sample is separated, though, so with a large fixed `splits` its
+#' bootstrap sample is separated, though, so with a large fixed `n_splits` its
 #' log-loss can grow with the splits, where `"logit"`'s does not. `"L1"` and
 #' `"L2"` fit class indicators directly and their probabilities are truncated
 #' to `[0, 1]`.
@@ -267,39 +274,55 @@
 #'
 #' ## `split_structure`
 #'
-#' In each round, a `t_try` fraction of all possible splits (capped at
+#' In each round, a `share_candidates` share of all possible splits (capped at
 #' `max_candidates`) is drawn as candidates with weights
 #' `exp(-split_decay_rate * age)`. `split_structure` defines what a candidate is
-#' and how its thresholds are evaluated.
+#' and how its split points are tried. The names say the candidate, then how
+#' the leaf to split is found.
 #'
-#' - `leaves`: Split candidates are (leaf, split-dimension) pairs. For each sampled
-#'   candidate, `split_try` thresholds are drawn uniformly without replacement from the
-#'   distinct values of that predictor among the leaf's rows, leaving out the smallest
-#'   and, with `min_leaf_rows`, those that leave fewer rows on either side (all of them
-#'   if there are fewer), and evaluated to choose the best split.
+#' - `"leaf"` (was `"leaves"`): Split candidates are (leaf, split-dimension) pairs. For each
+#'   sampled candidate, `n_try_split_points` split points are drawn uniformly without replacement
+#'   from the distinct values of that predictor among the leaf's rows, leaving out the smallest
+#'   and, with `min_leaf_rows`, those that leave fewer rows on either side (all of them if
+#'   there are fewer), and evaluated to choose the best split.
 #'
-#' - `hist`: As `leaves`, but thresholds are drawn from boundaries of
-#'   quantile bins computed once per predictor, which makes evaluating them
-#'   faster on large data.
+#' - `"leaf_binned"` (was `"hist"`): As `"leaf"`, but split points are drawn
+#'   from boundaries of quantile bins computed once per predictor, which makes
+#'   evaluating them faster on large data.
 #'
-#' - `cur_trees_1`: Split candidates are (current-tree, split-dimension) pairs. For each
-#'   sampled candidate, perform `split_try` evaluations. Each evaluation samples a leaf
-#'   from the set of valid current trees (with probability proportional to its number of
-#'   available thresholds) and then uniformly samples a single threshold within that leaf.
+#' - `"tree_then_leaf"` (was `"cur_trees_1"`): Split candidates are
+#'   (current-tree, split-dimension) pairs. For each sampled candidate, perform
+#'   `n_try_split_points` evaluations. Each evaluation samples a leaf from the
+#'   set of valid current trees (with probability proportional to its number of
+#'   available split points) and then uniformly samples a single split point
+#'   within that leaf.
 #'
-#' - `cur_trees_2`: Split candidates are (current-tree, split-dimension) pairs. For each
-#'   sampled candidate, iterate through every
-#'   valid leaf. Within each leaf, sample `split_try` thresholds uniformly and
-#'   evaluate them.
+#' - `"tree_then_all_leaves"` (was `"cur_trees_2"`): Split candidates are
+#'   (current-tree, split-dimension) pairs. For each sampled candidate, iterate
+#'   through every valid leaf. Within each leaf, sample `n_try_split_points`
+#'   split points uniformly and evaluate them.
 #'
-#' - `res_trees`: Split candidates are resulting trees. For each sampled candidate, run
-#'   `split_try` evaluations by sampling a (split-dimension, leaf) pair from all valid
-#'   pairs (with probability proportional to its number of available thresholds), then
-#'   uniformly sampling one threshold within that pair.
+#' - `"target_tree_then_leaf"` (was `"res_trees"`): Split candidates are
+#'   resulting trees. For each sampled candidate, run `n_try_split_points`
+#'   evaluations by sampling a (split-dimension, leaf) pair from all valid pairs
+#'   (with probability proportional to its number of available split points),
+#'   then uniformly sampling one split point within that pair.
 #'
-#' ## The draw of candidates for `leaves`
+#' ## Renamed arguments
 #'
-#' With `split_structure = "leaves"` (regression and classification), the
+#' Four arguments and the split structures were renamed after version 0.5.0:
+#' `ntrees` is now `n_families`, `splits` is `n_splits`, `split_try` is
+#' `n_try_split_points` and `t_try` is `share_candidates`; the split structures
+#' are listed above. The prefix gives the unit: `n_` a count, `share_` a
+#' share in `(0, 1]`, `max_` a cap. The old names still work and give the same
+#' fit, with one deprecation warning per call; giving an argument under both
+#' names is an error. The fitted model's `$params` keeps the old names
+#' (`ntrees`, `splits`, `split_try`, `t_try`, and the old `split_structure`
+#' values), so code that reads them, and models saved by 0.5.0, keep working.
+#'
+#' ## The draw of candidates for `"leaf"`
+#'
+#' With `split_structure = "leaf"` (regression and classification), the
 #' global option `randomPlantedForest.exact_draw` chooses how the candidates
 #' are drawn.
 #' With `FALSE` (the default), the candidates are drawn from a Fenwick tree
@@ -344,7 +367,7 @@
 #' did not draw it (about 37% of them). With `oob_path`, each family's
 #' prediction at its OOB rows is updated split by split while it grows, and
 #' copied at each checkpoint. So one fit gives the OOB error of every forest
-#' with fewer splits, for example to choose `splits` without cross-validation.
+#' with fewer splits, for example to choose `n_splits` without cross-validation.
 #' This costs `2 * nrow(x) * length(checkpoints)` doubles and a little time;
 #' the fit itself is unchanged.
 #'
@@ -353,7 +376,7 @@
 #' over the rows with an OOB family. That mean averages fewer families than the
 #' forest, so the plain error overstates the forest's error by the families'
 #' extra variance, more so with more splits. The corrected error (`oob_rmse`)
-#' subtracts this excess, `(1 / m_i - 1 / ntrees) * v_i` for row `i` with `m_i`
+#' subtracts this excess, `(1 / m_i - 1 / n_families) * v_i` for row `i` with `m_i`
 #' OOB families, where `v_i` is the variance across families estimated from the
 #' OOB means over the families of even and of odd index,
 #' `v_i = (g_even - g_odd)^2 / (1 / m_even + 1 / m_odd)`; this is also the
@@ -370,9 +393,9 @@
 #' ordering its OOB families split on, and the OOB error is somewhat optimistic
 #' with factor predictors, most so with many levels.
 #'
-#' ## Choosing `splits` out of bag
+#' ## Choosing `n_splits` out of bag
 #'
-#' With `splits = NULL` (not deterministic), the number of splits
+#' With `n_splits = NULL` (not deterministic), the number of splits
 #' is chosen while the forest grows, by the corrected OOB error of the
 #' out-of-bag path. The families grow to checkpoints, four per doubling of the
 #' splits ([oob_path_checkpoints()] up to 25,600), and the forest's corrected
@@ -388,11 +411,11 @@
 #' error was still falling there. The result is the forest at the lowest error
 #' (ties go to fewer splits; a corrected error at or below 0, a correction that
 #' overshot, is not chosen unless all are): the forest that `rpf()` with that
-#' many `splits` and the same seed returns. On 52 data sets (44 synthetic, 8 splits of
-#' California housing) the first rule alone chose the same `splits` as the
+#' many `n_splits` and the same seed returns. On 52 data sets (44 synthetic, 8 splits of
+#' California housing) the first rule alone chose the same `n_splits` as the
 #' lowest error along a fixed budget of 3,200 splits on 50 of them, and a
 #' later, lower minimum on the other two, while growing 0.72 of the splits.
-#' The plateau stop chose the same `splits` as the first rule alone on all 44
+#' The plateau stop chose the same `n_splits` as the first rule alone on all 44
 #' synthetic sets, the 4 California sets tried and 24 classification fits
 #' (logit and exponential loss), while growing 10% (regression) to 29%
 #' (classification) fewer splits; it matters most on long, flat out-of-bag
@@ -411,8 +434,8 @@
 #' stop: about 18 GB of resident memory (RSS) on California housing (16,512
 #' rows) at 200 families and `max_interaction = 3`, where the fit one family at
 #' a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
-#' fit alone, measured when it was added: `split_try = 3`, `t_try = 0.1`, the
-#' exact draw, 8 threads).
+#' fit alone, measured when it was added: `n_try_split_points = 3`,
+#' `share_candidates = 0.1`, the exact draw, 8 threads).
 #'
 #' ## Pruning
 #'
@@ -428,7 +451,7 @@
 #' `prune_components(rpf(..., prune = FALSE), data)` from the same random
 #' number state, for every interface. For other settings of the pruning (`rule`,
 #' `tau`, `select`, `select_by`, folds or seed), fit with `prune = FALSE` and call
-#' [prune_components()]. Together with `splits = NULL`, one call chooses the
+#' [prune_components()]. Together with `n_splits = NULL`, one call chooses the
 #' number of splits out of bag, prunes and returns the model to show. Pruning
 #' needs out-of-bag rows, so with `deterministic = TRUE` `prune = NULL` means
 #' `FALSE` and `prune = TRUE` is an error.
@@ -436,7 +459,7 @@
 #' ## Classification
 #'
 #' A classification forest goes through the same steps (the OOB path,
-#' `splits = NULL`, `prune`, `max_panels` and `tune`) with its score columns:
+#' `n_splits = NULL`, `prune`, `max_panels` and `tune`) with its score columns:
 #' one for a binary outcome, one per class otherwise (`K - 1` for
 #' `loss = "logit"`: the first level is the reference). Every out-of-bag choice
 #' is scored by the loss's own criterion, corrected for the OOB family count as
@@ -447,7 +470,7 @@
 #'   0/1 outcome, and the choices are the regression ones, bit for bit.
 #' - `loss = "logit"` or `"exponential"`: the log-loss of the probabilities
 #'   that `predict(type = "prob")` returns. The correction is its second-order
-#'   form, `(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
+#'   form, `(1 / m_i - 1 / n_families) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
 #'   with `d = g_even - g_odd` and `H = diag(p) - p p'` over the free score
 #'   columns (for the squared error `H = 2 I`, the correction above).
 #'
@@ -460,9 +483,9 @@
 #' ## Tuning out of bag
 #'
 #' With `tune`, `rpf()` searches the greediness of the split search
-#' (`split_try` and `t_try`, on the ladder of [greediness_ladder()]) and the
+#' (`n_try_split_points` and `share_candidates`, on the ladder of [greediness_ladder()]) and the
 #' minimum leaf size `min_leaf_rows`, without cross-validation. Every forest of
-#' the search is grown with `splits` chosen out of bag and pruned by
+#' the search is grown with `n_splits` chosen out of bag and pruned by
 #' [prune_components()] with its defaults (without the display), and forests are
 #' compared by the corrected out-of-bag RMSE of their pruned model (for
 #' classification by the root of its mean corrected criterion); the lowest
@@ -475,7 +498,7 @@
 #' forests, 3 / 0.1 and 1 / 0.025 at `min_leaf_rows = 1`. The chosen forest's
 #' pruned model is returned, with the display at `max_panels`, and the search in
 #' its element `tune`. Every forest is grown from the same random number state,
-#' so the result is the model that `rpf(splits = NULL, prune = TRUE)` returns
+#' so the result is the model that `rpf(n_splits = NULL, prune = TRUE)` returns
 #' at the chosen settings from that state.
 #'
 #' On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
@@ -508,7 +531,7 @@
 #'
 #' # Classification, the same steps
 #' set.seed(1)
-#' model <- rpf(Species ~ ., data = iris, ntrees = 50)
+#' model <- rpf(Species ~ ., data = iris, n_families = 50)
 #' predict(model, iris[c(1, 51, 101), ], type = "prob")
 #'
 #' # The forest instead of the pruned model, with x and y, pairwise interactions
@@ -518,7 +541,7 @@
 #'   x = mtcars[, c("cyl", "wt", "hp")],
 #'   y = mtcars$mpg,
 #'   max_interaction = 2,
-#'   splits = 30,
+#'   n_splits = 30,
 #'   prune = FALSE
 #' )
 #' rpfit
@@ -531,7 +554,14 @@
 #'
 #' # The out-of-bag error along the splits, from one fit
 #' set.seed(1)
-#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE, prune = FALSE)
+#' rpfit <- rpf(
+#'   mpg ~ .,
+#'   data = mtcars,
+#'   n_families = 20,
+#'   n_splits = 100,
+#'   oob_path = TRUE,
+#'   prune = FALSE
+#' )
 #' rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 #'
 #' \donttest{
@@ -542,10 +572,10 @@
 #'   mpg ~ cyl + wt,
 #'   data = mtcars,
 #'   max_interaction = 2,
-#'   ntrees = 50,
-#'   splits = 30,
-#'   split_try = 10,
-#'   t_try = 0.4,
+#'   n_families = 50,
+#'   n_splits = 30,
+#'   n_try_split_points = 10,
+#'   share_candidates = 0.4,
 #'   prune = FALSE
 #' )
 #' options(old)
@@ -556,7 +586,7 @@
 #' set.seed(1)
 #' x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 #' y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
-#' tuned <- rpf(x, y, ntrees = 10, tune = "quick")
+#' tuned <- rpf(x, y, n_families = 10, tune = "quick")
 #' tuned$tune$search
 #' }
 rpf <- function(x, ...) {
@@ -576,11 +606,11 @@ rpf.formula <- function(
   formula,
   data,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -600,7 +630,7 @@ rpf.formula <- function(
   oob_path = FALSE,
   ...
 ) {
-  rlang::check_dots_empty()
+  rpf_renamed(..., .env = environment())
   check_no_interaction_terms(formula, data)
   # model.matrix() would expand logical predictors into two dummy columns; use them
   # as 0/1 like the x/y interface. The outcome stays as is so it is still validated.
@@ -620,11 +650,11 @@ rpf.formula <- function(
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
-    ntrees = ntrees,
-    splits = splits,
+    n_families = n_families,
+    n_splits = n_splits,
     split_structure = split_structure,
-    split_try = split_try,
-    t_try = t_try,
+    n_try_split_points = n_try_split_points,
+    share_candidates = share_candidates,
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
@@ -653,11 +683,11 @@ rpf.data.frame <- function(
   x,
   y,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -677,18 +707,18 @@ rpf.data.frame <- function(
   oob_path = FALSE,
   ...
 ) {
-  rlang::check_dots_empty()
+  rpf_renamed(..., .env = environment())
   check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
-    ntrees = ntrees,
-    splits = splits,
+    n_families = n_families,
+    n_splits = n_splits,
     split_structure = split_structure,
-    split_try = split_try,
-    t_try = t_try,
+    n_try_split_points = n_try_split_points,
+    share_candidates = share_candidates,
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
@@ -717,11 +747,11 @@ rpf.matrix <- function(
   x,
   y,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -741,18 +771,18 @@ rpf.matrix <- function(
   oob_path = FALSE,
   ...
 ) {
-  rlang::check_dots_empty()
+  rpf_renamed(..., .env = environment())
   check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
-    ntrees = ntrees,
-    splits = splits,
+    n_families = n_families,
+    n_splits = n_splits,
     split_structure = split_structure,
-    split_try = split_try,
-    t_try = t_try,
+    n_try_split_points = n_try_split_points,
+    share_candidates = share_candidates,
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
@@ -781,11 +811,11 @@ rpf.recipe <- function(
   x,
   data,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -805,7 +835,7 @@ rpf.recipe <- function(
   oob_path = FALSE,
   ...
 ) {
-  rlang::check_dots_empty()
+  rpf_renamed(..., .env = environment())
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
   # the recipe's steps decide the predictor columns: indices have no user-given order to refer to
@@ -815,11 +845,11 @@ rpf.recipe <- function(
   rpf_bridge(
     processed,
     max_interaction = max_interaction,
-    ntrees = ntrees,
-    splits = splits,
+    n_families = n_families,
+    n_splits = n_splits,
     split_structure = split_structure,
-    split_try = split_try,
-    t_try = t_try,
+    n_try_split_points = n_try_split_points,
+    share_candidates = share_candidates,
     max_candidates = max_candidates,
     split_decay_rate = split_decay_rate,
     delete_leaves = delete_leaves,
@@ -848,11 +878,11 @@ rpf.recipe <- function(
 rpf_bridge <- function(
   processed,
   max_interaction,
-  ntrees,
-  splits,
+  n_families,
+  n_splits,
   split_structure,
-  split_try,
-  t_try,
+  n_try_split_points,
+  share_candidates,
   max_candidates,
   split_decay_rate,
   delete_leaves,
@@ -897,24 +927,24 @@ rpf_bridge <- function(
     max_interaction <- p
   }
 
-  checkmate::assert_int(ntrees, lower = 1)
-  checkmate::assert_int(splits, lower = 1, null.ok = TRUE)
-  checkmate::assert_choice(split_structure, choices = c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees"))
-  checkmate::assert_int(split_try, lower = 1, null.ok = TRUE)
-  checkmate::assert_number(t_try, lower = 0, upper = 1, null.ok = TRUE)
-  # NULL greediness: 3 / 0.1 for "leaves", 10 / 0.4 (master's) for the other structures
-  split_try <- split_try %||% if (split_structure == "leaves") 3 else 10
-  t_try <- t_try %||% if (split_structure == "leaves") 0.1 else 0.4
-  if (t_try <= 0) {
-    cli::cli_abort("{.arg t_try} must be greater than 0, not {t_try}.", call = call)
+  checkmate::assert_int(n_families, lower = 1)
+  checkmate::assert_int(n_splits, lower = 1, null.ok = TRUE)
+  checkmate::assert_choice(split_structure, choices = unname(renamed_split_structures))
+  checkmate::assert_int(n_try_split_points, lower = 1, null.ok = TRUE)
+  checkmate::assert_number(share_candidates, lower = 0, upper = 1, null.ok = TRUE)
+  # NULL greediness: 3 / 0.1 for "leaf", 10 / 0.4 (master's) for the other structures
+  n_try_split_points <- n_try_split_points %||% if (split_structure == "leaf") 3 else 10
+  share_candidates <- share_candidates %||% if (split_structure == "leaf") 0.1 else 0.4
+  if (share_candidates <= 0) {
+    cli::cli_abort("{.arg share_candidates} must be greater than 0, not {share_candidates}.", call = call)
   }
   checkmate::assert_int(max_candidates, lower = 1)
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
   checkmate::assert_int(min_leaf_rows, lower = 1)
-  if (min_leaf_rows > 1 && split_structure != "leaves") {
+  if (min_leaf_rows > 1 && split_structure != "leaf") {
     cli::cli_abort(
-      "{.arg min_leaf_rows} > 1 needs {.code split_structure = \"leaves\"}.",
+      "{.arg min_leaf_rows} > 1 needs {.code split_structure = \"leaf\"}.",
       call = call
     )
   }
@@ -945,11 +975,11 @@ rpf_bridge <- function(
   checkmate::assert_flag(deterministic)
   # prune = NULL: the pruned model for a random forest, the forest with deterministic = TRUE (no out-of-bag rows)
   prune <- prune %||% !deterministic
-  # tune: the search chooses split_try, t_try, min_leaf_rows and splits, and prunes every forest
+  # tune: the search chooses n_try_split_points, share_candidates, min_leaf_rows and n_splits, and prunes every forest
   control <- tune_resolve(tune, call = call)
   if (!is.null(control)) {
-    tune_check_call(control, given, splits, prune, deterministic, ntrees, split_structure, call = call)
-    splits <- NULL
+    tune_check_call(control, given, n_splits, prune, deterministic, n_families, split_structure, call = call)
+    n_splits <- NULL
     prune <- TRUE
   }
   checkmate::assert_number(max_panels, lower = 1)
@@ -968,24 +998,24 @@ rpf_bridge <- function(
       call = call
     )
   }
-  if (deterministic && ntrees > 1) {
+  if (deterministic && n_families > 1) {
     cli::cli_warn(c(
-      "With {.code deterministic = TRUE}, all {ntrees} tree families are identical.",
-      "i" = "Use {.code ntrees = 1} to fit the same model faster."
+      "With {.code deterministic = TRUE}, all {n_families} tree families are identical.",
+      "i" = "Use {.code n_families = 1} to fit the same model faster."
     ))
   }
-  # splits = NULL: chosen out of bag while growing (a random forest), otherwise 30
-  adaptive <- is.null(splits) && !deterministic
-  if (is.null(splits) && !adaptive) {
-    splits <- 30L
+  # n_splits = NULL: chosen out of bag while growing (a random forest), otherwise 30
+  adaptive <- is.null(n_splits) && !deterministic
+  if (is.null(n_splits) && !adaptive) {
+    n_splits <- 30L
   }
   checkpoints <- NULL
   if (!adaptive) {
-    checkpoints <- check_oob_path(oob_path, splits, deterministic, call = call)
+    checkpoints <- check_oob_path(oob_path, n_splits, deterministic, call = call)
   } else if (!isTRUE(oob_path) && !isFALSE(oob_path)) {
     cli::cli_abort(
       c(
-        "With {.code splits = NULL}, {.arg oob_path} must be {.code TRUE} or {.code FALSE}.",
+        "With {.code n_splits = NULL}, {.arg oob_path} must be {.code TRUE} or {.code FALSE}.",
         "i" = "The out-of-bag path of the checkpoints grown is stored either way."
       ),
       call = call
@@ -999,19 +1029,20 @@ rpf_bridge <- function(
     call = call
   )
 
+  # the stored params keep randomPlantedForest 0.5.0's names and split structure codes (renamed_args)
   params <- list(
     loss = loss,
-    ntrees = ntrees,
+    ntrees = n_families,
     max_interaction = max_interaction,
-    splits = if (adaptive) NA_integer_ else splits,
-    split_try = split_try,
-    t_try = t_try,
+    splits = if (adaptive) NA_integer_ else n_splits,
+    split_try = n_try_split_points,
+    t_try = share_candidates,
     split_decay_rate = split_decay_rate,
     max_candidates = max_candidates,
     delete_leaves = delete_leaves,
     min_leaf_rows = as.integer(min_leaf_rows),
     interaction_constraints = interaction_constraints,
-    split_structure = split_structure,
+    split_structure = split_structure_code(split_structure),
     delta = delta,
     epsilon = epsilon,
     deterministic = deterministic,
@@ -1032,7 +1063,7 @@ rpf_bridge <- function(
   res
 }
 
-# The forest of rpf_bridge()'s checked arguments: `adaptive` whether `splits` is chosen out of bag while growing,
+# The forest of rpf_bridge()'s checked arguments: `adaptive` whether `n_splits` is chosen out of bag while growing,
 # `checkpoints` those of rpf(oob_path = ) (fixed splits) or NULL. The OOB error is the regression one or the
 # classification criterion (oob_score_y()).
 rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call) {
@@ -1077,7 +1108,7 @@ rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoin
   )
   if (adaptive) {
     res$oob_path <- chosen$path
-    res$splits_oob <- chosen[c("splits", "stopped_at", "capped")]
+    res$splits_oob <- list(n_splits = chosen$splits, stopped_at = chosen$stopped_at, capped = chosen$capped)
   } else if (!is.null(checkpoints)) {
     res$oob_path <- oob_path_table(fit$oob_path(), score_y, params$ntrees, call = call)
   }
@@ -1117,7 +1148,7 @@ new_rpf <- function(fit, blueprint, ...) {
   )
 }
 
-# The draw of candidates for split_structure = "leaves": the option
+# The draw of candidates for split_structure = "leaf": the option
 # randomPlantedForest.exact_draw (FALSE, the default: the fast draw; TRUE: the
 # exact draw, the same distribution with other random numbers).
 rpf_exact_draw <- function(call = rlang::caller_env()) {
@@ -1137,8 +1168,13 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
 # these options existed have no such entries in their params and were fitted
 # with min_leaf_rows = 1 and the exact draw.
 rpf_param_vector <- function(params, mode) {
+  # the stored code (renamed_split_structures); a new name is taken too
+  structure <- params$split_structure
+  if (structure %in% renamed_split_structures) {
+    structure <- split_structure_code(structure)
+  }
   split_mode <- switch(
-    params$split_structure,
+    structure,
     res_trees = 0L,
     cur_trees_2 = 1L,
     cur_trees_1 = 2L,

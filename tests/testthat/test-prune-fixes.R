@@ -8,9 +8,9 @@ fix_sim <- function(n = 300, p = 4, seed = 11) {
   list(x = x, y = y)
 }
 
-fix_fit <- function(d, max_interaction = 2, ntrees = 20, splits = 40, ...) {
+fix_fit <- function(d, max_interaction = 2, n_families = 20, n_splits = 40, ...) {
   set.seed(5)
-  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits, ...)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, n_families = n_families, n_splits = n_splits, ...)
 }
 
 # The decomposition over every predictor set up to the forest's order, for comparison
@@ -50,7 +50,7 @@ test_that("many predictors at full order: only the stored components, not 2^p - 
   # 2^20 - 1 candidate sets, a few hundred stored components
   d <- fix_sim(n = 200, p = 20)
   set.seed(5)
-  fit <- rpf_050(d$x, d$y, max_interaction = 20, ntrees = 3, splits = 15)
+  fit <- rpf_050(d$x, d$y, max_interaction = 20, n_families = 3, n_splits = 15)
   t0 <- proc.time()[["elapsed"]]
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = c(0, 0.01), select_by = "cv", folds = 2, seed = 1)
   expect_lt(proc.time()[["elapsed"]] - t0, 60)
@@ -141,7 +141,7 @@ test_that("`data` and `y` must be the training rows, also for a given rule", {
 
 test_that("with few families the default scores by CV, and an empty half gets the mean variance", {
   d <- fix_sim()
-  fit <- fix_fit(d, ntrees = 8)
+  fit <- fix_fit(d, n_families = 8)
   expect_message(pr <- prune_components(fit, d$x, d$y, folds = 3, seed = 1), "scored by CV")
   expect_identical(pr$select_by, "cv")
   expect_false(is.null(pr$cv))
@@ -151,11 +151,11 @@ test_that("with few families the default scores by CV, and an empty half gets th
   )
   expect_identical(po$select_by, "oob")
   # 10 families: out of bag, no message
-  expect_silent(p10 <- prune_components(fix_fit(d, ntrees = 10), d$x, d$y, folds = 3, seed = 1))
+  expect_silent(p10 <- prune_components(fix_fit(d, n_families = 10), d$x, d$y, folds = 3, seed = 1))
   expect_identical(p10$select_by, "oob")
 
   # D's corrected OOB error by hand: rows with OOB families in one half only get the mean v of the other rows
-  o <- fix_fit(d, ntrees = 8)$fit$purify_oob(0L, 1L)
+  o <- fix_fit(d, n_families = 8)$fit$purify_oob(0L, 1L)
   m0 <- o$count[, 1]
   m1 <- o$count[, 2]
   m <- m0 + m1
@@ -245,7 +245,7 @@ test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old))
   set.seed(1)
-  pm <- rpf_050(mpg ~ ., data = mtcars, ntrees = 10, splits = NULL, prune = TRUE, nthreads = 1)
+  pm <- rpf_050(mpg ~ ., data = mtcars, n_families = 10, n_splits = NULL, prune = TRUE, nthreads = 1)
   expect_s3_class(pm, "rpf_pruned")
   oob <- pm$oob
   zero <- oob$oob_rmse == 0
@@ -271,7 +271,7 @@ test_that("noiseless data: corrected OOB errors of 0 are left out, and the choic
   x <- data.frame(x1 = (i - 0.5) / n, x2 = ((i * 7) %% n) / n)
   y <- x$x1
   set.seed(1)
-  fit <- rpf_050(x, y, max_interaction = 1, ntrees = 10, splits = 10, nthreads = 1)
+  fit <- rpf_050(x, y, max_interaction = 1, n_families = 10, n_splits = 10, nthreads = 1)
   pr <- prune_components(fit, x, y, seed = 1, nthreads = 1)
   oob <- pr$oob
   zero <- oob$oob_rmse == 0

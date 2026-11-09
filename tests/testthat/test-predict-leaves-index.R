@@ -30,15 +30,15 @@ test_that("the leaf index gives the scan's predictions bitwise (regression)", {
   x <- data.frame(x1 = round(runif(n), 2), x2 = runif(n), x3 = sample(0:3, n, TRUE), x4 = rnorm(n))
   y <- x$x1 + x$x2 * x$x3 + sin(3 * x$x4) + rnorm(n, sd = 0.2)
   X <- leaf_test_rows(x)
-  for (st in c("leaves", "cur_trees_1", "cur_trees_2", "res_trees", "hist")) {
+  for (st in c("leaf", "tree_then_leaf", "tree_then_all_leaves", "target_tree_then_leaf", "leaf_binned")) {
     for (dl in c(TRUE, FALSE)) {
       set.seed(5)
       fit <- rpf_050(
         x,
         y,
         max_interaction = 3,
-        ntrees = 4,
-        splits = 400,
+        n_families = 4,
+        n_splits = 400,
         split_structure = st,
         delete_leaves = dl
       )
@@ -68,7 +68,7 @@ test_that("the leaf index gives the scan's predictions bitwise (classification)"
     for (y in list(yb, y3)) {
       for (dl in c(TRUE, FALSE)) {
         set.seed(6)
-        fit <- rpf_050(x, y, max_interaction = 3, ntrees = 4, splits = 150, loss = loss, delete_leaves = dl)
+        fit <- rpf_050(x, y, max_interaction = 3, n_families = 4, n_splits = 150, loss = loss, delete_leaves = dl)
         label <- paste(loss, nlevels(y), dl)
         expect_gt(max_tree_leaves(fit), 64, label = label)
         expect_identical(fit$fit$predict_matrix(X, 0, 2L), scan_rows(fit, X), label = label)
@@ -87,7 +87,7 @@ test_that("predict() gives the same predictions for all rows at once as in chunk
   n <- 600
   x <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
   x$y <- x$x1 + x$x2 * x$x3 + rnorm(n, sd = 0.1)
-  fit <- rpf_050(y ~ ., data = x, max_interaction = 3, ntrees = 4, splits = 300, delete_leaves = FALSE)
+  fit <- rpf_050(y ~ ., data = x, max_interaction = 3, n_families = 4, n_splits = 300, delete_leaves = FALSE)
   expect_gt(max_tree_leaves(fit), 64)
   chunks <- split(seq_len(n), ceiling(seq_len(n) / 100))
   expect_identical(

@@ -22,9 +22,9 @@ sanity_failures <- function(make_y, check, ...) {
   for (name in names(sanity_predictors())) {
     predictor <- sanity_predictors()[[name]]
     dat <- data.frame(x = predictor$x, y = make_y(predictor$signal))
-    for (structure in c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees")) {
+    for (structure in c("leaf", "leaf_binned", "tree_then_leaf", "tree_then_all_leaves", "target_tree_then_leaf")) {
       set.seed(1)
-      fit <- rpf_050(y ~ x, data = dat, ntrees = 5, splits = 10, split_structure = structure, ...)
+      fit <- rpf_050(y ~ x, data = dat, n_families = 5, n_splits = 10, split_structure = structure, ...)
       if (!check(fit, dat, predictor$signal)) {
         failures <- c(failures, paste(name, structure))
       }

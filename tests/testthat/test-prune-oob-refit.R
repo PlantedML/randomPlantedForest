@@ -8,12 +8,12 @@ oobr_data <- function(n = 500, seed = 1) {
   list(x = x, y = y)
 }
 
-oobr_fit <- function(d, max_interaction = 3, ntrees = 20, splits = 60) {
+oobr_fit <- function(d, max_interaction = 3, n_families = 20, n_splits = 60) {
   # the exact draw: the tests below pin the components this fit's pruning keeps
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old))
   set.seed(1)
-  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, n_families = n_families, n_splits = n_splits)
 }
 
 # The OOB sums of purify_oob(), with the components named, and the number of OOB families per row
@@ -89,7 +89,7 @@ test_that("R chosen out of bag: the chosen tau's components, coefficients fitted
 test_that("R's OOB scores and final fit use the rows with OOB families, R fitted outside each fold", {
   # with 10 families a few rows are in every bootstrap sample, and some have OOB families in one half only
   d <- oobr_data(n = 300, seed = 2)
-  fit <- oobr_fit(d, max_interaction = 2, ntrees = 10, splits = 40)
+  fit <- oobr_fit(d, max_interaction = 2, n_families = 10, n_splits = 40)
   fold_id <- rep_len(1:4, nrow(d$x))
   p <- prune_components(fit, d$x, d$y, rule = "R", tau = c(0, 0.01), fold_id = fold_id, seed = 1, select = "min")
   o <- oobr_sums(fit, d$x)
@@ -131,7 +131,7 @@ test_that("R's OOB scores and final fit use the rows with OOB families, R fitted
 
 test_that("D's scores do not depend on R's fit, and D and CV choices are fitted as without a choice", {
   d <- oobr_data(seed = 5)
-  fit <- oobr_fit(d, max_interaction = 2, splits = 50)
+  fit <- oobr_fit(d, max_interaction = 2, n_splits = 50)
   # the D rows of a choice among both rules are those of a choice among D's thresholds alone
   pDR <- prune_components(fit, d$x, d$y, seed = 4)
   pD <- prune_components(fit, d$x, d$y, rule = "D", seed = 4)
@@ -162,7 +162,7 @@ test_that("a given R falls back to in-sample coefficients where the choice falls
     stats::lm.fit(cbind(1, as.matrix(own[, names(p$beta), with = FALSE])), d$y)$coefficients
   }
   # fewer than 10 families: in sample, with a message; an explicit select_by = "oob" warns and fits out of bag
-  f8 <- oobr_fit(d, max_interaction = 2, ntrees = 8, splits = 40)
+  f8 <- oobr_fit(d, max_interaction = 2, n_families = 8, n_splits = 40)
   expect_message(p8 <- prune_components(f8, d$x, d$y, rule = "R", tau = 0.01), "fitted in sample")
   expect_null(p8$select_by)
   expect_equal(unname(c(p8$intercept, p8$beta)), unname(in_sample(f8, p8)), tolerance = 1e-10)
@@ -176,14 +176,14 @@ test_that("a given R falls back to in-sample coefficients where the choice falls
 
   # a deterministic forest: in sample, silently; an explicit select_by = "oob" is an error
   set.seed(1)
-  det <- rpf_050(d$x, d$y, max_interaction = 2, ntrees = 1, splits = 20, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, max_interaction = 2, n_families = 1, n_splits = 20, deterministic = TRUE)
   expect_silent(pdet <- prune_components(det, d$x, d$y, rule = "R", tau = 0.01))
   expect_null(pdet$select_by)
   expect_equal(unname(c(pdet$intercept, pdet$beta)), unname(in_sample(det, pdet)), tolerance = 1e-10)
   expect_error(prune_components(det, d$x, d$y, rule = "R", tau = 0.01, select_by = "oob"), "deterministic")
 
   # no in-bag counts (restored from a blob of an earlier version, with its data): in sample, with a message
-  f20 <- oobr_fit(d, max_interaction = 2, splits = 40)
+  f20 <- oobr_fit(d, max_interaction = 2, n_splits = 40)
   blob <- rpf_marshal(f20, include_data = TRUE)
   blob$fit_state$inbag <- NULL
   expect_message(pn <- prune_components(rpf_unmarshal(blob), d$x, d$y, rule = "R", tau = 0.01), "no in-bag counts")

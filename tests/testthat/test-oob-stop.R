@@ -1,4 +1,4 @@
-# rpf(splits = NULL): the adaptive stop along the out-of-bag path
+# rpf(n_splits = NULL): the adaptive stop along the out-of-bag path
 
 stop_sim <- function(n = 300, seed = 1) {
   set.seed(seed)
@@ -9,7 +9,7 @@ stop_sim <- function(n = 300, seed = 1) {
 
 stop_fit <- function(d, splits, ...) {
   set.seed(5)
-  rpf_050(d$x, d$y, max_interaction = 2, ntrees = 6, splits = splits, ...)
+  rpf_050(d$x, d$y, max_interaction = 2, n_families = 6, n_splits = splits, ...)
 }
 
 # The OOB path at one checkpoint, as the C++ fit passes it to the stopper: rows i with OOB families of both halves
@@ -19,7 +19,7 @@ path_at <- function(v) {
   list(checkpoints = 1L, sum0 = matrix(v), sum1 = matrix(v), count = matrix(1L, n, 2))
 }
 
-test_that("splits = NULL stops one doubling past the lowest corrected OOB error and returns that forest", {
+test_that("n_splits = NULL stops one doubling past the lowest corrected OOB error and returns that forest", {
   # the patience alone (no plateau stop)
   old <- options(randomPlantedForest.adaptive_tolerance = 0)
   on.exit(options(old))
@@ -29,14 +29,14 @@ test_that("splits = NULL stops one doubling past the lowest corrected OOB error 
   j <- which.min(path$oob_rmse)
   # stopped once the lowest error was one doubling (4 checkpoints) back, and chose it
   expect_identical(nrow(path), j + 4L)
-  expect_identical(ad$params$splits, path$splits[j])
-  expect_identical(ad$splits_oob, list(splits = path$splits[j], stopped_at = max(path$splits), capped = FALSE))
+  expect_identical(ad$params$splits, path$n_splits[j])
+  expect_identical(ad$splits_oob, list(n_splits = path$n_splits[j], stopped_at = max(path$n_splits), capped = FALSE))
   # the default checkpoints, four per doubling, up to where it stopped
   cp <- oob_path_checkpoints(25600)
-  expect_identical(path$splits, cp[seq_len(nrow(path))])
+  expect_identical(path$n_splits, cp[seq_len(nrow(path))])
   # the path is that of a fixed fit grown to the stop; the forest that of a fixed fit with the chosen splits
-  expect_identical(path, stop_fit(d, max(path$splits), oob_path = path$splits)$oob_path)
-  ref <- stop_fit(d, path$splits[j])
+  expect_identical(path, stop_fit(d, max(path$n_splits), oob_path = path$n_splits)$oob_path)
+  ref <- stop_fit(d, path$n_splits[j])
   expect_identical(ad$fit$get_model(), ref$fit$get_model())
   expect_identical(predict(ad, d$x), predict(ref, d$x))
   # the C++ forest has the chosen number of splits and no OOB path
@@ -190,8 +190,8 @@ test_that("growing stops at the cap with a warning while the error still falls",
   )
   expect_true(tu$capped)
   expect_identical(tu$stopped_at, 9L)
-  expect_identical(tu$path$splits, 1:9)
-  # the engine with the default checkpoints is rpf(splits = NULL)
+  expect_identical(tu$path$n_splits, 1:9)
+  # the engine with the default checkpoints is rpf(n_splits = NULL)
   set.seed(5)
   tu <- randomPlantedForest:::tune_splits_oob(data$Y, data$X, ref$params)
   ad <- stop_fit(d, NULL)
@@ -200,22 +200,22 @@ test_that("growing stops at the cap with a warning while the error still falls",
   expect_identical(tu$fit$get_model(), ad$fit$get_model())
 })
 
-test_that("splits = NULL is chosen out of bag for classification too, and is 30 for deterministic forests", {
+test_that("n_splits = NULL is chosen out of bag for classification too, and is 30 for deterministic forests", {
   d <- stop_sim()
   yc <- factor(d$y > median(d$y))
   set.seed(5)
-  a <- rpf_050(d$x, yc, ntrees = 3, splits = NULL)
+  a <- rpf_050(d$x, yc, n_families = 3, n_splits = NULL)
   set.seed(5)
-  b <- rpf_050(d$x, yc, ntrees = 3, splits = a$params$splits)
-  expect_identical(a$splits_oob$splits, a$params$splits)
+  b <- rpf_050(d$x, yc, n_families = 3, n_splits = a$params$splits)
+  expect_identical(a$splits_oob$n_splits, a$params$splits)
   expect_identical(attr(a$oob_path, "criterion"), "logloss")
   expect_identical(a$fit$get_model(), b$fit$get_model())
-  det <- rpf_050(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, n_families = 1, n_splits = NULL, deterministic = TRUE)
   expect_identical(det$params$splits, 30L)
-  expect_identical(det$fit$get_model(), rpf_050(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())
+  expect_identical(det$fit$get_model(), rpf_050(d$x, d$y, n_families = 1, deterministic = TRUE)$fit$get_model())
 })
 
-test_that("splits = NULL: arguments, options and errors", {
+test_that("n_splits = NULL: arguments, options and errors", {
   d <- stop_sim()
   expect_error(stop_fit(d, NULL, oob_path = c(5, 10)), "must be `TRUE` or `FALSE`")
   expect_error(stop_fit(d, 0), "splits")
@@ -244,7 +244,7 @@ test_that("splits = NULL: arguments, options and errors", {
   expect_identical(stop_fit(d, 30)$fit$get_model(), ref$fit$get_model())
 })
 
-test_that("splits = NULL with purify, export_forest, print and marshal", {
+test_that("n_splits = NULL with purify, export_forest, print and marshal", {
   d <- stop_sim()
   ad <- stop_fit(d, NULL, purify = TRUE, export_forest = TRUE)
   ref <- stop_fit(d, ad$params$splits, purify = TRUE, export_forest = TRUE)
