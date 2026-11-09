@@ -43,7 +43,7 @@
 * `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
   The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
   With `splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.
-  `prune = TRUE` is an error for classification and with `deterministic = TRUE`, and `purify` is not used with it.
+  `prune = TRUE` is an error with `deterministic = TRUE`, and `purify` is not used with it.
   The default stays `prune = FALSE`, which returns the forest as before.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
@@ -59,6 +59,13 @@
   The result is the chosen forest's pruned model, with the search table in `$tune`.
   On 48 data sets (44 synthetic, 4 splits of California housing) the full search had 10.8% lower test error than 10 / 0.4 and 2.8% lower than 5-fold cross-validation over the same settings, at 1/24 of its cost; the quick preset had 9.4% lower test error. Those studies scored each forest with the pruning's choice of the time (the lowest out-of-bag error, R's coefficients in sample), not with the sparse default used here.
   The default stays `tune = FALSE`.
+* Classification forests go through the same pipeline as regression forests: `rpf(oob_path = )`, `rpf(splits = NULL)`, `prune_components()` with its display (`max_panels`), `rpf(prune = TRUE)` and `rpf(tune = )`.
+  Every out-of-bag choice is scored by the loss's own criterion, corrected for the out-of-bag family count: for `loss = "L1"` and `"L2"` the squared error of the raw scores summed over the classes (the Brier score), for `"logit"` and `"exponential"` the log-loss of the probabilities that `predict(type = "prob")` returns, with the correction in its second-order form.
+  On simulated data at 100 tree families the corrected out-of-bag log-loss was within -0.8% to +1.4% of the test log-loss (mean per setting), the uncorrected one +0.6% to +4.1% above it.
+  A component is kept or dropped for all classes, sized by its variance summed over the score columns centred across the classes; rule `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per score column (least squares for the Brier score, maximum likelihood for the log-loss), out of bag; the display chooses one panel form per component for all classes.
+  The pruned model's `predict()` takes `type` as `predict.rpf()` does, and its `predict_components()` has one column per component and class.
+  With two classes and `loss = "L2"`, every choice is that of the regression pipeline on the 0/1 response, bit for bit.
+  Fits with the defaults are unchanged.
 * `options(randomPlantedForest.exact_draw = FALSE)` draws the split candidates of regression with `split_structure = "leaves"` from a tree of weights kept up to date between rounds, instead of one random number per possible split in every round (`?rpf`, "The draw of candidates for `leaves`").
   This fits about 2.5 times as fast on larger data, for example 218 s → 86 s at 1 thread on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
   It draws from the same distribution and leaves out the same candidates under `min_leaf_rows`, but with other random numbers, so the same seed gives another forest.
