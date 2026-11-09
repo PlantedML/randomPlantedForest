@@ -1194,6 +1194,16 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   } leaves_scratch_guard;
   tls_leaves_scratch_ptr = &leaves_scratch;
 
+  // logit: the candidate-independent terms of the loss (losses_logit.cpp), the same pattern
+  LogitTerms logit_terms;
+  struct LogitTermsGuard {
+    ~LogitTermsGuard() { tls_logit_terms_ptr = nullptr; }
+  } logit_terms_guard;
+  if (this->loss == LossType::logit) {
+    logit_terms.reset(weights, samples_Y, value_size);
+    tls_logit_terms_ptr = &logit_terms;
+  }
+
   // the OOB path (nullptr if off): each OOB row's family prediction, split by split, as in rpf.cpp
   std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
 
@@ -1302,6 +1312,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           } else {
             weights[individual] += update_b;
           }
+          if (tls_logit_terms_ptr == &logit_terms)
+            logit_terms.update_row((size_t)individual);
         }
 
         break;

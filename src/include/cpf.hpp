@@ -3,6 +3,34 @@
 
 #include "rpf.hpp"
 
+// The logit loss's terms that do not depend on the candidate split: for every individual i of a tree family's sample,
+// with e_p = exp(W[i][p]) and den = 1 + sum_p e_p, the K values Y[i][p] * log(e_p / den) and then
+// (1 - sum_p Y[i][p]) * log(1 / den), row-major n x (K + 1) in `terms`. create_tree_family() fills them once and
+// refreshes the split leaf's rows after each logit update, so a candidate reads them instead of recomputing them
+// (losses_logit.cpp). It also holds one candidate's scratch.
+struct LogitTerms {
+  const std::vector<std::vector<double>> *W = nullptr;
+  const std::vector<std::vector<double>> *Y = nullptr;
+  size_t K = 0;
+  std::vector<double> terms;
+  // y_class[i]: the one column of row i whose y is not 0 (K: the reference class), -1 if there is none or several.
+  // irregular[i]: row i is not one-hot, or a cached term outside its class is not +-0 (a NaN); n_irregular: their count
+  std::vector<int> y_class;
+  std::vector<char> irregular;
+  long n_irregular = 0;
+  // scratch of one candidate
+  std::vector<double> e, W_new, W_new_den;
+  std::vector<int> inds, by_class;
+  std::vector<size_t> class_start, class_next;
+  // Points at W and Y (K columns) and computes every row.
+  void reset(const std::vector<std::vector<double>> &W_, const std::vector<std::vector<double>> &Y_, size_t K_);
+  // Recomputes row i (after W[i] changed).
+  void update_row(size_t i);
+};
+// The current tree family's LogitTerms on this thread, or nullptr. A pointer only: the object lives on
+// create_tree_family()'s stack.
+extern thread_local LogitTerms *tls_logit_terms_ptr;
+
 class ClassificationRPF : public RandomPlantedForest {
 
 public:
@@ -110,6 +138,8 @@ private:
   void L1_loss(Split &split);
   void median_loss(Split &split);
   void logit_loss(Split &split);
+  // logit_loss() without LogitTerms: every term computed here
+  void logit_loss_direct(Split &split);
   void logit_loss_2(Split &split);
   void logit_loss_3(Split &split);
   void logit_loss_4(Split &split);
