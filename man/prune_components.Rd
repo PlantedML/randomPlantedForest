@@ -22,14 +22,14 @@ prune_components(
 )
 }
 \arguments{
-\item{object}{\verb{[rpf]}: A fitted regression \code{\link{rpf}} model.}
+\item{object}{\verb{[rpf]}: A fitted \code{\link{rpf}} model (regression or classification).}
 
 \item{data}{\verb{[data.frame | matrix]}: The training data of \code{object}, in the order of the fit: the predictors as
 passed to \code{\link[=rpf]{rpf()}} as \code{x}, or the \code{data} of the formula or recipe interface. For a formula or recipe fit, \code{data}
 may contain the outcome.}
 
-\item{y}{\verb{[numeric | NULL: NULL]}: The outcome of the training rows. Required unless \code{data} contains the outcome
-of a formula or recipe fit.}
+\item{y}{\verb{[numeric | factor | NULL: NULL]}: The outcome of the training rows (the factor for classification).
+Required unless \code{data} contains the outcome of a formula or recipe fit.}
 
 \item{...}{Reserved for future expansion. Unknown arguments are an error.}
 
@@ -71,7 +71,7 @@ An object of class \code{rpf_pruned}, a list with elements:
 \itemize{
 \item \code{fit}: \code{object}, as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
-\item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}).
+\item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}); for classification one per score column.
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
 \code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
@@ -86,6 +86,7 @@ Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
 given rule and \code{tau}, \code{select_by} is \code{"oob"} if R's coefficients were fitted out of bag, otherwise \code{NULL}.
+\item \code{criterion} (classification only): \code{"brier"} or \code{"logloss"}, what the candidates were scored by.
 \item With the display (finite \code{max_panels}) and a component coarsened, a second pruning runs, and these describe it:
 its candidates are the components the first pruning kept, with the coarsened ones in place, and \code{oob} is its
 table. \code{components} then lists only these components, and their \code{share} (which the second pruning's \code{tau}
@@ -119,8 +120,8 @@ full resolution.
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
 }
 \description{
-Drops the small components of a regression forest's functional decomposition and, optionally, refits one
-coefficient per kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
+Drops the small components of a forest's functional decomposition and, optionally, refits one coefficient per
+kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
 without refits, or by K-fold cross-validation on the training rows. By default every kept interaction of three or
 more predictors is then coarsened so that it can be shown in at most \code{max_panels} heat maps, and the model is pruned
 again.
@@ -263,7 +264,27 @@ peaked at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at order
 order 8 (all predictors), most of it the 31 coarsened components the display keeps; there \code{\link[=purify]{purify()}} alone needs
 more than 12 GB of RSS. \code{nthreads} speeds up the fits and the purification.
 
-Only regression forests are supported.
+\strong{Classification.} A classification forest is pruned the same way, with its score columns: one for a binary
+outcome, one per class otherwise (\code{K - 1} for \code{loss = "logit"}, whose first level is the reference). Every component
+then has a column per score column, and:
+\itemize{
+\item A component's share sums its variance over the score columns, centred across the classes (\code{"logit"}: with the
+reference level's score 0 joined; \code{"exponential"}: the part all classes share does not count), over the same sum
+for the prediction. One kept list serves all classes.
+\item \code{"R"} fits one coefficient per kept component, shared by the classes, and one intercept per score column
+(\code{"exponential"} with more than two classes: the first is 0), out of bag as for regression.
+\item The criterion is the forest's loss's own: for \code{loss = "L1"} or \code{"L2"} the squared error of the raw scores summed
+over the columns (the Brier score; least squares for \code{"R"}), for \code{"logit"} and \code{"exponential"} the log-loss of the
+probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \code{"R"}, by Newton's method from rule
+\code{"D"}'s model). The OOB correction is its second-order form (see \code{\link[=rpf]{rpf()}}, "Classification"). The tables then have
+\code{oob_loss}, \code{se_loss}, \code{oob_loss_raw} and \code{se_loss_raw} (the mean criterion) instead of the RMSE columns, and
+\code{cv_loss} and \code{se_loss} for CV; \code{select = "1se"} uses the SE of the mean criterion. A binary forest with
+\code{"L1"} or \code{"L2"} has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
+\item The display coarsens a component with one form (\code{C}, \code{q}, cuts) for all score columns, chosen by the variance
+kept of the centred columns; its stored form is one per score column.
+\item \code{\link[=predict.rpf_pruned]{predict()}} takes \code{type} as \code{\link[=predict.rpf]{predict.rpf()}} does, and \code{\link[=predict_components]{predict_components()}} has one column
+per component and score column, named as for the forest.
+}
 }
 \examples{
 # A main effect and a pure interaction

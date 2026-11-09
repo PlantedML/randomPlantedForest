@@ -121,15 +121,9 @@ tune_given <- function(env) {
   vapply(args, function(a) !eval(call("missing", as.name(a)), env), logical(1))
 }
 
-# The checks of rpf(tune = ): random regression with at least 10 families (the pruning's out-of-bag choice), and none
+# The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none
 # of the settings the search chooses given
-tune_check_call <- function(control, given, splits, prune, mode, deterministic, ntrees, split_structure, call) {
-  if (mode != "regression") {
-    cli::cli_abort(
-      c("{.arg tune} supports regression only.", "x" = "The outcome is a factor (classification)."),
-      call = call
-    )
-  }
+tune_check_call <- function(control, given, splits, prune, deterministic, ntrees, split_structure, call) {
   if (deterministic) {
     cli::cli_abort(
       "{.arg tune} needs out-of-bag rows: it is not available with {.code deterministic = TRUE}.",
@@ -245,9 +239,10 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
     rng_fit[[k]] <<- get(".Random.seed", envir = globalenv())
     # scored only: without the stored pieces of the kept components
     pr <- rpf_prune(res, processed, Inf, store = FALSE, call = call)
-    # the chosen candidate's row of the out-of-bag table: its corrected OOB RMSE is the forest's score. The forest's
-    # own error on the same basis is that of rule D at tau 0, which keeps every nonzero component (the path's own
-    # correction leaves the rows without both halves of OOB families uncorrected: oob_path_table())
+    # the chosen candidate's row of the out-of-bag table: its corrected OOB RMSE is the forest's score (for
+    # classification the root of its mean corrected criterion, oob_table_rmse()). The forest's own error on the
+    # same basis is that of rule D at tau 0, which keeps every nonzero component (the path's own correction
+    # leaves the rows without both halves of OOB families uncorrected: oob_path_table())
     j <- which(pr$oob$rule == pr$rule & pr$oob$tau == pr$tau)[1]
     j0 <- which(pr$oob$rule == "D" & pr$oob$tau == 0)[1]
     rows[[k]] <<- list(
@@ -259,11 +254,11 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
       splits = as.integer(res$params$splits),
       stopped_at = as.integer(res$splits_oob$stopped_at),
       capped = isTRUE(res$splits_oob$capped),
-      oob_rmse_forest = pr$oob$oob_rmse[j0],
+      oob_rmse_forest = oob_table_rmse(pr$oob)[j0],
       rule = pr$rule,
       tau = pr$tau,
       n_kept = length(pr$beta),
-      oob_rmse = pr$oob$oob_rmse[j],
+      oob_rmse = oob_table_rmse(pr$oob)[j],
       seconds = proc.time()[["elapsed"]] - t0
     )
     forests[[k]] <<- res

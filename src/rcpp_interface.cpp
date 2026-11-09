@@ -683,7 +683,15 @@ List selected_to_list(const rpf_coarse::Selected &R)
   o["cuts"] = cuts_to_list(R.cuts);
   o["cells"] = cells;
   o["var_kept"] = R.var_kept;
-  o["g"] = NumericVector(R.g.begin(), R.g.end());
+  // one score column: a vector and a form; V > 1: an n x V matrix and a list of V forms
+  const int V = (int)R.stored.size();
+  if (V == 1)
+    o["g"] = NumericVector(R.g.begin(), R.g.end());
+  else {
+    NumericMatrix g((int)(R.g.size() / (size_t)V), V);
+    std::copy(R.g.begin(), R.g.end(), g.begin());
+    o["g"] = g;
+  }
   o["candidates"] = DataFrame::create(
       Named("combo") = cc,
       Named("q") = cq,
@@ -691,7 +699,14 @@ List selected_to_list(const rpf_coarse::Selected &R)
       Named("var_kept") = cvk,
       Named("stringsAsFactors") = false
   );
-  o["stored"] = form_to_list(R.stored);
+  if (V == 1)
+    o["stored"] = form_to_list(R.stored[0]);
+  else {
+    List forms(V);
+    for (int v = 0; v < V; ++v)
+      forms[v] = form_to_list(R.stored[(size_t)v]);
+    o["stored"] = forms;
+  }
   o["n_eval"] = IntegerVector::create(R.n_diff, R.n_kd);
   return o;
 }

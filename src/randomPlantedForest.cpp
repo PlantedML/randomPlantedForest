@@ -37,7 +37,17 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
       .method("set_inbag", &T::set_inbag)
       .method("purify_oob", &T::purify_oob)
       .method("purify_columns", &T::purify_columns)
-      .method("store_components", &T::store_components);
+      .method("store_components", &T::store_components)
+      // the out-of-bag path and the adaptive fit
+      .method("set_oob_path", &T::set_oob_path)
+      .method("oob_path", &T::oob_path)
+      .method("set_adaptive", &T::set_adaptive)
+      .method("adaptive_stats", &T::adaptive_stats)
+      .method("oob_row_errors", &T::oob_row_errors)
+      // the panel form of purified components
+      .method("coarsen_select", &T::coarsen_select)
+      .method("coarsen_oob", &T::coarsen_oob)
+      .method("coarsen_eval", &T::coarsen_eval);
 }
 
 RCPP_MODULE(mod_rpf)
@@ -60,15 +70,6 @@ RCPP_MODULE(mod_rpf)
       .constructor<const Rcpp::NumericVector>()
       .constructor<const Rcpp::NumericVector, const Rcpp::List>();
   expose_methods(rpf);
-  // the out-of-bag path and the adaptive fit are for regression only
-  rpf.method("set_oob_path", &RcppRPF::set_oob_path)
-      .method("oob_path", &RcppRPF::oob_path)
-      .method("set_adaptive", &RcppRPF::set_adaptive)
-      .method("adaptive_stats", &RcppRPF::adaptive_stats);
-  // the panel form of purified components (regression only)
-  rpf.method("coarsen_select", &RcppRPF::coarsen_select)
-      .method("coarsen_oob", &RcppRPF::coarsen_oob)
-      .method("coarsen_eval", &RcppRPF::coarsen_eval);
 
   Rcpp::class_<RcppCPF> cpf("ClassificationRPF");
   cpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, std::string, const Rcpp::NumericVector>()

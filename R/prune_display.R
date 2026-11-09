@@ -35,6 +35,10 @@
 #   coefficients in sample (a CV choice would need the display in every fold's refit).
 # If no kept component needs coarsening, the model is the first pruning's.
 #
+# Classification with V > 1 score columns: every component has V columns (component-major, dec_cols()); one form (C, q,
+# cuts) serves them all, chosen by the variance kept of the columns centred across the classes (the C++ forest's
+# score_centring(), as crit_centred_var()); its stored form is a list of V forms, and its training-row values n x V.
+#
 # first: the first pruning's model; dec: the forest's decomposition on the training rows; sums: the forest's OOB sums
 # (prune_columns(); NULL unless select_by = "oob"); cand: the candidates.
 prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthreads) {
@@ -44,6 +48,8 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   n <- length(tr$y)
   # the predictor names as the components are named (prune_columns())
   fnames <- colnames(preprocess_predictors_predict(object, tr$predictors[1, , drop = FALSE]))
+  # the score columns per component
+  V <- dec$V %||% 1L
 
   # ---- the kept components of order >= 3 in their panel form
   kept <- names(first$beta)
@@ -58,7 +64,7 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
           lapply(kept_sets[b], as.integer),
           max_panels,
           nthreads,
-          dec$own[, kept[b], drop = FALSE]
+          dec$own[, dec_cols(dec, kept[b]), drop = FALSE]
         )
       }),
       recursive = FALSE,
@@ -117,11 +123,11 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
     res <- first
   } else {
     t1 <- tick()
-    j <- match(co, kept)
-    own <- dec$own[, kept, drop = FALSE]
-    own[, j] <- vapply(co, function(nm) sel[[nm]]$g, numeric(n))
+    j <- crit_blk(match(co, kept), V)
+    own <- dec$own[, dec_cols(dec, kept), drop = FALSE]
+    own[, j] <- do.call(cbind, lapply(co, function(nm) sel[[nm]]$g))
     dimnames(own) <- NULL
-    dec2 <- prune_dec_matrix(own, kept_sets, dec$intercept, n, fnames)
+    dec2 <- prune_dec_matrix(own, kept_sets, dec$intercept, n, fnames, crit = tr$crit)
     rule <- first$rule
     tau <- first$tau
     oob <- NULL
@@ -134,8 +140,9 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
       # the forest's OOB sums of the kept components, the coarsened ones replaced
       idx <- match(kept, prune_set_names(lapply(sums$sets, as.integer), fnames))
       half <- function(s) {
-        out <- matrix(0, n, length(kept))
-        out[, !is.na(idx)] <- s[, idx[!is.na(idx)], drop = FALSE]
+        out <- matrix(0, n, length(kept) * V)
+        ok <- which(!is.na(idx))
+        out[, crit_blk(ok, V)] <- s[, crit_blk(idx[ok], V), drop = FALSE]
         out
       }
       S0 <- half(sums$sum0)
@@ -156,7 +163,7 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
         o2,
         dec2,
         fnames,
-        tr$y,
+        prune_score_y(tr),
         if (choose) cand,
         first$fold_id,
         object$params$ntrees,
@@ -171,7 +178,7 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
       }
       rm(sc, o2)
     }
-    rf <- prune_fit_rule(rule, tau, dec2, tr$y, oob = oob_fit)
+    rf <- prune_fit_rule(rule, tau, dec2, prune_score_y(tr), oob = oob_fit)
     res <- prune_result(
       object,
       rule,
@@ -225,12 +232,16 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
 prune_coarsen_batch <- 2L
 
 # The built form of coarsened component `nm` (k-d index over its stored rectangles), kept in the display's cache
-# environment; rebuilt if missing or if the pointer is gone (a deserialized object)
+# environment; rebuilt if missing or if the pointer is gone (a deserialized object). With V > 1 score columns the stored
+# form is a list of V forms, and so is the built one.
 prune_display_built <- function(object, nm) {
   cache <- object$display$cache
   xp <- if (is.environment(cache)) cache[[nm]] else NULL
-  if (is.null(xp) || !rpf_coarse_valid(xp)) {
-    xp <- rpf_coarse_build(object$display$coarse[[nm]]$stored)
+  multi <- pruned_V(object) > 1L
+  valid <- function(x) if (multi) all(vapply(x, rpf_coarse_valid, logical(1))) else rpf_coarse_valid(x)
+  if (is.null(xp) || !valid(xp)) {
+    st <- object$display$coarse[[nm]]$stored
+    xp <- if (multi) lapply(st, rpf_coarse_build) else rpf_coarse_build(st)
     if (is.environment(cache)) {
       assign(nm, xp, envir = cache)
     }

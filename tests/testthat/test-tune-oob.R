@@ -264,7 +264,6 @@ test_that("rpf(tune = ) and tune_control() check their arguments", {
   expect_error(f(tune = TRUE, prune = FALSE), "prune")
   expect_error(f(tune = TRUE, deterministic = TRUE), "deterministic")
   expect_error(rpf(d$x, d$y, ntrees = 5, tune = TRUE), "at least 10")
-  expect_error(rpf(Species ~ ., data = iris, ntrees = 10, tune = TRUE), "regression only")
   expect_error(f(tune = TRUE, split_structure = "hist"), "min_leaf_rows")
   expect_error(f(tune = "quick", oob_path = 1:3), "oob_path")
   expect_error(tune_control(ladder = data.frame(a = 1)), "split_try")

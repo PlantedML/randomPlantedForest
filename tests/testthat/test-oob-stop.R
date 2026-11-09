@@ -106,16 +106,16 @@ test_that("growing stops at the cap with a warning while the error still falls",
   expect_identical(tu$fit$get_model(), ad$fit$get_model())
 })
 
-test_that("splits = NULL is 30 for classification and deterministic forests", {
+test_that("splits = NULL is chosen out of bag for classification too, and is 30 for deterministic forests", {
   d <- stop_sim()
   yc <- factor(d$y > median(d$y))
   set.seed(5)
   a <- rpf(d$x, yc, ntrees = 3, splits = NULL)
   set.seed(5)
-  b <- rpf(d$x, yc, ntrees = 3, splits = 30)
-  expect_identical(a$params$splits, 30L)
+  b <- rpf(d$x, yc, ntrees = 3, splits = a$params$splits)
+  expect_identical(a$splits_oob$splits, a$params$splits)
+  expect_identical(attr(a$oob_path, "criterion"), "logloss")
   expect_identical(a$fit$get_model(), b$fit$get_model())
-  expect_null(a$splits_oob)
   det <- rpf(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
   expect_identical(det$params$splits, 30L)
   expect_identical(det$fit$get_model(), rpf(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())

@@ -163,7 +163,7 @@ Each family is grown on a bootstrap sample and predictions are averaged.}
 parameter: more splits fit more complex functions. A round splits the best of its
 candidates; near saturation, when every candidate's leaf is too small to split, a
 round can make no split. \code{NULL} chooses it out of bag while the forest grows
-(regression, not with \code{deterministic = TRUE}; otherwise \code{NULL} means 30). See
+(not with \code{deterministic = TRUE}, where \code{NULL} means 30). See
 "Choosing \code{splits} out of bag" in Details.}
 
 \item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
@@ -226,7 +226,7 @@ the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 values of pure leaves are infinite, and from 0.5 on every leaf value is 0.}
 
 \item{prune}{\verb{[logical(1): FALSE]}: Whether to return the pruned model
-instead of the forest (regression only, not with \code{deterministic = TRUE}):
+instead of the forest (not with \code{deterministic = TRUE}):
 the forest is pruned by \code{\link[=prune_components]{prune_components()}} with its defaults on the
 training rows, and the result is its \code{rpf_pruned} model. See "Pruning" in
 Details.}
@@ -239,8 +239,7 @@ at least 1, or \code{Inf} for no coarsening.}
 
 \item{tune}{\verb{[logical(1) | character(1) | rpf_tune_control: FALSE]}: Whether
 to tune the greediness (\code{split_try}, \code{t_try}) and \code{min_leaf_rows} out of
-bag (regression only, not with \code{deterministic = TRUE}, at least 10 tree
-families). \code{TRUE} runs the full search (\code{\link[=tune_control]{tune_control()}}), \code{"quick"} the
+bag (not with \code{deterministic = TRUE}, at least 10 tree families). \code{TRUE} runs the full search (\code{\link[=tune_control]{tune_control()}}), \code{"quick"} the
 two-forest preset, and a \code{\link[=tune_control]{tune_control()}} object your own. Every forest of
 the search has \code{splits} chosen out of bag and is pruned, so \code{tune} implies
 \code{splits = NULL} and \code{prune = TRUE}, and giving \code{split_try}, \code{t_try} or
@@ -271,7 +270,7 @@ order of every factor, and a character vector keeps it for the named
 factor predictors only. See "Factor predictors" below.}
 
 \item{oob_path}{\verb{[logical(1) | integer: FALSE]}: Whether to track the
-out-of-bag (OOB) error along the splits (regression only, not with
+out-of-bag (OOB) error along the splits (not with
 \code{deterministic = TRUE}). \code{TRUE} evaluates it at the checkpoints of
 \code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} for \code{splits}, four per doubling; an increasing
 integer vector in \verb{1..splits} gives the checkpoints. The fitted forest is
@@ -285,7 +284,11 @@ Object of class \code{"rpf"} with model object contained in \verb{$fit}. With
 checkpoint, \code{splits}, the corrected and the plain OOB root mean squared
 error (\code{oob_rmse}, \code{oob_rmse_raw}), and the standard errors of the two mean
 squared errors (\code{se_mse}, \code{se_mse_raw}). Its attribute \code{n_rows} is the
-number of training rows with an OOB tree family. With \code{splits = NULL},
+number of training rows with an OOB tree family. For classification with
+\code{loss = "logit"} or \code{"exponential"}, or more than two classes, the columns
+are the mean corrected and plain criterion (\code{oob_loss}, \code{oob_loss_raw}) and
+their standard errors (\code{se_loss}, \code{se_loss_raw}), and the attribute
+\code{criterion} names it (see "Classification" in Details). With \code{splits = NULL},
 \verb{$params$splits} is the chosen number of splits, \verb{$oob_path} the path of
 the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{splits},
 \code{stopped_at} (the number of splits where growing stopped) and \code{capped}
@@ -303,7 +306,8 @@ grown: \code{step}, \code{split_try}, \code{t_try}, \code{min_leaf_rows}, the ch
 nonzero component; the OOB path's \code{oob_rmse} at the chosen \code{splits} leaves
 the rows without OOB families of both halves uncorrected and is higher),
 its pruned model's \code{rule}, \code{tau}, \code{n_kept} and corrected OOB RMSE
-\code{oob_rmse} (the score), \code{seconds}, whether each step chose it
+\code{oob_rmse} (the score; for classification both are the square root of the
+mean corrected criterion), \code{seconds}, whether each step chose it
 (\code{chosen_step1}, \code{chosen_step2}, \code{chosen_step3}; \code{NA} if not a candidate of
 the step) and \code{final}); \code{steps}, each step's candidates and choice;
 \code{settings}, the chosen \code{split_try}, \code{t_try}, \code{min_leaf_rows} and \code{splits};
@@ -468,7 +472,7 @@ with factor predictors, most so with many levels.
 
 \subsection{Choosing \code{splits} out of bag}{
 
-With \code{splits = NULL} (regression, not deterministic), the number of splits
+With \code{splits = NULL} (not deterministic), the number of splits
 is chosen while the forest grows, by the corrected OOB error of the
 out-of-bag path. The families grow to checkpoints, four per doubling of the
 splits (\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} up to 25,600), and the forest's corrected
@@ -515,8 +519,35 @@ number state, for every interface. For other settings of the pruning (\code{rule
 \code{tau}, \code{select}, \code{select_by}, folds or seed), fit with \code{prune = FALSE} and call
 \code{\link[=prune_components]{prune_components()}}. Together with \code{splits = NULL}, one call chooses the
 number of splits out of bag, prunes and returns the model to show. Pruning
-needs out-of-bag rows and a numeric outcome, so \code{prune = TRUE} is an error for
-classification and with \code{deterministic = TRUE}.
+needs out-of-bag rows, so \code{prune = TRUE} is an error with
+\code{deterministic = TRUE}.
+}
+
+\subsection{Classification}{
+
+A classification forest goes through the same steps (the OOB path,
+\code{splits = NULL}, \code{prune}, \code{max_panels} and \code{tune}) with its score columns:
+one for a binary outcome, one per class otherwise (\code{K - 1} for
+\code{loss = "logit"}: the first level is the reference). Every out-of-bag choice
+is scored by the loss's own criterion, corrected for the OOB family count as
+above:
+\itemize{
+\item \code{loss = "L1"} or \code{"L2"}: the squared error of the raw scores summed over
+the columns (the Brier score, before the scores are truncated to
+probabilities). With two classes this is the regression criterion of the
+0/1 outcome, and the choices are the regression ones, bit for bit.
+\item \code{loss = "logit"} or \code{"exponential"}: the log-loss of the probabilities
+that \code{predict(type = "prob")} returns. The correction is its second-order
+form, \verb{(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))}
+with \code{d = g_even - g_odd} and \verb{H = diag(p) - p p'} over the free score
+columns (for the squared error \verb{H = 2 I}, the correction above).
+}
+
+The pruning keeps or drops a component for all classes, sizes it by its
+variance summed over the score columns centred across the classes, and fits
+one coefficient per kept component shared by the classes (see
+\code{\link[=prune_components]{prune_components()}}). The criterion was checked against the test log-loss
+on simulated data; the defaults were chosen on regression and carried over.
 }
 
 \subsection{Tuning out of bag}{
@@ -526,7 +557,8 @@ With \code{tune}, \code{rpf()} searches the greediness of the split search
 minimum leaf size \code{min_leaf_rows}, without cross-validation. Every forest of
 the search is grown with \code{splits} chosen out of bag and pruned by
 \code{\link[=prune_components]{prune_components()}} with its defaults (without the display), and forests are
-compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+compared by the corrected out-of-bag RMSE of their pruned model (for
+classification by the root of its mean corrected criterion); the lowest
 wins. A pruned model at 0 (every candidate's correction overshot, see
 \code{\link[=prune_components]{prune_components()}}) is not chosen unless all are. The search is
 coordinate-wise (\code{\link[=tune_control]{tune_control()}}): with \code{tune = TRUE}

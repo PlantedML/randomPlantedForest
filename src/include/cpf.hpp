@@ -11,6 +11,13 @@ public:
   void fit() override;
   void set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values) override;
   ~ClassificationRPF() {};
+  // The per-row out-of-bag criterion of the loss (rpf.hpp): L1 / L2 (and median) the squared error summed over the
+  // score columns, H = 2I; logit and exponential the log-loss of the probabilities predict() makes, H = diag(p) - pp'
+  // over the free score columns
+  double
+  oob_row_error(size_t i, const double *g, const double *d, double inv, const double *var, double coef) const override;
+  // The centring of the score columns (rpf.hpp): multiclass logit 1, multiclass exponential 2, otherwise 0
+  int score_centring() const override;
 
 protected:
   // Maps a loss name to `loss` and `calcLoss`; throws on unknown names.

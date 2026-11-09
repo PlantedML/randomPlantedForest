@@ -145,8 +145,9 @@ struct OobPath {
 };
 
 // The adaptive fit (set_adaptive()): after every family's prediction at checkpoint c (0-based) is known, the stopper
-// gets the OOB path at that checkpoint alone (as OobPath, one checkpoint) and returns 0 to grow on, or the 1-based
-// index (1..c+1) of the chosen checkpoint to stop there. It is called on the calling thread, checkpoint by checkpoint.
+// gets the OOB path at that checkpoint alone (as OobPath, one checkpoint: value_size columns) and returns 0 to grow on,
+// or the 1-based index (1..c+1) of the chosen checkpoint to stop there. It is called on the calling thread, checkpoint
+// by checkpoint.
 typedef std::function<int(size_t c, const OobPath &path)> AdaptiveStopper;
 
 // What the last adaptive fit did (adaptive_stats()), for diagnostics
@@ -293,13 +294,14 @@ public:
   // The pieces of the components `sets` (1-based; see ComponentStore), from one pass over the families restricted to
   // them. The forest is not changed. Needs the training data.
   ComponentStore store_components(const std::vector<std::vector<int>> &sets, int nthreads) const;
-  // Track the OOB path in the next fit() (regression): `checkpoints` are increasing split counts in 1..splits; empty
-  // turns it off (the default: a plain fit does none of this). The fit itself is unchanged.
+  // Track the OOB path in the next fit(): `checkpoints` are increasing split counts in 1..splits; empty turns it off
+  // (the default: a plain fit does none of this). The fit itself is unchanged. A classification forest tracks its
+  // value_size score columns (the leaves' values, on the link scale for logit and exponential).
   void set_oob_path(const std::vector<int> &checkpoints);
   // Whether the last fit tracked an OOB path; oob_path() returns it (see OobPath).
   bool has_oob_path() const;
   OobPath oob_path() const;
-  // The next fit() is adaptive (regression, not deterministic): the families grow one at a time, `nthreads` together,
+  // The next fit() is adaptive (not deterministic): the families grow one at a time, `nthreads` together,
   // and `stopper` decides at each of the `checkpoints` (increasing split counts, the last one splits) whether growing
   // goes on, from the corrected OOB error (see AdaptiveStopper). The forest at the chosen checkpoint is rebuilt from
   // the records of the splits, and n_splits becomes its number of splits: the forest that a fit with that many splits
@@ -310,21 +312,43 @@ public:
       const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
   );
   AdaptiveStats adaptive_stats() const;
-  // The panel form of purified components (coarsen.hpp, lib/coarsen.cpp). The forest must hold its training data and
-  // have value size 1 (regression); the components' rectangles come from passes over the families restricted to them.
+  // The corrected out-of-bag error of training row i whose OOB score is g (value_size values), as the adaptive fit
+  // estimates its bound: the per-row criterion of the forest's loss (regression, and classification with L1 / L2: the
+  // squared error summed over the score columns; logit and exponential: the log-loss of the probabilities predict()
+  // makes of g) minus coef times its second-order term, with H the Hessian of the per-row criterion in the score: given
+  // d (the difference of the even- and odd-family OOB means), d'Hd / (2 inv); given var (the per-column variances
+  // across families), sum_v H_vv var_v / 2; neither: none. For the squared error H = 2I, the regression correction.
+  virtual double
+  oob_row_error(size_t i, const double *g, const double *d, double inv, const double *var, double coef) const;
+  // oob_row_error() of every training row, for checks: G and D column-major n x value_size (a row of D with a NaN: no
+  // d), inv and coef per row
+  std::vector<double> oob_row_errors(
+      const std::vector<double> &G,
+      const std::vector<double> &D,
+      const std::vector<double> &inv,
+      const std::vector<double> &coef
+  ) const;
+  // How the score columns are centred across the classes before their variances are summed (the size of a
+  // component, the variance a coarsened form keeps): 0 not (regression, one column, L1 / L2), 1 with the reference
+  // score 0 joined (multiclass logit), 2 across the columns (multiclass exponential)
+  virtual int score_centring() const { return 0; }
+  // The panel form of purified components (coarsen.hpp, lib/coarsen.cpp). The forest must hold its training data; the
+  // components' rectangles come from passes over the families restricted to them. With value_size V > 1 (multiclass)
+  // every component has V score columns, and one form (C, q, cuts) serves them all.
   // coarsen_select(): for each set S (1-based) of order >= 3, the panels the forest's f_S needs (forest_panels) and,
   // if more than P, every candidate (coarse features C, maximal q vector, equal-mass cuts) scored by the variance kept
-  // on the training rows; the best one, its training-row values and its stored form. If at most P, its panels: the
-  // |S| - 2 features with the fewest own cut points and these cut points. fvals: column-major n_rows x n_cols, the
-  // forest's f_S at the training rows, one column per set (as purify_columns() gives them).
+  // on the training rows (of the columns centred by score_centring(), summed); the best one, its training-row values
+  // and its stored forms (one per column). If at most P, its panels: the |S| - 2 features with the fewest own cut
+  // points and these cut points (one set for all columns). fvals: column-major n_rows x n_cols, the forest's f_S at
+  // the training rows, V columns per set (column k * V + v, as purify_columns() gives them).
   std::vector<rpf_coarse::Selected> coarsen_select(
       const std::vector<std::vector<int>> &sets, int P, int nthreads, const double *fvals, int n_rows, int n_cols
   );
   // coarsen_oob(): each family's coarsened components at its out-of-bag rows, summed as purify_oob() sums (needs the
-  // in-bag counts).
+  // in-bag counts); V columns per spec.
   rpf_coarse::OobSums coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads);
   // coarsen_eval(): the forest's f_S coarsened on any C (possibly empty: f_S itself) at the n rows of column-major X
-  // (n x p, all features). The forest must be purified in mode 2.
+  // (n x p, all features). The forest must be purified in mode 2 and have one score column.
   std::vector<double> coarsen_eval(const rpf_coarse::Spec &spec, const double *X, int n, int p);
 
   // Destination for warnings; nullptr silences them. The core never writes to
@@ -410,8 +434,14 @@ protected:
   std::shared_ptr<PathTracker> path_start(size_t n, TreeFamily *fam);
   // A split found by the search, before the family's leaves change: move the tracked rows of the split leaf to the two
   // new leaves and add M_s / M_b to their predictions (the change of the family's prediction); in an adaptive fit,
-  // also record the split
-  void path_split(PathTracker &trk, const Split &split) const;
+  // also record the split. A classification forest passes its leaves' increments inc_s / inc_b instead (for logit and
+  // exponential not M_s / M_b).
+  void path_split(
+      PathTracker &trk,
+      const Split &split,
+      const std::vector<double> *inc_s = nullptr,
+      const std::vector<double> *inc_b = nullptr
+  ) const;
   // `k` splits are done: snapshot the predictions if k is the next checkpoint. Returns whether the family grows on
   // (always, except in an adaptive fit)
   bool path_step(PathTracker &trk, int k) const;

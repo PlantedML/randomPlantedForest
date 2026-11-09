@@ -1,6 +1,7 @@
-// Out-of-bag (OOB) path along the splits (regression). While a family grows, its prediction at each of its OOB rows
-// is updated split by split, as the residuals of its bootstrap rows are: every tracked row sits in a list per leaf, a
-// split moves the rows of the split leaf to the two new leaves and adds M_s or M_b to their predictions. At each
+// Out-of-bag (OOB) path along the splits. While a family grows, its prediction at each of its OOB rows is updated split
+// by split, as the residuals of its bootstrap rows are: every tracked row sits in a list per leaf, a split moves the
+// rows of the split leaf to the two new leaves and adds M_s or M_b to their predictions (a classification forest: its
+// leaves' increments, value_size columns; for logit and exponential on the link scale). At each
 // checkpoint the predictions are copied; after the family is grown the copies are added to per-row sums on the calling
 // thread, in family order. The forest grown with k splits and the same seed is exactly the first k splits of a longer
 // fit (nothing in the fit depends on the total number of splits), so the sums at checkpoint k are the OOB sums of
@@ -66,8 +67,11 @@ std::shared_ptr<RandomPlantedForest::PathTracker> RandomPlantedForest::path_star
   return t;
 }
 
-void RandomPlantedForest::path_split(PathTracker &trk, const Split &split) const
+void RandomPlantedForest::path_split(
+    PathTracker &trk, const Split &split, const std::vector<double> *inc_s, const std::vector<double> *inc_b
+) const
 {
+  const std::vector<double> &Ms = inc_s ? *inc_s : split.M_s, &Mb = inc_b ? *inc_b : split.M_b;
   const DecisionTree &T = *split.tree_index;
   auto &lists = trk.in_leaf[T.split_dims];
   const size_t li = (size_t)(split.leaf_index - &T.leaves[0]);
@@ -82,16 +86,19 @@ void RandomPlantedForest::path_split(PathTracker &trk, const Split &split) const
       trk.dims_list.push_back(T.split_dims);
     }
     trk.rec.push_back(
-        RpfSplitRecord{
-            it->second, (int32_t)li, (int32_t)split.split_coordinate, split.split_point, split.M_s[0], split.M_b[0]}
+        RpfSplitRecord{it->second, (int32_t)li, (int32_t)split.split_coordinate, split.split_point, Ms[0], Mb[0]}
     );
+    if (value_size > 1) {
+      trk.rec_vals.insert(trk.rec_vals.end(), Ms.begin(), Ms.begin() + (std::ptrdiff_t)value_size);
+      trk.rec_vals.insert(trk.rec_vals.end(), Mb.begin(), Mb.begin() + (std::ptrdiff_t)value_size);
+    }
   }
   std::vector<int> S, B;
   for (int p : lists[li]) {
     // the rule of create_tree_family: below the split point to the smaller half
     const bool small = X[(size_t)trk.rows[(size_t)p]][k] < split.split_point;
     (small ? S : B).push_back(p);
-    const std::vector<double> &M = small ? split.M_s : split.M_b;
+    const std::vector<double> &M = small ? Ms : Mb;
     for (size_t v = 0; v < value_size; ++v)
       trk.pred[(size_t)p * value_size + v] += M[v];
   }
@@ -171,9 +178,10 @@ OobPath RandomPlantedForest::oob_path() const
 // checkpoint. Growing all families together would hold every family's growing state (bootstrap copy, residuals,
 // leaves with their rows and caches, candidate pool) until the stop. Here at most `nthreads` families grow at a time,
 // each alone and to a bound (a number of checkpoints). A family keeps its OOB predictions at the checkpoints it reached
-// and a record of its splits (RpfSplitRecord, 40 bytes a split). A family's splits depend only on its seed (its own
-// random stream; the budget, the last checkpoint, is the same), so its predictions at a checkpoint are those of
-// growing all families together, and the record rebuilds its leaves there.
+// and a record of its splits (RpfSplitRecord, 40 bytes a split, and 16 bytes per score column more with value_size >
+// 1). A family's splits depend only on its seed (its own random stream; the budget, the last checkpoint, is the same),
+// so its predictions at a checkpoint are those of growing all families together, and the record rebuilds its leaves
+// there.
 //
 // 1. Pilot: the first `nthreads` families grow together, checkpoint by checkpoint, until the stopper's rule on their
 //    own corrected OOB error (AloneFit::estimate(), the same patience and floor) stops. That is the first bound.
@@ -212,6 +220,7 @@ struct RandomPlantedForest::AloneFit {
     std::vector<int> rows;                  /**< its OOB rows */
     std::vector<std::vector<double>> snaps; /**< per checkpoint reached: the predictions at its OOB rows */
     std::vector<RpfSplitRecord> rec;        /**< its splits in order */
+    std::vector<double> rec_vals;           /**< value_size > 1: per record its 2 * value_size values */
     std::vector<uint32_t> rec_at;           /**< per checkpoint reached: the number of records up to it */
     std::vector<std::set<int>> dims;        /**< the split trees' dims (RpfSplitRecord::dims) */
     size_t reached = 0;                     /**< the number of checkpoints reached */
@@ -250,13 +259,15 @@ struct RandomPlantedForest::AloneFit {
   double paused_bytes = 0;
   bool estimating = true; // re-estimate the bound after each family (off once the stopper decides)
   size_t consumed = 0;    // checkpoints already passed to the stopper (their predictions are freed)
-  // the bound's estimate: per checkpoint and row, the sums of the counted families' OOB predictions over the families
-  // of even and of odd index and their numbers (empty: no family counted there yet), and the sums of squares over all
+  // the bound's estimate: per checkpoint and row (and score column: [i * V + v]), the sums of the counted families' OOB
+  // predictions over the families of even and of odd index and their numbers (empty: no family counted there yet), and
+  // the sums of squares over all
   std::vector<std::vector<double>> s0, s1, q;
   std::vector<std::vector<int>> m0, m1;
-  std::vector<size_t> counted;   // per family: the checkpoints added to the estimate
-  std::vector<size_t> n_counted; // per checkpoint: the number of families counted there
-  std::vector<double> y;
+  std::vector<size_t> counted;                 // per family: the checkpoints added to the estimate
+  std::vector<size_t> n_counted;               // per checkpoint: the number of families counted there
+  const RandomPlantedForest *forest = nullptr; // its oob_row_error(): a row's error
+  size_t V = 1;                                // the score columns
   std::vector<int> cp;
   size_t B = 0, N = 0;
   AdaptiveStats stats;
@@ -266,20 +277,24 @@ struct RandomPlantedForest::AloneFit {
   {
     for (size_t c = counted[n]; c < to && c < snaps.size(); ++c) {
       if (s0[c].empty()) {
-        s0[c].assign(N, 0.0);
-        s1[c].assign(N, 0.0);
+        s0[c].assign(N * V, 0.0);
+        s1[c].assign(N * V, 0.0);
         m0[c].assign(N, 0);
         m1[c].assign(N, 0);
-        q[c].assign(N, 0.0);
+        q[c].assign(N * V, 0.0);
       }
       std::vector<double> &s = (n % 2 ? s1 : s0)[c];
       std::vector<int> &mm = (n % 2 ? m1 : m0)[c];
       const std::vector<double> &p = snaps[c];
-      if (p.size() < rows.size())
+      if (p.size() < rows.size() * V)
         break; // (freed: already passed to the stopper)
       for (size_t i = 0; i < rows.size(); ++i) {
-        s[(size_t)rows[i]] += p[i];
-        q[c][(size_t)rows[i]] += p[i] * p[i];
+        const size_t r = (size_t)rows[i] * V;
+        for (size_t v = 0; v < V; ++v) {
+          const double x = p[i * V + v];
+          s[r + v] += x;
+          q[c][r + v] += x * x;
+        }
         ++mm[(size_t)rows[i]];
       }
       ++n_counted[c];
@@ -293,12 +308,14 @@ struct RandomPlantedForest::AloneFit {
   // counted, the error is the stopper's (so the bound is its stop, up to the rounding of the sums); elsewhere v_i is
   // the sample variance over the row's OOB families, on the rows with at least two (with few families the even / odd
   // estimate, and the rows it leaves uncorrected, stop too early). Where the curve ends before a stop, the earliest
-  // stop that could follow.
+  // stop that could follow. A row's error is the forest's oob_row_error() (regression: (y - g)^2 - (1 / m - 1 / B) v;
+  // with V > 1 columns and the sample variances, the diagonal of their covariance).
   size_t estimate()
   {
     const size_t C = cp.size();
     std::vector<double> e;
     const size_t min_fam = std::min<size_t>(4, std::max<size_t>(1, std::min(B, pilot_n)));
+    std::vector<double> g(V), d(V), var(V);
     for (size_t c = 0; c < C && !s0[c].empty() && n_counted[c] >= min_fam; ++c) {
       const bool all = n_counted[c] == B || n_counted[c] < 2; // (one family: no variance across families)
       double sum = 0;
@@ -307,15 +324,21 @@ struct RandomPlantedForest::AloneFit {
         const int a = m0[c][i], b = m1[c][i], m = a + b;
         if (m == 0 || (!all && m < 2))
           continue;
-        const double g0 = s0[c][i], g1 = s1[c][i], g = (g0 + g1) / m, r = y[i] - g;
-        double v = 0;
-        if (!all)
-          v = (q[c][i] - m * g * g) / (m - 1);
-        else if (a > 0 && b > 0) {
-          const double d = g0 / a - g1 / b;
-          v = d * d / (1.0 / a + 1.0 / b);
+        for (size_t v = 0; v < V; ++v) {
+          const double g0 = s0[c][i * V + v], g1 = s1[c][i * V + v];
+          g[v] = (g0 + g1) / m;
+          if (!all)
+            var[v] = (q[c][i * V + v] - m * g[v] * g[v]) / (m - 1);
+          else if (a > 0 && b > 0)
+            d[v] = g0 / a - g1 / b;
         }
-        sum += r * r - (1.0 / m - 1.0 / (double)B) * v;
+        const double coef = 1.0 / m - 1.0 / (double)B;
+        if (!all)
+          sum += forest->oob_row_error(i, g.data(), nullptr, 0.0, var.data(), coef);
+        else if (a > 0 && b > 0)
+          sum += forest->oob_row_error(i, g.data(), d.data(), 1.0 / a + 1.0 / b, nullptr, coef);
+        else
+          sum += forest->oob_row_error(i, g.data(), nullptr, 0.0, nullptr, coef);
         ++n_ok;
       }
       if (n_ok == 0)
@@ -548,6 +571,8 @@ void RandomPlantedForest::alone_finish(size_t n)
       f.snaps[j] = std::move(t.csnaps[j]);
   f.rec = std::move(t.rec);
   f.rec.shrink_to_fit();
+  f.rec_vals = std::move(t.rec_vals);
+  f.rec_vals.shrink_to_fit();
   f.rec_at = std::move(t.rec_at);
   f.dims = std::move(t.dims_list);
   f.reached = t.next;
@@ -717,15 +742,23 @@ void RandomPlantedForest::alone_rebuild(size_t c)
           const std::shared_ptr<DecisionTree> T = fam.at(dims);
           const Leaf &parent = T->leaves.at((size_t)r.leaf);
           Leaf ls, lb;
-          ls.value.assign(1, r.ms);
-          lb.value.assign(1, r.mb);
+          if (value_size == 1) {
+            ls.value.assign(1, r.ms);
+            lb.value.assign(1, r.mb);
+          } else {
+            const double *rv = F.rec_vals.data() + i * 2 * value_size;
+            ls.value.assign(rv, rv + value_size);
+            lb.value.assign(rv + value_size, rv + 2 * value_size);
+          }
           ls.intervals = parent.intervals;
           lb.intervals = parent.intervals;
           ls.intervals[(size_t)r.coord - 1].second = r.point;
           lb.intervals[(size_t)r.coord - 1].first = r.point;
           if (dims.count(r.coord) && delete_leaves) {
-            ls.value[0] += parent.value[0];
-            lb.value[0] += parent.value[0];
+            for (size_t v = 0; v < value_size; ++v) {
+              ls.value[v] += parent.value[v];
+              lb.value[v] += parent.value[v];
+            }
             T->leaves[(size_t)r.leaf] = std::move(lb);
             T->leaves.push_back(std::move(ls));
           } else {
@@ -766,15 +799,12 @@ void RandomPlantedForest::alone_rebuild(size_t c)
 void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
 {
   AloneFit &A = *alone_;
-  const size_t B = (size_t)n_trees, C = path_checkpoints_.size(), N = (size_t)sample_size;
-  if (value_size != 1)
-    throw std::invalid_argument("The adaptive fit is for a single response.");
+  const size_t B = (size_t)n_trees, C = path_checkpoints_.size(), N = (size_t)sample_size, V = value_size;
   A.B = B;
   A.N = N;
   A.cp = path_checkpoints_;
-  A.y.resize(N);
-  for (size_t i = 0; i < N; ++i)
-    A.y[i] = Y[i][0];
+  A.forest = this;
+  A.V = V;
   A.fam.assign(B, AloneFit::Family());
   A.paused_cv.reset(new std::condition_variable[B]);
   A.counted.assign(B, 0);
@@ -817,7 +847,7 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
       std::vector<std::vector<double>>().swap(*v);
     for (auto *v : {&A.m0, &A.m1})
       std::vector<std::vector<int>>().swap(*v);
-    std::vector<double>().swap(A.y);
+    A.forest = nullptr;
     A.queue.clear();
     for (auto &t : path_family_)
       t.reset();
@@ -867,16 +897,17 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
       }
       const auto t0 = std::chrono::steady_clock::now();
       // every family's predictions at checkpoint c, summed over the families of even and of odd index in family order
-      // (as fit() sums the OOB path)
+      // (as fit() sums the OOB path; score column v at [v * N + i])
       path.checkpoints.assign(1, path_checkpoints_[c]);
-      path.sum0.assign(N, 0.0);
-      path.sum1.assign(N, 0.0);
+      path.sum0.assign(N * V, 0.0);
+      path.sum1.assign(N * V, 0.0);
       for (size_t b = 0; b < B; ++b) {
         const AloneFit::Family &F = A.fam[b];
         const std::vector<double> &p = F.snaps[c];
         std::vector<double> &sum = b % 2 ? path.sum1 : path.sum0;
         for (size_t i = 0; i < F.rows.size(); ++i)
-          sum[(size_t)F.rows[i]] += p[i];
+          for (size_t v = 0; v < V; ++v)
+            sum[v * N + (size_t)F.rows[i]] += p[i * V + v];
       }
       const int sel = A.stopper(c, path);
       A.stats.seconds_stopper += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -904,4 +935,42 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
     throw;
   }
   off();
+}
+
+// The regression criterion of a row: the squared error, corrected as the OOB path's table corrects it (see rpf.hpp)
+double RandomPlantedForest::oob_row_error(
+    size_t i, const double *g, const double *d, double inv, const double *var, double coef
+) const
+{
+  const double r = Y[i][0] - g[0];
+  double v = 0;
+  if (d)
+    v = d[0] * d[0] / inv;
+  else if (var)
+    v = var[0];
+  return r * r - coef * v;
+}
+
+std::vector<double> RandomPlantedForest::oob_row_errors(
+    const std::vector<double> &G,
+    const std::vector<double> &D,
+    const std::vector<double> &inv,
+    const std::vector<double> &coef
+) const
+{
+  const size_t n = (size_t)sample_size, V = value_size;
+  if (Y.size() != n || G.size() != n * V || D.size() != n * V || inv.size() != n || coef.size() != n)
+    throw std::invalid_argument("oob_row_errors(): G and D must be n x value_size, inv and coef of length n.");
+  std::vector<double> out(n), g(V), d(V);
+  for (size_t i = 0; i < n; ++i) {
+    bool has_d = true;
+    for (size_t v = 0; v < V; ++v) {
+      g[v] = G[v * n + i];
+      d[v] = D[v * n + i];
+      if (std::isnan(d[v]))
+        has_d = false;
+    }
+    out[i] = oob_row_error(i, g.data(), has_d ? d.data() : nullptr, inv[i], nullptr, coef[i]);
+  }
+  return out;
 }

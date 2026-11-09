@@ -1,5 +1,6 @@
 
 #include "cpf.hpp"
+#include "path_tracker.hpp"
 #include <cmath>
 #include <numeric>
 #include <algorithm>
@@ -1185,9 +1186,14 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   } leaves_scratch_guard;
   tls_leaves_scratch_ptr = &leaves_scratch;
 
+  // the OOB path (nullptr if off): each OOB row's family prediction, split by split, as in rpf.cpp
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+
   // modify existing or add new trees through splitting
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
+    if (path && !path_step(*path, split_count))
+      break;
 
     // find optimal split
     if (split_structure_mode_ == 0)
@@ -1498,6 +1504,10 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       }
 
+      // the OOB path follows the leaves' increments (for logit and exponential not M_s / M_b), before the leaves change
+      if (path)
+        path_split(*path, curr_split, &update_s, &update_b);
+
       // construct new leaves
       Leaf leaf_s, leaf_b;
       {
@@ -1675,4 +1685,82 @@ void ClassificationRPF::set_parameters(const std::vector<std::string> &keys, con
     }
   }
   this->fit();
+}
+
+// The per-row criterion of a classification forest (rpf.hpp; the same as R's crit_rows()). L1 / L2 (and median): the
+// squared error summed over the score columns (Y holds their 0/1 coding), H = 2I. logit and exponential: the log-loss
+// of the probabilities predict() makes: binary p = 1 / (1 + exp(-g)); multiclass logit the softmax of the K - 1 scores
+// and the reference level's score 0; multiclass exponential the softmax of the K scores. H = diag(p) - pp' over the
+// free score columns.
+double ClassificationRPF::oob_row_error(
+    size_t i, const double *g, const double *d, double inv, const double *var, double coef
+) const
+{
+  const size_t V = value_size;
+  const std::vector<double> &y = Y[i];
+  const bool logit_like =
+      loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4;
+  const bool expo = loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3;
+  if (!logit_like && !expo) {
+    double e = 0, q = 0;
+    for (size_t v = 0; v < V; ++v) {
+      const double r = y[v] - g[v];
+      e += r * r;
+      if (d)
+        q += d[v] * d[v] / inv;
+      else if (var)
+        q += var[v];
+    }
+    return e - coef * q;
+  }
+  // the probabilities of the free score columns, and the log-loss of the row's class
+  std::vector<double> p(V);
+  double e = 0;
+  if (V == 1) {
+    // exponential codes the classes as -1 / 1, logit as 0 / 1
+    const bool second = expo ? y[0] > 0 : y[0] > 0.5;
+    p[0] = 1 / (1 + std::exp(-g[0]));
+    // -log p(y): log(1 + exp(-g)) for the second class, log(1 + exp(g)) for the first, stably
+    const double z = second ? -g[0] : g[0];
+    e = z > 0 ? z + std::log1p(std::exp(-z)) : std::log1p(std::exp(z));
+  } else {
+    // logit: the reference score 0 joins the softmax; exponential: the K = V scores alone
+    double mx = logit_like ? 0.0 : -std::numeric_limits<double>::infinity();
+    for (size_t v = 0; v < V; ++v)
+      mx = std::max(mx, g[v]);
+    double den = logit_like ? std::exp(-mx) : 0.0;
+    for (size_t v = 0; v < V; ++v)
+      den += std::exp(g[v] - mx);
+    const double lse = mx + std::log(den);
+    int cls = -1; // the column of the row's class (-1: the reference level of logit)
+    for (size_t v = 0; v < V; ++v)
+      if (y[v] > (expo ? 0.0 : 0.5))
+        cls = (int)v;
+    for (size_t v = 0; v < V; ++v)
+      p[v] = std::exp(g[v] - lse);
+    e = cls < 0 ? lse : lse - g[cls];
+  }
+  double q = 0;
+  if (d) {
+    double a = 0, b = 0;
+    for (size_t v = 0; v < V; ++v) {
+      a += p[v] * d[v] * d[v];
+      b += p[v] * d[v];
+    }
+    q = 0.5 * (a - b * b) / inv;
+  } else if (var)
+    for (size_t v = 0; v < V; ++v)
+      q += 0.5 * p[v] * (1 - p[v]) * var[v];
+  return e - coef * q;
+}
+
+int ClassificationRPF::score_centring() const
+{
+  if (value_size < 2)
+    return 0;
+  if (loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4)
+    return 1;
+  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
+    return 2;
+  return 0;
 }
