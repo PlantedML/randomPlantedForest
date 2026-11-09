@@ -382,8 +382,9 @@ test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-cl
   # the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the families kept finding
   # new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A family pauses at most one
   # doubling past the first family's estimate and grows on when the stop comes later, so each grows to the stop.
+  # (the stop on a new minimum alone; the plateau stop, the default, stops this curve at 71 splits and chooses 42)
   d <- cp_data(300)
-  old <- options(randomPlantedForest.exact_draw = TRUE)
+  old <- options(randomPlantedForest.exact_draw = TRUE, randomPlantedForest.adaptive_tolerance = 0)
   on.exit(options(old))
   set.seed(8)
   f <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
@@ -405,6 +406,12 @@ test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-cl
     prune = FALSE
   )
   expect_identical(f$fit$get_model(), g$fit$get_model())
+  # the plateau stop (the default tolerance) ends the flat curve early, and the families grow only about that far
+  options(randomPlantedForest.adaptive_tolerance = 1)
+  set.seed(8)
+  p <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
+  expect_identical(p$splits_oob[c("splits", "stopped_at")], list(splits = 42L, stopped_at = 71L))
+  expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * 71)
 })
 
 test_that("the OOB path of a classification forest: prefix property, splits = NULL = the fixed fit", {

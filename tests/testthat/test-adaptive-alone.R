@@ -56,7 +56,10 @@ test_that("waiting families and families grown again give the same fit", {
     expect_identical(st$pauses, 0)
     expect_identical(none$fit$get_model(), big$fit$get_model())
   }
-  # the first families stop early, so the later ones that waited or finished at that estimate grow further
+  # the first families stop early, so the later ones that waited or finished at that estimate grow further (with the
+  # stop on a new minimum alone; the plateau stop ends this fit before any family falls short)
+  old <- options(randomPlantedForest.adaptive_tolerance = 0)
+  on.exit(options(old))
   expect_gt(alone_fit(d, split_structure = "cur_trees_1", pause_gb = 0)$fit$adaptive_stats()$regrowths, 0)
 })
 
