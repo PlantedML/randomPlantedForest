@@ -372,7 +372,9 @@
 #' the search is grown with `splits` chosen out of bag and pruned by
 #' [prune_components()] with its defaults (without the display), and forests are
 #' compared by the corrected out-of-bag RMSE of their pruned model; the lowest
-#' wins. The search is coordinate-wise ([tune_control()]): with `tune = TRUE`
+#' wins. A pruned model at 0 (every candidate's correction overshot, see
+#' [prune_components()]) is not chosen unless all are. The search is
+#' coordinate-wise ([tune_control()]): with `tune = TRUE`
 #' the ladder from 10 / 0.4 to 1 / 0.0125 at `min_leaf_rows = 1`, then
 #' `min_leaf_rows` 1, 5, 20 and 100 at the chosen point, then the point's two
 #' ladder neighbours, about 10 forests in all. `tune = "quick"` grows two

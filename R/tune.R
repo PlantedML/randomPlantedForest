@@ -355,10 +355,12 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
 rank_greedy <- function(idx) rank(idx, ties.method = "first")
 
 # The choice among k forests by their corrected OOB MSEs `mse`: the lowest (ties, relative 1e-12: the simplest by the
-# ranks `simpler`, 1 = simplest). Returns its index.
+# ranks `simpler`, 1 = simplest). Returns its index. A score of 0 is a pruned model whose corrected MSE was set to 0
+# (prune_oob_score(): the correction overshot, not a perfect model), so such forests are not chosen unless all are 0.
 tune_oob_choose <- function(mse, simpler) {
   mse <- unname(mse)
-  ties <- which(mse <= min(mse) * (1 + 1e-12) | mse == min(mse))
+  ok <- if (all(mse == 0)) seq_along(mse) else which(mse > 0)
+  ties <- ok[mse[ok] <= min(mse[ok]) * (1 + 1e-12) | mse[ok] == min(mse[ok])]
   ties[order(simpler[ties])][1]
 }
 

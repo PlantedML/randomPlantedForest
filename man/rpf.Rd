@@ -526,7 +526,9 @@ minimum leaf size \code{min_leaf_rows}, without cross-validation. Every forest o
 the search is grown with \code{splits} chosen out of bag and pruned by
 \code{\link[=prune_components]{prune_components()}} with its defaults (without the display), and forests are
 compared by the corrected out-of-bag RMSE of their pruned model; the lowest
-wins. The search is coordinate-wise (\code{\link[=tune_control]{tune_control()}}): with \code{tune = TRUE}
+wins. A pruned model at 0 (every candidate's correction overshot, see
+\code{\link[=prune_components]{prune_components()}}) is not chosen unless all are. The search is
+coordinate-wise (\code{\link[=tune_control]{tune_control()}}): with \code{tune = TRUE}
 the ladder from 10 / 0.4 to 1 / 0.0125 at \code{min_leaf_rows = 1}, then
 \code{min_leaf_rows} 1, 5, 20 and 100 at the chosen point, then the point's two
 ladder neighbours, about 10 forests in all. \code{tune = "quick"} grows two

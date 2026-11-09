@@ -186,6 +186,11 @@ test_that("the choice: the lowest MSE, ties to the simpler", {
   expect_identical(ch(c(1, 1, 3), simpler = c(2, 1, 3)), 2L)
   expect_identical(ch(c(1, 1 + 1e-14, 3), simpler = c(2, 1, 3)), 2L)
   expect_identical(ch(c(1, 1 + 1e-6, 3), simpler = c(2, 1, 3)), 1L)
+  # a score of 0 (a pruned model whose correction overshot) is not chosen while another forest is above 0
+  expect_identical(ch(c(0.5, 0, 0.4), simpler = 1:3), 3L)
+  expect_identical(ch(c(0, 0.4, 0.4), simpler = c(1, 3, 2)), 3L)
+  # all at 0: they tie, the simplest
+  expect_identical(ch(c(0, 0, 0), simpler = c(2, 1, 3)), 2L)
 })
 
 test_that("the same random number state gives the same search and model", {
