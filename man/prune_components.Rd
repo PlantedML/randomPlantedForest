@@ -69,7 +69,7 @@ on it.}
 \value{
 An object of class \code{rpf_pruned}, a list with elements:
 \itemize{
-\item \code{fit}: \code{object} (purified).
+\item \code{fit}: \code{object}, as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
 \item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}).
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
@@ -112,6 +112,8 @@ step); \code{cache}, an environment holding the coarsened components' search ind
 saving and loading). In \code{coarse} and \code{asis} alike, a panel is a cell of \code{cuts} (a value \code{x} of predictor \code{k} of
 \code{C} lies in cell \code{findInterval(x, cuts[[k]])}), shown as a heat map over the two predictors \code{setdiff(S, C)} at
 full resolution.
+\item \code{store}: the pieces of the kept components that are not coarsened, from which the model predicts (see
+\strong{Purification}), and \code{cache}, an environment holding them built for prediction.
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
@@ -153,9 +155,9 @@ with \code{"R"} fitted out of bag the out-of-bag error changes little over a ran
 components that add nothing on new data.
 
 \strong{Out of bag} (\code{select_by = "oob"}). Every tree family of \code{object} is grown on a bootstrap sample of the training
-rows, and the purification works family by family. So \code{object} is purified once more (as \code{\link[=purify]{purify()}} does), and on
-the way every family's components are evaluated at the training rows outside its bootstrap sample. A row's
-out-of-bag (OOB) component is the mean over its OOB families (about 37\% of them), and its OOB intercept likewise.
+rows, and the purification works family by family. So every family's components (see \strong{Purification} below) are
+also evaluated at the training rows outside its bootstrap sample. A row's out-of-bag (OOB) component is the mean
+over its OOB families (about 37\% of them), and its OOB intercept likewise.
 The purification uses the predictors of all training rows, not the outcome, so no outcome information of a row
 enters its OOB components.
 \itemize{
@@ -231,24 +233,34 @@ pruning judges the model that is shown. In simulations (48 data sets) this secon
 error than pruning and then coarsening, and 0.57\% lower than not coarsening; on California housing (50 families,
 order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
 the first pruning's.
-The display costs about as much again as the out-of-bag pruning: one restricted purification for the coarsened
-components' candidates and one for their out-of-bag values; the stored coarsened components take a few MB each on
-16,000 rows.
+The display costs about as much again as the out-of-bag pruning: a purification restricted to the components being
+coarsened (two at a time) for their candidates, and one for their out-of-bag values; the stored coarsened components
+take a few MB each on 16,000 rows at order 3, more at higher orders.
 
-\strong{Purification.} \code{object} is purified in place at all orders, as \code{\link[=purify]{purify()}} does, if it is not purified yet. This
-does not change its predictions. A forest purified with a \code{maxp_interaction} below its order is purified again at
-all orders, with a message: the pruning needs every component. The out-of-bag path purifies \code{object} (again) in
-mode 2, which gives the same components (a mode-1 purification's up to rounding).
+\strong{Purification.} The pruning needs every component's values at the training rows (and out of bag, its OOB
+means), not the purified forest: \code{\link[=purify]{purify()}} keeps every component of every tree family as pieces, which at high
+orders takes far more memory than the forest (see \strong{Cost}). So each family is
+purified in turn, as \code{\link[=purify]{purify()}} does (mode 2, all orders), its components are evaluated at the training rows and
+added up, and the family's pieces are freed. The pruned model then stores the pieces of its kept components only,
+merged over the families exactly as \code{\link[=purify]{purify()}} stores them, and \code{\link[=predict.rpf_pruned]{predict()}} and
+\code{\link[=predict_components]{predict_components()}} evaluate them from there; a coarsened component (the display) is stored in its coarsened
+form. The components equal those of the purified forest up to rounding (about \code{1e-15} relative), and the stored
+ones are the purified forest's bit for bit. \code{object} itself is not purified: an earlier \code{\link[=purify]{purify()}}, at any
+\code{maxp_interaction} or \code{mode}, is left as it is and does not change the result.
 
 \strong{Random numbers.} The folds are drawn after \code{set.seed(seed)}, and the CV's fold fits after it too. Afterwards the
 random number stream is restored to its state on entry (after drawing \code{seed} if it is \code{NULL}), so the call does not
 reset the caller's stream.
 
-\strong{Cost.} The out-of-bag choice purifies \code{object} once and evaluates each family's components at its OOB rows; it
-needs no fit. The CV fits and purifies the forest K more times. Both evaluate the components on the training rows:
-only those the purified forest stores (at most \code{sum(choose(p, seq_len(max_interaction)))}, usually far fewer: the
-subsets of the trees' predictor sets), in one pass over the rows. The memory is about \code{n} doubles per stored
-component, a few times that for the out-of-bag choice. \code{nthreads} speeds up the fits and the purification.
+\strong{Cost.} The out-of-bag choice purifies the families of \code{object} once (see \strong{Purification}); it needs no fit. The
+CV fits and purifies the forest K more times (each fold's forest as \code{\link[=purify]{purify()}} does). Only the components the
+forest has are evaluated (at most \code{sum(choose(p, seq_len(max_interaction)))}, usually far fewer: the subsets of the
+trees' predictor sets). The memory is the forest's plus about \code{n} doubles per component, three times that for the
+out-of-bag choice, plus one family's components at a time per thread; storing the kept components passes over the
+families once more. On California housing (16,512 rows, 200 families, 8 threads) the whole call of
+\code{rpf(splits = NULL, prune = TRUE)} peaks at 2.3 GB of physical memory at order 3, and at 6.4 GB at order 8 (all
+predictors), most of it the 31 coarsened components the display keeps; there \code{\link[=purify]{purify()}} alone needs more than
+12 GB. \code{nthreads} speeds up the fits and the purification.
 
 Only regression forests are supported.
 }

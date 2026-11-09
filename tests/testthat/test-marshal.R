@@ -357,10 +357,16 @@ test_that("a pruned forest survives the round trip and predicts the same", {
       predict_components(pr, d$x, max_interaction = 1)
     )
     expect_identical(format(restored), format(pr))
-    # everything but the forest is kept as it is
-    keep <- setdiff(names(pr), "fit")
+    # everything but the forest and the cache of the built store is kept as it is
+    expect_null(blob$cache)
+    expect_true(is.environment(restored$cache))
+    keep <- setdiff(names(pr), c("fit", "cache"))
+    expect_true("store" %in% keep)
     expect_identical(unclass(restored)[keep], unclass(pr)[keep])
     expect_identical(predict(restored$fit, d$x), predict(d$fit, d$x))
+    # the forest is not purified by the pruning, so the blob holds no purified store
+    expect_false(is_purified(restored$fit))
+    expect_null(blob$fit$fit_state$rects)
   }
 })
 

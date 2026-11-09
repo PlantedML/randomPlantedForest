@@ -227,9 +227,9 @@ values of pure leaves are infinite, and from 0.5 on every leaf value is 0.}
 
 \item{prune}{\verb{[logical(1): FALSE]}: Whether to return the pruned model
 instead of the forest (regression only, not with \code{deterministic = TRUE}):
-the forest is purified and pruned by \code{\link[=prune_components]{prune_components()}} with its defaults
-on the training rows, and the result is its \code{rpf_pruned} model. See
-"Pruning" in Details.}
+the forest is pruned by \code{\link[=prune_components]{prune_components()}} with its defaults on the
+training rows, and the result is its \code{rpf_pruned} model. See "Pruning" in
+Details.}
 
 \item{max_panels}{\verb{[numeric(1): 10]}: Used only with \code{prune = TRUE}: the
 most heat maps a kept component of three or more predictors may need; such
@@ -249,7 +249,7 @@ the search has \code{splits} chosen out of bag and is pruned, so \code{tune} imp
 \item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
 \code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other
 settings, call \code{\link[=purify]{purify()}} after fitting instead. Not used with
-\code{prune = TRUE}, which purifies the forest itself.}
+\code{prune = TRUE}: the pruned model stores the components it keeps.}
 
 \item{nthreads}{\verb{[integer(1): 1]}: Number of threads for fitting. Also the default for
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
@@ -291,7 +291,7 @@ the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{split
 \code{stopped_at} (the number of splits where growing stopped) and \code{capped}
 (whether it stopped at the cap while the error was still falling).
 With \code{prune = TRUE}, an object of class \code{rpf_pruned} (see
-\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest, purified, with
+\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest (not purified), with
 the elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
 with \code{splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
 the stop \verb{$fit$splits_oob}.
@@ -500,8 +500,8 @@ exact draw, 8 threads).
 
 \subsection{Pruning}{
 
-With \code{prune = TRUE}, \code{rpf()} fits the forest, then purifies it and prunes its
-components with \code{\link[=prune_components]{prune_components()}} at that function's defaults, on the
+With \code{prune = TRUE}, \code{rpf()} fits the forest, then prunes its components
+with \code{\link[=prune_components]{prune_components()}} at that function's defaults, on the
 training rows: the rule and the threshold are chosen out of bag (by
 cross-validation below 10 tree families, with a message), the sparse choice
 \code{select = "1se"}, and every kept component of three or more predictors is
@@ -576,7 +576,7 @@ rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
 rpfit
 rpfit$params$splits
 
-# The whole pipeline: splits chosen out of bag, purified, pruned
+# The whole pipeline: splits chosen out of bag, pruned
 set.seed(1)
 pruned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL, prune = TRUE)
 pruned

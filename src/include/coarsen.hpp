@@ -16,11 +16,15 @@
 #define RPF_COARSEN_HPP
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <numeric>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "rects.hpp"
@@ -262,6 +266,55 @@ template <class V> inline rpf_rect::RectList coarse_rects(const Boxes &B, const 
   rpf_rect::RectList rl(m, nc);
   std::vector<double> w(nc);
   std::vector<int32_t> l(std::max(1, m)), h(std::max(1, m));
+  if (m >= 1 && m <= 2) {
+    // Equal boxes merged as they come (their weights added in the order of B, as sort_merge() adds them), then
+    // written in sorted order: the same list as below, bitwise, without one rectangle per box of B held at once
+    struct KeyHash {
+      size_t operator()(const std::pair<uint64_t, uint64_t> &k) const
+      {
+        uint64_t x = k.first * 0x9e3779b97f4a7c15ULL ^ (k.second + 0x7f4a7c159e3779b9ULL + (k.first << 6));
+        x = (x ^ (x >> 31)) * 0xbf58476d1ce4e5b9ULL;
+        return (size_t)(x ^ (x >> 29));
+      }
+    };
+    auto u = [](int32_t v) { return (uint64_t)(uint32_t)v; };
+    std::unordered_map<std::pair<uint64_t, uint64_t>, size_t, KeyHash> at;
+    std::vector<std::array<int32_t, 4>> keys; // lo[0..m), hi[0..m), zero-padded
+    std::vector<double> acc;
+    for (size_t r = 0; r < B.size(); ++r) {
+      coarse_weights(B, r, axes, w.data(), nc);
+      std::array<int32_t, 4> key{{0, 0, 0, 0}};
+      for (int q = 0; q < m; ++q) {
+        key[q] = B.lo[r * B.k + dpos[q]];
+        key[m + q] = B.hi[r * B.k + dpos[q]];
+      }
+      const std::pair<uint64_t, uint64_t> kk{(u(key[0]) << 32) | u(key[1]), (u(key[2]) << 32) | u(key[3])};
+      auto it = at.find(kk);
+      if (it == at.end()) {
+        at.emplace(kk, keys.size());
+        keys.push_back(key);
+        acc.insert(acc.end(), w.begin(), w.end());
+      } else {
+        double *dst = acc.data() + it->second * nc;
+        for (int c = 0; c < nc; ++c)
+          dst[c] += w[c];
+      }
+    }
+    std::unordered_map<std::pair<uint64_t, uint64_t>, size_t, KeyHash>().swap(at);
+    std::vector<size_t> perm(keys.size());
+    std::iota(perm.begin(), perm.end(), 0);
+    std::sort(perm.begin(), perm.end(), [&](size_t a, size_t b) {
+      return std::lexicographical_compare(
+          keys[a].begin(), keys[a].begin() + 2 * m, keys[b].begin(), keys[b].begin() + 2 * m
+      );
+    });
+    rl.box.reserve(keys.size() * 2 * m);
+    rl.w.reserve(keys.size() * nc);
+    for (size_t i : perm)
+      rl.push(keys[i].data(), keys[i].data() + m, acc.data() + i * nc, 1.0);
+    rl.drop_zeros();
+    return rl;
+  }
   for (size_t r = 0; r < B.size(); ++r) {
     coarse_weights(B, r, axes, w.data(), nc);
     for (int q = 0; q < m; ++q) {

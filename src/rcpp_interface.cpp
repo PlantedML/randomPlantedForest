@@ -371,6 +371,141 @@ List adaptive_stats_to_list(const AdaptiveStats &st)
   );
 }
 
+// ---- The pruning without the purified store (purify_columns(), store_components())
+
+List columns_to_list(ComponentColumns &cc, int n, int value_size)
+{
+  const int K = (int)cc.oob.sets.size();
+  List sets(K);
+  for (int k = 0; k < K; ++k)
+    sets[k] = IntegerVector(cc.oob.sets[k].begin(), cc.oob.sets[k].end());
+  // each vector is freed once copied
+  auto num = [n](std::vector<double> &v, int ncol) {
+    NumericMatrix m(n, ncol);
+    std::copy(v.begin(), v.end(), m.begin());
+    std::vector<double>().swap(v);
+    return m;
+  };
+  List out = List::create(
+      Named("sets") = sets,
+      Named("own") = num(cc.own, K * value_size),
+      Named("intercept") = NumericVector(cc.intercept.begin(), cc.intercept.end())
+  );
+  if (!cc.oob.count.empty()) {
+    IntegerMatrix count(n, 2);
+    std::copy(cc.oob.count.begin(), cc.oob.count.end(), count.begin());
+    out["sum0"] = num(cc.oob.sum0, K * value_size);
+    out["sum1"] = num(cc.oob.sum1, K * value_size);
+    out["intercept0"] = num(cc.oob.intercept0, value_size);
+    out["intercept1"] = num(cc.oob.intercept1, value_size);
+    out["count"] = count;
+  }
+  return out;
+}
+
+List store_to_list(ComponentStore &st)
+{
+  const int vs = st.value_size;
+  List comps;
+  for (auto it = st.pieces.comps.begin(); it != st.pieces.comps.end(); it = st.pieces.comps.erase(it)) {
+    List groups;
+    for (const auto &g : it->second.second) {
+      const rpf_rect::RectList &rl = g.second;
+      const int R = (int)rl.size(), m = rl.m;
+      IntegerMatrix box(R, 2 * m);
+      NumericMatrix w(R, vs);
+      for (int r = 0; r < R; ++r) {
+        for (int q = 0; q < 2 * m; ++q)
+          box(r, q) = rl.box[(size_t)r * 2 * m + q];
+        for (int c = 0; c < vs; ++c)
+          w(r, c) = rl.w[(size_t)r * vs + c];
+      }
+      groups.push_back(List::create(Named("jmask") = g.first, Named("box") = box, Named("w") = w));
+    }
+    comps.push_back(
+        List::create(
+            Named("S") = IntegerVector(it->first.begin(), it->first.end()),
+            Named("constant") = wrap(it->second.first),
+            Named("groups") = groups
+        )
+    );
+  }
+  List cuts;
+  for (const auto &c : st.cuts)
+    cuts.push_back(wrap(c));
+  return List::create(
+      Named("p") = st.p,
+      Named("value_size") = vs,
+      Named("n_trees") = st.n_trees,
+      Named("cuts") = cuts,
+      Named("comps") = comps
+  );
+}
+
+ComponentStore list_to_store(const List &x)
+{
+  ComponentStore st;
+  st.p = as<int>(x["p"]);
+  st.value_size = as<int>(x["value_size"]);
+  st.n_trees = as<int>(x["n_trees"]);
+  const int vs = st.value_size;
+  List cuts = x["cuts"];
+  for (R_xlen_t d = 0; d < cuts.size(); ++d)
+    st.cuts.push_back(as<std::vector<double>>(cuts[d]));
+  List comps = x["comps"];
+  for (R_xlen_t k = 0; k < comps.size(); ++k) {
+    List c = comps[k];
+    auto &entry = st.pieces.comps[as<std::vector<int>>(c["S"])];
+    entry.first = as<std::vector<double>>(c["constant"]);
+    List groups = c["groups"];
+    for (R_xlen_t g = 0; g < groups.size(); ++g) {
+      List gr = groups[g];
+      IntegerMatrix box = gr["box"];
+      NumericMatrix w = gr["w"];
+      if (box.ncol() % 2 != 0 || box.nrow() != w.nrow() || w.ncol() != vs)
+        stop("Corrupt component store.");
+      const int R = box.nrow(), m = box.ncol() / 2;
+      rpf_rect::RectList rl(m, vs);
+      rl.box.resize((size_t)R * 2 * m);
+      rl.w.resize((size_t)R * vs);
+      for (int r = 0; r < R; ++r) {
+        for (int q = 0; q < 2 * m; ++q)
+          rl.box[(size_t)r * 2 * m + q] = box(r, q);
+        for (int v = 0; v < vs; ++v)
+          rl.w[(size_t)r * vs + v] = w(r, v);
+      }
+      if (!entry.second.emplace(as<int>(gr["jmask"]), std::move(rl)).second)
+        stop("Corrupt component store.");
+    }
+  }
+  return st;
+}
+
+SEXP rpf_store_build(const List store, int nthreads)
+{
+  ComponentStore st = list_to_store(store);
+  return XPtr<BuiltStore>(new BuiltStore(st, (unsigned)std::max(1, nthreads)), true);
+}
+
+NumericMatrix rpf_store_eval(SEXP store, const NumericMatrix &X, const List sets, int nthreads)
+{
+  if (!rpf_store_valid(store))
+    stop("The built component store is gone (e.g. after saveRDS()).");
+  XPtr<BuiltStore> B(store);
+  std::vector<std::vector<int>> S;
+  for (R_xlen_t k = 0; k < sets.size(); ++k)
+    S.push_back(as<std::vector<int>>(sets[k]));
+  std::vector<double> v = B->eval(REAL(X), X.nrow(), X.ncol(), S, nthreads);
+  NumericMatrix out(X.nrow(), (int)S.size() * B->value_size());
+  std::copy(v.begin(), v.end(), out.begin());
+  return out;
+}
+
+bool rpf_store_valid(SEXP store)
+{
+  return TYPEOF(store) == EXTPTRSXP && R_ExternalPtrAddr(store) != nullptr;
+}
+
 void connect_to_r(RandomPlantedForest &core)
 {
   core.verbose_out = &Rcout;

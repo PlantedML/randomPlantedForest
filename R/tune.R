@@ -243,7 +243,8 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
     t0 <- proc.time()[["elapsed"]]
     res <- fit_at(i, m)
     rng_fit[[k]] <<- get(".Random.seed", envir = globalenv())
-    pr <- rpf_prune(res, processed, Inf, call = call)
+    # scored only: without the stored pieces of the kept components
+    pr <- rpf_prune(res, processed, Inf, store = FALSE, call = call)
     # the chosen candidate's row of the out-of-bag table: its corrected OOB RMSE is the forest's score. The forest's
     # own error on the same basis is that of rule D at tau 0, which keeps every nonzero component (the path's own
     # correction leaves the rows without both halves of OOB families uncorrected: oob_path_table())

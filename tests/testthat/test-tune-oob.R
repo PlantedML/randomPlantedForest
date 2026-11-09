@@ -23,6 +23,7 @@ to_tune <- function(d, search = 2:3, min_leaf_rows = c(1L, 20L), neighbours = TR
 strip_tune <- function(p) {
   p$tune <- NULL
   p$fit$fit <- NULL
+  p$cache <- NULL
   p$display$cache <- NULL
   p$display$seconds <- NULL
   for (nm in names(p$display$coarse)) {

@@ -50,7 +50,9 @@ test_that("the panel form: C = {} is the component, the coarsened values are the
     v <- fit$fit$coarsen_eval(list(S = hi[[k]], C = integer(0), cuts = list()), X)
     expect_lt(max(abs(v - M[, k])), 1e-12 * max(1, sd(M[, k])))
   }
-  sel <- fit$fit$coarsen_select(hi[1:min(4, length(hi))], 3L, 1L)
+  # f_S at the training rows from the purified store (prune_components() takes them from purify_columns())
+  K <- min(4, length(hi))
+  sel <- fit$fit$coarsen_select(hi[1:K], 3L, 1L, M[, 1:K, drop = FALSE])
   co <- Filter(function(s) s$form == "coarsened", sel)
   expect_true(length(co) > 0)
   for (s in co) {
@@ -84,10 +86,13 @@ test_that("the OOB sums: with C = {} those of purify_oob(); threads do not chang
 test_that("the C++ checks its input", {
   d <- pd_data(n = 200)
   fit <- pd_fit(d, 3)
-  expect_error(fit$fit$coarsen_select(list(1:3), 3L, 1L), "not purified")
+  f1 <- matrix(0, 200, 1)
+  expect_error(fit$fit$coarsen_select(list(1:3), 3L, 1L, matrix(0, 199, 1)), "one column per set")
+  expect_error(fit$fit$coarsen_select(list(1:3, 2:4), 3L, 1L, f1), "one column per set")
+  expect_error(fit$fit$coarsen_eval(list(S = 1:3, C = integer(0), cuts = list()), d$x), "not purified")
   purify(fit)
-  expect_error(fit$fit$coarsen_select(list(1:2), 3L, 1L), "at least 3 features")
-  expect_error(fit$fit$coarsen_select(list(1:3), 0L, 1L), "at least 1")
+  expect_error(fit$fit$coarsen_select(list(1:2), 3L, 1L, f1), "at least 3 features")
+  expect_error(fit$fit$coarsen_select(list(1:3), 0L, 1L, f1), "at least 1")
   expect_error(fit$fit$coarsen_eval(list(S = 1:3, C = 7L, cuts = list(0.5)), d$x), "subset of S")
   expect_error(fit$fit$coarsen_eval(list(S = 1:3, C = 1L, cuts = list()), d$x), "one vector per feature")
   st <- list(
@@ -136,7 +141,10 @@ test_that("max_panels: at most P heat maps, decomposition, marginal means, Inf =
   nm <- intersect(names(disp$coarse), names(pd$beta))
   expect_true(length(nm) > 0)
   expect_equal(pc$m[[nm[1]]], pd$beta[[nm[1]]] * rpf_coarse_predict(disp$coarse[[nm[1]]]$stored, d$x[1:50, ]))
-  # the marginal means: averaging along j commutes with the cell means (j coarse: g against f_S coarsened on C - {j})
+  # the marginal means: averaging along j commutes with the cell means (j coarse: g against f_S coarsened on C - {j});
+  # coarsen_eval() reads the purified store (prune_components() leaves the forest unpurified)
+  expect_false(is_purified(fit))
+  purify(fit)
   X <- d$x
   z <- disp$coarse[[1]]
   S <- match(z$S, colnames(X))
@@ -179,7 +187,7 @@ test_that("full order: components of order >= 6 coarsened with q vectors contain
   sets <- prune_stored_sets(fit)
   big <- sets[lengths(sets) >= 6]
   expect_true(length(big) > 0)
-  sel <- fit$fit$coarsen_select(big, 10L, 2L)
+  sel <- fit$fit$coarsen_select(big, 10L, 2L, fit$fit$predict_components_matrix(d$x, big, 2L))
   co <- Filter(function(s) s$form == "coarsened", sel)
   expect_true(length(co) > 0)
   X <- d$x

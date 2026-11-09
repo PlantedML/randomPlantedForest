@@ -87,9 +87,9 @@
 #'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
 #' @param prune `[logical(1): FALSE]`: Whether to return the pruned model
 #'   instead of the forest (regression only, not with `deterministic = TRUE`):
-#'   the forest is purified and pruned by [prune_components()] with its defaults
-#'   on the training rows, and the result is its `rpf_pruned` model. See
-#'   "Pruning" in Details.
+#'   the forest is pruned by [prune_components()] with its defaults on the
+#'   training rows, and the result is its `rpf_pruned` model. See "Pruning" in
+#'   Details.
 #' @param max_panels `[numeric(1): 10]`: Used only with `prune = TRUE`: the
 #'   most heat maps a kept component of three or more predictors may need; such
 #'   a component is coarsened to at most `max_panels` heat maps and the model is
@@ -106,7 +106,7 @@
 #' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
 #'   [predict_components()] requires, with the defaults of [purify()]. For other
 #'   settings, call [purify()] after fitting instead. Not used with
-#'   `prune = TRUE`, which purifies the forest itself.
+#'   `prune = TRUE`: the pruned model stores the components it keeps.
 #' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
 #' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in
@@ -142,7 +142,7 @@
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
 #'   (whether it stopped at the cap while the error was still falling).
 #'   With `prune = TRUE`, an object of class `rpf_pruned` (see
-#'   [prune_components()]), whose element `fit` is the forest, purified, with
+#'   [prune_components()]), whose element `fit` is the forest (not purified), with
 #'   the elements above: the pruned model's OOB path is `$fit$oob_path`, and
 #'   with `splits = NULL` the chosen number of splits `$fit$params$splits` and
 #'   the stop `$fit$splits_oob`.
@@ -347,8 +347,8 @@
 #'
 #' ## Pruning
 #'
-#' With `prune = TRUE`, `rpf()` fits the forest, then purifies it and prunes its
-#' components with [prune_components()] at that function's defaults, on the
+#' With `prune = TRUE`, `rpf()` fits the forest, then prunes its components
+#' with [prune_components()] at that function's defaults, on the
 #' training rows: the rule and the threshold are chosen out of bag (by
 #' cross-validation below 10 tree families, with a message), the sparse choice
 #' `select = "1se"`, and every kept component of three or more predictors is
@@ -432,7 +432,7 @@
 #' rpfit
 #' rpfit$params$splits
 #'
-#' # The whole pipeline: splits chosen out of bag, purified, pruned
+#' # The whole pipeline: splits chosen out of bag, pruned
 #' set.seed(1)
 #' pruned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL, prune = TRUE)
 #' pruned
@@ -906,7 +906,7 @@ rpf_bridge <- function(
     epsilon = epsilon,
     deterministic = deterministic,
     nthreads = nthreads,
-    # pruning purifies the forest itself (prune_components()), so that rpf(prune = TRUE) is its pruning
+    # the pruning leaves the forest unpurified (prune_components()), so that rpf(prune = TRUE) is its pruning
     purify = purify && !prune,
     exact_draw = rpf_exact_draw(call = call),
     keep_level_order = predictors$keep_level_order
@@ -964,8 +964,8 @@ rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoin
 }
 
 # rpf(prune = TRUE): prune_components() with its defaults on the training rows, the same as prune_components(res, data)
-# after rpf(prune = FALSE), random numbers included. max_panels: the display's (Inf: none)
-rpf_prune <- function(res, processed, max_panels, call) {
+# after rpf(prune = FALSE), random numbers included. max_panels: the display's (Inf: none); store: prune_run()'s
+rpf_prune <- function(res, processed, max_panels, store = TRUE, call) {
   defaults <- lapply(formals(prune_components)[c("rule", "tau", "select", "select_by", "folds")], eval)
   prune_run(
     res,
@@ -981,6 +981,7 @@ rpf_prune <- function(res, processed, max_panels, call) {
     seed = NULL,
     nthreads = as.integer(res$params$nthreads),
     verbose = FALSE,
+    store = store,
     call = call
   )
 }

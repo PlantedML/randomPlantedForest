@@ -35,7 +35,9 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
       .method("set_purify_cap", &T::set_purify_cap)
       .method("inbag", &T::inbag)
       .method("set_inbag", &T::set_inbag)
-      .method("purify_oob", &T::purify_oob);
+      .method("purify_oob", &T::purify_oob)
+      .method("purify_columns", &T::purify_columns)
+      .method("store_components", &T::store_components);
 }
 
 RCPP_MODULE(mod_rpf)
@@ -47,6 +49,10 @@ RCPP_MODULE(mod_rpf)
   Rcpp::function("rpf_coarse_eval", &rpf_coarse_eval);
   Rcpp::function("rpf_coarse_valid", &rpf_coarse_valid);
   Rcpp::function("rpf_coarse_predict", &rpf_coarse_predict);
+  // the stored pieces of a pruned model's kept components (prune_components())
+  Rcpp::function("rpf_store_build", &rpf_store_build);
+  Rcpp::function("rpf_store_eval", &rpf_store_eval);
+  Rcpp::function("rpf_store_valid", &rpf_store_valid);
 
   Rcpp::class_<RcppRPF> rpf("RandomPlantedForest");
   rpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector>()

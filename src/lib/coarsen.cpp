@@ -1,6 +1,8 @@
 // The panel form of purified components (coarsen.hpp): for prune_components(max_panels = P), every kept component
 // of order >= 3 is shown in at most P heat maps. Candidates (C, q) in lexicographic order, equal-mass cuts of the
-// training rows, the choice by the variance kept, from the forest's rectangle store.
+// training rows, the choice by the variance kept. The components' rectangles come from passes over the families
+// restricted to them (merged_components()), their values at the training rows from the caller (purify_columns()), so
+// no purified store is needed.
 #include "rpf.hpp"
 #include "subset_count.hpp"
 #include <atomic>
@@ -99,6 +101,7 @@ std::vector<double> eval_train(const Built &b, const V &A, const std::vector<int
 // Grid limit (doubles) of the difference-array evaluation of a candidate; beyond it the k-d index
 const double DIFF_MAX = 8e6;
 
+// fval: the forest's f_S at the training rows (T.n values); pf: the forest's cells
 void select_one(
     Selected &R,
     const rpf_rect::PurifiedForest &pf,
@@ -106,7 +109,8 @@ void select_one(
     double fp,
     const rpf_rect::Accumulator &raw,
     int n_trees,
-    int P
+    int P,
+    const double *fval
 )
 {
   auto t0 = std::chrono::steady_clock::now();
@@ -114,37 +118,27 @@ void select_one(
   const int k = (int)S.size();
   R.forest_panels = fp;
 
-  auto it = pf.comps.find(S);
-  if (it == pf.comps.end()) {
+  bool nonzero = false;
+  for (size_t i = 0; i < T.n && !nonzero; ++i)
+    nonzero = fval[i] != 0.0;
+  if (!nonzero) {
     R.form = 0;
     return;
   }
   std::vector<int32_t> ncell = ncell_of(T, S);
-  // f_S at the training rows, as predict_components_matrix() computes it
-  {
-    std::vector<int32_t> cells(T.n * (size_t)T.p);
-    for (size_t i = 0; i < T.n; ++i)
-      for (int d = 0; d < T.p; ++d)
-        cells[i * T.p + d] = T.cells[d][i];
-    std::vector<double> f(T.n, 0.0);
-    pf.add_component_rows(it->second, cells.data(), (size_t)T.p, T.n, f.data(), 1);
-    for (auto &v : f)
-      v /= n_trees;
-    R.var_forest = rpf_coarse::var_pop(f);
-  }
+  R.var_forest = rpf_coarse::var_pop(std::vector<double>(fval, fval + T.n));
   if (fp <= (double)P) {
     R.form = 1;
     R.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     return;
   }
   R.form = 2;
-  // the component's rectangles as the families wrote them (merged), or else from the store's index
+  // the component's rectangles as the families wrote them, merged
   auto rw = raw.comps.find(S);
-  const Boxes B = rw != raw.comps.end()
-                      ? rpf_coarse::boxes_from_groups(
-                            k, rw->second.first.empty() ? 0.0 : rw->second.first[0], rw->second.second, ncell
-                        )
-                      : rpf_coarse::boxes_from_component(it->second, ncell);
+  if (rw == raw.comps.end())
+    throw std::logic_error("coarsen_select(): a nonzero component without rectangles.");
+  const Boxes B =
+      rpf_coarse::boxes_from_groups(k, rw->second.first.empty() ? 0.0 : rw->second.first[0], rw->second.second, ncell);
   const size_t NR = B.size();
   std::vector<std::vector<int>> qv;
   rpf_coarse::q_vectors(k - 2, P, qv);
@@ -350,10 +344,8 @@ std::vector<int> sorted_set(std::vector<int> S)
   return S;
 }
 
-void check_coarsen(bool purified, bool has_rects, size_t value_size, bool has_data)
+void check_coarsen(size_t value_size, bool has_data)
 {
-  if (!(purified && has_rects))
-    throw std::invalid_argument("The forest is not purified (mode 2).");
   if (value_size != 1)
     throw std::invalid_argument("Coarsening supports regression forests only.");
   if (!has_data)
@@ -361,12 +353,13 @@ void check_coarsen(bool purified, bool has_rects, size_t value_size, bool has_da
 }
 } // namespace
 
-rpf_rect::Accumulator RandomPlantedForest::merged_components(const std::set<std::vector<int>> &only, int nthreads) const
+rpf_rect::Accumulator RandomPlantedForest::merged_components(
+    const std::set<std::vector<int>> &only, int nthreads, const std::vector<std::vector<double>> &cuts
+) const
 {
   rpf_rect::Accumulator total;
   if (only.empty())
     return total;
-  const rpf_rect::PurifiedForest &pf = *rect_forest_;
   rpf_kd::KDTree kdt;
   rpf_cnt::SubsetCounter counter(&X, feature_size);
   const unsigned nt = (unsigned)std::max(1, nthreads);
@@ -378,7 +371,7 @@ rpf_rect::Accumulator RandomPlantedForest::merged_components(const std::set<std:
       [&](size_t f) {
         rpf_rect::Accumulator &acc = batch[f % nt];
         acc = rpf_rect::Accumulator();
-        purify_fast_exact_family(tree_families[f], feature_size, kdt, pf.cuts, acc, &counter, &only);
+        purify_fast_exact_family(tree_families[f], feature_size, kdt, cuts, acc, &counter, &only);
       },
       [&](size_t, size_t nb) {
         for (size_t i = 0; i < nb; ++i) {
@@ -397,15 +390,19 @@ rpf_rect::Accumulator RandomPlantedForest::merged_components(const std::set<std:
   return total;
 }
 
-std::vector<Selected>
-RandomPlantedForest::coarsen_select(const std::vector<std::vector<int>> &sets, int P, int nthreads)
+std::vector<Selected> RandomPlantedForest::coarsen_select(
+    const std::vector<std::vector<int>> &sets, int P, int nthreads, const double *fvals, int n_rows, int n_cols
+)
 {
-  check_coarsen(purified, (bool)rect_forest_, value_size, !X.empty());
+  check_coarsen(value_size, !X.empty());
   if (P < 1)
     throw std::invalid_argument("P must be at least 1.");
-  const rpf_rect::PurifiedForest &pf = *rect_forest_;
-  const Train T = make_train(X, pf, feature_size);
   const size_t K = sets.size();
+  if (n_rows != sample_size || n_cols != (int)K || (K > 0 && fvals == nullptr))
+    throw std::invalid_argument("`fvals` must have one column per set and one row per training row.");
+  rpf_rect::PurifiedForest pf; // the cells only
+  pf.cuts = forest_cuts();
+  const Train T = make_train(X, pf, feature_size);
   std::vector<Selected> res(K);
   for (size_t i = 0; i < K; ++i) {
     res[i].S = sorted_set(sets[i]);
@@ -472,10 +469,12 @@ RandomPlantedForest::coarsen_select(const std::vector<std::vector<int>> &sets, i
   parallel_for(K, nthreads, [&](size_t i) { fps[i] = panels_of(res[i]); });
   std::set<std::vector<int>> need;
   for (size_t i = 0; i < K; ++i)
-    if (fps[i] > (double)P && pf.comps.count(res[i].S))
+    if (fps[i] > (double)P)
       need.insert(res[i].S);
-  const rpf_rect::Accumulator raw = merged_components(need, nthreads);
-  parallel_for(K, nthreads, [&](size_t i) { select_one(res[i], pf, T, fps[i], raw, n_trees, P); });
+  const rpf_rect::Accumulator raw = merged_components(need, nthreads, pf.cuts);
+  parallel_for(K, nthreads, [&](size_t i) {
+    select_one(res[i], pf, T, fps[i], raw, n_trees, P, fvals + i * (size_t)sample_size);
+  });
   return res;
 }
 
@@ -523,13 +522,14 @@ TrainSpec make_spec(const rpf_coarse::Spec &sp, const Train &T, int p)
 
 rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads)
 {
-  check_coarsen(purified, (bool)rect_forest_, value_size, !X.empty());
+  check_coarsen(value_size, !X.empty());
   bool ok = inbag_.size() == tree_families.size() && !tree_families.empty();
   for (const auto &inb : inbag_)
     ok = ok && inb.size() == (size_t)sample_size;
   if (!ok)
     throw std::invalid_argument("The forest has no in-bag counts.");
-  const rpf_rect::PurifiedForest &pf = *rect_forest_;
+  rpf_rect::PurifiedForest pf; // the cells only
+  pf.cuts = forest_cuts();
   const Train T = make_train(X, pf, feature_size);
   const size_t K = specs.size(), n = T.n;
   std::vector<TrainSpec> sp;
@@ -600,7 +600,9 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
 
 std::vector<double> RandomPlantedForest::coarsen_eval(const rpf_coarse::Spec &spec, const double *Xn, int n, int p)
 {
-  check_coarsen(purified, (bool)rect_forest_, value_size, !X.empty());
+  if (!(purified && rect_forest_))
+    throw std::invalid_argument("The forest is not purified (mode 2).");
+  check_coarsen(value_size, !X.empty());
   if (p != feature_size)
     throw std::invalid_argument("X has the wrong number of columns.");
   const rpf_rect::PurifiedForest &pf = *rect_forest_;

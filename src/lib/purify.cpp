@@ -433,22 +433,7 @@ void RandomPlantedForest::purify_mode2(int maxp_interaction, unsigned threads_to
 
   auto forest = std::make_shared<rpf_rect::PurifiedForest>();
   // Cell coordinates shared by all families: the distinct interval end points of every feature
-  forest->cuts.assign(feature_size, std::vector<double>());
-  for (const auto &fam : this->tree_families)
-    for (const auto &tree : fam)
-      for (int d : tree.first) {
-        if (d < 1)
-          continue;
-        for (const auto &leaf : tree.second->leaves) {
-          forest->cuts[d - 1].push_back(leaf.intervals[d - 1].first);
-          forest->cuts[d - 1].push_back(leaf.intervals[d - 1].second);
-        }
-      }
-  for (auto &c : forest->cuts) {
-    std::sort(c.begin(), c.end());
-    c.erase(std::unique(c.begin(), c.end()), c.end());
-    c.shrink_to_fit();
-  }
+  forest->cuts = forest_cuts();
 
   // The range counts: from one k-d tree over all features, or (purify_oob()) from per-subset k-d trees, which give the
   // same integers faster (subset_count.hpp)
@@ -532,6 +517,27 @@ void RandomPlantedForest::purify_mode2(int maxp_interaction, unsigned threads_to
   purified = true;
   purify_capped = capped;
   purify_cap = capped ? maxp_interaction : 0;
+}
+
+std::vector<std::vector<double>> RandomPlantedForest::forest_cuts() const
+{
+  std::vector<std::vector<double>> cuts(feature_size, std::vector<double>());
+  for (const auto &fam : this->tree_families)
+    for (const auto &tree : fam)
+      for (int d : tree.first) {
+        if (d < 1)
+          continue;
+        for (const auto &leaf : tree.second->leaves) {
+          cuts[d - 1].push_back(leaf.intervals[d - 1].first);
+          cuts[d - 1].push_back(leaf.intervals[d - 1].second);
+        }
+      }
+  for (auto &c : cuts) {
+    std::sort(c.begin(), c.end());
+    c.erase(std::unique(c.begin(), c.end()), c.end());
+    c.shrink_to_fit();
+  }
+  return cuts;
 }
 
 OobComponents RandomPlantedForest::purify_oob(int maxp_interaction, int nthreads_param)

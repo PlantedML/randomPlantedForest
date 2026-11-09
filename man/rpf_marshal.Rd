@@ -38,9 +38,8 @@ With it, the in-bag counts of the bootstrap samples are stored too, so that
 
 A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}} (class \code{rpf_pruned}) is marshaled
 the same way: its forest as above, and the pruning (rule, coefficients,
-components, the table of the choice, the display's coarsened components) as it is. The restored model predicts as
-before;
-its forest is purified, so it needs no training data for that.
+components, the table of the choice, the stored kept components, the display's coarsened components) as it is. The
+restored model predicts as before, from its stored components, so it needs no training data for that.
 }
 \examples{
 fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)

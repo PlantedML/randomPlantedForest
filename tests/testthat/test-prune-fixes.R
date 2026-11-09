@@ -25,20 +25,23 @@ all_sets_decompose <- function(fit, x) {
   list(sets = sets[v > 0], M = M[, v > 0, drop = FALSE])
 }
 
-test_that("only the stored components are evaluated, with the results of all subsets", {
+test_that("only the components the forest has are evaluated, with the results of all subsets", {
   ns <- asNamespace("randomPlantedForest")
   for (k in 2:3) {
     d <- fix_sim(p = 5)
     fit <- fix_fit(d, max_interaction = k)
     pr <- prune_components(fit, d$x, d$y, rule = "D", tau = 0)
+    dec <- ns$prune_columns(fit, colnames(d$x), 1L, oob = FALSE)$dec
+    expect_false(is_purified(fit))
+    # against every predictor set of the purified forest
+    purify(fit)
     ref <- all_sets_decompose(fit, d$x)
     expect_identical(pr$components$component, ns$prune_set_names(ref$sets, colnames(d$x)))
-    dec <- ns$prune_decompose(fit, ns$prune_training_data(fit, d$x, d$y)$predictors, rep(TRUE, nrow(d$x)))
-    expect_identical(unname(dec$own), unname(ref$M))
-    # only the stored sets were evaluated, ordered as utils::combn() orders all sets
-    expect_length(dec$sets, length(fit$fit$purified_components()))
-    expect_lte(length(dec$sets), sum(choose(5, seq_len(k))))
     expect_identical(dec$sets[dec$nonzero], ref$sets)
+    expect_lt(max(abs(unname(dec$own) - unname(ref$M))), 1e-13)
+    # only the sets the purified forest stores were evaluated, ordered as utils::combn() orders all sets
+    expect_identical(dec$sets, ns$prune_stored_sets(fit))
+    expect_lte(length(dec$sets), sum(choose(5, seq_len(k))))
   }
 })
 
@@ -59,39 +62,36 @@ test_that("many predictors at full order: only the stored components, not 2^p - 
   )
 })
 
-test_that("a forest purified below its order is purified again at all orders", {
+test_that("the forest is not purified, and an earlier purification of it does not matter", {
   d <- fix_sim()
+  model <- c("rule", "tau", "intercept", "beta", "components", "store")
   for (by in c("oob", "cv")) {
-    ref <- prune_components(fix_fit(d, max_interaction = 3), d$x, d$y, select_by = by, folds = 3, seed = 2)
+    f0 <- fix_fit(d, max_interaction = 3)
+    ref <- prune_components(f0, d$x, d$y, select_by = by, folds = 3, seed = 2)
     expect_false(is.null(ref[[by]]))
-    fit <- fix_fit(d, max_interaction = 3)
-    p0 <- predict(fit, d$x)
-    purify(fit, maxp_interaction = 1)
-    expect_true(fit$fit$is_purify_capped())
-    expect_message(pr <- prune_components(fit, d$x, d$y, select_by = by, folds = 3, seed = 2), "below its order")
-    expect_false(fit$fit$is_purify_capped())
-    expect_identical(pr[[by]], ref[[by]])
-    expect_identical(pr$beta, ref$beta)
-    expect_identical(pr$components, ref$components)
-    expect_equal(predict(fit, d$x)$.pred, p0$.pred, tolerance = 1e-12)
-
-    # a purification at the forest's order (or above) is fine, and so is a mode-1 purification (equal up to
-    # rounding; the out-of-bag choice purifies in mode 2 again)
-    f3 <- fix_fit(d, max_interaction = 3)
-    purify(f3, maxp_interaction = 3)
-    expect_silent(p3 <- prune_components(f3, d$x, d$y, select_by = by, folds = 3, seed = 2))
-    expect_identical(p3[[by]], ref[[by]])
-    f1 <- fix_fit(d, max_interaction = 3)
-    purify(f1, mode = 1)
-    p1 <- prune_components(f1, d$x, d$y, select_by = by, folds = 3, seed = 2)
-    expect_equal(p1[[by]], ref[[by]], tolerance = 1e-10)
-    expect_equal(p1$beta, ref$beta, tolerance = 1e-10)
+    expect_false(is_purified(f0))
+    # purified below the forest's order, at its order, or in mode 1: the same model, the purification left as it is
+    for (how in list(list(maxp_interaction = 1), list(maxp_interaction = 3), list(mode = 1))) {
+      fit <- fix_fit(d, max_interaction = 3)
+      do.call(purify, c(list(fit), how))
+      capped <- fit$fit$is_purify_capped()
+      p0 <- predict(fit, d$x)
+      expect_silent(pr <- prune_components(fit, d$x, d$y, select_by = by, folds = 3, seed = 2))
+      expect_identical(pr[c(by, model)], ref[c(by, model)])
+      expect_true(is_purified(fit))
+      expect_identical(fit$fit$is_purify_capped(), capped)
+      expect_identical(predict(fit, d$x), p0)
+    }
   }
   # a given rule too
   f2 <- fix_fit(d, max_interaction = 3)
   purify(f2, maxp_interaction = 2, mode = 1)
-  expect_message(p2 <- prune_components(f2, d$x, d$y, rule = "R", tau = 0.01), "below its order")
-  expect_identical(p2$components$component, ref$components$component)
+  p2 <- prune_components(f2, d$x, d$y, rule = "R", tau = 0.01)
+  expect_identical(
+    p2[model],
+    prune_components(fix_fit(d, max_interaction = 3), d$x, d$y, rule = "R", tau = 0.01)[model]
+  )
+  expect_true(f2$fit$is_purify_capped())
 })
 
 test_that("the caller's random number stream is restored", {

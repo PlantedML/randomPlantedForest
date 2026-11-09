@@ -1,4 +1,4 @@
-# rpf(prune = TRUE): the forest purified and pruned by prune_components() with its defaults, on the training rows.
+# rpf(prune = TRUE): the forest pruned by prune_components() with its defaults, on the training rows.
 # It must equal prune_components(rpf(..., prune = FALSE), data) bit for bit, from the same random number state.
 
 rp_data <- function(n = 300, seed = 1) {
@@ -9,13 +9,14 @@ rp_data <- function(n = 300, seed = 1) {
 }
 
 # The pruned model without what cannot be compared with identical(): the C++ forest (compared by its model, its
-# purified rectangles and its predictions), the display's cache of built indices (external pointers) and the timings
-# (the display's, and a recipe's own prep times)
+# purified rectangles and its predictions), the caches of the built store and the display's built indices (external
+# pointers) and the timings (the display's, and a recipe's own prep times)
 rp_strip <- function(p) {
   p$fit$fit <- NULL
   if (!is.null(p$fit$blueprint$recipe)) {
     p$fit$blueprint$recipe$fit_times <- NULL
   }
+  p$cache <- NULL
   p$display$cache <- NULL
   p$display$seconds <- NULL
   for (nm in names(p$display$coarse)) {
@@ -30,6 +31,8 @@ expect_same_pruned <- function(a, b, newdata) {
   expect_identical(rp_strip(a), rp_strip(b))
   expect_identical(a$fit$fit$get_model(), b$fit$fit$get_model())
   expect_identical(a$fit$fit$get_purified_rects(), b$fit$fit$get_purified_rects())
+  # the pruning leaves the forest unpurified
+  expect_false(is_purified(a$fit))
   expect_identical(predict(a, newdata), predict(b, newdata))
   expect_identical(predict_components(a, newdata), predict_components(b, newdata))
 }

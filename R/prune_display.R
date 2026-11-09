@@ -19,6 +19,12 @@
 # it is; its panels (those |S| - 2 features and their own cut points) are kept for a plot ($display$asis), as
 # $display$coarse keeps a coarsened one's.
 #
+# The choice needs the component's values at the training rows (the forest's decomposition, prune_columns()) and its
+# rectangles merged over the families (C++ merged_components(): a purification of the families restricted to the
+# components being chosen), not the purified store. The components are chosen in batches of prune_coarsen_batch: a
+# batch's rectangles and candidates are held only while it is chosen, and the choice of one component does not depend
+# on the others.
+#
 # The second pruning:
 # - chosen out of bag: the same candidates, folds and correction, on each family's coarsened component at its
 #   out-of-bag rows (coarsening is linear in the rectangles, so every family's rectangles of S are coarsened with the
@@ -29,14 +35,14 @@
 #   coefficients in sample (a CV choice would need the display in every fold's refit).
 # If no kept component needs coarsening, the model is the first pruning's.
 #
-# first: the first pruning's model; dec: the forest's decomposition on the training rows; sums: purify_oob()'s OOB sums
-# (NULL unless select_by = "oob"); cand: the candidates.
+# first: the first pruning's model; dec: the forest's decomposition on the training rows; sums: the forest's OOB sums
+# (prune_columns(); NULL unless select_by = "oob"); cand: the candidates.
 prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthreads) {
   tick <- function() proc.time()[["elapsed"]]
   secs <- list()
   t0 <- tick()
   n <- length(tr$y)
-  # the predictor names as the components are named (prune_decompose())
+  # the predictor names as the components are named (prune_columns())
   fnames <- colnames(preprocess_predictors_predict(object, tr$predictors[1, , drop = FALSE]))
 
   # ---- the kept components of order >= 3 in their panel form
@@ -45,7 +51,19 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   hi <- which(lengths(kept_sets) >= 3)
   sel <- list()
   if (length(hi) > 0) {
-    sel <- object$fit$coarsen_select(lapply(kept_sets[hi], as.integer), max_panels, nthreads)
+    batches <- split(hi, (seq_along(hi) - 1L) %/% prune_coarsen_batch)
+    sel <- unlist(
+      lapply(batches, function(b) {
+        object$fit$coarsen_select(
+          lapply(kept_sets[b], as.integer),
+          max_panels,
+          nthreads,
+          dec$own[, kept[b], drop = FALSE]
+        )
+      }),
+      recursive = FALSE,
+      use.names = FALSE
+    )
   }
   names(sel) <- kept[hi]
   co <- names(sel)[vapply(sel, function(s) s$form == "coarsened", logical(1))]
@@ -200,6 +218,11 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   )
   res
 }
+
+# The components the display chooses the panel forms of in one restricted pass (prune_display()): fewer passes are
+# faster, but each component chosen at once holds its rectangles and candidates (about 0.5-1 GB per three-way
+# interaction of California housing at order 8, 200 families: all eleven at once peaked 5 GB higher)
+prune_coarsen_batch <- 2L
 
 # The built form of coarsened component `nm` (k-d index over its stored rectangles), kept in the display's cache
 # environment; rebuilt if missing or if the pointer is gone (a deserialized object)
