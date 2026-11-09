@@ -25,9 +25,10 @@ For classification and \code{loss = "L1"} or \code{"L2"}, \code{"numeric"} yield
 predictions which are not guaranteed to be valid probabilities in \verb{[0, 1]}.
 For \code{type = "prob"}, these are truncated to ensure this property.
 
-If \code{loss} is \code{"logit"} or \code{"exponential"}, \code{type = "link"} is an alias
-for \code{type = "numeric"}, as in this case the raw predictions have the
-additional interpretation similar to the linear predictor in a \code{\link{glm}}.}
+For classification, \code{type = "link"} is an alias for \code{type = "numeric"}.
+If \code{loss} is \code{"logit"} or \code{"exponential"}, the raw predictions have the
+additional interpretation similar to the linear predictor in a \code{\link{glm}}.
+If \code{loss} is \code{"L1"} or \code{"L2"}, the link is the identity.}
 
 \item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads}
 the forest was fitted with, capped at the available cores.}

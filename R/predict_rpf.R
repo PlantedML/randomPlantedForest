@@ -10,9 +10,10 @@
 #' predictions which are not guaranteed to be valid probabilities in `[0, 1]`.
 #' For `type = "prob"`, these are truncated to ensure this property.
 #'
-#' If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
-#' for `type = "numeric"`, as in this case the raw predictions have the
+#' For classification, `type = "link"` is an alias for `type = "numeric"`.
+#' If `loss` is `"logit"` or `"exponential"`, the raw predictions have the
 #' additional interpretation similar to the linear predictor in a [`glm`].
+#' If `loss` is `"L1"` or `"L2"`, the link is the identity.
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads`
 #'   the forest was fitted with, capped at the available cores.
 #' @param ... Not currently used, but required for extensibility. Unknown
@@ -76,10 +77,9 @@ predict_rpf_bridge <- function(type, object, predictors, nthreads = 0L) {
     }
     type <- "numeric"
   } else if (object$mode == "classification") {
-    if (object$params$loss %in% c("logit", "exponential")) {
-      # numeric yields raw predictions, which is the link in the binary case
-      if (type == "link") type <- "numeric"
-    }
+    # numeric yields the raw predictions, which are the link for every loss
+    # (the identity for L1 and L2)
+    if (type == "link") type <- "numeric"
   }
 
   switch(

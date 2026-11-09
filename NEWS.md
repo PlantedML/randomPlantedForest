@@ -15,6 +15,9 @@
   Fitted models change for classification and for regression with `split_structure` other than `"leaves"`.
 * Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
   Previously an error in a worker thread terminated the R session.
+* `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.
+  It returns the raw predictions, as `type = "numeric"` does (the link is the identity).
+  Previously it stopped with an error about the size of `pred`.
 * The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
