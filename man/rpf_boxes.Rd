@@ -9,7 +9,7 @@ rpf_boxes(x, family = 1L, ...)
 \arguments{
 \item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{family}{\verb{[integer(1): 1]}: Which tree family to extract, between 1 and \code{ntrees}.}
+\item{family}{\verb{[integer(1): 1]}: Which tree family to extract, between 1 and \code{n_families}.}
 
 \item{...}{Reserved for future expansion.}
 }
@@ -49,7 +49,7 @@ Factor predictors are encoded as integer codes in the order of
 \verb{lower <= c < upper}.
 }
 \examples{
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 5, n_splits = 10, prune = FALSE)
 head(rpf_boxes(rpfit))
 }
 \seealso{

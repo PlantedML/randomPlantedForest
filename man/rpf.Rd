@@ -14,11 +14,11 @@ rpf(x, ...)
   formula,
   data,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -43,11 +43,11 @@ rpf(x, ...)
   x,
   y,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -72,11 +72,11 @@ rpf(x, ...)
   x,
   y,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -101,11 +101,11 @@ rpf(x, ...)
   x,
   data,
   max_interaction = 3,
-  ntrees = 200,
-  splits = NULL,
-  split_structure = "leaves",
-  split_try = NULL,
-  t_try = NULL,
+  n_families = 200,
+  n_splits = NULL,
+  split_structure = "leaf",
+  n_try_split_points = NULL,
+  share_candidates = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -136,8 +136,9 @@ contain \code{:}, which joins predictor names in component names such as \code{x
 classification. A numeric outcome must be finite. A factor outcome needs at
 least two classes; levels that do not occur are dropped with a warning.}
 
-\item{...}{Not currently used, but required for extensibility. Unknown
-(e.g. misspelled) arguments are an error.}
+\item{...}{Only the old names of renamed arguments (\code{ntrees}, \code{splits},
+\code{split_try}, \code{t_try}), deprecated: they work, with a warning. Any other
+(e.g. misspelled) argument is an error. See "Renamed arguments" in Details.}
 
 \item{formula}{\verb{[formula]}: A formula with the outcome on the left-hand side and the
 predictors on the right-hand side, e.g. \code{y ~ x1 + x2}. Interaction terms
@@ -156,28 +157,30 @@ split on. \code{1} fits main effects only (an additive model), \code{2} adds
 pairwise interactions, \code{3} (the default) three-way interactions, and so on. \code{0} uses all predictors and values above
 the number of predictors are reduced to it.}
 
-\item{ntrees}{\verb{[integer(1): 200]}: Number of tree families, i.e. the size of the forest.
-Each family is grown on a bootstrap sample and predictions are averaged.}
+\item{n_families}{\verb{[integer(1): 200]}: Number of tree families, i.e. the size of the forest.
+Each family is grown on a bootstrap sample and predictions are averaged. Was \code{ntrees}.}
 
-\item{splits}{\verb{[integer(1) | NULL: NULL]}: Number of split rounds per tree family. The main tuning
+\item{n_splits}{\verb{[integer(1) | NULL: NULL]}: Number of split rounds per tree family. The main tuning
 parameter: more splits fit more complex functions. A round splits the best of its
 candidates; near saturation, when every candidate's leaf is too small to split, a
 round can make no split. \code{NULL} (the default) chooses it out of bag while the forest
 grows (with \code{deterministic = TRUE}, which has no out-of-bag rows, \code{NULL} means 30). See
-"Choosing \code{splits} out of bag" in Details.}
+"Choosing \code{n_splits} out of bag" in Details. Was \code{splits}.}
 
-\item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
-sampled; one of \code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
-or \code{"res_trees"}. See Details.}
+\item{split_structure}{\verb{[character(1): "leaf"]}: How split candidates are formed and
+sampled; one of \code{"leaf"}, \code{"leaf_binned"}, \code{"tree_then_leaf"},
+\code{"tree_then_all_leaves"} or \code{"target_tree_then_leaf"}. See Details. The
+names of 0.5.0 (\code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
+\code{"res_trees"}) still work, with a deprecation warning.}
 
-\item{split_try}{\verb{[integer(1) | NULL: NULL]}: Number of thresholds evaluated per split
-candidate. \code{NULL} means 3 for \code{split_structure = "leaves"} and 10 for the
-other structures.}
+\item{n_try_split_points}{\verb{[integer(1) | NULL: NULL]}: Number of split points (thresholds)
+tried per split candidate. \code{NULL} means 3 for \code{split_structure = "leaf"} and 10 for
+the other structures. Was \code{split_try}.}
 
-\item{t_try}{\verb{[numeric(1) | NULL: NULL]}: Proportion in \verb{(0, 1]} of all possible splits sampled
-as candidates in each round, capped at \code{max_candidates}. \code{NULL} means 0.1
-for \code{split_structure = "leaves"} and 0.4 for the other structures. See
-"Choosing parameters" in Details.}
+\item{share_candidates}{\verb{[numeric(1) | NULL: NULL]}: Share in \verb{(0, 1]} of all possible
+splits drawn as candidates in each round, capped at \code{max_candidates}. \code{NULL}
+means 0.1 for \code{split_structure = "leaf"} and 0.4 for the other structures.
+See "Choosing parameters" in Details. Was \code{t_try}.}
 
 \item{max_candidates}{\verb{[integer(1): 50]}: Maximum number of split candidates per round.}
 
@@ -192,7 +195,7 @@ splitting along an existing dimension.}
 \item{min_leaf_rows}{\verb{[integer(1): 1]}: Minimum number of rows of the
 bootstrap sample on each side of every split, so in every leaf. Leaves
 without a threshold that keeps this many rows on each side are not drawn
-as split candidates. Only for \code{split_structure = "leaves"} (regression and
+as split candidates. Only for \code{split_structure = "leaf"} (regression and
 classification); \code{1} (no limit) otherwise.}
 
 \item{interaction_constraints}{\verb{[list | NULL: NULL]}: Feature sets that restrict which
@@ -244,12 +247,14 @@ pruned again (the \code{max_panels} of \code{\link[=prune_components]{prune_comp
 at least 1, or \code{Inf} for no coarsening.}
 
 \item{tune}{\verb{[logical(1) | character(1) | rpf_tune_control: FALSE]}: Whether
-to tune the greediness (\code{split_try}, \code{t_try}) and \code{min_leaf_rows} out of
-bag (not with \code{deterministic = TRUE}, at least 10 tree families). \code{TRUE} runs the full search (\code{\link[=tune_control]{tune_control()}}), \code{"quick"} the
+to tune the greediness (\code{n_try_split_points}, \code{share_candidates}) and
+\code{min_leaf_rows} out of bag (not with \code{deterministic = TRUE}, at least 10
+tree families). \code{TRUE} runs the full search (\code{\link[=tune_control]{tune_control()}}), \code{"quick"} the
 two-forest preset, and a \code{\link[=tune_control]{tune_control()}} object your own. Every forest of
-the search has \code{splits} chosen out of bag and is pruned, so \code{tune} implies
-\code{splits = NULL} and \code{prune = TRUE}, and giving \code{split_try}, \code{t_try} or
-\code{min_leaf_rows} with it is an error. See "Tuning out of bag" in Details.}
+the search has \code{n_splits} chosen out of bag and is pruned, so \code{tune} implies
+\code{n_splits = NULL} and \code{prune = TRUE}, and giving \code{n_try_split_points},
+\code{share_candidates} or \code{min_leaf_rows} with it is an error. See "Tuning out
+of bag" in Details.}
 
 \item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
 \code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other
@@ -265,9 +270,9 @@ the returned object as \verb{$forest} (with \code{prune = TRUE}, in the forest:
 
 \item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
-(\code{t_try} and \code{split_decay_rate} are ignored) and evenly spaced thresholds. The result does not
-depend on the seed, and all tree families are identical, so use
-\code{ntrees = 1}. There are no out-of-bag rows, so \code{splits = NULL} means 30
+(\code{share_candidates} and \code{split_decay_rate} are ignored) and evenly spaced thresholds. The
+result does not depend on the seed, and all tree families are identical, so use
+\code{n_families = 1}. There are no out-of-bag rows, so \code{n_splits = NULL} means 30
 and \code{prune = NULL} means \code{FALSE}. Mainly useful for testing and debugging.}
 
 \item{keep_level_order}{\verb{[logical(1) | character: FALSE]}: Which factor
@@ -279,9 +284,9 @@ factor predictors only. See "Factor predictors" below.}
 \item{oob_path}{\verb{[logical(1) | integer: FALSE]}: Whether to track the
 out-of-bag (OOB) error along the splits (not with
 \code{deterministic = TRUE}). \code{TRUE} evaluates it at the checkpoints of
-\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} for \code{splits}, four per doubling; an increasing
-integer vector in \verb{1..splits} gives the checkpoints. The fitted forest is
-the same as without. See Details. With \code{splits = NULL} the path of the
+\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} for \code{n_splits}, four per doubling; an increasing
+integer vector in \verb{1..n_splits} gives the checkpoints. The fitted forest is
+the same as without. See Details. With \code{n_splits = NULL} the path of the
 checkpoints grown is stored either way, and only \code{TRUE} or \code{FALSE} is
 allowed.}
 }
@@ -289,38 +294,40 @@ allowed.}
 With the defaults, an object of class \code{rpf_pruned} (see below). With
 \code{prune = FALSE}, an object of class \code{"rpf"} with model object contained in \verb{$fit}. With
 \code{oob_path}, \verb{$oob_path} holds the OOB path: a data frame with one row per
-checkpoint, \code{splits}, the corrected and the plain OOB root mean squared
+checkpoint, \code{n_splits}, the corrected and the plain OOB root mean squared
 error (\code{oob_rmse}, \code{oob_rmse_raw}), and the standard errors of the two mean
 squared errors (\code{se_mse}, \code{se_mse_raw}). Its attribute \code{n_rows} is the
 number of training rows with an OOB tree family. For classification with
 \code{loss = "logit"} or \code{"exponential"}, or more than two classes, the columns
 are the mean corrected and plain criterion (\code{oob_loss}, \code{oob_loss_raw}) and
 their standard errors (\code{se_loss}, \code{se_loss_raw}), and the attribute
-\code{criterion} names it (see "Classification" in Details). With \code{splits = NULL},
-\verb{$params$splits} is the chosen number of splits, \verb{$oob_path} the path of
-the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{splits},
+\code{criterion} names it (see "Classification" in Details). With \code{n_splits = NULL},
+\verb{$params$splits} is the chosen number of splits (\verb{$params} keeps the names
+of 0.5.0, see "Renamed arguments" in Details), \verb{$oob_path} the path of
+the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{n_splits},
 \code{stopped_at} (the number of splits where growing stopped) and \code{capped}
 (whether it stopped at the cap while the error was still falling, neither
 stop rule reached).
 When pruning (the default), an object of class \code{rpf_pruned} (see
 \code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest (not purified),
 with the elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
-with \code{splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
+with \code{n_splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
 the stop \verb{$fit$splits_oob}.
 With \code{tune}, the \code{rpf_pruned} model of the chosen forest, with an element
 \code{tune}: \code{search}, the search table (one row per forest grown, in the order
-grown: \code{step}, \code{split_try}, \code{t_try}, \code{min_leaf_rows}, the chosen \code{splits},
-\code{stopped_at}, \code{capped}, the forest's corrected OOB RMSE \code{oob_rmse_forest}
-(as the pruning scores it: its rule \code{"D"} at \code{tau = 0}, which keeps every
-nonzero component; the OOB path's \code{oob_rmse} at the chosen \code{splits} leaves
-the rows without OOB families of both halves uncorrected and is higher),
+grown: \code{step}, \code{n_try_split_points}, \code{share_candidates}, \code{min_leaf_rows},
+the chosen \code{n_splits}, \code{stopped_at}, \code{capped}, the forest's corrected OOB
+RMSE \code{oob_rmse_forest} (as the pruning scores it: its rule \code{"D"} at
+\code{tau = 0}, which keeps every nonzero component; the OOB path's \code{oob_rmse} at
+the chosen \code{n_splits} leaves the rows without OOB families of both halves
+uncorrected and is higher),
 its pruned model's \code{rule}, \code{tau}, \code{n_kept} and corrected OOB RMSE
 \code{oob_rmse} (the score; for classification both are the square root of the
 mean corrected criterion), \code{seconds}, whether each step chose it
 (\code{chosen_step1}, \code{chosen_step2}, \code{chosen_step3}; \code{NA} if not a candidate of
 the step) and \code{final}); \code{steps}, each step's candidates and choice;
-\code{settings}, the chosen \code{split_try}, \code{t_try}, \code{min_leaf_rows} and \code{splits};
-\code{control}, the \code{\link[=tune_control]{tune_control()}} used; and \code{seconds}.
+\code{settings}, the chosen \code{n_try_split_points}, \code{share_candidates},
+\code{min_leaf_rows} and \code{n_splits}; \code{control}, the \code{\link[=tune_control]{tune_control()}} used; and \code{seconds}.
 }
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
@@ -332,7 +339,7 @@ interaction components; see \code{\link[=predict_components]{predict_components(
 By default, \code{rpf()} returns the pruned model that can be shown, in one call:
 \enumerate{
 \item it grows 200 tree families of up to three-way interactions, with the
-number of splits chosen out of bag while they grow (\code{splits = NULL});
+number of splits chosen out of bag while they grow (\code{n_splits = NULL});
 \item it prunes the forest's components by \code{\link[=prune_components]{prune_components()}} with its
 defaults (\code{prune = NULL}): the sparse rule, chosen out of bag;
 \item it coarsens every kept component of three or more predictors to at most
@@ -342,7 +349,7 @@ defaults (\code{prune = NULL}): the sparse rule, chosen out of bag;
 The result, of class \code{rpf_pruned}, has methods for
 \code{\link[=predict.rpf_pruned]{predict()}}, \code{\link[=predict_components]{predict_components()}} and \code{print()}.
 \code{prune = FALSE} returns the forest (class \code{rpf}) instead, and
-\verb{splits = <number>} fits a fixed number of splits.
+\verb{n_splits = <number>} fits a fixed number of splits.
 \subsection{Choosing parameters}{
 
 The defaults were chosen on 44 simulated data sets and California housing
@@ -358,11 +365,11 @@ pruned model rarely keeps a component of more than three predictors, so it
 is shown in at most \code{max_panels} heat maps anyway. With a higher
 \code{max_interaction}, splits are spread over more possible components.
 
-\code{splits} sets how closely the model follows the data. By default it is
-chosen out of bag while the forest grows (see "Choosing \code{splits} out of
+\code{n_splits} sets how closely the model follows the data. By default it is
+chosen out of bag while the forest grows (see "Choosing \code{n_splits} out of
 bag"), so it need not be tuned.
 
-\code{ntrees} averages over bootstrap samples to reduce variance, and fitting and
+\code{n_families} averages over bootstrap samples to reduce variance, and fitting and
 prediction time grow linearly with it. Each tree family is itself a complete
 model, a sum of trees covering all components, rather than a single tree,
 but averaging more of them still pays off: the test error fell by about 2\%
@@ -371,23 +378,23 @@ pruned models were sparser (California housing: 34 instead of 47 kept
 components at 200 instead of 50 families). Hence the default of 200, at the
 price of time; use fewer for a quick look.
 
-The split search parameters (\code{split_structure}, \code{split_try}, \code{t_try},
-\code{max_candidates}, \code{split_decay_rate}) trade speed for a more thorough, more
-greedy search. For \code{"leaves"}, a less greedy search is better: 3 thresholds
-per candidate and 10\% of the possible splits per round (the default) had
-5.7\% to 6.8\% lower test error than 10 and 40\% (the default of the other
-structures, and of \code{"leaves"} before). \code{tune} searches this greediness out of
-bag.
+The split search parameters (\code{split_structure}, \code{n_try_split_points},
+\code{share_candidates}, \code{max_candidates}, \code{split_decay_rate}) trade speed for a
+more thorough, more greedy search. For \code{"leaf"}, a less greedy search is
+better: 3 split points per candidate and 10\% of the possible splits per
+round (the default) had 5.7\% to 6.8\% lower test error than 10 and 40\% (the
+default of the other structures, and of \code{"leaf"} before). \code{tune} searches
+this greediness out of bag.
 
 For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
 link scale and are transformed to probabilities. With more than two classes
 \code{"exponential"} is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
 and Hastie, 2009): with one score per class, summing to 0, a row's weight is
 \code{exp(-g)}, \code{g} the score of its class, and the probabilities are the softmax
-of the scores. With \code{splits} chosen out of bag and the forest pruned (the
+of the scores. With \code{n_splits} chosen out of bag and the forest pruned (the
 defaults), \code{"exponential"} was as accurate as \code{"logit"} in simulations and
 about twice as fast. Nothing bounds its scores once a tree family's
-bootstrap sample is separated, though, so with a large fixed \code{splits} its
+bootstrap sample is separated, though, so with a large fixed \code{n_splits} its
 log-loss can grow with the splits, where \code{"logit"}'s does not. \code{"L1"} and
 \code{"L2"} fit class indicators directly and their probabilities are truncated
 to \verb{[0, 1]}.
@@ -421,37 +428,54 @@ name, so the order of the levels in \code{new_data} does not matter.
 
 \subsection{\code{split_structure}}{
 
-In each round, a \code{t_try} fraction of all possible splits (capped at
+In each round, a \code{share_candidates} share of all possible splits (capped at
 \code{max_candidates}) is drawn as candidates with weights
 \code{exp(-split_decay_rate * age)}. \code{split_structure} defines what a candidate is
-and how its thresholds are evaluated.
+and how its split points are tried. The names say the candidate, then how
+the leaf to split is found.
 \itemize{
-\item \code{leaves}: Split candidates are (leaf, split-dimension) pairs. For each sampled
-candidate, \code{split_try} thresholds are drawn uniformly without replacement from the
-distinct values of that predictor among the leaf's rows, leaving out the smallest
-and, with \code{min_leaf_rows}, those that leave fewer rows on either side (all of them
-if there are fewer), and evaluated to choose the best split.
-\item \code{hist}: As \code{leaves}, but thresholds are drawn from boundaries of
-quantile bins computed once per predictor, which makes evaluating them
-faster on large data.
-\item \code{cur_trees_1}: Split candidates are (current-tree, split-dimension) pairs. For each
-sampled candidate, perform \code{split_try} evaluations. Each evaluation samples a leaf
-from the set of valid current trees (with probability proportional to its number of
-available thresholds) and then uniformly samples a single threshold within that leaf.
-\item \code{cur_trees_2}: Split candidates are (current-tree, split-dimension) pairs. For each
-sampled candidate, iterate through every
-valid leaf. Within each leaf, sample \code{split_try} thresholds uniformly and
-evaluate them.
-\item \code{res_trees}: Split candidates are resulting trees. For each sampled candidate, run
-\code{split_try} evaluations by sampling a (split-dimension, leaf) pair from all valid
-pairs (with probability proportional to its number of available thresholds), then
-uniformly sampling one threshold within that pair.
+\item \code{"leaf"} (was \code{"leaves"}): Split candidates are (leaf, split-dimension) pairs. For each
+sampled candidate, \code{n_try_split_points} split points are drawn uniformly without replacement
+from the distinct values of that predictor among the leaf's rows, leaving out the smallest
+and, with \code{min_leaf_rows}, those that leave fewer rows on either side (all of them if
+there are fewer), and evaluated to choose the best split.
+\item \code{"leaf_binned"} (was \code{"hist"}): As \code{"leaf"}, but split points are drawn
+from boundaries of quantile bins computed once per predictor, which makes
+evaluating them faster on large data.
+\item \code{"tree_then_leaf"} (was \code{"cur_trees_1"}): Split candidates are
+(current-tree, split-dimension) pairs. For each sampled candidate, perform
+\code{n_try_split_points} evaluations. Each evaluation samples a leaf from the
+set of valid current trees (with probability proportional to its number of
+available split points) and then uniformly samples a single split point
+within that leaf.
+\item \code{"tree_then_all_leaves"} (was \code{"cur_trees_2"}): Split candidates are
+(current-tree, split-dimension) pairs. For each sampled candidate, iterate
+through every valid leaf. Within each leaf, sample \code{n_try_split_points}
+split points uniformly and evaluate them.
+\item \code{"target_tree_then_leaf"} (was \code{"res_trees"}): Split candidates are
+resulting trees. For each sampled candidate, run \code{n_try_split_points}
+evaluations by sampling a (split-dimension, leaf) pair from all valid pairs
+(with probability proportional to its number of available split points),
+then uniformly sampling one split point within that pair.
 }
 }
 
-\subsection{The draw of candidates for \code{leaves}}{
+\subsection{Renamed arguments}{
 
-With \code{split_structure = "leaves"} (regression and classification), the
+Four arguments and the split structures were renamed after version 0.5.0:
+\code{ntrees} is now \code{n_families}, \code{splits} is \code{n_splits}, \code{split_try} is
+\code{n_try_split_points} and \code{t_try} is \code{share_candidates}; the split structures
+are listed above. The prefix gives the unit: \code{n_} a count, \code{share_} a
+share in \verb{(0, 1]}, \code{max_} a cap. The old names still work and give the same
+fit, with one deprecation warning per call; giving an argument under both
+names is an error. The fitted model's \verb{$params} keeps the old names
+(\code{ntrees}, \code{splits}, \code{split_try}, \code{t_try}, and the old \code{split_structure}
+values), so code that reads them, and models saved by 0.5.0, keep working.
+}
+
+\subsection{The draw of candidates for \code{"leaf"}}{
+
+With \code{split_structure = "leaf"} (regression and classification), the
 global option \code{randomPlantedForest.exact_draw} chooses how the candidates
 are drawn.
 With \code{FALSE} (the default), the candidates are drawn from a Fenwick tree
@@ -497,7 +521,7 @@ bootstrap sample, so every training row is out of bag for the families that
 did not draw it (about 37\% of them). With \code{oob_path}, each family's
 prediction at its OOB rows is updated split by split while it grows, and
 copied at each checkpoint. So one fit gives the OOB error of every forest
-with fewer splits, for example to choose \code{splits} without cross-validation.
+with fewer splits, for example to choose \code{n_splits} without cross-validation.
 This costs \code{2 * nrow(x) * length(checkpoints)} doubles and a little time;
 the fit itself is unchanged.
 
@@ -506,7 +530,7 @@ error (\code{oob_rmse_raw}) is the root mean squared error of these predictions
 over the rows with an OOB family. That mean averages fewer families than the
 forest, so the plain error overstates the forest's error by the families'
 extra variance, more so with more splits. The corrected error (\code{oob_rmse})
-subtracts this excess, \code{(1 / m_i - 1 / ntrees) * v_i} for row \code{i} with \code{m_i}
+subtracts this excess, \code{(1 / m_i - 1 / n_families) * v_i} for row \code{i} with \code{m_i}
 OOB families, where \code{v_i} is the variance across families estimated from the
 OOB means over the families of even and of odd index,
 \code{v_i = (g_even - g_odd)^2 / (1 / m_even + 1 / m_odd)}; this is also the
@@ -524,9 +548,9 @@ ordering its OOB families split on, and the OOB error is somewhat optimistic
 with factor predictors, most so with many levels.
 }
 
-\subsection{Choosing \code{splits} out of bag}{
+\subsection{Choosing \code{n_splits} out of bag}{
 
-With \code{splits = NULL} (not deterministic), the number of splits
+With \code{n_splits = NULL} (not deterministic), the number of splits
 is chosen while the forest grows, by the corrected OOB error of the
 out-of-bag path. The families grow to checkpoints, four per doubling of the
 splits (\code{\link[=oob_path_checkpoints]{oob_path_checkpoints()}} up to 25,600), and the forest's corrected
@@ -542,11 +566,11 @@ the first rule. Growing also stops at 25,600 splits, with a warning if the
 error was still falling there. The result is the forest at the lowest error
 (ties go to fewer splits; a corrected error at or below 0, a correction that
 overshot, is not chosen unless all are): the forest that \code{rpf()} with that
-many \code{splits} and the same seed returns. On 52 data sets (44 synthetic, 8 splits of
-California housing) the first rule alone chose the same \code{splits} as the
+many \code{n_splits} and the same seed returns. On 52 data sets (44 synthetic, 8 splits of
+California housing) the first rule alone chose the same \code{n_splits} as the
 lowest error along a fixed budget of 3,200 splits on 50 of them, and a
 later, lower minimum on the other two, while growing 0.72 of the splits.
-The plateau stop chose the same \code{splits} as the first rule alone on all 44
+The plateau stop chose the same \code{n_splits} as the first rule alone on all 44
 synthetic sets, the 4 California sets tried and 24 classification fits
 (logit and exponential loss), while growing 10\% (regression) to 29\%
 (classification) fewer splits; it matters most on long, flat out-of-bag
@@ -564,8 +588,8 @@ all families together would hold every family's growing state until the
 stop: about 18 GB of resident memory (RSS) on California housing (16,512
 rows) at 200 families and \code{max_interaction = 3}, where the fit one family at
 a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
-fit alone, measured when it was added: \code{split_try = 3}, \code{t_try = 0.1}, the
-exact draw, 8 threads).
+fit alone, measured when it was added: \code{n_try_split_points = 3},
+\code{share_candidates = 0.1}, the exact draw, 8 threads).
 }
 
 \subsection{Pruning}{
@@ -582,7 +606,7 @@ is the same, bit for bit, as
 \code{prune_components(rpf(..., prune = FALSE), data)} from the same random
 number state, for every interface. For other settings of the pruning (\code{rule},
 \code{tau}, \code{select}, \code{select_by}, folds or seed), fit with \code{prune = FALSE} and call
-\code{\link[=prune_components]{prune_components()}}. Together with \code{splits = NULL}, one call chooses the
+\code{\link[=prune_components]{prune_components()}}. Together with \code{n_splits = NULL}, one call chooses the
 number of splits out of bag, prunes and returns the model to show. Pruning
 needs out-of-bag rows, so with \code{deterministic = TRUE} \code{prune = NULL} means
 \code{FALSE} and \code{prune = TRUE} is an error.
@@ -591,7 +615,7 @@ needs out-of-bag rows, so with \code{deterministic = TRUE} \code{prune = NULL} m
 \subsection{Classification}{
 
 A classification forest goes through the same steps (the OOB path,
-\code{splits = NULL}, \code{prune}, \code{max_panels} and \code{tune}) with its score columns:
+\code{n_splits = NULL}, \code{prune}, \code{max_panels} and \code{tune}) with its score columns:
 one for a binary outcome, one per class otherwise (\code{K - 1} for
 \code{loss = "logit"}: the first level is the reference). Every out-of-bag choice
 is scored by the loss's own criterion, corrected for the OOB family count as
@@ -603,7 +627,7 @@ probabilities). With two classes this is the regression criterion of the
 0/1 outcome, and the choices are the regression ones, bit for bit.
 \item \code{loss = "logit"} or \code{"exponential"}: the log-loss of the probabilities
 that \code{predict(type = "prob")} returns. The correction is its second-order
-form, \verb{(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))}
+form, \verb{(1 / m_i - 1 / n_families) * d' H d / (2 * (1 / m_even + 1 / m_odd))}
 with \code{d = g_even - g_odd} and \verb{H = diag(p) - p p'} over the free score
 columns (for the squared error \verb{H = 2 I}, the correction above).
 }
@@ -618,9 +642,9 @@ on simulated data; the defaults were chosen on regression and carried over.
 \subsection{Tuning out of bag}{
 
 With \code{tune}, \code{rpf()} searches the greediness of the split search
-(\code{split_try} and \code{t_try}, on the ladder of \code{\link[=greediness_ladder]{greediness_ladder()}}) and the
+(\code{n_try_split_points} and \code{share_candidates}, on the ladder of \code{\link[=greediness_ladder]{greediness_ladder()}}) and the
 minimum leaf size \code{min_leaf_rows}, without cross-validation. Every forest of
-the search is grown with \code{splits} chosen out of bag and pruned by
+the search is grown with \code{n_splits} chosen out of bag and pruned by
 \code{\link[=prune_components]{prune_components()}} with its defaults (without the display), and forests are
 compared by the corrected out-of-bag RMSE of their pruned model (for
 classification by the root of its mean corrected criterion); the lowest
@@ -633,7 +657,7 @@ ladder neighbours, about 10 forests in all. \code{tune = "quick"} grows two
 forests, 3 / 0.1 and 1 / 0.025 at \code{min_leaf_rows = 1}. The chosen forest's
 pruned model is returned, with the display at \code{max_panels}, and the search in
 its element \code{tune}. Every forest is grown from the same random number state,
-so the result is the model that \code{rpf(splits = NULL, prune = TRUE)} returns
+so the result is the model that \code{rpf(n_splits = NULL, prune = TRUE)} returns
 at the chosen settings from that state.
 
 On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
@@ -656,7 +680,7 @@ predict(model, mtcars[1:3, ])
 
 # Classification, the same steps
 set.seed(1)
-model <- rpf(Species ~ ., data = iris, ntrees = 50)
+model <- rpf(Species ~ ., data = iris, n_families = 50)
 predict(model, iris[c(1, 51, 101), ], type = "prob")
 
 # The forest instead of the pruned model, with x and y, pairwise interactions
@@ -666,7 +690,7 @@ rpfit <- rpf(
   x = mtcars[, c("cyl", "wt", "hp")],
   y = mtcars$mpg,
   max_interaction = 2,
-  splits = 30,
+  n_splits = 30,
   prune = FALSE
 )
 rpfit
@@ -679,7 +703,14 @@ rpfit$factor_levels
 
 # The out-of-bag error along the splits, from one fit
 set.seed(1)
-rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE, prune = FALSE)
+rpfit <- rpf(
+  mpg ~ .,
+  data = mtcars,
+  n_families = 20,
+  n_splits = 100,
+  oob_path = TRUE,
+  prune = FALSE
+)
 rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 
 \donttest{
@@ -690,10 +721,10 @@ rpfit <- rpf(
   mpg ~ cyl + wt,
   data = mtcars,
   max_interaction = 2,
-  ntrees = 50,
-  splits = 30,
-  split_try = 10,
-  t_try = 0.4,
+  n_families = 50,
+  n_splits = 30,
+  n_try_split_points = 10,
+  share_candidates = 0.4,
   prune = FALSE
 )
 options(old)
@@ -704,7 +735,7 @@ options(old)
 set.seed(1)
 x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
-tuned <- rpf(x, y, ntrees = 10, tune = "quick")
+tuned <- rpf(x, y, n_families = 10, tune = "quick")
 tuned$tune$search
 }
 }

@@ -12,14 +12,15 @@ tune_control(
 )
 }
 \arguments{
-\item{ladder}{\verb{[data.frame: greediness_ladder()]}: The points of greediness, greediest first: columns \code{split_try}
-(whole numbers, at least 1) and \code{t_try} (in \verb{(0, 1]}).}
+\item{ladder}{\verb{[data.frame: greediness_ladder()]}: The points of greediness, greediest first: columns
+\code{n_try_split_points} (whole numbers, at least 1) and \code{share_candidates} (in \verb{(0, 1]}). The column names of 0.5.0,
+\code{split_try} and \code{t_try}, still work, with a deprecation warning.}
 
 \item{search}{\verb{[integer: 3:8]}: The rows of \code{ladder} searched in step 1 (on the default ladder from 10 / 0.4 to
 1 / 0.0125).}
 
 \item{min_leaf_rows}{\verb{[integer: c(1, 5, 20, 100)]}: The values of \code{\link[=rpf]{rpf()}}'s \code{min_leaf_rows} searched in step 2;
-the first one is that of step 1. Values above 1 need \code{split_structure = "leaves"}.}
+the first one is that of step 1. Values above 1 need \code{split_structure = "leaf"}.}
 
 \item{neighbours}{\verb{[logical(1): TRUE]}: Whether to run step 3.}
 }
@@ -36,7 +37,7 @@ defaults):
 }
 }
 \details{
-Every forest has its number of splits chosen out of bag while it grows (as \code{rpf(splits = NULL)}) and is pruned
+Every forest has its number of splits chosen out of bag while it grows (as \code{rpf(n_splits = NULL)}) and is pruned
 by \code{\link[=prune_components]{prune_components()}} with its defaults, without the display. A step chooses, among all forests grown at the
 coordinate it varies, the one whose pruned model has the lowest corrected out-of-bag RMSE (ties: the greedier
 point, the larger \code{min_leaf_rows}). Step 3 chooses among every forest grown at the chosen \code{min_leaf_rows}, so with
@@ -59,7 +60,7 @@ tuned <- rpf(
   x,
   y,
   max_interaction = 2,
-  ntrees = 10,
+  n_families = 10,
   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 )
 tuned$tune$search
