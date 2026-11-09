@@ -164,7 +164,8 @@
 #'   `$params$splits` is the chosen number of splits, `$oob_path` the path of
 #'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
-#'   (whether it stopped at the cap while the error was still falling).
+#'   (whether it stopped at the cap while the error was still falling, neither
+#'   stop rule reached).
 #'   When pruning (the default), an object of class `rpf_pruned` (see
 #'   [prune_components()]), whose element `fit` is the forest (not purified),
 #'   with the elements above: the pruned model's OOB path is `$fit$oob_path`, and
@@ -377,14 +378,25 @@
 #' splits ([oob_path_checkpoints()] up to 25,600), and the forest's corrected
 #' error is followed checkpoint by checkpoint. Growing stops once the lowest
 #' error is one doubling of the splits back (for example, no new minimum from
-#' 100 to 200 splits), or at 25,600 splits, with a warning if the error was
-#' still falling there. The result is the forest at the lowest error (ties go
-#' to fewer splits; a corrected error at or below 0, a correction that
+#' 100 to 200 splits), or once it is on a plateau: the lowest error improved
+#' over the last doubling by at most
+#' `getOption("randomPlantedForest.adaptive_tolerance", 1)` standard errors of
+#' that improvement (paired over the training rows: the standard deviation of
+#' the rows' differences in corrected error between the two checkpoints,
+#' divided by the square root of their number). A tolerance of 0 stops only on
+#' the first rule. Growing also stops at 25,600 splits, with a warning if the
+#' error was still falling there. The result is the forest at the lowest error
+#' (ties go to fewer splits; a corrected error at or below 0, a correction that
 #' overshot, is not chosen unless all are): the forest that `rpf()` with that
-#' many `splits` and the same seed returns. On 52 data sets (44 synthetic, 8 splits of California
-#' housing) this chose the same `splits` as the lowest error along a fixed
-#' budget of 3,200 splits on 50 of them, and a later, lower minimum on the
-#' other two, while growing 0.72 of the splits.
+#' many `splits` and the same seed returns. On 52 data sets (44 synthetic, 8 splits of
+#' California housing) the first rule alone chose the same `splits` as the
+#' lowest error along a fixed budget of 3,200 splits on 50 of them, and a
+#' later, lower minimum on the other two, while growing 0.72 of the splits.
+#' The plateau stop chose the same `splits` as the first rule alone on all 44
+#' synthetic sets, the 4 California sets tried and 24 classification fits
+#' (logit and exponential loss), while growing 10\% (regression) to 29\%
+#' (classification) fewer splits; it matters most on long, flat out-of-bag
+#' curves.
 #'
 #' The families grow one at a time, `nthreads` together, each to the stop
 #' estimated from the families grown before it. A grown family keeps only its
@@ -1156,7 +1168,8 @@ rpf_param_vector <- function(params, mode) {
 
 # Main fitting function and interface to C++ implementation
 # `oob_path`: NULL, or the checkpoints of the OOB path (see check_oob_path())
-# `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, floor and pause_gb (see tune_splits_oob())
+# `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, tolerance, floor and pause_gb (see
+# tune_splits_oob())
 rpf_impl <- function(Y, X, mode = c("regression", "classification"), params, oob_path = NULL, adaptive = NULL) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
@@ -1186,6 +1199,7 @@ rpf_impl <- function(Y, X, mode = c("regression", "classification"), params, oob
       as.integer(adaptive$checkpoints),
       adaptive$stopper,
       adaptive$patience,
+      adaptive$tolerance,
       adaptive$floor,
       adaptive$pause_gb
     )

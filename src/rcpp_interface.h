@@ -396,7 +396,12 @@ public:
   // path) at each checkpoint c (1-based) with the OOB path there (as oob_path() gives it, one checkpoint: value_size
   // columns); it returns 0 to grow on or the index of the chosen checkpoint (see AdaptiveStopper)
   void set_adaptive(
-      const Rcpp::IntegerVector &checkpoints, Rcpp::Function stopper, int patience, double floor, double pause_gb
+      const Rcpp::IntegerVector &checkpoints,
+      Rcpp::Function stopper,
+      int patience,
+      double tolerance,
+      double floor,
+      double pause_gb
   )
   {
     core.set_adaptive(
@@ -405,6 +410,7 @@ public:
           return Rcpp::as<int>(stopper((int)c + 1, oob_path_to_list(path)));
         },
         patience,
+        tolerance,
         floor,
         pause_gb
     );
