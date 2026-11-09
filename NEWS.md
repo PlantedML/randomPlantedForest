@@ -49,6 +49,9 @@
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
   The default `min_leaf_rows = 1` fits the same models as before, bit for bit.
+* Classification with `split_structure = "leaves"` (the default) takes `min_leaf_rows` and the fast draw of split candidates (`options(randomPlantedForest.exact_draw = FALSE)`) as regression does.
+  Both use regression's draw: the same candidates are left out, and a classification fit with `loss = "L2"` on a 0/1 response is the regression fit, bit for bit, with either option.
+  With the defaults (`min_leaf_rows = 1`, the exact draw) classification fits are unchanged, bit for bit.
 * `rpf(tune = TRUE)` tunes out of bag in one call (regression): the greediness of the split search (`split_try` and `t_try`, on the ladder of the new `greediness_ladder()`) and `min_leaf_rows`.
   Every forest of the search has `splits` chosen out of bag and is pruned by `prune_components()` with its defaults, and the forest whose pruned model has the lowest corrected out-of-bag error wins; the display (`max_panels`) is applied once, to the chosen model.
   The search is coordinate-wise, about 10 forests: the ladder from 10 / 0.4 to 1 / 0.0125, then `min_leaf_rows` 1, 5, 20 and 100, then the two ladder neighbours of the chosen point.
