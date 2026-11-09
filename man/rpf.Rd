@@ -188,8 +188,8 @@ splitting along an existing dimension.}
 \item{min_leaf_rows}{\verb{[integer(1): 1]}: Minimum number of rows of the
 bootstrap sample on each side of every split, so in every leaf. Leaves
 without a threshold that keeps this many rows on each side are not drawn
-as split candidates. Only for regression with \code{split_structure = "leaves"}; \code{1}
-(no limit) otherwise.}
+as split candidates. Only for \code{split_structure = "leaves"} (regression and
+classification); \code{1} (no limit) otherwise.}
 
 \item{interaction_constraints}{\verb{[list | NULL: NULL]}: Feature sets that restrict which
 interactions the forest may form, e.g. \code{list(c("x1", "x2"), c("x3", "x4"))}.
@@ -400,8 +400,9 @@ uniformly sampling one threshold within that pair.
 
 \subsection{The draw of candidates for \code{leaves}}{
 
-For regression with \code{split_structure = "leaves"}, the global option
-\code{randomPlantedForest.exact_draw} chooses how the candidates are drawn.
+With \code{split_structure = "leaves"} (regression and classification), the
+global option \code{randomPlantedForest.exact_draw} chooses how the candidates
+are drawn.
 With \code{TRUE} (the default), every possible split gets a random number in
 every round. With \code{FALSE}, the candidates are drawn from a Fenwick tree
 over the weights, kept up to date between rounds, which costs a few random
@@ -413,8 +414,8 @@ in distribution, though not in accuracy. With \code{min_leaf_rows}, both leave
 out the same candidates: those
 whose leaf has no threshold with that many rows on each side. The fast draw
 pays off on large data with many splits. The option is read when the forest
-is fitted and stored in \code{params$exact_draw}; it does not affect
-classification or the other split structures.
+is fitted and stored in \code{params$exact_draw}; it does not affect the other
+split structures.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{options(randomPlantedForest.exact_draw = FALSE)
 }\if{html}{\out{</div>}}

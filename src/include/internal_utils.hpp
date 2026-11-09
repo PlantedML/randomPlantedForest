@@ -148,6 +148,11 @@ std::vector<double> leaves_draw_counts(
     const std::vector<int> &rows_ok,
     uint64_t seed
 );
+// leaves with min_leaf_rows: the distinct-value indices [lo, hi_excl) of a
+// leaf's sorted values (first positions first_pos of its m rows) whose
+// threshold leaves at least leaf_size distinct values and min_rows rows on
+// each side (splits_leaves.cpp)
+void min_rows_range(const std::vector<size_t> &first_pos, size_t m, int leaf_size, int min_rows, int &lo, int &hi_excl);
 } // namespace rpf_utils
 extern thread_local LeavesScratch *tls_leaves_scratch_ptr;
 

@@ -393,10 +393,17 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
   if (possible_splits.empty())
     return min_split;
 
-  std::vector<double> ages(possible_splits.size());
-  for (size_t i = 0; i < possible_splits.size(); ++i)
-    ages[i] = possible_splits[i].age;
-  std::vector<size_t> sample_idxs = sampleCandidates(ages);
+  // The draw of regression's leaves (splits_leaves.cpp): deterministic, exact or
+  // fast, leaving out entries that min_leaf_rows rules out. Its scratch (the
+  // fast draw's sampler) is the tree family's (create_tree_family).
+  LeavesScratch local_scratch;
+  LeavesScratch &sc = tls_leaves_scratch_ptr ? *tls_leaves_scratch_ptr : local_scratch;
+  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(t_try * possible_splits.size()));
+  unsigned int upper = std::min<size_t>(max_candidates_, possible_splits.size());
+  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  std::vector<size_t> sample_idxs = draw_leaves_candidates(X, possible_splits, n_candidates, sc);
+  const int min_rows = min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
 
   int best_idx = -1;
   for (size_t idx : sample_idxs) {
@@ -411,7 +418,7 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
     const size_t m = leafPtr->individuals.size();
     if (m == 0)
       continue;
-    if (m < static_cast<size_t>(2 * leaf_size))
+    if (m < static_cast<size_t>(2 * leaf_size) || m < static_cast<size_t>(2 * min_rows))
       continue;
 
     std::vector<size_t> order;
@@ -431,6 +438,11 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
 
     int left = leaf_size;
     int right_exclusive = (int)unique.size() - leaf_size + 1;
+    if (rows_check) { // only thresholds with at least min_rows rows on each side
+      min_rows_range(first_pos, m, leaf_size, min_rows, left, right_exclusive);
+      if (left >= right_exclusive)
+        continue;
+    }
     std::vector<int> samples = deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)split_try)
                                              : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)split_try);
 
@@ -447,6 +459,8 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
       if (pos == 0 || pos >= m)
         continue;
       if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
+        continue;
+      if (pos < static_cast<size_t>(min_rows) || (m - pos) < static_cast<size_t>(min_rows))
         continue;
       curr_split.sum_s.assign(value_size, 0.0);
       curr_split.sum_b.assign(value_size, 0.0);
@@ -467,6 +481,7 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
   }
 
   age_pool_by_sample(sample_idxs, best_idx, possible_splits);
+  leaves_sampler_after_aging(possible_splits, sample_idxs, sc);
   return min_split;
 }
 
@@ -1161,6 +1176,15 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       W = std::vector<double>(value_size, 0);
   }
 
+  // The leaves split search's scratch (the exact draw's keys, the fast draw's
+  // sampler), reused across this family's splits, as in rpf.cpp: on this
+  // function's stack, TLS holds only a pointer, detached by the guard.
+  LeavesScratch leaves_scratch;
+  struct LeavesScratchGuard {
+    ~LeavesScratchGuard() { tls_leaves_scratch_ptr = nullptr; }
+  } leaves_scratch_guard;
+  tls_leaves_scratch_ptr = &leaves_scratch;
+
   // modify existing or add new trees through splitting
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
@@ -1524,7 +1548,16 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         }
         // index before push_back, which may reallocate leaves and invalidate leaf_index
         size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
-        *curr_split.leaf_index = leaf_b;                 // replace old interval
+        *curr_split.leaf_index = leaf_b; // replace old interval
+        if (min_leaf_rows_ > 1)          // the entries of the overwritten leaf refer to leaf_b now
+          for (size_t i = 0; i < possible_splits.size(); ++i) {
+            SplitCandidate &c = possible_splits[i];
+            if (c.tree.get() == curr_split.tree_index.get() && c.leaf_idx == idx_b) {
+              c.rows_ok = -1;
+              if (!exact_draw_ && !deterministic) // the fast draw sets their weights again
+                leaves_scratch.sampler.dirty.push_back(i);
+            }
+          }
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
         size_t idx_s = curr_split.tree_index->leaves.size() - 1;
         if (split_structure_mode_ == 3 || split_structure_mode_ == 4) {

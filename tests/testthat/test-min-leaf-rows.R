@@ -79,9 +79,7 @@ test_that("`min_leaf_rows` is validated, stored and restored", {
   expect_error(mlr_fit(d, min_leaf_rows = 0), "min_leaf_rows")
   expect_error(mlr_fit(d, min_leaf_rows = 2.5), "min_leaf_rows")
   expect_error(mlr_fit(d, min_leaf_rows = 5, split_structure = "hist"), "leaves")
-  yc <- factor(d$y > median(d$y))
-  expect_error(rpf(d$x, yc, ntrees = 1, min_leaf_rows = 5), "regression")
-  expect_no_error(rpf(d$x, yc, ntrees = 1, splits = 5, min_leaf_rows = 1))
+  # classification: test-classification-leaves.R
 
   b <- mlr_fit(d, min_leaf_rows = 10, ntrees = 2)
   expect_identical(b$params$min_leaf_rows, 10L)

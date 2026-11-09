@@ -85,7 +85,6 @@ format.rpf <- function(x, ...) {
     if (
       isFALSE(params$exact_draw) &&
         !params$deterministic &&
-        x$mode == "regression" &&
         params$split_structure == "leaves"
     ) {
       cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")

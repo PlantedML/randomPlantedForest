@@ -41,6 +41,8 @@
 
 typedef std::vector<std::vector<double>> Matrix2D; /**< row-major: rows x columns */
 
+struct LeavesScratch; // internal_utils.hpp
+
 struct RPFParams {
   int max_interaction = 1;
   int n_trees = 50;
@@ -482,6 +484,19 @@ protected:
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
       TreeFamily &curr_family
+  );
+  // leaves (both outcomes): this round's n_candidates entries of the pool, by the deterministic, exact or fast draw,
+  // leaving out entries without a threshold that keeps min_leaf_rows_ rows on each side (splits_leaves.cpp). sc holds
+  // the exact draw's keys and the fast draw's sampler, which lasts one tree family.
+  std::vector<size_t> draw_leaves_candidates(
+      const std::vector<std::vector<double>> &X,
+      std::vector<SplitCandidate> &possible_splits,
+      size_t n_candidates,
+      LeavesScratch &sc
+  );
+  // leaves: after the drawn entries were aged, their new weights into the fast draw's sampler
+  void leaves_sampler_after_aging(
+      std::vector<SplitCandidate> &possible_splits, const std::vector<size_t> &sample_idxs, LeavesScratch &sc
   );
   Split calcOptimalSplit_curTrees2(
       const std::vector<std::vector<double>> &Y,

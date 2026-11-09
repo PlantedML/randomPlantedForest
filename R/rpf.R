@@ -53,8 +53,8 @@
 #' @param min_leaf_rows `[integer(1): 1]`: Minimum number of rows of the
 #'   bootstrap sample on each side of every split, so in every leaf. Leaves
 #'   without a threshold that keeps this many rows on each side are not drawn
-#'   as split candidates. Only for regression with `split_structure = "leaves"`; `1`
-#'   (no limit) otherwise.
+#'   as split candidates. Only for `split_structure = "leaves"` (regression and
+#'   classification); `1` (no limit) otherwise.
 #' @param interaction_constraints `[list | NULL: NULL]`: Feature sets that restrict which
 #'   interactions the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`.
 #'   Each set is given by predictor names or by column indices: with `x`, the
@@ -249,8 +249,9 @@
 #'
 #' ## The draw of candidates for `leaves`
 #'
-#' For regression with `split_structure = "leaves"`, the global option
-#' `randomPlantedForest.exact_draw` chooses how the candidates are drawn.
+#' With `split_structure = "leaves"` (regression and classification), the
+#' global option `randomPlantedForest.exact_draw` chooses how the candidates
+#' are drawn.
 #' With `TRUE` (the default), every possible split gets a random number in
 #' every round. With `FALSE`, the candidates are drawn from a Fenwick tree
 #' over the weights, kept up to date between rounds, which costs a few random
@@ -262,8 +263,8 @@
 #' out the same candidates: those
 #' whose leaf has no threshold with that many rows on each side. The fast draw
 #' pays off on large data with many splits. The option is read when the forest
-#' is fitted and stored in `params$exact_draw`; it does not affect
-#' classification or the other split structures.
+#' is fitted and stored in `params$exact_draw`; it does not affect the other
+#' split structures.
 #'
 #' ```r
 #' options(randomPlantedForest.exact_draw = FALSE)
@@ -795,9 +796,9 @@ rpf_bridge <- function(
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
   checkmate::assert_int(min_leaf_rows, lower = 1)
-  if (min_leaf_rows > 1 && (outcomes$mode != "regression" || split_structure != "leaves")) {
+  if (min_leaf_rows > 1 && split_structure != "leaves") {
     cli::cli_abort(
-      "{.arg min_leaf_rows} > 1 needs regression with {.code split_structure = \"leaves\"}.",
+      "{.arg min_leaf_rows} > 1 needs {.code split_structure = \"leaves\"}.",
       call = call
     )
   }
@@ -1011,10 +1012,10 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
 }
 
 # Assemble the positional parameter vector for the C++ constructors.
-# 15 elements for regression (+ min_leaf_rows, exact_draw), 15 (+ delta,
-# epsilon) for classification, which has neither. Models saved before these
-# options existed have no such entries in their params and were fitted with
-# min_leaf_rows = 1 and the exact draw.
+# 15 elements for regression (+ min_leaf_rows, exact_draw), 17 (+ delta,
+# epsilon, min_leaf_rows, exact_draw) for classification. Models saved before
+# these options existed have no such entries in their params and were fitted
+# with min_leaf_rows = 1 and the exact draw.
 rpf_param_vector <- function(params, mode) {
   split_mode <- switch(
     params$split_structure,
@@ -1041,10 +1042,8 @@ rpf_param_vector <- function(params, mode) {
   )
   if (mode == "classification") {
     base <- c(base, params$delta, params$epsilon)
-  } else {
-    base <- c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
   }
-  base
+  c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
 }
 
 # Main fitting function and interface to C++ implementation
