@@ -28,7 +28,7 @@
   - `split_try` → `n_try_split_points` (split points tried per candidate),
   - `t_try` → `share_candidates` (share of the possible splits drawn as candidates each round);
   - `split_structure`: `"leaves"` → `"leaf"`, `"hist"` → `"leaf_binned"`, `"cur_trees_1"` → `"tree_then_leaf"`, `"cur_trees_2"` → `"tree_then_all_leaves"`, `"res_trees"` → `"target_tree_then_leaf"` (the candidate, then how the leaf to split is found).
-* The old names still work and give the same fit, with one deprecation warning per call (class `lifecycle_warning_deprecated`); giving an argument under both names is an error.
+* The old names still work and give the same fit, with a deprecation warning once per session for each old name (class `lifecycle_warning_deprecated`; `options(lifecycle_verbosity = "warning")` warns every time, `"quiet"` never); giving an argument under both names is an error.
   The same holds for `oob_path_checkpoints(splits = )` and for a `tune_control()` ladder with the columns `split_try` and `t_try`.
 * The new names are used in `print()`, in the tables of the new features (the `n_splits` column of `$oob_path`, the tuning's `$tune$search` and `$tune$settings`, `greediness_ladder()`), and in errors and documentation.
   A fitted model's `$params` keeps the old names (`ntrees`, `splits`, `split_try`, `t_try` and the old `split_structure` values), so code that reads them, and models saved by 0.5.0, keep working.

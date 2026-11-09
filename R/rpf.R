@@ -315,8 +315,10 @@
 #' `n_try_split_points` and `t_try` is `share_candidates`; the split structures
 #' are listed above. The prefix gives the unit: `n_` a count, `share_` a
 #' share in `(0, 1]`, `max_` a cap. The old names still work and give the same
-#' fit, with one deprecation warning per call; giving an argument under both
-#' names is an error. The fitted model's `$params` keeps the old names
+#' fit, with a deprecation warning once per session for each old name (as
+#' lifecycle's soft deprecation; `options(lifecycle_verbosity = "warning")`
+#' warns every time, `"quiet"` never); giving an argument under both names is
+#' an error. The fitted model's `$params` keeps the old names
 #' (`ntrees`, `splits`, `split_try`, `t_try`, and the old `split_structure`
 #' values), so code that reads them, and models saved by 0.5.0, keep working.
 #'

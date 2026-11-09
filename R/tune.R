@@ -129,14 +129,10 @@ ladder_renamed <- function(ladder, call = rlang::caller_env()) {
     )
   }
   names(ladder)[match(old, names(ladder))] <- new
-  cli::cli_warn(
-    c(
-      "{.fn tune_control}: the column names {.code split_try} and {.code t_try} of randomPlantedForest 0.5.0 are deprecated.",
-      "i" = "Name the columns of {.arg ladder} {.code n_try_split_points} and {.code share_candidates}."
-    ),
-    class = c("rpf_deprecated", "lifecycle_warning_deprecated"),
-    call = call
-  )
+  # once per session per old column name (rpf_deprecation_warn())
+  used <- as.list(sprintf("Name the column {.code %s} of {.arg ladder} {.code %s}.", old, new))
+  names(used) <- paste0("ladder$", old)
+  rpf_deprecation_warn(used, "tune_control", call = call)
   ladder
 }
 

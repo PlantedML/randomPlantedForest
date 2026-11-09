@@ -25,16 +25,16 @@ split_structure_name <- function(code) {
 
 # The old argument names of a function, given in its `...`: called first in the function as
 # `rpf_renamed(..., .env = environment(), .fn = "<its name>")`. Each old argument given is moved to its new name in
-# `.env` (the new name must be an argument of the function and must not be given too), an old `split_structure` value
-# is replaced by its new name, and the call gets one deprecation warning for all of them. Any other argument in `...`
-# is an error, as rlang::check_dots_empty() gives it.
+# `.env` (the new name must be an argument of the function and must not be given too), and an old `split_structure`
+# value is replaced by its new name. The old names not warned about yet in this session get one deprecation warning
+# (rpf_deprecation_warn()). Any other argument in `...` is an error, as rlang::check_dots_empty() gives it.
 rpf_renamed <- function(..., ntrees, splits, split_try, t_try, .env, .fn = "rpf") {
   rlang::check_dots_empty(call = .env)
   here <- environment()
   old_given <- names(renamed_args)[
     !vapply(names(renamed_args), function(a) eval(call("missing", as.name(a)), here), logical(1))
   ]
-  used <- character(0)
+  used <- list()
   for (old in old_given) {
     new <- renamed_args[[old]]
     if (!exists(new, envir = .env, inherits = FALSE)) {
@@ -50,33 +50,60 @@ rpf_renamed <- function(..., ntrees, splits, split_try, t_try, .env, .fn = "rpf"
       )
     }
     assign(new, get(old, envir = here), envir = .env)
-    used <- c(used, sprintf("Use {.arg %s} instead of {.arg %s}.", new, old))
+    used[[old]] <- sprintf("Use {.arg %s} instead of {.arg %s}.", new, old)
   }
   if (exists("split_structure", envir = .env, inherits = FALSE)) {
     s <- get("split_structure", envir = .env)
     if (is.character(s) && length(s) == 1 && s %in% names(renamed_split_structures)) {
       assign("split_structure", renamed_split_structures[[s]], envir = .env)
-      used <- c(
-        used,
-        sprintf(
-          "Use {.code split_structure = \"%s\"} instead of {.code \"%s\"}.",
-          renamed_split_structures[[s]],
-          s
-        )
+      used[[paste0("split_structure = ", s)]] <- sprintf(
+        "Use {.code split_structure = \"%s\"} instead of {.code \"%s\"}.",
+        renamed_split_structures[[s]],
+        s
       )
     }
   }
-  if (length(used) > 0) {
-    fn <- .fn
-    names(used) <- rep("i", length(used))
-    cli::cli_warn(
-      c(
-        "{.fn {fn}}: {cli::qty(length(used))}{?a name/names} of randomPlantedForest 0.5.0 {?is/are} deprecated, see {.code ?rpf}.",
-        used
-      ),
-      class = c("rpf_deprecated", "lifecycle_warning_deprecated"),
-      call = .env
-    )
-  }
+  rpf_deprecation_warn(used, .fn, call = .env)
   invisible(old_given)
+}
+
+# The old names warned about in this session. As lifecycle's deprecate_soft() default, each old name warns once per
+# session, so that a caller that fits in a loop (a learner in a benchmark) warns once, not on every fit.
+rpf_deprecations <- new.env(parent = emptyenv())
+
+# Forget the old names warned about (for tests)
+rpf_deprecation_reset <- function() {
+  rm(list = ls(rpf_deprecations, all.names = TRUE), envir = rpf_deprecations)
+  invisible(NULL)
+}
+
+# One deprecation warning for the old names `used` (a list named by a key per old name, each element a bullet) not
+# warned about yet in this session. As for lifecycle, options(lifecycle_verbosity = "warning") warns every time and
+# "quiet" never. Returns whether it warned.
+rpf_deprecation_warn <- function(used, fn, call) {
+  verbosity <- getOption("lifecycle_verbosity", "default")
+  if (length(used) == 0 || identical(verbosity, "quiet")) {
+    return(invisible(FALSE))
+  }
+  if (!identical(verbosity, "warning")) {
+    used <- used[!names(used) %in% ls(rpf_deprecations, all.names = TRUE)]
+    if (length(used) == 0) {
+      return(invisible(FALSE))
+    }
+    for (key in names(used)) {
+      assign(key, TRUE, envir = rpf_deprecations)
+    }
+  }
+  bullets <- unlist(used, use.names = FALSE)
+  names(bullets) <- rep("i", length(bullets))
+  cli::cli_warn(
+    c(
+      "{.fn {fn}}: {cli::qty(length(bullets))}{?a name/names} of randomPlantedForest 0.5.0 {?is/are} deprecated, see {.code ?rpf}.",
+      bullets,
+      " " = "This warning is shown once per session for each old name."
+    ),
+    class = c("rpf_deprecated", "lifecycle_warning_deprecated"),
+    call = call
+  )
+  invisible(TRUE)
 }

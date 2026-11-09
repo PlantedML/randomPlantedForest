@@ -467,8 +467,10 @@ Four arguments and the split structures were renamed after version 0.5.0:
 \code{n_try_split_points} and \code{t_try} is \code{share_candidates}; the split structures
 are listed above. The prefix gives the unit: \code{n_} a count, \code{share_} a
 share in \verb{(0, 1]}, \code{max_} a cap. The old names still work and give the same
-fit, with one deprecation warning per call; giving an argument under both
-names is an error. The fitted model's \verb{$params} keeps the old names
+fit, with a deprecation warning once per session for each old name (as
+lifecycle's soft deprecation; \code{options(lifecycle_verbosity = "warning")}
+warns every time, \code{"quiet"} never); giving an argument under both names is
+an error. The fitted model's \verb{$params} keeps the old names
 (\code{ntrees}, \code{splits}, \code{split_try}, \code{t_try}, and the old \code{split_structure}
 values), so code that reads them, and models saved by 0.5.0, keep working.
 }

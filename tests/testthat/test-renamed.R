@@ -1,5 +1,12 @@
-# The arguments renamed after 0.5.0 keep their old names as deprecated aliases: the same fit, bit for bit, one
-# deprecation warning per call, and an error when both names are given.
+# The arguments renamed after 0.5.0 keep their old names as deprecated aliases: the same fit, bit for bit, a
+# deprecation warning once per session for each old name, and an error when both names are given.
+
+# Forget the old names warned about, now and when the test ends, with lifecycle's verbosity at its default
+local_fresh_deprecations <- function(frame = parent.frame()) {
+  rlang::local_options(lifecycle_verbosity = NULL, .frame = frame)
+  randomPlantedForest:::rpf_deprecation_reset()
+  do.call(on.exit, list(quote(randomPlantedForest:::rpf_deprecation_reset()), add = TRUE), envir = frame)
+}
 
 renamed_fit <- function(..., seed = 1) {
   set.seed(seed)
@@ -12,6 +19,7 @@ renamed_numbers <- function(fit) {
 }
 
 test_that("each old argument name gives the fit of its new name, with a deprecation warning", {
+  local_fresh_deprecations()
   new_args <- list(n_families = 3, n_splits = 20, n_try_split_points = 4, share_candidates = 0.3)
   old_names <- c(
     n_families = "ntrees",
@@ -33,6 +41,7 @@ test_that("each old argument name gives the fit of its new name, with a deprecat
 })
 
 test_that("all old names at once give one warning and the same fit", {
+  local_fresh_deprecations()
   ref <- renamed_fit(n_families = 3, n_splits = 20, n_try_split_points = 4, share_candidates = 0.3)
   warnings <- list()
   fit <- withCallingHandlers(
@@ -56,6 +65,7 @@ test_that("the new names give no warning", {
 })
 
 test_that("each old split structure name gives the fit of its new name", {
+  local_fresh_deprecations()
   old_new <- c(
     leaves = "leaf",
     hist = "leaf_binned",
@@ -93,6 +103,7 @@ test_that("giving an argument under both names is an error", {
 })
 
 test_that("an old name given as NULL is the new name's NULL", {
+  local_fresh_deprecations()
   set.seed(1)
   ref <- rpf(mpg ~ ., data = mtcars, n_families = 10, n_splits = NULL, prune = FALSE)
   set.seed(1)
@@ -109,14 +120,17 @@ test_that("the old names work in every rpf() method, and other unknown arguments
   x <- mtcars[, c("cyl", "wt", "hp")]
   set.seed(1)
   ref <- rpf(x, mtcars$mpg, n_families = 2, n_splits = 10, prune = FALSE)
+  local_fresh_deprecations()
   set.seed(1)
   expect_warning(fit <- rpf(x, mtcars$mpg, ntrees = 2, splits = 10, prune = FALSE), class = "rpf_deprecated")
   expect_identical(predict(fit, x), predict(ref, x))
+  randomPlantedForest:::rpf_deprecation_reset()
   set.seed(1)
   expect_warning(fit <- rpf(as.matrix(x), mtcars$mpg, ntrees = 2, splits = 10, prune = FALSE), class = "rpf_deprecated")
   expect_identical(predict(fit, as.matrix(x)), predict(ref, x))
   skip_if_not_installed("recipes")
   rec <- recipes::recipe(mpg ~ cyl + wt + hp, data = mtcars)
+  randomPlantedForest:::rpf_deprecation_reset()
   set.seed(1)
   expect_warning(fit <- rpf(rec, mtcars, ntrees = 2, splits = 10, prune = FALSE), class = "rpf_deprecated")
   expect_identical(predict(fit, mtcars), predict(ref, x))
@@ -132,6 +146,7 @@ test_that("tune: an old name counts as given", {
 })
 
 test_that("oob_path_checkpoints() takes the old name", {
+  local_fresh_deprecations()
   expect_warning(
     cp <- oob_path_checkpoints(splits = 100),
     "Use `n_splits` instead of `splits`",
@@ -143,11 +158,47 @@ test_that("oob_path_checkpoints() takes the old name", {
 })
 
 test_that("tune_control() takes a ladder with the old column names", {
+  local_fresh_deprecations()
   old <- data.frame(split_try = c(3, 1), t_try = c(0.1, 0.025))
   new <- data.frame(n_try_split_points = c(3, 1), share_candidates = c(0.1, 0.025))
   expect_warning(tc <- tune_control(ladder = old, search = 1:2), class = "rpf_deprecated")
   expect_identical(tc, tune_control(ladder = new, search = 1:2))
   expect_error(tune_control(ladder = cbind(old, new), search = 1:2), "give one")
+  # once per session
+  expect_no_warning(tune_control(ladder = old, search = 1:2))
+})
+
+test_that("each old name warns once per session; other old names still warn", {
+  local_fresh_deprecations()
+  ref <- renamed_fit(n_families = 3, n_splits = 20)
+  expect_warning(renamed_fit(ntrees = 3, n_splits = 20), "`ntrees`", class = "rpf_deprecated")
+  # the same old name again: no warning, the same fit (a learner fitting in a loop warns once)
+  for (i in 1:3) {
+    expect_no_warning(fit <- renamed_fit(ntrees = 3, n_splits = 20))
+    expect_identical(renamed_numbers(fit), renamed_numbers(ref))
+  }
+  # a call with a warned and a new old name warns about the new one only
+  w <- expect_warning(renamed_fit(ntrees = 3, splits = 20), class = "rpf_deprecated")
+  expect_match(conditionMessage(w), "`splits`", fixed = TRUE)
+  expect_no_match(conditionMessage(w), "`ntrees`", fixed = TRUE)
+  expect_match(conditionMessage(w), "once per session", fixed = TRUE)
+  # an old split structure is its own old name; another function shares the record (splits is warned already)
+  expect_warning(renamed_fit(n_families = 2, n_splits = 10, split_structure = "hist"), "leaf_binned")
+  expect_no_warning(renamed_fit(n_families = 2, n_splits = 10, split_structure = "hist"))
+  expect_no_warning(oob_path_checkpoints(splits = 100))
+  # both names stay an error after the warning
+  expect_error(renamed_fit(ntrees = 3, n_families = 3), "were given")
+})
+
+test_that("lifecycle_verbosity: \"warning\" warns every time, \"quiet\" never", {
+  local_fresh_deprecations()
+  rlang::local_options(lifecycle_verbosity = "warning")
+  for (i in 1:2) {
+    expect_warning(renamed_fit(ntrees = 2, n_splits = 10), class = "rpf_deprecated")
+  }
+  rlang::local_options(lifecycle_verbosity = "quiet")
+  randomPlantedForest:::rpf_deprecation_reset()
+  expect_no_warning(renamed_fit(ntrees = 2, n_splits = 10))
 })
 
 test_that("print() and the result tables use the new names", {
