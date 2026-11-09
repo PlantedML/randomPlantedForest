@@ -193,6 +193,9 @@
 * A fitted forest takes about 40% less memory: the split search's per-leaf caches are kept apart from the leaves and freed when a tree family is finished, so a leaf takes 80 instead of 232 bytes; finished classification forests now also drop their training rows and caches.
   On California housing (`max_interaction = 3`, 10,000 splits, 200 tree families) the fitted forest falls from 821 MB to 490 MB and the fit's peak resident memory from about 1.9 GB to 1.6 GB, in the same time.
   Fitted models are bitwise unchanged.
+* Classification with `loss = "logit"` fits another 1.2x to 1.8x faster, with bitwise the same fits.
+  The terms of the loss under the current weights do not depend on the candidate split, so each observation's terms are now computed once and refreshed only when its weights change, and the terms of classes the observation is not in (which are zero) are skipped: a candidate takes one exponential per logit column and one logarithm per observation of the leaf, instead of two exponentials and two logarithms per column plus two logarithms.
+  With 4,000 rows, 300 splits, 200 tree families and `max_interaction = 3` (1 thread), a binary fit takes 74 s instead of 95 s and a three-class fit 91 s instead of 129 s; with 300 rows, 8.8 s → 6.2 s (binary) and 22.5 s → 13.6 s (three classes).
 
 # randomPlantedForest 0.5.0
 
