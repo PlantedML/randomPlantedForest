@@ -82,4 +82,6 @@ RCPP_MODULE(mod_rpf)
       .constructor<std::string, const Rcpp::NumericVector>()
       .constructor<std::string, const Rcpp::NumericVector, const Rcpp::List>();
   expose_methods(cpf);
+  // internal, for tests: the loss weights of each family's sample rows (set_parameters("keep_weights", 1))
+  cpf.method("kept_weights", &RcppCPF::kept_weights);
 }

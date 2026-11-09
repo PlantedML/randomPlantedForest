@@ -267,6 +267,21 @@ public:
     Rcpp::RNGScope scope;
     core.set_parameters(Rcpp::as<std::vector<std::string>>(keys), Rcpp::as<std::vector<double>>(values));
   }
+  // Internal, for tests (classification only; registered for ClassificationRPF alone): the loss weights each family's
+  // growth ended with after set_parameters("keep_weights", 1), per family list(rows = the data row of each sample row,
+  // 1-based; weights = sample rows x value_size)
+  Rcpp::List kept_weights()
+  {
+    const auto &kw = core.kept_weights();
+    Rcpp::List out(kw.size());
+    for (size_t b = 0; b < kw.size(); ++b) {
+      Rcpp::IntegerVector rows(kw[b].rows.begin(), kw[b].rows.end());
+      rows = rows + 1;
+      out[(R_xlen_t)b] =
+          Rcpp::List::create(Rcpp::Named("rows") = rows, Rcpp::Named("weights") = from_matrix2d(kw[b].weights));
+    }
+    return out;
+  }
   bool is_purified() { return core.is_purified(); }
   bool is_purify_capped() { return core.is_purify_capped(); }
   void set_purify_capped(bool capped) { core.set_purify_capped(capped); }

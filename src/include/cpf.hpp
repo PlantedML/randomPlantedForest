@@ -18,6 +18,14 @@ public:
   oob_row_error(size_t i, const double *g, const double *d, double inv, const double *var, double coef) const override;
   // The centring of the score columns (rpf.hpp): multiclass logit 1, multiclass exponential 2, otherwise 0
   int score_centring() const override;
+  // Internal, for tests: with set_parameters("keep_weights", 1) (which refits), each family keeps the loss weights of
+  // its sample rows as they are when its growth ends (one vector per sample row), and each sample row's row in the
+  // data (0-based). Empty otherwise.
+  struct KeptWeights {
+    std::vector<int> rows;
+    std::vector<std::vector<double>> weights;
+  };
+  const std::vector<KeptWeights> &kept_weights() const { return kept_weights_; }
 
 protected:
   // Maps a loss name to `loss` and `calcLoss`; throws on unknown names.
@@ -108,6 +116,8 @@ private:
   void exponential_loss(Split &split);
   void exponential_loss_2(Split &split);
   void exponential_loss_3(Split &split);
+  bool keep_weights_ = false;
+  std::vector<KeptWeights> kept_weights_;
 };
 
 #endif

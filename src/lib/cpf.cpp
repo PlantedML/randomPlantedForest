@@ -1134,12 +1134,17 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   init_inbag(n);
   std::vector<std::vector<double>> samples_X;
   std::vector<std::vector<double>> samples_Y;
+  std::vector<int> kept_rows; // (keep_weights_, tests) each sample row's row in the data
 
   // deterministic
   if (deterministic) {
     samples_X = X;
     samples_Y = Y;
     this->t_try = 1;
+    if (keep_weights_) {
+      kept_rows.resize((size_t)sample_size);
+      std::iota(kept_rows.begin(), kept_rows.end(), 0);
+    }
   } else {
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
@@ -1150,6 +1155,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       add_inbag(n, sample_index);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
+      if (keep_weights_)
+        kept_rows.push_back(sample_index);
     }
   }
 
@@ -1614,11 +1621,16 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   }
 
   tree_families[n] = curr_family;
+
+  // (tests) the weights as the family's growth leaves them (cpf.hpp)
+  if (keep_weights_ && n < kept_weights_.size())
+    kept_weights_[n] = KeptWeights{std::move(kept_rows), std::move(weights)};
 }
 
 // fit forest to new data
 void ClassificationRPF::fit()
 {
+  kept_weights_.assign(keep_weights_ ? (size_t)n_trees : 0, KeptWeights());
   // Use the base class multithreaded trainer with RNG seeding identical to regression
   RandomPlantedForest::fit();
 }
@@ -1680,6 +1692,8 @@ void ClassificationRPF::set_parameters(const std::vector<std::string> &keys, con
       this->split_decay_rate_ = values[i];
     } else if (keys[i] == "max_candidates") {
       this->max_candidates_ = static_cast<size_t>(values[i]);
+    } else if (keys[i] == "keep_weights") { // internal, for tests (cpf.hpp)
+      this->keep_weights_ = values[i] != 0;
     } else {
       warn("Unkown parameter key  '" + keys[i] + "' .");
     }
