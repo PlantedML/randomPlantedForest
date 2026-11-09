@@ -1,5 +1,5 @@
-# prune_components(): stored components only, the purification, the random number stream, the training rows, and
-# the out-of-bag choice with few families
+# prune_components(): stored components only, the purification, the random number stream, the training rows, the
+# out-of-bag choice with few families, and a corrected OOB error of 0
 
 fix_sim <- function(n = 300, p = 4, seed = 11) {
   set.seed(seed)
@@ -181,4 +181,79 @@ test_that("with few families the default scores by CV, and an empty half gets th
     expect_equal(po$oob$oob_rmse[row], sqrt(mean(e2)), tolerance = 1e-12)
     expect_equal(attr(po$oob, "n_rows"), sum(use))
   }
+})
+
+test_that("candidates whose corrected OOB MSE was set to 0 are not chosen, unless all are", {
+  ns <- asNamespace("randomPlantedForest")
+  cand <- data.frame(rule = rep(c("D", "R"), each = 3), tau = rep(c(0, 0.01, 0.1), 2))
+  # R at 0 and 0.01 left out (at 0, below every other RMSE and within any SE): min D 0; 1se within D 0's SE, D 0.01
+  rmse <- c(1, 1.1, 2, 0, 0, 3)
+  se <- c(0.3, 0.1, 0.1, 0.5, 5, 0.1)
+  ch <- ns$prune_choose(rmse, se, cand, left_out = rmse == 0)
+  expect_identical(which(ch$min), 1L)
+  expect_identical(which(ch$one_se), 2L)
+  # all left out: they tie at 0, the largest tau, then D
+  ch <- ns$prune_choose(rep(0, 6), rep(0, 6), cand, left_out = rep(TRUE, 6))
+  expect_identical(which(ch$min), 3L)
+  expect_identical(which(ch$one_se), 3L)
+  # none left out: as without left_out
+  expect_identical(ns$prune_choose(rmse + 1, se, cand, left_out = rep(FALSE, 6)), ns$prune_choose(rmse + 1, se, cand))
+  # without left_out (the CV), an RMSE of 0 is a tie at 0: at the same tau, D
+  ch <- ns$prune_choose(c(0, 1, 1, 0, 2, 2), rep(0.1, 6), cand)
+  expect_identical(which(ch$min), 1L)
+  expect_identical(which(ch$one_se), 1L)
+  # above 0, ties are relative as before
+  ch <- ns$prune_choose(c(2, 1, 1 + 1e-13, 3, 3, 3), rep(0, 6), cand)
+  expect_identical(which(ch$min), 3L)
+  expect_identical(which(ch$one_se), 3L)
+})
+
+test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
+  # 32 rows, 10 families: R at a small tau has about as many coefficients as a fold has rows, its predictions differ
+  # wildly between the two halves of the families, and the correction exceeds the uncorrected OOB MSE
+  set.seed(1)
+  pm <- rpf(mpg ~ ., data = mtcars, ntrees = 10, splits = NULL, prune = TRUE, nthreads = 1)
+  expect_s3_class(pm, "rpf_pruned")
+  oob <- pm$oob
+  zero <- oob$oob_rmse == 0
+  expect_equal(sum(oob$min), 1)
+  expect_equal(sum(oob$one_se), 1)
+  # no choice at 0 while a candidate is above 0
+  expect_true(all(zero) || !any(zero[oob$min | oob$one_se]))
+  expect_identical(c(pm$rule, pm$tau), unlist(oob[oob$one_se, c("rule", "tau")], use.names = FALSE))
+  expect_true(all(is.finite(predict(pm, mtcars)$.pred)))
+  pmin <- prune_components(pm$fit, mtcars, select = "min", seed = pm$seed, max_panels = Inf, nthreads = 1)
+  expect_identical(pmin$oob, oob)
+  expect_identical(c(pmin$rule, pmin$tau), unlist(oob[oob$min, c("rule", "tau")], use.names = FALSE))
+  # this platform's fit: R at 0 and 0.01% at 0, left out
+  skip_on_cran()
+  expect_identical(zero, oob$rule == "R" & oob$tau <= 1e-4)
+  expect_true(all(oob$oob_rmse_raw > 0))
+  expect_identical(c(pmin$rule, pmin$tau), c("D", "0"))
+  expect_identical(c(pm$rule, pm$tau), c("D", "0.01"))
+})
+
+test_that("noiseless data: R's corrected OOB errors are 0, and the choice keeps the true component", {
+  # y = x1 exactly: R's uncorrected OOB error is almost all the OOB means' extra variance, and the correction,
+  # estimated from the two halves of the families, exceeds it
+  n <- 24
+  i <- seq_len(n)
+  x <- data.frame(x1 = (i - 0.5) / n, x2 = ((i * 7) %% n) / n)
+  y <- x$x1
+  set.seed(1)
+  fit <- rpf(x, y, max_interaction = 1, ntrees = 10, splits = 10, nthreads = 1)
+  pr <- prune_components(fit, x, y, seed = 1, nthreads = 1)
+  oob <- pr$oob
+  zero <- oob$oob_rmse == 0
+  expect_equal(sum(oob$min), 1)
+  expect_equal(sum(oob$one_se), 1)
+  expect_true(all(zero) || !any(zero[oob$min | oob$one_se]))
+  # this platform's fit: every R candidate at 0, left out; D at 10% with x1 alone
+  skip_on_cran()
+  expect_identical(zero, oob$rule == "R")
+  expect_true(all(oob$oob_rmse_raw > 0))
+  expect_identical(oob$min, oob$rule == "D" & oob$tau == 0.1)
+  expect_identical(oob$one_se, oob$min)
+  expect_identical(c(pr$rule, pr$tau), c("D", "0.1"))
+  expect_identical(names(pr$beta), "x1")
 })

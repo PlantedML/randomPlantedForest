@@ -51,6 +51,10 @@
 #'   the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
 #'   mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
 #'   look worse than they are. The uncorrected values are reported as `oob_rmse_raw`.
+#' - If the correction exceeds a candidate's uncorrected MSE, its corrected MSE is reported as 0. That is not a perfect
+#'   candidate but an overshooting, unreliable estimate (it happens with very few rows, e.g. `"R"` with about as many
+#'   coefficients as rows, or with almost no noise). Such candidates are not chosen, unless all candidates are at 0
+#'   (then they tie).
 #' - The OOB RMSE is taken over the rows with at least one OOB family, the SE for `"1se"` from the per-fold MSEs.
 #' - With few families the OOB means average only one to a few families, and many rows have none (16% at 4
 #'   families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned `"D"` was
@@ -167,9 +171,9 @@
 #'   of the display, only of those the first pruning kept: see below): `component` (its name, as in
 #'   [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
 #' - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a `data.frame` with one row per candidate: `rule`,
-#'   `tau`, `oob_rmse` (corrected; used for the choice), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and
-#'   `se_mse_raw` (uncorrected), `n_kept`, `min` and `one_se` (the two choices). Its attribute `n_rows` is the number
-#'   of rows with an OOB family.
+#'   `tau`, `oob_rmse` (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
+#'   Details), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and `se_mse_raw` (uncorrected), `n_kept`, `min` and
+#'   `one_se` (the two choices). Its attribute `n_rows` is the number of rows with an OOB family.
 #' - `cv`: `NULL` unless the pair was chosen by CV; otherwise a `data.frame` with one row per candidate: `rule`, `tau`,
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
 #' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
@@ -716,11 +720,19 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   )
 }
 
-# The two choices among the candidates from their RMSE and the SE of their MSE (logical vectors)
-prune_choose <- function(rmse, se_mse, cand) {
+# The two choices among the candidates from their RMSE and the SE of their MSE (logical vectors). left_out: candidates
+# not chosen unless all are left out (prune_oob_score(): those whose corrected MSE was set to 0, an overshooting
+# correction); they then tie at 0
+prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
+  if (any(left_out) && !all(left_out)) {
+    use <- !left_out
+    ch <- prune_choose(rmse[use], se_mse[use], cand[use, , drop = FALSE])
+    spread <- function(x) replace(logical(length(rmse)), use, x)
+    return(list(min = spread(ch$min), one_se = spread(ch$one_se)))
+  }
   rule_rank <- match(cand$rule, c("D", "R"))
-  # min: the lowest RMSE; ties (relative 1e-12): the larger tau, then D
-  ties <- which(abs(rmse / min(rmse) - 1) <= 1e-12)
+  # min: the lowest RMSE; ties (relative 1e-12): the larger tau, then D. At a lowest RMSE of 0 the candidates at 0 tie
+  ties <- if (min(rmse) > 0) which(abs(rmse / min(rmse) - 1) <= 1e-12) else which(rmse == 0)
   best <- ties[order(-cand$tau[ties], rule_rank[ties])][1]
   # 1se: the largest tau with MSE within one SE of the minimum; at that tau the lower RMSE, then D
   ok <- which(rmse^2 <= (rmse[best]^2 + se_mse[best]) * (1 + 1e-12))
@@ -938,7 +950,7 @@ prune_oob_score <- function(
     se_of <- function(x) apply(sweep(x, 2, n_k, "/"), 1, stats::sd) / sqrt(length(fids))
     oob_rmse <- sqrt(pmax(rowSums(sse_corr), 0) / n_use)
     se_mse <- se_of(sse_corr)
-    ch <- prune_choose(oob_rmse, se_mse, cand)
+    ch <- prune_choose(oob_rmse, se_mse, cand, left_out = oob_rmse == 0)
     table <- data.frame(
       rule = cand$rule,
       tau = cand$tau,

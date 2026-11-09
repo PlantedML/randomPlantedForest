@@ -79,9 +79,9 @@ An object of class \code{rpf_pruned}, a list with elements:
 of the display, only of those the first pruning kept: see below): \code{component} (its name, as in
 \code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
-\code{tau}, \code{oob_rmse} (corrected; used for the choice), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and
-\code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and \code{one_se} (the two choices). Its attribute \code{n_rows} is the number
-of rows with an OOB family.
+\code{tau}, \code{oob_rmse} (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
+Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and
+\code{one_se} (the two choices). Its attribute \code{n_rows} is the number of rows with an OOB family.
 \item \code{cv}: \code{NULL} unless the pair was chosen by CV; otherwise a \code{data.frame} with one row per candidate: \code{rule}, \code{tau},
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
@@ -171,6 +171,10 @@ scatters more around its expectation. The OOB MSE is therefore corrected: per ro
 the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
 mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
 look worse than they are. The uncorrected values are reported as \code{oob_rmse_raw}.
+\item If the correction exceeds a candidate's uncorrected MSE, its corrected MSE is reported as 0. That is not a perfect
+candidate but an overshooting, unreliable estimate (it happens with very few rows, e.g. \code{"R"} with about as many
+coefficients as rows, or with almost no noise). Such candidates are not chosen, unless all candidates are at 0
+(then they tie).
 \item The OOB RMSE is taken over the rows with at least one OOB family, the SE for \code{"1se"} from the per-fold MSEs.
 \item With few families the OOB means average only one to a few families, and many rows have none (16\% at 4
 families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned \code{"D"} was
