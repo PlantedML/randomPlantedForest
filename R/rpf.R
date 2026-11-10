@@ -31,8 +31,10 @@
 #'   the number of predictors are reduced to it.
 #' @param ntrees `[integer(1): 50]`: Number of tree families, i.e. the size of the forest.
 #'   Each family is grown on a bootstrap sample and predictions are averaged.
-#' @param splits `[integer(1): 30]`: Number of splits per tree family. The main tuning
-#'   parameter: more splits fit more complex functions.
+#' @param splits `[integer(1): 30]`: Number of split rounds per tree family. The main tuning
+#'   parameter: more splits fit more complex functions. A round splits the best of its
+#'   candidates; near saturation, when every candidate's leaf is too small to split, a
+#'   round can make no split.
 #' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
 #'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
 #'   or `"res_trees"`. See Details.
@@ -198,7 +200,10 @@
 #' over the weights, kept up to date between rounds, which costs a few random
 #' numbers per candidate instead. Both draw from the same distribution, but
 #' with other random numbers, so the same seed gives another (equally good)
-#' forest. With `min_leaf_rows`, both leave out the same candidates: those
+#' forest. Ties between equally good candidates may go to different candidates
+#' under the two draws, so with many splits, near saturation, their fits differ
+#' in distribution, though not in accuracy. With `min_leaf_rows`, both leave
+#' out the same candidates: those
 #' whose leaf has no threshold with that many rows on each side. The fast draw
 #' pays off on large data with many splits. The option is read when the forest
 #' is fitted and stored in `params$exact_draw`; it does not affect

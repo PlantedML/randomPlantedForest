@@ -86,6 +86,7 @@
 
 * `?purify` states how the components are identified (the marginal identification over the training rows, Hiabu, Meyer and Wright, 2023), and that the intercept is the mean prediction on the training rows.
 * `?rpf` says that `deterministic = TRUE` also ignores `split_decay_rate`, how `split_structure = "leaves"` draws its thresholds, and that a seed reproduces a fit on the same platform only.
+  `splits` counts rounds: near saturation a round can make no split. Ties between equally good candidates may go to different candidates under the exact and the fast draw, so their fits differ in distribution near saturation, though not in accuracy.
 * `?print.rpf_forest`'s example prints a forest (`export_forest = TRUE`), and `?plot.rpf` cites the RPF paper as 2020.
 
 ## Performance

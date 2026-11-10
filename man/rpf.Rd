@@ -143,8 +143,10 @@ the number of predictors are reduced to it.}
 \item{ntrees}{\verb{[integer(1): 50]}: Number of tree families, i.e. the size of the forest.
 Each family is grown on a bootstrap sample and predictions are averaged.}
 
-\item{splits}{\verb{[integer(1): 30]}: Number of splits per tree family. The main tuning
-parameter: more splits fit more complex functions.}
+\item{splits}{\verb{[integer(1): 30]}: Number of split rounds per tree family. The main tuning
+parameter: more splits fit more complex functions. A round splits the best of its
+candidates; near saturation, when every candidate's leaf is too small to split, a
+round can make no split.}
 
 \item{split_structure}{\verb{[character(1): "leaves"]}: How split candidates are formed and
 sampled; one of \code{"leaves"}, \code{"hist"}, \code{"cur_trees_1"}, \code{"cur_trees_2"},
@@ -329,7 +331,10 @@ every round. With \code{FALSE}, the candidates are drawn from a Fenwick tree
 over the weights, kept up to date between rounds, which costs a few random
 numbers per candidate instead. Both draw from the same distribution, but
 with other random numbers, so the same seed gives another (equally good)
-forest. With \code{min_leaf_rows}, both leave out the same candidates: those
+forest. Ties between equally good candidates may go to different candidates
+under the two draws, so with many splits, near saturation, their fits differ
+in distribution, though not in accuracy. With \code{min_leaf_rows}, both leave
+out the same candidates: those
 whose leaf has no threshold with that many rows on each side. The fast draw
 pays off on large data with many splits. The option is read when the forest
 is fitted and stored in \code{params$exact_draw}; it does not affect
