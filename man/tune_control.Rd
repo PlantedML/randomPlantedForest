@@ -19,7 +19,7 @@ tune_control(
 1 / 0.0125).}
 
 \item{min_leaf_rows}{\verb{[integer: c(1, 5, 20, 100)]}: The values of \code{\link[=rpf]{rpf()}}'s \code{min_leaf_rows} searched in step 2;
-the first one is that of steps 1. Values above 1 need \code{split_structure = "leaves"}.}
+the first one is that of step 1. Values above 1 need \code{split_structure = "leaves"}.}
 
 \item{neighbours}{\verb{[logical(1): TRUE]}: Whether to run step 3.}
 }

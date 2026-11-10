@@ -2,8 +2,8 @@
 #'
 #' The points of greediness that `rpf(tune = )` searches: pairs of `split_try` (thresholds evaluated per split
 #' candidate) and `t_try` (share of the possible splits drawn as candidates in each round), greediest first. Each step
-#' down the ladder halves `t_try` and `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125. Row 3 is
-#' [rpf()]'s default, 10 / 0.4.
+#' down the ladder halves `t_try` and `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125, except the
+#' first, which takes `t_try` from 1 to 0.8. Row 3 is [rpf()]'s default, 10 / 0.4.
 #'
 #' @return A `data.frame` with columns `split_try` and `t_try`, one row per point, greediest first.
 #' @seealso [tune_control()], [rpf()]
@@ -39,7 +39,7 @@ greediness_ladder <- function() {
 #' @param search `[integer: 3:8]`: The rows of `ladder` searched in step 1 (on the default ladder from 10 / 0.4 to
 #'   1 / 0.0125).
 #' @param min_leaf_rows `[integer: c(1, 5, 20, 100)]`: The values of [rpf()]'s `min_leaf_rows` searched in step 2;
-#'   the first one is that of steps 1. Values above 1 need `split_structure = "leaves"`.
+#'   the first one is that of step 1. Values above 1 need `split_structure = "leaves"`.
 #' @param neighbours `[logical(1): TRUE]`: Whether to run step 3.
 #'
 #' @return An object of class `rpf_tune_control`, a list with the four settings, for `rpf(tune = )`.
