@@ -11,6 +11,9 @@
 #' non-overlapping set per component of the functional decomposition.
 #' As [purify()] modifies the forest in place, extract the unpurified boxes
 #' before purifying.
+#' After `purify(mode = 2)`, the default, the cells are computed from the
+#' training data, so a forest restored by [rpf_unmarshal()] needs to have been
+#' marshaled with `include_data = TRUE`.
 #'
 #' Factor predictors are encoded as integer codes in the order of
 #' `x$factor_levels`, with a box covering the codes `c` with
@@ -44,7 +47,8 @@ rpf_boxes <- function(x, family = 1L, ...) {
   # mold() moves factors last, so the model's column order can differ from the ptype's
   predictors <- names(hardhat::forge(x$blueprint$ptypes$predictors, x$blueprint)$predictors)
   boxes <- if (is_purified(x)) {
-    grid_boxes(x$fit$get_grid_leaves()[[family]])
+    # only this family: after purify(mode = 2) its grid is computed from the components on request
+    grid_boxes(x$fit$get_grid_family(family))
   } else {
     leaf_boxes(x$fit$get_model()[[family]])
   }
@@ -107,9 +111,9 @@ leaf_boxes <- function(family) {
 #' the tree's dims. The last index per dimension is padding and never used for
 #' prediction, so it is dropped.
 #'
-#' @param family `[list]`: One element of `x$fit$get_grid_leaves()`, with
-#'   `lim_list` (grid limits per predictor) and `trees` (per tree `variables`,
-#'   `dims` and `values`).
+#' @param family `[list]`: `x$fit$get_grid_family(f)`, one element of
+#'   `x$fit$get_grid_leaves()`, with `lim_list` (grid limits per predictor) and
+#'   `trees` (per tree `variables`, `dims` and `values`).
 #'
 #' @return `[list]`: Same structure as `leaf_boxes()`.
 #' @noRd

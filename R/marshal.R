@@ -29,6 +29,8 @@ rpf_marshal <- function(x, include_data = FALSE) {
   check_rpf_alive(x)
 
   purified <- x$fit$is_purified()
+  # purify(mode = 2) keeps its components as rectangles, mode 1 as per-tree grids
+  rects <- if (purified) x$fit$get_purified_rects()
   fit_state <- list(
     version = 1L,
     pkg_version = utils::packageVersion("randomPlantedForest"),
@@ -38,7 +40,8 @@ rpf_marshal <- function(x, include_data = FALSE) {
     purified = purified,
     # purify(maxp_interaction = k) below the fit's order: predict() keeps using the leaves
     purify_capped = x$fit$is_purify_capped(),
-    grid = if (purified) x$fit$get_grid_leaves(),
+    grid = if (purified && length(rects) == 0) x$fit$get_grid_leaves(),
+    rects = if (length(rects) > 0) rects,
     data = if (include_data) x$fit$get_data(),
     # $forest (export_forest = TRUE) duplicates $model; rebuilt on unmarshal
     had_forest = !is.null(x$forest)
@@ -85,7 +88,11 @@ rpf_unmarshal <- function(blob) {
   }
   fit$set_model(state$model)
   if (state$purified) {
-    fit$set_grid_leaves(state$grid)
+    if (length(state$rects) > 0) {
+      fit$set_purified_rects(state$rects)
+    } else {
+      fit$set_grid_leaves(state$grid)
+    }
     # NULL in blobs from versions before the field existed
     if (isTRUE(state$purify_capped)) {
       fit$set_purify_capped(TRUE)

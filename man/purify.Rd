@@ -22,7 +22,10 @@ during purification, which are the same as when purifying all orders.
 \code{NULL} purifies all orders.}
 
 \item{mode}{\verb{[integer(1): 2]}: Purification algorithm: \code{2} is the fast exact KD-tree
-based algorithm, \code{1} the original grid-based one.}
+based algorithm, which keeps the components as weighted rectangles, \code{1} the
+original grid-based one, which stores every component as a dense grid over
+the split points and can run out of memory from \code{max_interaction = 3} on.
+Both give the same components up to rounding.}
 
 \item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads} the
 forest was fitted with, capped at the available cores.}

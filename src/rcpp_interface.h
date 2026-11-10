@@ -26,6 +26,9 @@ Rcpp::List model_to_list(const std::vector<FamilyExport> &model, int feature_siz
 std::vector<FamilyExport> list_to_model(const Rcpp::List &model, int feature_size);
 Rcpp::List grid_to_list(const std::vector<GridFamilyExport> &grid, int value_size);
 std::vector<GridFamilyExport> list_to_grid(const Rcpp::List &grid);
+Rcpp::List rects_to_list(const rpf_rect::PurifiedForest *pf);
+rpf_rect::PurifiedForest list_to_rects(const Rcpp::List &x, int value_size);
+Rcpp::List purify_stats_to_list(const PurifyStats &st);
 
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
@@ -150,12 +153,45 @@ public:
   void set_model(Rcpp::List &model) { core.set_model(list_to_model(model, core.get_feature_size())); }
   Rcpp::List get_grid_leaves() { return grid_to_list(core.get_grid_leaves(), core.get_value_size()); }
   void set_grid_leaves(Rcpp::List &grid) { core.set_grid_leaves(list_to_grid(grid)); }
+  // One element of get_grid_leaves(); family is 1-based, as in R
+  Rcpp::List get_grid_family(int family)
+  {
+    if (core.get_purified_rects() != nullptr && core.get_X().empty())
+      Rcpp::stop(
+          "The boxes of a forest purified with mode = 2 are computed from its training data. If this forest was "
+          "restored with rpf_unmarshal(), marshal it with include_data = TRUE."
+      );
+    Rcpp::List one = grid_to_list({core.get_grid_family(family - 1)}, core.get_value_size());
+    return one[0];
+  }
+  Rcpp::List get_purified_rects() { return rects_to_list(core.get_purified_rects()); }
+  void set_purified_rects(Rcpp::List &x) { core.set_purified_rects(list_to_rects(x, core.get_value_size())); }
+  Rcpp::List purify_stats() { return purify_stats_to_list(core.purify_stats()); }
 
   Rcpp::NumericMatrix predict_matrix(const Rcpp::NumericMatrix &X, const Rcpp::NumericVector components, int nthreads)
   {
     std::vector<double> pred = core.predict_matrix(REAL(X), X.nrow(), X.ncol(), to_int_set(components), nthreads);
     Rcpp::NumericMatrix out(X.nrow(), core.get_value_size());
     std::copy(pred.begin(), pred.end(), out.begin());
+    return out;
+  }
+  // sets: a list of 1-based feature indices per component
+  Rcpp::NumericMatrix predict_components_matrix(const Rcpp::NumericMatrix &X, const Rcpp::List sets, int nthreads)
+  {
+    std::vector<std::vector<int>> S;
+    for (R_xlen_t k = 0; k < sets.size(); ++k)
+      S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
+    std::vector<double> pred = core.predict_components(REAL(X), X.nrow(), X.ncol(), S, nthreads);
+    Rcpp::NumericMatrix out(X.nrow(), (int)(S.size() * core.get_value_size()));
+    std::copy(pred.begin(), pred.end(), out.begin());
+    return out;
+  }
+  Rcpp::List purified_components()
+  {
+    std::vector<std::vector<int>> sets = core.purified_components();
+    Rcpp::List out(sets.size());
+    for (size_t i = 0; i < sets.size(); ++i)
+      out[(R_xlen_t)i] = Rcpp::IntegerVector(sets[i].begin(), sets[i].end());
     return out;
   }
   Rcpp::NumericMatrix predict_vector(const Rcpp::NumericVector &X, const Rcpp::NumericVector components)

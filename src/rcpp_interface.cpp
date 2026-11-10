@@ -224,6 +224,118 @@ std::uint64_t seed_from_r()
 }
 } // namespace
 
+List rects_to_list(const rpf_rect::PurifiedForest *pf)
+{
+  if (pf == nullptr)
+    return List();
+  List cuts;
+  for (const auto &c : pf->cuts)
+    cuts.push_back(wrap(c));
+  List comps;
+  for (const auto &kv : pf->comps) {
+    const rpf_rect::Component &c = kv.second;
+    List groups;
+    for (const rpf_rect::Group &g : c.groups) {
+      std::vector<int> nodes;
+      nodes.reserve(g.index.nodes.size() * 7);
+      for (const auto &nd : g.index.nodes) {
+        int f[7] = {nd.dim, nd.split, nd.left, nd.right, nd.cst, nd.r0, nd.r1};
+        nodes.insert(nodes.end(), f, f + 7);
+      }
+      groups.push_back(
+          List::create(
+              Named("feat") = wrap(g.feat),
+              Named("table") = wrap(g.table),
+              Named("box") = IntegerVector(g.rects.box.begin(), g.rects.box.end()),
+              Named("w") = wrap(g.rects.w),
+              Named("nodes") = wrap(nodes),
+              Named("csts") = wrap(g.index.csts),
+              Named("ids") = wrap(g.index.ids)
+          )
+      );
+    }
+    comps.push_back(
+        List::create(Named("S") = wrap(c.S), Named("constant") = wrap(c.constant), Named("groups") = groups)
+    );
+  }
+  return List::create(
+      Named("cuts") = cuts,
+      Named("intercept") = wrap(pf->intercept),
+      Named("n_rects") = (double)pf->n_rects,
+      Named("maxp") = pf->maxp,
+      Named("components") = comps
+  );
+}
+
+rpf_rect::PurifiedForest list_to_rects(const List &x, int value_size)
+{
+  rpf_rect::PurifiedForest pf;
+  List cuts = x["cuts"];
+  for (int i = 0; i < cuts.size(); ++i)
+    pf.cuts.push_back(as<std::vector<double>>(cuts[i]));
+  pf.intercept = as<std::vector<double>>(x["intercept"]);
+  pf.n_rects = (size_t)as<double>(x["n_rects"]);
+  pf.maxp = as<int>(x["maxp"]);
+  List comps = x["components"];
+  for (int i = 0; i < comps.size(); ++i) {
+    List cl = comps[i];
+    rpf_rect::Component c;
+    c.S = as<std::vector<int>>(cl["S"]);
+    c.constant = as<std::vector<double>>(cl["constant"]);
+    List groups = cl["groups"];
+    for (int j = 0; j < groups.size(); ++j) {
+      List gl = groups[j];
+      rpf_rect::Group g;
+      g.feat = as<std::vector<int>>(gl["feat"]);
+      for (int f : g.feat) {
+        auto it = std::find(c.S.begin(), c.S.end(), f + 1);
+        g.pos.push_back(it == c.S.end() ? -1 : (int)(it - c.S.begin()));
+      }
+      g.table = as<std::vector<double>>(gl["table"]);
+      g.rects = rpf_rect::RectList((int)g.feat.size(), value_size);
+      IntegerVector box = gl["box"];
+      g.rects.box.assign(box.begin(), box.end());
+      g.rects.w = as<std::vector<double>>(gl["w"]);
+      std::vector<int> nodes = as<std::vector<int>>(gl["nodes"]);
+      if (nodes.size() % 7 != 0)
+        throw std::invalid_argument("Corrupt purified components: index nodes.");
+      g.index.nodes.reserve(nodes.size() / 7);
+      for (size_t k = 0; k < nodes.size(); k += 7) {
+        rpf_rect::KdIndex::Node nd;
+        nd.dim = nodes[k];
+        nd.split = nodes[k + 1];
+        nd.left = nodes[k + 2];
+        nd.right = nodes[k + 3];
+        nd.cst = nodes[k + 4];
+        nd.r0 = nodes[k + 5];
+        nd.r1 = nodes[k + 6];
+        g.index.nodes.push_back(nd);
+      }
+      g.index.csts = as<std::vector<double>>(gl["csts"]);
+      g.index.ids = as<std::vector<int>>(gl["ids"]);
+      c.groups.push_back(std::move(g));
+    }
+    std::vector<int> key = c.S;
+    pf.comps.emplace(key, std::move(c));
+  }
+  return pf;
+}
+
+// An empty list without a rectangle store
+List purify_stats_to_list(const PurifyStats &st)
+{
+  if (!st.rectangles)
+    return List();
+  return List::create(
+      Named("n_components") = st.n_components,
+      Named("n_rects") = st.n_rects,
+      Named("n_groups") = st.n_groups,
+      Named("n_index_nodes") = st.n_index_nodes,
+      Named("n_table_cells") = st.n_table_cells,
+      Named("bytes") = st.bytes
+  );
+}
+
 void connect_to_r(RandomPlantedForest &core)
 {
   core.verbose_out = &Rcout;

@@ -1,156 +1,33 @@
 #include "rpf.hpp"
 #include "kdtree.hpp"
-#include "diffbuf.hpp"
+#include <functional>
+#include <numeric>
+#include <thread>
 #include <exception>
 #include <limits>
 #include <cmath>
 #include <unordered_map>
 
-// Generates the next combination of k indices from a set of n elements.
-static inline bool next_combination(std::vector<int> &p, int n)
-{
-  int k = (int)p.size();
-  for (int i = k - 1; i >= 0; --i) {
-    if (p[i] < n - k + i) {
-      p[i]++;
-      for (int j = i + 1; j < k; ++j) {
-        p[j] = p[j - 1] + 1;
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
-void RandomPlantedForest::purify_1()
-{
-
-  // go through all n_trees families
-  for (auto &curr_family : this->tree_families) {
-
-    // recap maximum number of dimensions of current family
-    unsigned int curr_max = 0;
-    for (auto tree : curr_family) {
-      if (tree.first.size() > curr_max)
-        curr_max = tree.first.size();
-    }
-
-    while (curr_max >= 1) {
-
-      // go through split dimensions of all trees
-      auto keys = getKeys(curr_family);
-      std::vector<std::set<int>>::reverse_iterator key = keys.rbegin();
-      while (key != keys.rend()) {
-
-        auto &curr_tree = curr_family[(*key)];
-        std::set<int> curr_dims = curr_tree->split_dims;
-
-        // check if number of dims same as current max_interaction
-        if (curr_dims.size() == curr_max) {
-
-          // go through feature dims
-          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-
-            // continue only if dim in current tree
-            if (curr_tree->split_dims.count(feature_dim) != 0) {
-
-              std::set<int> tree_dims = curr_tree->split_dims;
-              tree_dims.erase(tree_dims.find(feature_dim)); // remove current feature dim from current tree
-
-              // check if tree with dimensions exists, if not create
-              std::shared_ptr<DecisionTree> tree = treeExists(tree_dims, curr_family);
-              if (curr_max == 1) {
-                tree = curr_family[std::set<int>{0}];
-              } else {
-                if (!tree) {
-                  curr_family.insert(
-                      std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims)))
-                  );
-                  tree = curr_family[tree_dims];
-                }
-              }
-
-              // go through leaves of current tree
-              int n_leaves = curr_tree->leaves.size();
-              for (int l = 0; l < n_leaves; ++l) {
-                auto &curr_leaf = curr_tree->leaves[l];
-
-                double multiplier =
-                    (curr_leaf.intervals[feature_dim - 1].second - curr_leaf.intervals[feature_dim - 1].first) /
-                    (upper_bounds[feature_dim - 1] - lower_bounds[feature_dim - 1]);
-
-                // new leaf including intervals and value
-                Leaf new_leaf = curr_leaf; // initialize intervals with first leaf
-                new_leaf.intervals[feature_dim - 1].first = lower_bounds[feature_dim - 1];
-                new_leaf.intervals[feature_dim - 1].second = upper_bounds[feature_dim - 1];
-                for (size_t i = 0; i < value_size; ++i)
-                  new_leaf.value[i] = -curr_leaf.value[i] * multiplier; // update value of new leaf
-
-                // append new leaf
-                if (!leafExists(new_leaf.intervals, curr_tree))
-                  curr_tree->leaves.push_back(new_leaf);
-                for (size_t i = 0; i < value_size; ++i)
-                  new_leaf.value[i] = curr_leaf.value[i] * multiplier; // update value of new leaf
-                if (!leafExists(new_leaf.intervals, tree))
-                  tree->leaves.push_back(new_leaf);
-              }
-            }
-          }
-        }
-        key++;
-      }
-
-      // update currently considered dimension size
-      --curr_max;
-    }
-  }
-
-  purified = true;
-}
-
-void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int maxp_interaction)
+// Mode 2 for one family: computes the purified components exactly (KD-tree range counts, one per leaf and subset)
+// and adds them to `acc` as weighted rectangles grouped by (S, j); see rects.hpp. Nothing is rasterised and the
+// family is not modified. Components above maxp_interaction are not produced (they are zero).
+void RandomPlantedForest::purify_fast_exact_family(
+    const TreeFamily &curr_family,
+    int maxp_interaction,
+    const rpf_kd::KDTree &kdt,
+    const std::vector<std::vector<double>> &cuts,
+    rpf_rect::Accumulator &acc
+) const
 {
   // Normalize cap: treat 0 (or out-of-range) as full order p = feature_size
   if (maxp_interaction <= 0 || maxp_interaction > feature_size)
     maxp_interaction = feature_size;
 
-  // Portable 32-bit popcount to avoid compiler-specific builtins
   auto popcount32 = [](unsigned int x) -> int {
     x = x - ((x >> 1) & 0x55555555u);
     x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
     return (int)((((x + (x >> 4)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24);
   };
-
-  // 0) Ensure all subset components exist in the family (sources and targets)
-  {
-    auto base_keys = getKeys(curr_family);
-    for (const auto &T : base_keys) {
-      if (T == std::set<int>{0})
-        continue;
-      std::vector<int> dims;
-      dims.reserve(T.size());
-      for (int d : T)
-        dims.push_back(d);
-      int k = (int)dims.size();
-      for (int mask = 1; mask < (1 << k); ++mask) {
-        if (maxp_interaction > 0) {
-          int bits = popcount32((unsigned)mask);
-          if (bits > maxp_interaction)
-            continue;
-        }
-        std::set<int> S;
-        for (int b = 0; b < k; ++b)
-          if (mask & (1 << b))
-            S.insert(dims[b]);
-        if (curr_family.find(S) == curr_family.end()) {
-          curr_family.insert({S, std::make_shared<DecisionTree>(DecisionTree(S))});
-        }
-      }
-    }
-    if (curr_family.find(std::set<int>{0}) == curr_family.end()) {
-      curr_family.insert({std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}))});
-    }
-  }
 
   // 1) Build lim_list (unique cut endpoints per feature)
   std::vector<std::vector<double>> lim_list(feature_size);
@@ -169,54 +46,7 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
     lim_list[d - 1] = bounds;
   }
 
-  // Precompute number of cells per feature (endpoints - 1), clamped at 0
-  std::vector<int> cells_by_dim(feature_size + 1, 0);
-  for (int d = 1; d <= feature_size; ++d)
-    cells_by_dim[d] = std::max(0, (int)lim_list[d - 1].size() - 1);
-
-  // 2) Prepare per-S diff buffers (emit only S with |S|<=maxp; keep intercept)
-  auto keys = getKeys(curr_family);
-  std::vector<std::set<int>> S_vars;
-  S_vars.reserve(keys.size());
-  std::vector<rpf_diff::NDArray<std::vector<double>>> diff_S;
-  diff_S.reserve(keys.size());
-  std::vector<double> intercept(value_size, 0.0);
-  for (const auto &S : keys) {
-    if (S != std::set<int>{0} && maxp_interaction > 0 && (int)S.size() > maxp_interaction)
-      continue;
-    S_vars.push_back(S);
-    if (S == std::set<int>{0})
-      diff_S.emplace_back(
-          rpf_diff::NDArray<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
-      );
-    else {
-      std::vector<int> diff_dims;
-      diff_dims.reserve(S.size());
-      for (int d : S) {
-        int K = (int)lim_list[d - 1].size();
-        int cells = std::max(0, K - 1);
-        diff_dims.push_back(cells + 1);
-      }
-      diff_S.emplace_back(rpf_diff::NDArray<std::vector<double>>(diff_dims, std::vector<double>(value_size, 0)));
-    }
-  }
-
-  std::map<std::set<int>, int, utils::setComp> s_index_map;
-  for (size_t i = 0; i < S_vars.size(); ++i)
-    s_index_map[S_vars[i]] = (int)i;
-  auto set_to_vec = [](const std::set<int> &S) {
-    std::vector<int> v;
-    v.reserve(S.size());
-    for (int x : S)
-      v.push_back(x);
-    return v;
-  };
-
-  // 3) KD-tree over all samples
-  std::vector<int> all_idx(sample_size);
-  for (int i = 0; i < sample_size; ++i)
-    all_idx[i] = i;
-  rpf_kd::KDTree kdt(&X, all_idx, feature_size);
+  acc.intercept.assign(value_size, 0.0);
 
   // Precompute tot(U) with half-open domain [front, back)
   std::map<std::set<int>, double, utils::setComp> tot_cache;
@@ -257,95 +87,119 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
   std::unordered_map<std::vector<int>, size_t, KeyHash> kd_cache;
   kd_cache.reserve(1u << 15);
 
-  // 4) Accumulate leaf contributions from ALL trees T (any order), enumerating only S up to maxp
+  // 2) Accumulate leaf contributions from ALL trees T (any order), enumerating only S up to maxp
   for (const auto &kv : curr_family) {
     const std::set<int> &T = kv.first;
     if (T == std::set<int>{0})
       continue;
-    const auto &leaves = kv.second->get_leaves();
-    std::vector<int> Tvec = set_to_vec(T);
+    const auto &leaves = kv.second->leaves;
+    if (leaves.empty())
+      continue;
+    std::vector<int> Tvec(T.begin(), T.end());
     const int tdim = (int)Tvec.size();
-    // map from dimension id -> position index in Tvec
-    std::vector<int> pos_in_T(feature_size + 1, -1);
-    for (int i = 0; i < tdim; ++i)
-      pos_in_T[Tvec[i]] = i;
+
+    // The terms a leaf of T writes: for every S subset T (1 <= |S| <= maxp) and j subset S, the weight of j times
+    // (-1)^(|S| - |j|) on the leaf's box restricted to j, into group (S, j); j = {} goes to the constant of S.
+    struct Term {
+      int jmask;
+      double sign;
+      std::vector<double> *constant;
+      rpf_rect::RectList *rects;
+      std::vector<int> jpos;
+    };
+    std::vector<Term> terms;
+    for (int smask = 1; smask < (1 << tdim); ++smask) {
+      int s_size = popcount32((unsigned)smask);
+      if (s_size > maxp_interaction)
+        continue;
+      std::vector<int> S, spos;
+      for (int b = 0; b < tdim; ++b)
+        if (smask & (1 << b)) {
+          S.push_back(Tvec[b]);
+          spos.push_back(b);
+        }
+      auto &entry = acc.comps[S];
+      if (entry.first.empty())
+        entry.first.assign(value_size, 0.0);
+      for (int jS = 0; jS < (1 << s_size); ++jS) {
+        Term t;
+        t.jmask = 0;
+        t.constant = nullptr;
+        t.rects = nullptr;
+        for (int b = 0; b < s_size; ++b)
+          if (jS & (1 << b)) {
+            t.jmask |= (1 << spos[b]);
+            t.jpos.push_back(spos[b]);
+          }
+        t.sign = ((s_size - (int)t.jpos.size()) % 2) ? -1.0 : 1.0;
+        if (jS == 0)
+          t.constant = &entry.first;
+        else {
+          auto g = entry.second.find(jS);
+          if (g == entry.second.end())
+            g = entry.second.emplace(jS, rpf_rect::RectList((int)t.jpos.size(), (int)value_size)).first;
+          t.rects = &g->second;
+        }
+        terms.push_back(std::move(t));
+      }
+    }
+
+    std::vector<std::vector<double>> contrib((size_t)1 << tdim);
+    std::vector<char> has_contrib((size_t)1 << tdim, 0);
+    std::vector<int32_t> lo_cell(tdim), hi_cell(tdim), jlo(tdim), jhi(tdim);
+    std::vector<rpf_kd::RangeConstraint> rc_by_pos(tdim);
+    std::vector<char> rc_ok(tdim, 0);
+    std::vector<int> rc_lo_idx(tdim, -1), rc_hi_idx(tdim, -1);
+    std::vector<rpf_kd::RangeConstraint> cons;
+    cons.reserve((size_t)tdim);
+    std::vector<int> key;
+    key.reserve(3 * (size_t)tdim);
 
     for (const auto &leaf : leaves) {
-      // Pre-cache per-dim grid cell ranges for this leaf
-      std::vector<int> lo_cached(feature_size + 1, 0), hi_cached(feature_size + 1, 0);
-      for (int d : T) {
+      for (int b = 0; b < tdim; ++b) {
+        int d = Tvec[b];
         const auto &lims = lim_list[d - 1];
-        int cells = std::max(0, (int)lims.size() - 1);
-        int k_low = (int)(std::lower_bound(lims.begin(), lims.end(), leaf.intervals[d - 1].first) - lims.begin());
-        int ub = (int)(std::upper_bound(lims.begin(), lims.end(), leaf.intervals[d - 1].second) - lims.begin());
-        int k_high_cell = std::max(0, ub - 2);
-        lo_cached[d] = std::max(0, k_low);
-        hi_cached[d] = std::min(cells, k_high_cell + 1);
-      }
-
-      // Precompute per-dimension KD constraints for this leaf
-      std::vector<rpf_kd::RangeConstraint> rc_by_dim(feature_size + 1);
-      std::vector<char> rc_ok(feature_size + 1, 0);
-      // Also store lim_list boundary indices for exact caching
-      std::vector<int> rc_lo_idx(feature_size + 1, -1);
-      std::vector<int> rc_hi_idx(feature_size + 1, -1);
-      for (int d : T) {
-        const auto &lims = lim_list[d - 1];
-        if ((int)lims.size() < 2) {
-          rc_ok[d] = 0;
+        const auto &cd = cuts[d - 1];
+        double a = leaf.intervals[d - 1].first, e = leaf.intervals[d - 1].second;
+        // the box in cells of `cuts`; the family's outermost cut points are open (as the dense grids clamp)
+        lo_cell[b] = (a <= lims.front()) ? 0 : (int32_t)(std::lower_bound(cd.begin(), cd.end(), a) - cd.begin()) + 1;
+        hi_cell[b] = (e >= lims.back()) ? (int32_t)cd.size() + 1
+                                        : (int32_t)(std::lower_bound(cd.begin(), cd.end(), e) - cd.begin()) + 1;
+        // KD constraints on [l, r) and their exact positions in lim_list for caching
+        rc_ok[b] = 0;
+        if ((int)lims.size() < 2)
           continue;
-        }
-        double l = std::max(leaf.intervals[d - 1].first, lims.front());
-        double r = std::min(leaf.intervals[d - 1].second, lims.back());
-        if (!(r > l)) {
-          rc_ok[d] = 0;
-        } else {
-          rc_by_dim[d] = {d - 1, l, r};
-          rc_ok[d] = 1;
-          int lidx = (int)(std::lower_bound(lims.begin(), lims.end(), l) - lims.begin());
-          int ridx = (int)(std::lower_bound(lims.begin(), lims.end(), r) - lims.begin());
-          rc_lo_idx[d] = lidx;
-          rc_hi_idx[d] = ridx;
+        double l = std::max(a, lims.front());
+        double r = std::min(e, lims.back());
+        if (r > l) {
+          rc_by_pos[b] = {d - 1, l, r};
+          rc_ok[b] = 1;
+          rc_lo_idx[b] = (int)(std::lower_bound(lims.begin(), lims.end(), l) - lims.begin());
+          rc_hi_idx[b] = (int)(std::lower_bound(lims.begin(), lims.end(), r) - lims.begin());
         }
       }
 
-      // Precompute E[f_T | X_j] only for j with |j| <= maxp_interaction by enumerating combinations
-      // Store by mask over positions in T (0..tdim-1) to avoid building a full 2^tdim table
-      std::unordered_map<int, std::vector<double>> contrib_by_mask;
-      contrib_by_mask.reserve(32u);
-      std::vector<rpf_kd::RangeConstraint> cons;
-      cons.reserve((size_t)tdim);
-
-      auto compute_for_j = [&](const std::vector<int> &j_pos) {
-        // Build complement U = T \ j and corresponding KD constraints
+      // E[f_leaf | X_j] weights for j with |j| <= maxp: cnt(box on U = T \ j) / tot(U) * value
+      std::fill(has_contrib.begin(), has_contrib.end(), 0);
+      for (int jmask = 0; jmask < (1 << tdim); ++jmask) {
+        if (popcount32((unsigned)jmask) > maxp_interaction)
+          continue;
         std::set<int> U;
-        U.clear();
-        int jmask = 0;
-        std::vector<char> is_in_j((size_t)tdim, 0);
-        for (int pos : j_pos) {
-          if (pos >= 0 && pos < tdim) {
-            is_in_j[(size_t)pos] = 1;
-            jmask |= (1 << pos);
-          }
-        }
-        for (int b = 0; b < tdim; ++b)
-          if (!is_in_j[(size_t)b])
-            U.insert(Tvec[b]);
         cons.clear();
-        cons.reserve(U.size());
+        key.clear();
         bool empty_range = false;
-        // Build exact cache key from ordered (dim, lo_idx, hi_idx)
-        std::vector<int> key;
-        key.reserve(3 * U.size());
-        for (int u : U) {
-          if (!rc_ok[u]) {
+        for (int b = 0; b < tdim; ++b) {
+          if (jmask & (1 << b))
+            continue;
+          U.insert(Tvec[b]);
+          if (!rc_ok[b]) {
             empty_range = true;
-            break;
+            continue;
           }
-          cons.push_back(rc_by_dim[u]);
-          key.push_back(u - 1);
-          key.push_back(rc_lo_idx[u]);
-          key.push_back(rc_hi_idx[u]);
+          cons.push_back(rc_by_pos[b]);
+          key.push_back(Tvec[b] - 1);
+          key.push_back(rc_lo_idx[b]);
+          key.push_back(rc_hi_idx[b]);
         }
         size_t cnt = 0;
         if (empty_range)
@@ -363,140 +217,36 @@ void RandomPlantedForest::purify_fast_exact_family(TreeFamily &curr_family, int 
         }
         double totU = get_tot_for_U(U);
         if (totU <= 0.0)
-          return;
-        contrib_by_mask[jmask] = ((double)cnt / totU) * leaf.value;
-      };
-
-      // j size = 0
-      compute_for_j(std::vector<int>{});
-      // j sizes 1..min(tdim, maxp_interaction)
-      int maxk = std::min(tdim, maxp_interaction);
-      for (int k = 1; k <= maxk; ++k) {
-        std::vector<int> p(k);
-        for (int i = 0; i < k; ++i)
-          p[i] = i;
-        do {
-          compute_for_j(p);
-        } while (next_combination(p, tdim));
+          continue;
+        contrib[jmask] = ((double)cnt / totU) * leaf.value;
+        has_contrib[jmask] = 1;
       }
 
-      // Efficiently iterate directly over target subsets S up to size maxp_interaction
-      for (int k = 0; k <= std::min(tdim, maxp_interaction); ++k) {
-        std::vector<int> p(k);
-        for (int i = 0; i < k; ++i)
-          p[i] = i;
-        if (k == 0) {
-          // j = {} corresponds to mask 0
-          auto it0 = contrib_by_mask.find(0);
-          if (it0 != contrib_by_mask.end())
-            intercept += it0->second;
-        } else {
-          do {
-            std::set<int> S;
-            for (int idx : p)
-              S.insert(Tvec[idx]);
-            // Inclusion-exclusion over all j subset S, writing per-term rectangles
-            auto itS = s_index_map.find(S);
-            if (itS == s_index_map.end()) { /* nothing to write */
-            } else {
-              int s_idx = itS->second;
-              std::vector<int> Svec = set_to_vec(S);
-              const int s_dim = (int)Svec.size();
-              for (int sm = 0; sm < (1 << s_dim); ++sm) {
-                int jmask_on_T = 0;
-                int jcount = 0;
-                for (int b = 0; b < s_dim; ++b) {
-                  if (sm & (1 << b)) {
-                    ++jcount;
-                    int d = Svec[b];
-                    int pos = pos_in_T[d];
-                    if (pos >= 0)
-                      jmask_on_T |= (1 << pos);
-                  }
-                }
-                auto jit = contrib_by_mask.find(jmask_on_T);
-                if (jit == contrib_by_mask.end())
-                  continue;
-                const std::vector<double> &contrib_j = jit->second;
-                int sign_flip = ((int)S.size() - jcount) % 2;
-                std::vector<double> signed_contrib = sign_flip ? (contrib_j * (-1)) : contrib_j;
-                // Build rectangle: restrict dims in j to leaf's range; others span entire domain
-                std::vector<int> lo;
-                lo.reserve(S.size());
-                std::vector<int> hi;
-                hi.reserve(S.size());
-                for (int di = 0; di < s_dim; ++di) {
-                  int d = Svec[di];
-                  if (sm & (1 << di)) {
-                    lo.push_back(lo_cached[d]);
-                    hi.push_back(hi_cached[d]);
-                  } else {
-                    lo.push_back(0);
-                    hi.push_back(cells_by_dim[d]);
-                  }
-                }
-                rpf_diff::add_rect(diff_S[s_idx], lo, hi, signed_contrib);
-              }
-            }
-          } while (next_combination(p, tdim));
+      if (has_contrib[0])
+        acc.intercept += contrib[0];
+      for (const auto &t : terms) {
+        if (!has_contrib[t.jmask])
+          continue;
+        const std::vector<double> &w = contrib[t.jmask];
+        if (t.constant) {
+          for (size_t k = 0; k < value_size; ++k)
+            (*t.constant)[k] += t.sign * w[k];
+          continue;
         }
+        for (size_t i = 0; i < t.jpos.size(); ++i) {
+          jlo[i] = lo_cell[t.jpos[i]];
+          jhi[i] = hi_cell[t.jpos[i]];
+        }
+        t.rects->push(jlo.data(), jhi.data(), w.data(), t.sign);
       }
     }
   }
 
-  // 5) Finalize per S
-  for (size_t i = 0; i < S_vars.size(); ++i) {
-    const auto &S = S_vars[i];
-    LeafGrid gl;
-    gl.lim_list = lim_list;
-    if (S == std::set<int>{0}) {
-      gl.grid = grid::NDGrid();
-      gl.values = utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0));
-      gl.individuals = utils::Matrix<int>(std::vector<int>{1}, 0);
-      std::vector<int> idx0{0};
-      gl.values[idx0] = intercept;
-    } else {
-      std::vector<int> dims_end;
-      std::vector<int> cells_dims;
-      for (int d : S) {
-        int K = (int)lim_list[d - 1].size();
-        dims_end.push_back(std::max(1, K));
-        cells_dims.push_back(std::max(0, K - 1));
-      }
-      rpf_diff::inclusive_scan_inplace(diff_S[i]);
-      gl.grid = grid::NDGrid(dims_end);
-      gl.values = utils::Matrix<std::vector<double>>(dims_end, std::vector<double>(value_size, 0));
-      gl.individuals = utils::Matrix<int>(dims_end, 0);
-      auto g = grid::NDGrid(cells_dims);
-      while (!g.nextPoint()) {
-        auto point = g.getPoint();
-        gl.values[point] = diff_S[i].at(point);
-      }
-    }
-    curr_family[S]->GridLeaves = gl;
-  }
-
-  // 6) Overwrite high orders with zeros if capped
-  if (maxp_interaction > 0) {
-    for (const auto &S : keys) {
-      if (S == std::set<int>{0} || (int)S.size() <= maxp_interaction)
-        continue;
-      LeafGrid gl;
-      gl.lim_list = lim_list;
-      std::vector<int> dims_end;
-      for (int d : S) {
-        int K = (int)lim_list[d - 1].size();
-        dims_end.push_back(std::max(1, K));
-      }
-      gl.grid = grid::NDGrid(dims_end);
-      gl.values = utils::Matrix<std::vector<double>>(dims_end, std::vector<double>(value_size, 0));
-      gl.individuals = utils::Matrix<int>(dims_end, 0);
-      curr_family[S]->GridLeaves = gl;
-    }
-  }
+  // 3) Merge equal boxes within each group
+  acc.sort_merge();
 }
 
-// Unified purifier entry: mode 1 = grid path, mode 2 = fast exact path
+// Unified purifier entry: mode 1 = grid path, mode 2 = fast exact path (weighted rectangles, see rects.hpp)
 void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int mode)
 {
   if (sample_size == 0 || X.empty())
@@ -514,58 +264,219 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     threads_to_use = std::min(obj, eff_avail);
   }
 
-  // Below the fit's order, the higher-order grids stay zero, so they no longer sum to the forest's prediction
+  // Below the fit's order, the higher-order components stay zero, so they no longer sum to the forest's prediction
   const bool capped = maxp_interaction > 0 && maxp_interaction < std::min(max_interaction, feature_size);
-
-  auto worker = [this, maxp_interaction, mode](TreeFamily &fam) {
-    if (mode == 2)
-      this->purify_fast_exact_family(fam, maxp_interaction);
-    else
-      this->purify_3_family(fam, maxp_interaction);
-  };
 
   if (threads_to_use > 1) {
     unsigned int avail = std::thread::hardware_concurrency();
     if (avail > 0 && threads_to_use > avail) {
       warn("Requested " + std::to_string(threads_to_use) + " threads but only " + std::to_string(avail) + " available");
     }
+  }
+  threads_to_use = std::max(1u, threads_to_use);
+
+  // Runs fn(family index) for all families, at most threads_to_use at a time, in batches of increasing index.
+  // after_batch(start, batch) runs on the calling thread after each batch.
+  auto run_families = [this, threads_to_use](
+                          const std::function<void(size_t)> &fn, const std::function<void(size_t, size_t)> &after_batch
+                      ) {
     for (size_t start = 0; start < this->tree_families.size(); start += (size_t)threads_to_use) {
       size_t batch = std::min<size_t>((size_t)threads_to_use, this->tree_families.size() - start);
-      if (batch == 0)
-        break;
-      std::vector<std::thread> threads(batch);
-      std::vector<std::exception_ptr> errors(batch);
-      for (size_t i = 0; i < batch; ++i) {
-        size_t fam_index = start + i;
-        // an exception escaping a std::thread would terminate R
-        threads[i] = std::thread(
-            [&worker, &errors, i](TreeFamily *fam_ptr) {
-              try {
-                worker(*fam_ptr);
-              } catch (...) {
-                errors[i] = std::current_exception();
-              }
-            },
-            &this->tree_families[fam_index]
-        );
+      if (batch == 1)
+        fn(start);
+      else {
+        std::vector<std::thread> threads(batch);
+        std::vector<std::exception_ptr> errors(batch);
+        for (size_t i = 0; i < batch; ++i) {
+          // an exception escaping a std::thread would terminate R
+          threads[i] = std::thread(
+              [&fn, &errors, i](size_t f) {
+                try {
+                  fn(f);
+                } catch (...) {
+                  errors[i] = std::current_exception();
+                }
+              },
+              start + i
+          );
+        }
+        for (auto &th : threads)
+          if (th.joinable())
+            th.join();
+        for (auto &e : errors)
+          if (e)
+            std::rethrow_exception(e);
       }
-      for (auto &th : threads) {
-        if (th.joinable())
-          th.join();
-      }
-      for (auto &e : errors)
-        if (e)
-          std::rethrow_exception(e);
+      after_batch(start, batch);
     }
+  };
+
+  // Drop the store of an earlier mode-2 purification first: it is not read here, and holding both would double the
+  // memory. The forest counts as unpurified until the new components are in place.
+  rect_forest_.reset();
+  purified = false;
+  purify_capped = false;
+
+  if (mode != 2) {
+    run_families(
+        [this, maxp_interaction](size_t f) { this->purify_3_family(this->tree_families[f], maxp_interaction); },
+        [](size_t, size_t) {}
+    );
     purified = true;
     purify_capped = capped;
     return;
   }
 
+  // Mode 2. Drop the dense grids of an earlier mode-1 purification.
   for (auto &fam : this->tree_families)
-    worker(fam);
+    for (auto &tree : fam)
+      tree.second->GridLeaves = LeafGrid();
+
+  auto forest = std::make_shared<rpf_rect::PurifiedForest>();
+  // Cell coordinates shared by all families: the distinct interval end points of every feature
+  forest->cuts.assign(feature_size, std::vector<double>());
+  for (const auto &fam : this->tree_families)
+    for (const auto &tree : fam)
+      for (int d : tree.first) {
+        if (d < 1)
+          continue;
+        for (const auto &leaf : tree.second->leaves) {
+          forest->cuts[d - 1].push_back(leaf.intervals[d - 1].first);
+          forest->cuts[d - 1].push_back(leaf.intervals[d - 1].second);
+        }
+      }
+  for (auto &c : forest->cuts) {
+    std::sort(c.begin(), c.end());
+    c.erase(std::unique(c.begin(), c.end()), c.end());
+    c.shrink_to_fit();
+  }
+
+  std::vector<int> all_idx(sample_size);
+  std::iota(all_idx.begin(), all_idx.end(), 0);
+  rpf_kd::KDTree kdt(&X, all_idx, feature_size);
+
+  // Families are merged in index order through a binary counter (pairwise merges of equal size), so the result
+  // does not depend on the number of threads and the working set stays near the size of the merged result.
+  std::vector<std::pair<int, rpf_rect::Accumulator>> stack;
+  std::vector<rpf_rect::Accumulator> batch_acc(threads_to_use);
+  run_families(
+      [&](size_t f) {
+        this->purify_fast_exact_family(
+            this->tree_families[f], maxp_interaction, kdt, forest->cuts, batch_acc[f % threads_to_use]
+        );
+      },
+      [&](size_t, size_t batch) {
+        for (size_t i = 0; i < batch; ++i) {
+          stack.emplace_back(0, std::move(batch_acc[i]));
+          batch_acc[i] = rpf_rect::Accumulator();
+          while (stack.size() >= 2 && stack[stack.size() - 2].first == stack.back().first) {
+            stack[stack.size() - 2].second.absorb(stack.back().second);
+            stack[stack.size() - 2].first += 1;
+            stack.pop_back();
+          }
+        }
+      }
+  );
+  rpf_rect::Accumulator total;
+  for (auto &s : stack)
+    total.absorb(s.second);
+  stack.clear();
+  forest->maxp = (maxp_interaction <= 0 || maxp_interaction > feature_size) ? feature_size : maxp_interaction;
+  forest->build_from(total, (int)value_size, threads_to_use);
+  rect_forest_ = forest;
   purified = true;
   purify_capped = capped;
+}
+
+// The components of purify(mode = 2) of one family on the dense grid over the family's cut points, in the format of
+// mode 1's grids (for get_grid_family(), e.g. rpf_boxes()). Recomputes the family's rectangles, so it needs the
+// training data, and the grid is as large as mode 1's.
+GridFamilyExport RandomPlantedForest::family_grid_from_rects(size_t f) const
+{
+  if (sample_size == 0 || X.empty())
+    throw std::runtime_error("The per-family grids of purify(mode = 2) need the training data.");
+  const TreeFamily &fam = tree_families[f];
+  const int maxp = rect_forest_->maxp;
+  std::vector<int> all_idx(sample_size);
+  std::iota(all_idx.begin(), all_idx.end(), 0);
+  rpf_kd::KDTree kdt(&X, all_idx, feature_size);
+  rpf_rect::Accumulator acc;
+  purify_fast_exact_family(fam, maxp, kdt, rect_forest_->cuts, acc);
+  rpf_rect::PurifiedForest pf;
+  pf.cuts = rect_forest_->cuts;
+  pf.build_from(acc, (int)value_size);
+
+  GridFamilyExport out;
+  out.lim_list.assign(feature_size, std::vector<double>());
+  for (int d = 1; d <= feature_size; ++d) {
+    auto &b = out.lim_list[d - 1];
+    for (const auto &kv : fam) {
+      if (!kv.first.count(d))
+        continue;
+      for (const auto &leaf : kv.second->leaves) {
+        b.push_back(leaf.intervals[d - 1].first);
+        b.push_back(leaf.intervals[d - 1].second);
+      }
+    }
+    std::sort(b.begin(), b.end());
+    b.erase(std::unique(b.begin(), b.end()), b.end());
+  }
+  // the family's trees and their subsets up to maxp (as mode 1 creates them); trees above maxp stay zero
+  std::set<std::set<int>, utils::setComp> keys;
+  for (const auto &kv : fam) {
+    keys.insert(kv.first);
+    if (kv.first == std::set<int>{0})
+      continue;
+    std::vector<int> T(kv.first.begin(), kv.first.end());
+    for (int mask = 1; mask < (1 << (int)T.size()); ++mask) {
+      std::set<int> S;
+      for (size_t b = 0; b < T.size(); ++b)
+        if (mask & (1 << b))
+          S.insert(T[b]);
+      if ((int)S.size() <= maxp)
+        keys.insert(S);
+    }
+  }
+  keys.insert(std::set<int>{0});
+  for (const auto &S : keys) {
+    GridTreeExport t;
+    t.variables = S;
+    if (S == std::set<int>{0}) {
+      t.dims = {1};
+      t.values.assign(1, pf.intercept);
+      out.trees.push_back(std::move(t));
+      continue;
+    }
+    std::vector<int> Sv(S.begin(), S.end());
+    size_t n_cells = 1;
+    for (int d : Sv) {
+      t.dims.push_back(std::max(1, (int)out.lim_list[d - 1].size()));
+      n_cells *= (size_t)t.dims.back();
+    }
+    t.values.assign(n_cells, std::vector<double>(value_size, 0.0));
+    auto it = pf.comps.find(Sv);
+    if (it != pf.comps.end()) {
+      std::vector<int32_t> cells(feature_size, 0);
+      std::vector<int> idx(Sv.size(), 0);
+      for (size_t e = 0; e < n_cells; ++e) {
+        // column-major position e -> grid index; the last index of each dimension is not a cell and stays zero
+        size_t rem = e;
+        bool inside = true;
+        for (size_t q = 0; q < Sv.size(); ++q) {
+          idx[q] = (int)(rem % (size_t)t.dims[q]);
+          rem /= (size_t)t.dims[q];
+          inside = inside && idx[q] < t.dims[q] - 1;
+        }
+        if (!inside)
+          continue;
+        for (size_t q = 0; q < Sv.size(); ++q)
+          cells[Sv[q] - 1] = pf.cell(Sv[q] - 1, out.lim_list[Sv[q] - 1][idx[q]]);
+        pf.add_component(it->second, cells.data(), t.values[e].data(), (int)value_size);
+      }
+    }
+    out.trees.push_back(std::move(t));
+  }
+  return out;
 }
 
 // Purify a single family, but only materialize outputs up to maxp_interaction.
@@ -1022,348 +933,4 @@ void RandomPlantedForest::purify_3_family(TreeFamily &curr_family, int maxp_inte
     }
     curr_family[variables[tree_index3]]->GridLeaves = curr_gridLeaf;
   }
-}
-
-void RandomPlantedForest::purify_2()
-{
-
-  // go through all n_trees families
-  for (auto &curr_family : this->tree_families) {
-
-    // lim_list is a list giving for each variable all interval end-points
-    std::vector<std::vector<double>> lim_list(feature_size);
-
-    // go through all variables of the component
-    for (int curr_dim = 1; curr_dim <= feature_size; ++curr_dim) {
-      std::vector<double> bounds;
-
-      // go through trees of family
-      for (const auto &curr_tree : curr_family) {
-
-        // consider only relevant trees that have current dimension as variable
-        if (!curr_tree.first.count(curr_dim))
-          continue;
-
-        // go through leaves of tree
-        for (const auto &curr_leaf : curr_tree.second->leaves) {
-          // get interval ends of variable
-          bounds.push_back(curr_leaf.intervals[curr_dim - 1].second);
-        }
-      }
-      std::sort(bounds.begin(), bounds.end());
-      bounds.erase(std::unique(bounds.begin(), bounds.end()), bounds.end());
-      lim_list[curr_dim - 1] = bounds;
-    }
-
-    // initialize values and individuals for each tree in family
-    std::vector<grid::NDGrid> grids(curr_family.size() - 1);
-    std::vector<utils::Matrix<int>> individuals(curr_family.size() - 1);
-    std::vector<utils::Matrix<std::vector<double>>> values(curr_family.size() - 1);
-    std::vector<std::set<int>> variables(curr_family.size() - 1);
-
-    //  ------------- setup finer grid  -------------
-
-    int tree_index = 0;
-    for (const auto &curr_tree : curr_family) {
-
-      if (curr_tree.first == std::set<int>{0})
-        continue; // ignore null tree
-
-      // fill space with dimensions
-      std::vector<int> dimensions;
-      for (const auto &dim : curr_tree.first) {
-        dimensions.push_back(lim_list[dim - 1].size() - 1); // size - 1 ?
-      }
-
-      // setup grid for leaf indices
-      auto grid = grid::NDGrid(dimensions);
-
-      // initialize data for current tree
-      grids[tree_index] = grid;
-      individuals[tree_index] = utils::Matrix<int>(dimensions, 0);
-      values[tree_index] =
-          utils::Matrix<std::vector<double>>(dimensions, std::vector<double>(value_size, 0)); // changed
-      variables[tree_index] = curr_tree.first;
-
-      // fill grid points with individuals and values
-      while (!grid.nextPoint()) {
-
-        std::vector<int> gridPoint = grid.getPoint();
-
-        bool in_leaf = true;
-
-        // go through sample points to sum up individuals
-        for (const auto &feature_vec : X) {
-          int dim_index = 0;
-          in_leaf = true;
-          for (const auto &dim : curr_tree.first) {
-            double val = feature_vec[dim - 1];
-            if (!((val >= lim_list[dim - 1][gridPoint[dim_index]]) &&
-                  (val < lim_list[dim - 1][gridPoint[dim_index] + 1]))) {
-              in_leaf = false;
-              break;
-            }
-            ++dim_index;
-          }
-
-          // consider individuals only if all in
-          if (in_leaf)
-            individuals[tree_index][gridPoint] += 1;
-        }
-
-        // go through leaves of tree to sum up values
-        for (const auto &leaf : curr_tree.second->get_leaves()) {
-
-          in_leaf = true;
-          int dim_index = 0;
-          for (const auto &dim : curr_tree.first) {
-            // consider values only if all in
-            if (!((leaf.intervals[dim - 1].first <= lim_list[dim - 1][gridPoint[dim_index]]) &&
-                  (leaf.intervals[dim - 1].second >= lim_list[dim - 1][gridPoint[dim_index] + 1]))) {
-              in_leaf = false;
-              break;
-            }
-            ++dim_index;
-          }
-
-          // sum up values
-          if (in_leaf)
-            values[tree_index][gridPoint] += leaf.value; // todo: multiclass
-        }
-      }
-
-      ++tree_index;
-    }
-
-    // ------------- create new trees -------------
-
-    // insert null tree
-    grids.insert(grids.begin(), grid::NDGrid());
-    values.insert(
-        values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
-    );
-    individuals.insert(individuals.begin(), utils::Matrix<int>(std::vector<int>{1}));
-    variables.insert(variables.begin(), std::set<int>{0});
-
-    // recap maximum number of dimensions of current family
-    unsigned int curr_max = 0;
-    for (const auto &tree : curr_family) {
-      if (tree.first.size() > curr_max)
-        curr_max = tree.first.size();
-    }
-
-    auto keys = getKeys(curr_family);
-    while (curr_max > 1) {
-
-      // go through split dimensions of all trees
-      for (std::vector<std::set<int>>::reverse_iterator key = keys.rbegin(); key != keys.rend(); ++key) {
-
-        auto &curr_tree = curr_family[(*key)];
-        std::set<int> curr_dims = curr_tree->split_dims;
-
-        // check if number of dims same as current max_interaction
-        if (curr_dims.size() == curr_max) {
-
-          // go through feature dims
-          int dim_index = 0;
-          for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-
-            // continue only if dim in current tree
-            if (curr_tree->split_dims.count(feature_dim) != 0) {
-
-              std::set<int> tree_dims = curr_tree->split_dims;
-              tree_dims.erase(tree_dims.find(feature_dim)); // remove current feature dim from current tree
-
-              // check if tree with dimensions exists, if not create
-              std::shared_ptr<DecisionTree> tree = treeExists(tree_dims, curr_family);
-              if (!tree) {
-
-                // get index of old and new tree
-                auto old_tree_index =
-                    std::distance(std::begin(curr_family), curr_family.find(curr_tree->get_split_dims()));
-                curr_family.insert(std::make_pair(tree_dims, std::make_shared<DecisionTree>(DecisionTree(tree_dims))));
-                auto tree_index = std::distance(std::begin(curr_family), curr_family.find(tree_dims));
-
-                // remove matrix dimension of respective variable
-                std::vector<int> matrix_dimensions = values[old_tree_index].dims;
-                matrix_dimensions.erase(matrix_dimensions.begin() + dim_index);
-
-                // initialize data for new tree
-                auto grid = grid::NDGrid(matrix_dimensions);
-                grids.insert(grids.begin() + tree_index, grid);
-                values.insert(
-                    values.begin() + tree_index,
-                    utils::Matrix<std::vector<double>>(matrix_dimensions, std::vector<double>(0, value_size))
-                );
-                individuals.insert(individuals.begin() + tree_index, utils::Matrix<int>(matrix_dimensions));
-                variables.insert(variables.begin() + tree_index, tree_dims);
-
-                // fill individuals of new trees
-                while (!grid.nextPoint()) {
-
-                  std::vector<int> gridPoint = grid.getPoint();
-                  bool in_leaf = true;
-
-                  // go through sample points to sum up individuals
-                  for (const auto &feature_vec : X) {
-                    int dim_index = 0;
-                    in_leaf = true;
-                    for (const auto &dim : tree_dims) {
-                      double val = feature_vec[dim - 1];
-                      if (!((val >= lim_list[dim - 1][gridPoint[dim_index]]) &&
-                            (val < lim_list[dim - 1][gridPoint[dim_index] + 1])))
-                        in_leaf = false;
-                      ++dim_index;
-                    }
-
-                    // consider individuals only if all in
-                    if (in_leaf)
-                      individuals[tree_index][gridPoint] += 1;
-                  }
-                }
-              }
-
-              dim_index++;
-            }
-          }
-        }
-      }
-
-      // update currently considered dimension size
-      --curr_max;
-    }
-
-    // ------------- purify -------------
-
-    // measure tolerance and number of iterations
-    std::vector<double> tol(curr_family.size(), 1);
-    int iter;
-
-    // iterate backwards through tree family
-    int curr_tree_index = curr_family.size() - 1;
-    for (TreeFamily::reverse_iterator curr_tree = curr_family.rbegin(); curr_tree != curr_family.rend(); ++curr_tree) {
-      iter = 0;
-      std::set<int> curr_dims = curr_tree->second->get_split_dims();
-
-      // do not purify null
-      if (curr_dims == std::set<int>{0})
-        continue;
-
-      // repeat until tolerance small enough and (?) maximum number of iterations reached
-      while ((tol[curr_tree_index] > 0.00000000001) && (iter < 100)) {
-
-        // go through feature dims
-        int curr_dim_index = 0;
-        for (const auto &feature_dim : curr_dims) {
-
-          // get tree that has same variables as curr_tree minus j-variable
-          std::set<int> tree_dims = curr_dims;
-          tree_dims.erase(tree_dims.find(feature_dim));
-          int tree_index = 0; // if tree not exist, set to null tree
-          if (curr_family.find(tree_dims) != curr_family.end())
-            tree_index = std::distance(std::begin(curr_family), curr_family.find(tree_dims)) - 1;
-
-          // update values
-          if (grids[curr_tree_index].dimensions.size() == 1) { // one dimensional case
-
-            int sum_ind = 0;
-            std::vector<double> avg(value_size, 0);
-
-            // get sum of individuals
-            for (int i = 0; i < (int)individuals[curr_tree_index].n_entries; ++i) {
-              std::vector<int> tmp{i};
-              sum_ind += individuals[curr_tree_index][tmp];
-            }
-            if (sum_ind == 0)
-              continue;
-
-            // calc avg
-            for (int i = 0; i < (int)individuals[curr_tree_index].n_entries; ++i) {
-              std::vector<int> tmp{i};
-              avg += (individuals[curr_tree_index][tmp] * values[curr_tree_index][tmp]) / sum_ind;
-            }
-
-            // update values of one dimensional and null tree
-            for (int i = 0; i < (int)values[curr_tree_index].n_entries; ++i) {
-              std::vector<int> tmp{i};
-              values[curr_tree_index][tmp] -= avg;
-            }
-            std::vector<int> tmp{0};
-            values[tree_index][tmp] += avg;
-          } else { // higher dimensional case
-
-            // setup new grid without dimension j
-            std::vector<int> new_dimensions = grids[curr_tree_index].dimensions;
-            int j_dim = new_dimensions[curr_dim_index];
-            new_dimensions.erase(new_dimensions.begin() + curr_dim_index);
-            grid::NDGrid grid = grid::NDGrid(new_dimensions);
-
-            // go through values without dimension j
-            while (!grid.nextPoint()) {
-              auto gridPoint = grid.getPoint();
-              gridPoint.push_back(0);
-
-              int sum_ind = 0;
-              std::vector<double> avg(value_size, 0);
-
-              // go through slice to sum up individuals
-              for (int j = 0; j < j_dim; ++j) {
-                gridPoint.back() = j;
-
-                // get sum of individuals
-                sum_ind += individuals[curr_tree_index][gridPoint];
-              }
-
-              // go through slice to calc avg
-              for (int j = 0; j < j_dim; ++j) {
-                gridPoint.back() = j;
-
-                // calc avg
-                avg += (individuals[curr_tree_index][gridPoint] * values[curr_tree_index][gridPoint]) / sum_ind;
-              }
-
-              // go through slice to update values
-              for (int j = 0; j < j_dim; ++j) {
-                gridPoint.back() = j;
-
-                // update values of current slice
-                values[curr_tree_index][gridPoint] -= avg;
-              }
-
-              // update lower dimensional tree
-              gridPoint.pop_back();
-              values[tree_index][gridPoint] += avg;
-            }
-          }
-
-          ++curr_dim_index;
-        }
-
-        // update tolerance
-        if (variables[curr_tree_index].size() == 1) {
-          tol[curr_tree_index] = 1; // todo
-        } else {
-          tol[curr_tree_index] = 1;
-        }
-
-        ++iter;
-      }
-
-      --curr_tree_index;
-    }
-
-    // ------------- attach to rpf class -------------
-
-    // fill with new trees
-    for (size_t tree_index = 0; tree_index < variables.size(); ++tree_index) {
-      LeafGrid curr_gridLeaf;
-      curr_gridLeaf.grid = grids[tree_index];
-      curr_gridLeaf.individuals = individuals[tree_index];
-      curr_gridLeaf.lim_list = lim_list;
-      curr_gridLeaf.values = values[tree_index];
-      curr_family[variables[tree_index]]->GridLeaves = curr_gridLeaf;
-    }
-  }
-
-  purified = true;
 }
