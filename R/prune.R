@@ -394,7 +394,8 @@ prune_refit <- function(object, predictors, y, rows, seed, nthreads) {
     predictors = predictors[rows, , drop = FALSE],
     outcomes = data.frame(.outcome = y[rows])
   )
-  pre <- preprocess_predictors_fit(processed)
+  # the factors that keep their level order in the forest keep it in the fold fits too
+  pre <- preprocess_predictors_fit(processed, keep_level_order = object$params$keep_level_order %||% FALSE)
   params <- object$params
   params$nthreads <- nthreads
   params$purify <- FALSE

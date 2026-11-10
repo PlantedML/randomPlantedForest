@@ -185,6 +185,23 @@ test_that("factor predictors are coded per fold, as rpf() codes them", {
   expect_identical(predict(refit, df), predict(direct, df))
 })
 
+test_that("a fold fit keeps the level order of the factors the forest keeps it for", {
+  d <- prune_sim(n = 300)
+  df <- data.frame(d$x, g = factor(sample(letters[1:4], 300, replace = TRUE), levels = c("d", "b", "a", "c")))
+  df$y <- d$y + c(a = 0, b = 1, c = -1, d = 2)[as.character(df$g)]
+  set.seed(5)
+  fit <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30, keep_level_order = "g")
+  ns <- asNamespace("randomPlantedForest")
+  rows <- rep_len(1:3, 300) != 1
+  tr <- ns$prune_training_data(fit, df, NULL)
+  refit <- ns$prune_refit(fit, tr$predictors, tr$y, rows, seed = 7, nthreads = 1L)
+  set.seed(7)
+  direct <- rpf(y ~ ., data = df[rows, ], max_interaction = 2, ntrees = 10, splits = 30, keep_level_order = "g")
+  expect_identical(refit$factor_levels, direct$factor_levels)
+  expect_identical(refit$factor_levels$g, c("d", "b", "a", "c"))
+  expect_identical(predict(refit, df), predict(direct, df))
+})
+
 test_that("predict_components() selects the right components with a factor before numeric columns", {
   # hardhat::mold() puts the factors last, so the fit's columns are x1, x2, g, not the data's g, x1, x2
   set.seed(3)
