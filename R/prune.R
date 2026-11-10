@@ -85,16 +85,21 @@
 #'   numbers of training rows (ties merged), with `prod(q) <= max_panels`; `q_k = 1` averages `k` out. Only the
 #'   maximal `q` vectors (no `q_k` can grow) are considered; they are listed directly, not searched among all
 #'   `max_panels^(|S| - 2)` vectors.
-#' - Within a cell, `f_S` is averaged over the coarse predictors with the product of their training marginals. This
-#'   keeps the component's means along each predictor, so it stays purified.
+#' - Within a cell, `f_S` is averaged over the coarse predictors with the product of their training marginals. The
+#'   coarsened component is not purified again: [purify()] identifies the components under the joint distribution of
+#'   the training rows, not under the product of the marginals, and the averaging changes the component's means along
+#'   its two full-resolution predictors and its mean over the training rows. It is used as it is (no part of it is
+#'   moved into the intercept or into components of lower order).
 #' - Of all choices of the two full predictors and the `q` vector, the one keeping the largest share of the variance
 #'   of `f_S` on the training rows is taken (ties: the first in lexicographic order).
 #'
 #' Then the same rule prunes again, on the components the first pruning kept, with the coarsened ones in place of the
-#' originals: chosen out of bag, with the same candidates and folds, scored with each family's coarsened components at
-#' its out-of-bag rows (R's coefficients out of bag); a given rule and `tau`, or a pair chosen by CV, is applied again as
-#' it is (R's coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated,
-#' as it would need the display in every fold's refit). The prediction then uses the coarsened components, so the
+#' originals. Its shares, which `tau` thresholds, are of the variance of that model (the intercept plus these
+#' components) on the training rows, not of the forest's prediction. A pair chosen out of bag is chosen again out of
+#' bag, with the same candidates and folds, scored with each family's coarsened components at its out-of-bag rows (R's
+#' coefficients out of bag); a given rule and `tau`, or a pair chosen by CV, is applied again as it is (R's
+#' coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated, as it would
+#' need the display in every fold's refit). The prediction then uses the coarsened components, so the
 #' pruning judges the model that is shown. In simulations (48 data sets) this second pruning had 0.49% lower test
 #' error than pruning and then coarsening, and 0.57% lower than not coarsening; on California housing (50 families,
 #' order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
@@ -158,8 +163,9 @@
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
 #'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
-#' - `components`: a `data.frame` of every nonzero component of `object` on the training rows: `component` (its
-#'   name, as in [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
+#' - `components`: a `data.frame` of every nonzero component of `object` on the training rows (after a second pruning
+#'   of the display, only of those the first pruning kept: see below): `component` (its name, as in
+#'   [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
 #' - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a `data.frame` with one row per candidate: `rule`,
 #'   `tau`, `oob_rmse` (corrected; used for the choice), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and
 #'   `se_mse_raw` (uncorrected), `n_kept`, `min` and `one_se` (the two choices). Its attribute `n_rows` is the number
@@ -168,23 +174,32 @@
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
 #' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
 #'   given rule and `tau`, `select_by` is `"oob"` if R's coefficients were fitted out of bag, otherwise `NULL`.
-#' - With the display (finite `max_panels`), these describe the second pruning: its candidates are the components the
-#'   first pruning kept, with their shares after coarsening, and `oob` is its table. `components` also has `form`
-#'   (`"full"` for one or two predictors, `"asis"` if its own cut points need at most `max_panels` heat maps,
-#'   `"coarsened"`; `NA` if not kept by the first pruning) and `heat_maps`. The element `display` is a list:
+#' - With the display (finite `max_panels`) and a component coarsened, a second pruning runs, and these describe it:
+#'   its candidates are the components the first pruning kept, with the coarsened ones in place, and `oob` is its
+#'   table. `components` then lists only these components, and their `share` (which the second pruning's `tau`
+#'   thresholds) is of the variance of their model (the intercept plus these components) on the training rows, not of
+#'   the forest's prediction; every nonzero component of `object` with its share of the forest's prediction is in
+#'   `display$first$components`. Without a coarsened component, they are the first pruning's. With the display,
+#'   `components` also has `form` (`"full"` for one or two predictors, `"asis"` if its own cut points need at most
+#'   `max_panels` heat maps, `"coarsened"`; `NA` for a component of three or more predictors the first pruning dropped,
+#'   so only without a second pruning) and `heat_maps`. The element `display` is a list:
 #'   `max_panels`; `first`, the first pruning's model (without `fit`); `coarse`, per coarsened component (named as the
 #'   components): `S` (all the component's predictors), `C` (the coarse predictors, `|S| - 2` of `S`: the panel
-#'   predictors), `q`, `cuts` (per coarse predictor), `cells`, `var_kept` (the share of the component's variance
-#'   kept), `forest_panels`, `kept` (in the final model), `candidates` (every candidate's coarse set, `q`, cells and
-#'   variance kept) and `stored` (what prediction needs; no training data); `asis`, per component kept as it is (form
-#'   `"asis"`), its panels with the same names and meaning: `S` (all the component's predictors), `C` (the panel
-#'   predictors: the `|S| - 2` of `S` with the fewest own cut points; of ties, the first in `S`), `cuts` (per
-#'   predictor of `C`, its own cut points: the leaf bounds of the trees containing `S` inside the range of the
-#'   training values), `forest_panels` (`prod(lengths(cuts) + 1)`) and `kept`; `forms`, per component of three or
-#'   more predictors the first pruning kept, its form, heat maps and variance kept; `second` (whether a second pruning
-#'   ran); `seconds` (the time of each step). In `coarse` and `asis` alike, a panel is a cell of `cuts` (a value `x`
-#'   of predictor `k` of `C` lies in cell `findInterval(x, cuts[[k]])`), shown as a heat map over the two predictors
-#'   `setdiff(S, C)` at full resolution.
+#'   predictors), `q` (the numbers of intervals aimed at; merged ties can leave fewer, `lengths(cuts) + 1`), `cuts`
+#'   (per coarse predictor), `cells` (the number of heat maps, `prod(lengths(cuts) + 1)`), `var_kept` (the share of
+#'   the component's variance kept), `forest_panels`, `kept` (in the final model), `candidates` (every candidate's
+#'   coarse set, `q`, cells and variance kept), `stored` (what prediction needs; no training data) and `seconds` (the
+#'   time to choose and build its form); `asis`, per component kept as it is (form `"asis"`), its panels with the
+#'   same names and meaning: `S` (all the component's predictors), `C` (the panel predictors: the `|S| - 2` of `S`
+#'   with the fewest own cut points; of ties, the first in `S`), `cuts` (per predictor of `C`, its own cut points: the
+#'   leaf bounds of the trees containing `S` inside the range of the training values), `forest_panels`
+#'   (`prod(lengths(cuts) + 1)`) and `kept`; `forms`, per component of three or more predictors the first pruning
+#'   kept, its form, heat maps and variance kept; `second` (whether a second pruning ran); `seconds` (the time of each
+#'   step); `cache`, an environment holding the coarsened components' search indices, built at their first
+#'   [`predict()`][predict.rpf_pruned] (a cache, not part of the model: rebuilt when missing or invalid, as after
+#'   saving and loading). In `coarse` and `asis` alike, a panel is a cell of `cuts` (a value `x` of predictor `k` of
+#'   `C` lies in cell `findInterval(x, cuts[[k]])`), shown as a heat map over the two predictors `setdiff(S, C)` at
+#'   full resolution.
 #'
 #' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
 #'
@@ -221,7 +236,7 @@
 #' fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
 #' shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 #' shown
-#' shown$display$coarse
+#' shown$display$forms
 prune_components <- function(
   object,
   data,

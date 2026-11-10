@@ -3,8 +3,10 @@
 // t_i), the outer ones open); the two others (D) stay at full resolution. Within a cell the component is averaged with
 // product-marginal weights: each rectangle's indicator on a coarse axis k is replaced by mu_k(B & I) / mu_k(I) for the
 // cell's interval I (mu_k: the training rows' marginal of feature k). This is linear in the rectangles, so it applies
-// to the merged store (the forest's component) and to one family's rectangles alike, and it keeps the component's
-// marginal means along each feature.
+// to the merged store (the forest's component) and to one family's rectangles alike. Averaging over a coarse feature
+// under mu_k commutes with it; the means along the two full-resolution features and over the training rows change, and
+// as purify() identifies the components under the training rows' joint distribution (not the product of marginals),
+// the coarsened component is not purified (it is not re-centred either).
 //
 // Coordinates: forest cells as in rects.hpp (feature d: cell c(x) = #{cuts[d] <= x}, 0..K_d; a box [lo, hi) of cells,
 // lo = 0 / hi = K_d + 1 open). A rectangle of the group (S, j) restricts only the features of j; here every rectangle

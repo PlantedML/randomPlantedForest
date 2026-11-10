@@ -75,8 +75,9 @@ An object of class \code{rpf_pruned}, a list with elements:
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
 \code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
-\item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows: \code{component} (its
-name, as in \code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
+\item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows (after a second pruning
+of the display, only of those the first pruning kept: see below): \code{component} (its name, as in
+\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
 \code{tau}, \code{oob_rmse} (corrected; used for the choice), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and
 \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and \code{one_se} (the two choices). Its attribute \code{n_rows} is the number
@@ -85,23 +86,32 @@ of rows with an OOB family.
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
 given rule and \code{tau}, \code{select_by} is \code{"oob"} if R's coefficients were fitted out of bag, otherwise \code{NULL}.
-\item With the display (finite \code{max_panels}), these describe the second pruning: its candidates are the components the
-first pruning kept, with their shares after coarsening, and \code{oob} is its table. \code{components} also has \code{form}
-(\code{"full"} for one or two predictors, \code{"asis"} if its own cut points need at most \code{max_panels} heat maps,
-\code{"coarsened"}; \code{NA} if not kept by the first pruning) and \code{heat_maps}. The element \code{display} is a list:
+\item With the display (finite \code{max_panels}) and a component coarsened, a second pruning runs, and these describe it:
+its candidates are the components the first pruning kept, with the coarsened ones in place, and \code{oob} is its
+table. \code{components} then lists only these components, and their \code{share} (which the second pruning's \code{tau}
+thresholds) is of the variance of their model (the intercept plus these components) on the training rows, not of
+the forest's prediction; every nonzero component of \code{object} with its share of the forest's prediction is in
+\code{display$first$components}. Without a coarsened component, they are the first pruning's. With the display,
+\code{components} also has \code{form} (\code{"full"} for one or two predictors, \code{"asis"} if its own cut points need at most
+\code{max_panels} heat maps, \code{"coarsened"}; \code{NA} for a component of three or more predictors the first pruning dropped,
+so only without a second pruning) and \code{heat_maps}. The element \code{display} is a list:
 \code{max_panels}; \code{first}, the first pruning's model (without \code{fit}); \code{coarse}, per coarsened component (named as the
 components): \code{S} (all the component's predictors), \code{C} (the coarse predictors, \verb{|S| - 2} of \code{S}: the panel
-predictors), \code{q}, \code{cuts} (per coarse predictor), \code{cells}, \code{var_kept} (the share of the component's variance
-kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's coarse set, \code{q}, cells and
-variance kept) and \code{stored} (what prediction needs; no training data); \code{asis}, per component kept as it is (form
-\code{"asis"}), its panels with the same names and meaning: \code{S} (all the component's predictors), \code{C} (the panel
-predictors: the \verb{|S| - 2} of \code{S} with the fewest own cut points; of ties, the first in \code{S}), \code{cuts} (per
-predictor of \code{C}, its own cut points: the leaf bounds of the trees containing \code{S} inside the range of the
-training values), \code{forest_panels} (\code{prod(lengths(cuts) + 1)}) and \code{kept}; \code{forms}, per component of three or
-more predictors the first pruning kept, its form, heat maps and variance kept; \code{second} (whether a second pruning
-ran); \code{seconds} (the time of each step). In \code{coarse} and \code{asis} alike, a panel is a cell of \code{cuts} (a value \code{x}
-of predictor \code{k} of \code{C} lies in cell \code{findInterval(x, cuts[[k]])}), shown as a heat map over the two predictors
-\code{setdiff(S, C)} at full resolution.
+predictors), \code{q} (the numbers of intervals aimed at; merged ties can leave fewer, \code{lengths(cuts) + 1}), \code{cuts}
+(per coarse predictor), \code{cells} (the number of heat maps, \code{prod(lengths(cuts) + 1)}), \code{var_kept} (the share of
+the component's variance kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's
+coarse set, \code{q}, cells and variance kept), \code{stored} (what prediction needs; no training data) and \code{seconds} (the
+time to choose and build its form); \code{asis}, per component kept as it is (form \code{"asis"}), its panels with the
+same names and meaning: \code{S} (all the component's predictors), \code{C} (the panel predictors: the \verb{|S| - 2} of \code{S}
+with the fewest own cut points; of ties, the first in \code{S}), \code{cuts} (per predictor of \code{C}, its own cut points: the
+leaf bounds of the trees containing \code{S} inside the range of the training values), \code{forest_panels}
+(\code{prod(lengths(cuts) + 1)}) and \code{kept}; \code{forms}, per component of three or more predictors the first pruning
+kept, its form, heat maps and variance kept; \code{second} (whether a second pruning ran); \code{seconds} (the time of each
+step); \code{cache}, an environment holding the coarsened components' search indices, built at their first
+\code{\link[=predict.rpf_pruned]{predict()}} (a cache, not part of the model: rebuilt when missing or invalid, as after
+saving and loading). In \code{coarse} and \code{asis} alike, a panel is a cell of \code{cuts} (a value \code{x} of predictor \code{k} of
+\code{C} lies in cell \code{findInterval(x, cuts[[k]])}), shown as a heat map over the two predictors \code{setdiff(S, C)} at
+full resolution.
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
@@ -197,17 +207,22 @@ the others. If its own cut points need more than \code{max_panels} such heat map
 numbers of training rows (ties merged), with \code{prod(q) <= max_panels}; \code{q_k = 1} averages \code{k} out. Only the
 maximal \code{q} vectors (no \code{q_k} can grow) are considered; they are listed directly, not searched among all
 \verb{max_panels^(|S| - 2)} vectors.
-\item Within a cell, \code{f_S} is averaged over the coarse predictors with the product of their training marginals. This
-keeps the component's means along each predictor, so it stays purified.
+\item Within a cell, \code{f_S} is averaged over the coarse predictors with the product of their training marginals. The
+coarsened component is not purified again: \code{\link[=purify]{purify()}} identifies the components under the joint distribution of
+the training rows, not under the product of the marginals, and the averaging changes the component's means along
+its two full-resolution predictors and its mean over the training rows. It is used as it is (no part of it is
+moved into the intercept or into components of lower order).
 \item Of all choices of the two full predictors and the \code{q} vector, the one keeping the largest share of the variance
 of \code{f_S} on the training rows is taken (ties: the first in lexicographic order).
 }
 
 Then the same rule prunes again, on the components the first pruning kept, with the coarsened ones in place of the
-originals: chosen out of bag, with the same candidates and folds, scored with each family's coarsened components at
-its out-of-bag rows (R's coefficients out of bag); a given rule and \code{tau}, or a pair chosen by CV, is applied again as
-it is (R's coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated,
-as it would need the display in every fold's refit). The prediction then uses the coarsened components, so the
+originals. Its shares, which \code{tau} thresholds, are of the variance of that model (the intercept plus these
+components) on the training rows, not of the forest's prediction. A pair chosen out of bag is chosen again out of
+bag, with the same candidates and folds, scored with each family's coarsened components at its out-of-bag rows (R's
+coefficients out of bag); a given rule and \code{tau}, or a pair chosen by CV, is applied again as it is (R's
+coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated, as it would
+need the display in every fold's refit). The prediction then uses the coarsened components, so the
 pruning judges the model that is shown. In simulations (48 data sets) this second pruning had 0.49\% lower test
 error than pruning and then coarsening, and 0.57\% lower than not coarsening; on California housing (50 families,
 order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
@@ -263,7 +278,7 @@ y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
 fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
 shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 shown
-shown$display$coarse
+shown$display$forms
 }
 \seealso{
 \code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}.

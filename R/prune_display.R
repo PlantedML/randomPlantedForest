@@ -7,13 +7,17 @@
 # product <= P (q_k = 1 averages feature k out entirely; with |S| - 2 >= 4 and P = 10 some q_k are always 1); the two
 # other features stay at full resolution, so each of the at most P coarse cells is one heat map. Within a cell the
 # component is averaged with product-marginal weights: each rectangle's indicator on a coarse axis k is replaced by
-# mu_k(B & I) / mu_k(I) for the cell's interval I (mu_k: the training marginal of feature k). This keeps the
-# component's marginal means (purify()'s identification), so nothing is purified again. Among all coarse sets C (in
-# lexicographic order) and maximal q vectors (lexicographic, listed directly: never P^(|S| - 2) candidates), the one
-# keeping the most of the forest component's variance on the training rows is chosen (ties: the first; a later one must
-# be larger by more than 1e-15). A component whose own cut points (the leaves of all trees containing S) already need
-# at most P heat maps (the product of its |S| - 2 smallest interval counts) stays as it is; its panels (those |S| - 2
-# features and their own cut points) are kept for a plot ($display$asis), as $display$coarse keeps a coarsened one's.
+# mu_k(B & I) / mu_k(I) for the cell's interval I (mu_k: the training marginal of feature k). Averaging over a coarse
+# feature k under mu_k commutes with this (the mean along k of the coarsened component is the coarsened mean along k),
+# but the means along the two full-resolution features and the mean over the training rows change. purify() identifies
+# the components under the joint distribution of the training rows, not under the product of the marginals, so the
+# coarsened component is not purified; it is used as it is (nothing is purified again or moved into the intercept).
+# Among all coarse sets C (in lexicographic order) and maximal q vectors (lexicographic, listed directly: never
+# P^(|S| - 2) candidates), the one keeping the most of the forest component's variance on the training rows is chosen
+# (ties: the first; a later one must be larger by more than 1e-15). A component whose own cut points (the leaves of all
+# trees containing S) already need at most P heat maps (the product of its |S| - 2 smallest interval counts) stays as
+# it is; its panels (those |S| - 2 features and their own cut points) are kept for a plot ($display$asis), as
+# $display$coarse keeps a coarsened one's.
 #
 # The second pruning:
 # - chosen out of bag: the same candidates, folds and correction, on each family's coarsened component at its
