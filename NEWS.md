@@ -88,6 +88,9 @@
   Purification at `max_interaction = 3` and above no longer runs out of memory: on California housing (16,512 rows, 50 tree families, 94,138 leaves) order 3 takes 6 s and 0.25 GB with 4 threads, where it was stopped at 6 GB before, and the full order (8) takes 40 s and 2.3 GB.
   The components equal those of `mode = 1` up to rounding, and `rpf_marshal()` stores the rectangles.
 * `predict_components()` evaluates all components in one pass over the rows of `new_data`, and skips those the forest does not hold, instead of one pass per component: on a 10-feature full-order fit (1,023 components, 636 of them not held), 5,000 rows take 0.5 s instead of 2.0 s.
+* A fitted forest takes about 40% less memory: the split search's per-leaf caches are kept apart from the leaves and freed when a tree family is finished, so a leaf takes 80 instead of 232 bytes; finished classification forests now also drop their training rows and caches.
+  On California housing (`max_interaction = 3`, 10,000 splits, 200 tree families) the fitted forest falls from 821 MB to 490 MB and the fit's peak resident memory from about 1.9 GB to 1.6 GB, in the same time.
+  Fitted models are bitwise unchanged.
 
 # randomPlantedForest 0.5.0
 

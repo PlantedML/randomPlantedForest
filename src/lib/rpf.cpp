@@ -589,13 +589,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         // Individuals are not used after training; caches are training-only
         leaf.individuals.clear();
         leaf.individuals.shrink_to_fit();
-        // Free per-leaf caches decisively
-        {
-          std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-          std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-          std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-          std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
-        }
+        // Free the per-leaf caches
+        leaf.free_cache();
         // Keep intervals and value but release spare capacity
         leaf.intervals.shrink_to_fit();
         leaf.value.shrink_to_fit();
@@ -814,10 +809,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       for (auto &leaf : treePtr->leaves) {
         leaf.individuals.clear();
         leaf.individuals.shrink_to_fit();
-        std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-        std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-        std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-        std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
+        leaf.free_cache();
         leaf.intervals.shrink_to_fit();
         leaf.value.shrink_to_fit();
       }
@@ -997,10 +989,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     for (auto &leaf : treePtr->leaves) {
       leaf.individuals.clear();
       leaf.individuals.shrink_to_fit();
-      std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-      std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-      std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-      std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
+      leaf.free_cache();
       leaf.intervals.shrink_to_fit();
       leaf.value.shrink_to_fit();
     }

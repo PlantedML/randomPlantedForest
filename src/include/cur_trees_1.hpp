@@ -33,7 +33,7 @@ struct FamilyRanks {
 // The family's ranks: those in `slot` (the null tree's) if they were built from X, else built now and stored there.
 FamilyRanks &family_ranks(std::shared_ptr<FamilyRanks> &slot, const std::vector<std::vector<double>> &X);
 
-// The number of distinct values of feature k among the leaf's rows (cached in leaf.unique_count_cache).
+// The number of distinct values of feature k among the leaf's rows (cached in the leaf's unique_count_cache).
 size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k);
 
 // The leaf's sampling weight in feature k, as rpf_utils::leaf_threshold_weight() gives it, without sorting the leaf:
@@ -42,7 +42,7 @@ double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size);
 
 // The leaf's distinct values of feature k, ascending, as rpf_utils::compute_unique_sorted_values() gives them from the
 // leaf's stably sorted values: a run of equal values is represented by its first row in the leaf's order (this
-// matters only for -0 and +0). Cached in leaf.unique_vals_cache, and the count in leaf.unique_count_cache.
+// matters only for -0 and +0). Cached in the leaf's unique_vals_cache, and the count in the leaf's unique_count_cache.
 const std::vector<double> &unique_values(FamilyRanks &fr, const std::vector<std::vector<double>> &X, Leaf &leaf, int k);
 
 // The rank of value v, a value of feature k among the working rows.

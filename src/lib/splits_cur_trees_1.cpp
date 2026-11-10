@@ -59,8 +59,8 @@ FamilyRanks &family_ranks(std::shared_ptr<FamilyRanks> &slot, const std::vector<
 
 size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k)
 {
-  auto it = leaf.unique_count_cache.find(k);
-  if (it != leaf.unique_count_cache.end())
+  auto it = leaf.cache().unique_count_cache.find(k);
+  if (it != leaf.cache().unique_count_cache.end())
     return it->second;
   const int32_t *rk = fr.rank[(size_t)k].data();
   uint32_t *st = fr.stamp.data();
@@ -71,7 +71,7 @@ size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k)
     c += (st[r] != e) ? 1 : 0;
     st[r] = e;
   }
-  leaf.unique_count_cache[k] = c;
+  leaf.cache().unique_count_cache[k] = c;
   return c;
 }
 
@@ -84,8 +84,8 @@ double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size)
 
 const std::vector<double> &unique_values(FamilyRanks &fr, const std::vector<std::vector<double>> &X, Leaf &leaf, int k)
 {
-  auto it = leaf.unique_vals_cache.find(k);
-  if (it != leaf.unique_vals_cache.end())
+  auto it = leaf.cache().unique_vals_cache.find(k);
+  if (it != leaf.cache().unique_vals_cache.end())
     return it->second;
   const int32_t *rk = fr.rank[(size_t)k].data();
   uint32_t *st = fr.stamp.data();
@@ -114,8 +114,8 @@ const std::vector<double> &unique_values(FamilyRanks &fr, const std::vector<std:
         }
     u[i] = v;
   }
-  leaf.unique_count_cache[k] = u.size();
-  auto &slot = leaf.unique_vals_cache[k];
+  leaf.cache().unique_count_cache[k] = u.size();
+  auto &slot = leaf.cache().unique_vals_cache[k];
   slot = std::move(u);
   return slot;
 }

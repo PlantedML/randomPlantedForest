@@ -100,31 +100,31 @@ void ensure_order_and_sorted_vals_for_leaf(
 )
 {
   const size_t m = leaf.individuals.size();
-  if (leaf.order_cache.count(k) && leaf.order_cache[k].size() == m) {
-    order_out = leaf.order_cache[k];
+  if (leaf.cache().order_cache.count(k) && leaf.cache().order_cache[k].size() == m) {
+    order_out = leaf.cache().order_cache[k];
   } else {
     order_out.resize(m);
     std::iota(order_out.begin(), order_out.end(), 0);
     std::stable_sort(order_out.begin(), order_out.end(), [&](size_t a, size_t b) {
       return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k];
     });
-    leaf.order_cache[k] = order_out;
+    leaf.cache().order_cache[k] = order_out;
   }
-  if (leaf.sorted_vals_cache.count(k) && leaf.sorted_vals_cache[k].size() == m) {
-    sorted_vals_out = leaf.sorted_vals_cache[k];
+  if (leaf.cache().sorted_vals_cache.count(k) && leaf.cache().sorted_vals_cache[k].size() == m) {
+    sorted_vals_out = leaf.cache().sorted_vals_cache[k];
   } else {
     sorted_vals_out.resize(m);
     for (size_t i = 0; i < m; ++i)
       sorted_vals_out[i] = X[leaf.individuals[order_out[i]]][k];
-    leaf.sorted_vals_cache[k] = sorted_vals_out;
+    leaf.cache().sorted_vals_cache[k] = sorted_vals_out;
   }
 }
 
 double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size)
 {
   size_t unique_count = 0;
-  auto it_uc = leaf.unique_count_cache.find(k);
-  if (it_uc != leaf.unique_count_cache.end()) {
+  auto it_uc = leaf.cache().unique_count_cache.find(k);
+  if (it_uc != leaf.cache().unique_count_cache.end()) {
     unique_count = it_uc->second;
   } else {
     std::vector<size_t> order;
@@ -136,7 +136,7 @@ double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &le
         if (sorted_vals[i] != sorted_vals[i - 1])
           ++unique_count;
     }
-    leaf.unique_count_cache[k] = unique_count;
+    leaf.cache().unique_count_cache[k] = unique_count;
   }
   const long width_unique = (long)unique_count - 2L * (long)leaf_size + 1L;
   return (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
