@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <deque>
 #include <exception>
+#include <memory>
 #include <mutex>
 #include <numeric>
 #include <thread>
@@ -228,7 +229,10 @@ struct RandomPlantedForest::AloneFit {
   double pause_budget = 0; // bytes
   // the fit
   std::mutex m;
-  std::condition_variable cv;
+  std::condition_variable cv; // the pool and the pilot wait on it
+  // a paused family waits on its own (wake()): with one for all, every change woke every paused family's thread, and
+  // with many families paused the system time of those wake-ups was many times the fit's, also at nthreads = 1
+  std::unique_ptr<std::condition_variable[]> paused_cv;
   std::atomic<size_t> bound{0}; // a family grows to this many checkpoints (read at each checkpoint)
   std::atomic<bool> cancel{false};
   std::exception_ptr err;
@@ -344,6 +348,27 @@ struct RandomPlantedForest::AloneFit {
     return need;
   }
 
+  // After a change (under the lock): wake the pool and the pilot, and of the paused families those whose wait ends: all
+  // of them at the end of the fit, otherwise those below the bound, in family order, as many as there are free permits
+  void wake()
+  {
+    cv.notify_all();
+    if (!paused_cv)
+      return;
+    int free = permits;
+    for (size_t b = 0; b < fam.size(); ++b) {
+      const Family &F = fam[b];
+      if (F.state != 4)
+        continue;
+      if (cancel.load() || F.release)
+        paused_cv[b].notify_one();
+      else if (free > 0 && bound.load() > F.reached) {
+        paused_cv[b].notify_one();
+        --free;
+      }
+    }
+  }
+
   // After a family is counted (under the lock): the bound moves to the new estimate, and the finished families short
   // of it are queued to grow again (the paused ones resume on their own)
   void after_count()
@@ -423,7 +448,7 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
           }
           A.pilot_arrived = 0;
           ++A.pilot_gen;
-          A.cv.notify_all();
+          A.wake();
         } else
           A.cv.wait(lk, [&] { return A.pilot_gen != gen || A.cancel.load(); });
       }
@@ -467,11 +492,11 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     --A.running;
     A.count(n, F.rows, F.snaps, F.reached);
     A.after_count();
-    A.cv.notify_all();
+    A.wake();
     lk.unlock();
     free_leaf_caches(*trk.fam);
     lk.lock();
-    A.cv.wait(lk, [&] { return A.cancel.load() || F.release || (A.bound.load() > c + 1 && A.permits > 0); });
+    A.paused_cv[n].wait(lk, [&] { return A.cancel.load() || F.release || (A.bound.load() > c + 1 && A.permits > 0); });
     A.paused_bytes -= F.pause_bytes;
     F.pause_bytes = 0;
     if (A.cancel || F.release)
@@ -507,7 +532,7 @@ void RandomPlantedForest::alone_finish(size_t n)
     --A.running;
   }
   if (A.cancel || !tp) {
-    A.cv.notify_all();
+    A.wake();
     return;
   }
   PathTracker &t = *tp;
@@ -529,7 +554,7 @@ void RandomPlantedForest::alone_finish(size_t n)
   A.stats.splits_grown += f.reached ? (double)path_checkpoints_[f.reached - 1] : 0.0;
   A.count(n, f.rows, f.snaps, f.reached);
   A.after_count();
-  A.cv.notify_all();
+  A.wake();
 }
 
 // Grow the families until every one has reached the bound (paused or finished): the pilot first (if on), then the
@@ -559,7 +584,7 @@ void RandomPlantedForest::alone_pool(const std::vector<Leaf> &initial_leaves)
         ++A.permits;
         --A.running;
       }
-      A.cv.notify_all();
+      A.wake();
     }
   };
   auto launch = [&](size_t n) { // under the lock, with a permit taken
@@ -627,7 +652,7 @@ void RandomPlantedForest::alone_pool(const std::vector<Leaf> &initial_leaves)
     {
       std::lock_guard<std::mutex> lk(A.m);
       A.cancel = true;
-      A.cv.notify_all();
+      A.wake();
     }
     for (auto &th : A.threads)
       if (th.joinable())
@@ -651,7 +676,7 @@ void RandomPlantedForest::alone_end()
     A.estimating = false;
     for (auto &F : A.fam)
       F.release = true;
-    A.cv.notify_all();
+    A.wake();
   }
   for (auto &th : A.threads)
     if (th.joinable())
@@ -751,6 +776,7 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
   for (size_t i = 0; i < N; ++i)
     A.y[i] = Y[i][0];
   A.fam.assign(B, AloneFit::Family());
+  A.paused_cv.reset(new std::condition_variable[B]);
   A.counted.assign(B, 0);
   for (auto *v : {&A.s0, &A.s1, &A.q})
     v->assign(C, {});
@@ -835,7 +861,7 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
               A.fam[b].state = 3;
               A.queue.push_back(b);
             }
-          A.cv.notify_all();
+          A.wake();
         }
         alone_pool(initial_leaves);
       }
