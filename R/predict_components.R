@@ -132,9 +132,14 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   )
   all_components <- .predict_components(object, new_data_matrix, combinations)
   # Get intercept (scalar), using only one row of x as input as we don't need it repeated
+  # (the intercept does not depend on the row; with zero rows, one row of zeros, as C++ needs a row)
+  intercept_data <- new_data_matrix[, 1, drop = FALSE]
+  if (nrow(intercept_data) == 0) {
+    intercept_data <- matrix(0, nrow = 1, ncol = 1, dimnames = list(NULL, colnames(new_data_matrix)[1]))
+  }
   intercept <- .predict_single_component(
     object,
-    new_data_matrix[, 1, drop = FALSE],
+    intercept_data,
     predictors = NULL
   )
 
@@ -160,7 +165,14 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # are zero columns, and the remainder holds their sum.
 
   left_out <- max_interaction < object$params$max_interaction || !all(fit_predictors %in% predictors)
-  if (left_out || object$fit$is_purify_capped()) {
+  if ((left_out || object$fit$is_purify_capped()) && nrow(new_data_matrix) == 0) {
+    # zero rows: a remainder with zero rows, as predict() cannot run on them
+    ret$remainder <- if (length(outcome_levels) > 2) {
+      data.table::as.data.table(stats::setNames(rep(list(numeric(0)), length(model_levels)), model_levels))
+    } else {
+      numeric(0)
+    }
+  } else if (left_out || object$fit$is_purify_capped()) {
     pred <- predict.rpf(object, new_data = new_data, type = "numeric")
 
     # handling differs if multiclass
@@ -253,14 +265,23 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   }
   first <- which(key == seq_len(n))
 
+  # Get outcome levels for multiclass handling
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+
   # Get predicted components from C++
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
-  ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
-  ret <- ret[match(key, first), , drop = FALSE]
-
-  # Get outcome levels for multiclass handling
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (n == 0) {
+    # the C++ code needs at least one row: zero rows, one column per model level
+    ret <- matrix(
+      numeric(0),
+      nrow = 0,
+      ncol = if (length(outcome_levels) > 2) length(model_outcome_levels(object)) else 1L
+    )
+  } else {
+    ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
+    ret <- ret[match(key, first), , drop = FALSE]
+  }
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class

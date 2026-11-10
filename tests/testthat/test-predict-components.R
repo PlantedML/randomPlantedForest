@@ -292,3 +292,37 @@ test_that("components follow the fit's column order when factors come first", {
   expect_equal(pc_f$m[["f:x2"]], pc$m[["f:x2"]])
   expect_lt(components_gap(fit, pc_f, d[1:40, ]), 1e-10)
 })
+
+test_that("zero rows of new_data give zero rows with the right columns", {
+  set.seed(10)
+  n <- 120
+  d <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
+  lin <- d$x1 + d$x2 * d$x3
+  d_reg <- cbind(d, y = lin + rnorm(n, sd = 0.2))
+  d_bin <- cbind(d, y = factor(lin > stats::median(lin), labels = c("lo", "hi")))
+  d_3 <- cbind(d, y = cut(lin, stats::quantile(lin, 0:3 / 3), include.lowest = TRUE, labels = c("a", "b", "c")))
+
+  for (dd in list(d_reg, d_bin, d_3)) {
+    set.seed(1)
+    fit <- rpf(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 20)
+    full <- predict_components(fit, dd[1:5, ])
+    zero <- predict_components(fit, dd[0, ])
+    expect_identical(nrow(zero$m), 0L)
+    expect_named(zero$m, names(full$m))
+    expect_identical(zero$intercept, full$intercept)
+    expect_identical(nrow(zero$x), 0L)
+    expect_named(zero$x, names(full$x))
+    expect_null(zero$remainder)
+
+    # with a remainder: zero rows of it too
+    full_sub <- predict_components(fit, dd[1:5, ], predictors = c("x1", "x2"))
+    zero_sub <- predict_components(fit, dd[0, ], predictors = c("x1", "x2"))
+    expect_named(zero_sub$m, names(full_sub$m))
+    if (is.null(full_sub$target_levels)) {
+      expect_identical(zero_sub$remainder, numeric(0))
+    } else {
+      expect_identical(nrow(zero_sub$remainder), 0L)
+      expect_named(zero_sub$remainder, names(full_sub$remainder))
+    }
+  }
+})
