@@ -41,6 +41,19 @@ with \code{purify = TRUE}, \code{\link[=predict_components]{predict_components()
 use.
 }
 \details{
+The components are identified by the training data (the marginal
+identification of Hiabu, Meyer and Wright, 2023). With \code{f} the forest's
+prediction and \verb{X_1, ..., X_n} the training rows, the component of a set \code{S}
+of predictors is
+
+\verb{m_S(x_S) = sum over the subsets V of S of (-1)^(|S| - |V|) * mean_i f(x_V, X_(i,-V))},
+
+where \code{X_(i,-V)} are training row \code{i}'s values of the predictors outside
+\code{V}. The intercept, the component of the empty set, is the mean
+prediction on the training rows. The averages are over the joint
+distribution of the training rows, so with dependent predictors a component
+need not have mean zero along each of its predictors.
+
 The forest is modified in place: \code{x} and every copy of it are purified,
 whether or not the result is assigned.
 If the forest is already purified with all the orders asked for, \code{purify()} returns it unmodified, whatever
@@ -53,4 +66,14 @@ rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
 is_purified(rpfit)
 purify(rpfit)
 is_purified(rpfit)
+}
+\references{
+Hiabu, M., Meyer, J. T., & Wright, M. N. (2023). Unifying local and global
+model explanations by functional decomposition of low dimensional
+structures. Proceedings of The 26th International Conference on Artificial
+Intelligence and Statistics (AISTATS), PMLR 206, 7040--7060.
+\url{https://proceedings.mlr.press/v206/hiabu23a.html}
+
+Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
+directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
 }
