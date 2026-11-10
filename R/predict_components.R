@@ -200,12 +200,17 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 #'   `.predict_single_component()` names its columns.
 .predict_components <- function(object, new_data, sets) {
   idx <- lapply(sets, function(s) sort.int(match(s, colnames(new_data))))
-  ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
   out_names <- vapply(sets, function(s) paste0(sort(s), collapse = ":"), character(1))
   if (length(levels(object$blueprint$ptypes$outcomes[[1]])) > 2) {
     # (model levels: multiclass logit has no column for the reference level)
     model_levels <- model_outcome_levels(object)
     out_names <- paste0(rep(out_names, each = length(model_levels)), "__class:", model_levels)
+  }
+  if (nrow(new_data) == 0) {
+    # the C++ code needs at least one row
+    ret <- matrix(numeric(0), nrow = 0, ncol = length(out_names))
+  } else {
+    ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
   }
   colnames(ret) <- out_names
   ret
@@ -265,23 +270,14 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   }
   first <- which(key == seq_len(n))
 
-  # Get outcome levels for multiclass handling
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
-
   # Get predicted components from C++
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
-  if (n == 0) {
-    # the C++ code needs at least one row: zero rows, one column per model level
-    ret <- matrix(
-      numeric(0),
-      nrow = 0,
-      ncol = if (length(outcome_levels) > 2) length(model_outcome_levels(object)) else 1L
-    )
-  } else {
-    ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
-    ret <- ret[match(key, first), , drop = FALSE]
-  }
+  ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
+  ret <- ret[match(key, first), , drop = FALSE]
+
+  # Get outcome levels for multiclass handling
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class
