@@ -450,7 +450,7 @@ prune_run <- function(
     res$store <- prune_store(object, res$sets[!coarse], nthreads)
     res$cache <- new.env(parent = emptyenv())
     # each component's share of the final model, on the training rows
-    res$components$model_share <- NA_real_
+    res$components$model_share <- rep(NA_real_, nrow(res$components))
     X <- preprocess_predictors_predict(object, tr$predictors)
     res$components$model_share[match(names(res$beta), res$components$component)] <-
       prune_model_share(res, X, tr$crit, nthreads)
@@ -1500,7 +1500,8 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
 #'
 #' Shows the model: its intercept and its components, each with its importance, the component's share of the variance
 #' of the model's prediction on the training rows (`components$model_share`). How the components were chosen (the
-#' rule and threshold, what was left out, the heat-map forms) follows briefly at the end.
+#' forest's families and splits, given or chosen out of bag, the rule and threshold, what was left out, the heat-map
+#' forms) follows briefly at the end.
 #'
 #' @param x `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param n_show `[integer(1): 20]`: The largest number of components to list.
@@ -1590,6 +1591,24 @@ format_pruned_choice <- function(x) {
   # without the display, the one pruning; with it, the first (on the forest's components), then the second
   m <- if (is.null(d)) x else d$first
   cmp <- m$components
+  # the forest's size: its families and splits, given or chosen out of bag (rpf(splits = NULL))
+  n_fmt <- function(v) format(v, big.mark = ",", scientific = FALSE)
+  so <- x$fit$splits_oob
+  lines <- sprintf(
+    "The forest: %s tree famil%s of %s splits%s.",
+    n_fmt(x$fit$params$ntrees),
+    if (identical(as.integer(x$fit$params$ntrees), 1L)) "y" else "ies",
+    n_fmt(x$fit$params$splits),
+    if (is.null(so)) {
+      ""
+    } else {
+      sprintf(
+        " (chosen out of bag; growing stopped at %s%s)",
+        n_fmt(so$stopped_at),
+        if (isTRUE(so$capped)) ", the cap, with the error still falling" else ""
+      )
+    }
+  )
   rule <- c(
     D = "as they are",
     R = if (identical(m$select_by, "oob")) {
@@ -1598,15 +1617,18 @@ format_pruned_choice <- function(x) {
       "each with one coefficient"
     }
   )[[m$rule]]
-  lines <- sprintf(
-    paste(
-      "From the forest's %d nonzero components (purified): those with a share of at least %s of the forest's",
-      "Var(prediction), %s (rule %s)."
-    ),
-    nrow(cmp),
-    format_share(m$tau),
-    rule,
-    m$rule
+  lines <- c(
+    lines,
+    sprintf(
+      paste(
+        "From the forest's %d nonzero components (purified): those with a share of at least %s of the forest's",
+        "Var(prediction), %s (rule %s)."
+      ),
+      nrow(cmp),
+      format_share(m$tau),
+      rule,
+      m$rule
+    )
   )
   crit <- pruned_crit_name(x)
   lines <- c(

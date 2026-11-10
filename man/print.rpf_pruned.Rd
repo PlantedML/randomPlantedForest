@@ -19,7 +19,8 @@ Invisibly: \code{x}.
 \description{
 Shows the model: its intercept and its components, each with its importance, the component's share of the variance
 of the model's prediction on the training rows (\code{components$model_share}). How the components were chosen (the
-rule and threshold, what was left out, the heat-map forms) follows briefly at the end.
+forest's families and splits, given or chosen out of bag, the rule and threshold, what was left out, the heat-map
+forms) follows briefly at the end.
 }
 \examples{
 set.seed(1)

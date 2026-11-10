@@ -76,7 +76,7 @@
   The default `NULL` leaves fits unchanged.
 * `print()` of a pruned model shows the final model: its intercept and its components, largest first, each with its importance, its share of the variance of the model's prediction on the training rows (`$components$model_share`, a new column: the coefficient times the component, in the form the model uses, over the model's prediction; for classification over the centred score columns).
   `share`, what `tau` thresholds, is the forest's component before the coefficient: a three-predictor component of share 3.5% with coefficient 3.0 is 19% of the model.
-  How the components were chosen (the rule and threshold, what was left out, the heat-map forms) follows under "How it was chosen". No choice or fit changes.
+  How the components were chosen (the forest's families and splits, given or chosen out of bag, the rule and threshold, what was left out, the heat-map forms) follows under "How it was chosen". No choice or fit changes.
 
 ## Bug fixes
 

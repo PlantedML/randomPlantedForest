@@ -356,6 +356,32 @@ test_that("model_share is each component's share of the final model", {
   top <- pr$components$component[k][which.max(pr$components$model_share[k])]
   expect_match(out[grep("^ component +importance", out) + 1], paste0("^ ", top, " "))
   expect_no_match(paste(out[seq_len(grep("How it was chosen", out))], collapse = " "), "pruned|kept|coarsened|display")
+  # and, first under "How it was chosen", the forest's size
+  expect_identical(out[grep("How it was chosen", out) + 1], "  The forest: 20 tree families of 40 splits.")
+})
+
+test_that("a constant outcome gives the intercept alone, and it prints", {
+  set.seed(42)
+  x <- data.frame(x1 = runif(100), x2 = runif(100))
+  y <- rep(2, 100)
+  set.seed(1)
+  f <- rpf(x, y, ntrees = 10, splits = 10)
+  p <- prune_components(f, x, y, seed = 1)
+  expect_identical(nrow(p$components), 0L)
+  expect_length(p$beta, 0)
+  expect_equal(predict(p, x)$.pred, rep(2, 100))
+  expect_true("  The forest: 10 tree families of 10 splits." %in% capture.output(print(p)))
+  # the same through rpf(prune = TRUE), with the splits chosen out of bag
+  set.seed(1)
+  q <- rpf(x, y, ntrees = 10, splits = NULL, prune = TRUE)
+  expect_s3_class(q, "rpf_pruned")
+  expect_length(q$beta, 0)
+  expect_equal(predict(q, x)$.pred, rep(2, 100))
+  expect_match(
+    capture.output(print(q)),
+    "^  The forest: 10 tree families of [0-9,]+ splits \\(chosen out of bag; growing",
+    all = FALSE
+  )
 })
 
 test_that("model_share of a three-class model is its share of the centred scores", {
