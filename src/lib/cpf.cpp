@@ -1205,7 +1205,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   }
 
   // the OOB path (nullptr if off): each OOB row's family prediction, split by split, as in rpf.cpp
-  std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
 
   // modify existing or add new trees through splitting
   Split curr_split;

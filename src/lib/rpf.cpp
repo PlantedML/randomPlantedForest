@@ -533,7 +533,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
-    std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+    std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
       if (path && !path_step(*path, split_count))
@@ -753,7 +753,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     } leaves_scratch_guard;
     tls_leaves_scratch_ptr = &leaves_scratch;
 
-    std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+    std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
     Split curr_split;
     for (int split_count = 0; split_count < n_splits; ++split_count) {
       if (path && !path_step(*path, split_count))
@@ -906,7 +906,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
 
-  std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
     if (path && !path_step(*path, split_count))

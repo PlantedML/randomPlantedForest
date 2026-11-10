@@ -106,3 +106,45 @@ test_that("min_leaf_rows above half the rows leaves every family without a split
   fit <- rpf_050(y ~ x1 + x2, data = dat, n_families = 1, n_splits = 10, min_leaf_rows = 51, deterministic = TRUE)
   expect_equal(predict(fit, dat[1:3, ])$.pred, rep(mean(dat$y), 3))
 })
+
+test_that("rpf()'s default call (splits chosen out of bag): a family without a split predicts its rows' fit", {
+  # The adaptive fit rebuilds the forest from the families' records at the chosen number of splits; a family without
+  # a split there gets its rows' fit, as a fit with that number of splits gives it. Checked on the forest itself
+  # (`$fit`) and on the pruned model.
+  dat <- no_split_data()
+  constant <- dat
+  constant[c("x1", "x2")] <- 1
+  shares <- function(y) as.numeric(prop.table(table(y)))
+  check_reg <- function(fit, label) {
+    for (model in list(fit, fit$fit)) {
+      pred <- predict(model, dat[1:3, ])$.pred
+      expect_equal(pred, rep(pred[1], 3), label = label)
+      # the mean of the families' bootstrap means
+      expect_lt(abs(pred[1] - mean(dat$y)), 0.1, label = label)
+    }
+  }
+  check_cls <- function(fit, y, label) {
+    for (model in list(fit, fit$fit)) {
+      p <- unlist(predict(model, dat[1, ]), use.names = FALSE)
+      expect_lt(max(abs(p - shares(y))), 0.1, label = label)
+    }
+  }
+  set.seed(1)
+  check_reg(rpf(y ~ x1 + x2, data = constant), "constant predictors")
+  for (outcome in c("cl", "cl3")) {
+    for (loss in c("exponential", "logit")) {
+      set.seed(1)
+      fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = constant, loss = loss)
+      check_cls(fit, constant[[outcome]], paste(outcome, loss))
+    }
+  }
+
+  # min_leaf_rows above half the rows: no family can split
+  set.seed(1)
+  check_reg(rpf(y ~ x1 + x2, data = dat, min_leaf_rows = 51), "min_leaf_rows")
+  for (outcome in c("cl", "cl3")) {
+    set.seed(1)
+    fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = dat, min_leaf_rows = 51)
+    check_cls(fit, dat[[outcome]], paste(outcome, "min_leaf_rows"))
+  }
+})
