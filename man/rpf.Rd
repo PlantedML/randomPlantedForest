@@ -114,15 +114,23 @@ rpf(x, ...)
 \item{x, y}{\verb{[data.frame | matrix | recipe]}, \verb{[numeric | factor]}:
 Predictors and outcome for the x/y interface.
 \code{x} holds the predictors, or is a \code{\link[recipes:recipe]{recipe}} (then supply
-\code{data} instead of \code{y}).
+\code{data} instead of \code{y}). The predictors need unique names that do not
+contain \code{:}, which joins predictor names in component names such as \code{x1:x2}.
 \code{y} is the outcome vector: \strong{numeric} for regression, \strong{factor} for
-classification.}
+classification. A numeric outcome must be finite. A factor outcome needs at
+least two classes; levels that do not occur are dropped with a warning.}
 
 \item{...}{Not currently used, but required for extensibility. Unknown
 (e.g. misspelled) arguments are an error.}
 
 \item{formula}{\verb{[formula]}: A formula with the outcome on the left-hand side and the
-predictors on the right-hand side, e.g. \code{y ~ x1 + x2}.}
+predictors on the right-hand side, e.g. \code{y ~ x1 + x2}. Interaction terms
+such as \code{x1:x2} or \code{x1 * x2} are an error: they would add a predictor named
+\code{x1:x2}, and \code{:} is how components are named. The forest finds interactions
+itself, up to \code{max_interaction}, so list the predictors as \code{y ~ x1 + x2}.
+To fit a product as a predictor of its own, write \code{I(x1 * x2)}, or add it to
+\code{data} as a column with its own name. Transformed terms of one predictor,
+such as \code{log(x1)}, are allowed.}
 
 \item{data}{\verb{[data.frame]}: Data containing the predictors and the outcome,
 used with \code{formula} or a recipe \code{x}.}
@@ -185,15 +193,17 @@ not yield proper probability estimates.}
 
 \item{delta}{\verb{[numeric(1): 0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Class proportions are truncated to \verb{[delta, 1 - delta]} when computing the
-loss of a split. Should be positive for \code{"logit"}: with \code{delta = 0}, nodes
-containing a single class have infinite loss and their splits are always
-rejected.}
+loss of a split. Must be less than 0.5, from where every proportion is
+truncated to the same value, and positive for \code{"logit"}: with \code{delta = 0},
+nodes containing a single class have infinite loss and their splits are
+always rejected.}
 
 \item{epsilon}{\verb{[numeric(1): 0.1]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
 Class proportions are truncated to \verb{[epsilon, 1 - epsilon]} when computing
 the fit in a leaf. Unlike \code{delta}, this caps the size of individual leaf
 updates and acts as regularization: smaller values permit larger jumps on
-the link scale.}
+the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
+values of pure leaves are infinite, and from 0.5 on every leaf value is 0.}
 
 \item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
 \code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other

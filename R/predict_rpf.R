@@ -90,9 +90,20 @@ predict_rpf_bridge <- function(type, object, predictors, nthreads = 0L) {
   )
 }
 
+# The raw predictions, one row per row of new_data. The C++ code needs at least
+# one row, so zero rows give a zero-row matrix with the fit's number of columns.
+predict_rpf_raw <- function(object, new_data, nthreads = 0L) {
+  if (nrow(new_data) == 0) {
+    n_levels <- length(levels(object$blueprint$ptypes$outcomes[[1]]))
+    n_cols <- if (object$mode == "regression" || n_levels == 2) 1L else length(model_outcome_levels(object))
+    return(matrix(numeric(0), nrow = 0, ncol = n_cols))
+  }
+  object$fit$predict_matrix(new_data, 0, nthreads)
+}
+
 # Predict function for numeric outcome / regression
 predict_rpf_numeric <- function(object, new_data, nthreads = 0L) {
-  pred <- object$fit$predict_matrix(new_data, 0, nthreads)
+  pred <- predict_rpf_raw(object, new_data, nthreads)
 
   if (ncol(pred) == 1) {
     # Regression or binary case: just return predictions as-is, single column
@@ -116,7 +127,7 @@ predict_rpf_numeric <- function(object, new_data, nthreads = 0L) {
 predict_rpf_prob <- function(object, new_data, nthreads = 0L) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
-  pred_raw <- object$fit$predict_matrix(new_data, 0, nthreads)
+  pred_raw <- predict_rpf_raw(object, new_data, nthreads)
 
   if (length(outcome_levels) == 2) {
     # Binary outcome

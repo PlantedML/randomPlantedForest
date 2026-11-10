@@ -61,9 +61,9 @@ test_that("Binary detection: Fail for character, logical", {
   # y two-level character: should fail because ambiguous
   # similar problem as factor but w/o levels no order can be assumed
   expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
+  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 
   # y logical: should error and note what it expects
   expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ylogi ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
+  expect_error(rpf(ylogi ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 })
