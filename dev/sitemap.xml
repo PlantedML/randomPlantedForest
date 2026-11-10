@@ -6,6 +6,7 @@
 <url><loc>https://plantedml.com/randomPlantedForest/dev/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/news/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/bundle.rpf.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/reference/greediness_ladder.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/plot.rpf.html</loc></url>
@@ -22,5 +23,6 @@
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/rpf_is_valid.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/reference/tune_control.html</loc></url>
 </urlset>
 

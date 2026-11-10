@@ -15,7 +15,9 @@ print(x, n_show = 20, ...)
 - x:
 
   `[rpf_pruned]`: A pruned forest from
-  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  or
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
 
 - n_show:
 
@@ -49,13 +51,17 @@ prune_components(fit, x, y, rule = "R", tau = 0.01)
 #> Kept:    6 (by order 1: 3, 2: 3)
 #> Dropped: 0
 #> 
+#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
+#> First pruning: rule R, tau = 1%, 6 components kept.
+#> Heat maps of the model: 6
+#> 
 #> Intercept: -0.0251072
-#> Kept components (largest first), share on the training rows and coefficient:
-#>  component share beta    
-#>  x1        57%    0.90346
-#>  x2:x3     12%    1.83593
-#>  x1:x2     2.8%  -0.06836
-#>  x3        2.6%   0.41588
-#>  x2        2.4%   0.25804
-#>  x1:x3     1.4%  -0.35157
+#> Kept components (largest first), share on the training rows, coefficient and heat maps:
+#>  component share beta     heat_maps
+#>  x1        57%    0.90346 1        
+#>  x2:x3     12%    1.83593 1        
+#>  x1:x2     2.8%  -0.06836 1        
+#>  x3        2.6%   0.41588 1        
+#>  x2        2.4%   0.25804 1        
+#>  x1:x3     1.4%  -0.35157 1        
 ```

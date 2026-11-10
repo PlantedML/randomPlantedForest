@@ -58,8 +58,24 @@
   coefficients, with half the components (29 instead of 83 on California
   housing) and no false component on the synthetic sets; it can drop a
   small true component (a four-way interaction in one synthetic design,
-  +2.5% test error there). Every fit records how often each training row
-  is in each family’s bootstrap sample (fits are unchanged), and
+  +2.5% test error there). By default every kept component of three or
+  more predictors is then shown in at most `max_panels = 10` heat maps,
+  and the model is pruned again with the shown components
+  (`max_panels = Inf` switches this off). Two predictors of such a
+  component stay at full resolution; the others are cut into intervals
+  of equal numbers of training rows whose counts multiply to at most
+  `max_panels` (a count of 1 averages a predictor out), the component is
+  averaged within the cells (weighted by the product of the coarse
+  predictors’ training marginals; the result is used as it is, not
+  purified again), and the cuts that keep most of its variance are
+  taken. The same rule then prunes again, so that the pruning judges the
+  model that is shown; predictions use the coarsened components, and
+  `tau` is then a share of that model’s variance. In simulations (48
+  data sets) this had 0.49% lower test error than coarsening after
+  pruning, and 0.57% lower than not coarsening; on California housing
+  (50 families, order 3) the default keeps 30 components, shown in 75
+  heat maps. Every fit records how often each training row is in each
+  family’s bootstrap sample (fits are unchanged), and
   `rpf_marshal(include_data = TRUE)` stores these in-bag counts. On 44
   synthetic data sets with known sparse structure, the pruned models
   kept no false component (except five tiny main effects on one additive
@@ -106,6 +122,20 @@
   `splits` and where growing stopped. A corrected out-of-bag error at or
   below 0 at a checkpoint (a correction that overshot; never observed)
   is not chosen unless all are. The default stays `splits = 30`.
+- `rpf(prune = TRUE)` returns the pruned model instead of the forest
+  (regression): the forest is pruned by
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  with its defaults on the training rows, including the display at
+  `max_panels` (a new argument of
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+  10 by default, `Inf` for no coarsening). The result equals
+  `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the
+  same random number state, for the formula, x/y and recipe interfaces.
+  With `splits = NULL`, one call chooses the number of splits out of
+  bag, prunes and returns the model to show. `prune = TRUE` is an error
+  for classification and with `deterministic = TRUE`, and `purify` is
+  not used with it. The default stays `prune = FALSE`, which returns the
+  forest as before.
 - [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   gains `min_leaf_rows`, the minimum number of rows on each side of
   every split, so in every leaf. Values above 1 need regression with
@@ -114,6 +144,29 @@
   on each side are no longer drawn as split candidates, and binary
   predictors are split whenever both sides keep enough rows. The default
   `min_leaf_rows = 1` fits the same models as before, bit for bit.
+- `rpf(tune = TRUE)` tunes out of bag in one call (regression): the
+  greediness of the split search (`split_try` and `t_try`, on the ladder
+  of the new
+  [`greediness_ladder()`](https://plantedml.com/randomPlantedForest/dev/reference/greediness_ladder.md))
+  and `min_leaf_rows`. Every forest of the search has `splits` chosen
+  out of bag and is pruned by
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  with its defaults, and the forest whose pruned model has the lowest
+  corrected out-of-bag error wins; the display (`max_panels`) is applied
+  once, to the chosen model. The search is coordinate-wise, about 10
+  forests: the ladder from 10 / 0.4 to 1 / 0.0125, then `min_leaf_rows`
+  1, 5, 20 and 100, then the two ladder neighbours of the chosen point.
+  `tune = "quick"` grows two forests, 3 / 0.1 and 1 / 0.025, and the new
+  [`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
+  sets your own search. The result is the chosen forest’s pruned model,
+  with the search table in `$tune`. On 48 data sets (44 synthetic, 4
+  splits of California housing) the full search had 10.8% lower test
+  error than 10 / 0.4 and 2.8% lower than 5-fold cross-validation over
+  the same settings, at 1/24 of its cost; the quick preset had 9.4%
+  lower test error. Those studies scored each forest with the pruning’s
+  choice of the time (the lowest out-of-bag error, R’s coefficients in
+  sample), not with the sparse default used here. The default stays
+  `tune = FALSE`.
 - `options(randomPlantedForest.exact_draw = FALSE)` draws the split
   candidates of regression with `split_structure = "leaves"` from a tree
   of weights kept up to date between rounds, instead of one random
@@ -334,6 +387,33 @@
   skips those the forest does not hold, instead of one pass per
   component: on a 10-feature full-order fit (1,023 components, 636 of
   them not held), 5,000 rows take 0.5 s instead of 2.0 s.
+- [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
+  and so `rpf(prune = TRUE)` and `rpf(tune = )`, no longer build the
+  purified store of all components. Each tree family is purified in
+  turn, its components are evaluated at the training rows (and out of
+  bag) and then freed, and the pruned model stores the pieces of its
+  kept components only, from which
+  [`predict()`](https://rdrr.io/r/stats/predict.html) and
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  evaluate them.
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  keeps every piece of every component, which grows steeply with the
+  order: on California housing (16,512 rows, 200 tree families,
+  `split_try = 3`, `t_try = 0.1`, the fast draw, 8 threads; both builds
+  measured when this change was made) the whole call
+  `rpf(splits = NULL, prune = TRUE)` at `max_interaction = 8` (all
+  predictors) was stopped at 12 GB of resident memory (RSS) while
+  purifying, and now finishes with a peak physical footprint of 6.4 GB
+  (9.9 GB RSS), most of it the coarsened components of the display; at
+  order 3 the footprint peaks at 2.3 GB instead of 3.2 GB (RSS 4.1 GB
+  instead of 5.4 GB), in the same time. The pruned models are the same
+  up to rounding: on 136 pruned models of 36 forests (simulated and
+  benchmark data, orders 2 to 10) the choices, the kept components and
+  the display are the same, and test predictions agree to 3e-15 of their
+  scale. The forest in the result is left unpurified (call
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  for all its components), and an earlier purification of it is no
+  longer redone.
 - A fitted forest takes about 40% less memory: the split search’s
   per-leaf caches are kept apart from the leaves and freed when a tree
   family is finished, so a leaf takes 80 instead of 232 bytes; finished

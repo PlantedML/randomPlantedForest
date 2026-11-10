@@ -17,7 +17,9 @@ predict(object, new_data, nthreads = NULL, ...)
 - object:
 
   `[rpf_pruned]`: A pruned forest from
-  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  or
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
 
 - new_data:
 

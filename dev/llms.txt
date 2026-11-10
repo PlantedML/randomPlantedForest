@@ -134,6 +134,15 @@ Forest models.
 - [`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)
   : Checkpoints of the out-of-bag path
 
+## Tuning
+
+Tuning the greediness and the leaf size out of bag
+
+- [`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
+  : Settings of the out-of-bag tuning
+- [`greediness_ladder()`](https://plantedml.com/randomPlantedForest/dev/reference/greediness_ladder.md)
+  : The greediness ladder of the out-of-bag tuning
+
 ## Functional decomposition
 
 Enabling and utilizing functional decomposition

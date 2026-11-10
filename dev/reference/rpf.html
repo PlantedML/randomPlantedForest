@@ -75,6 +75,9 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  prune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -102,6 +105,9 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  prune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -129,6 +135,9 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  prune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -156,6 +165,9 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  prune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -304,10 +316,38 @@ the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 values of pure leaves are infinite, and from 0.5 on every leaf value is 0.</p></dd>
 
 
+<dt id="arg-prune">prune<a class="anchor" aria-label="anchor" href="#arg-prune"></a></dt>
+<dd><p><code>[logical(1): FALSE]</code>: Whether to return the pruned model
+instead of the forest (regression only, not with <code>deterministic = TRUE</code>):
+the forest is pruned by <code><a href="prune_components.html">prune_components()</a></code> with its defaults on the
+training rows, and the result is its <code>rpf_pruned</code> model. See "Pruning" in
+Details.</p></dd>
+
+
+<dt id="arg-max-panels">max_panels<a class="anchor" aria-label="anchor" href="#arg-max-panels"></a></dt>
+<dd><p><code>[numeric(1): 10]</code>: Used only with <code>prune = TRUE</code>: the
+most heat maps a kept component of three or more predictors may need; such
+a component is coarsened to at most <code>max_panels</code> heat maps and the model is
+pruned again (the <code>max_panels</code> of <code><a href="prune_components.html">prune_components()</a></code>). A whole number of
+at least 1, or <code>Inf</code> for no coarsening.</p></dd>
+
+
+<dt id="arg-tune">tune<a class="anchor" aria-label="anchor" href="#arg-tune"></a></dt>
+<dd><p><code>[logical(1) | character(1) | rpf_tune_control: FALSE]</code>: Whether
+to tune the greediness (<code>split_try</code>, <code>t_try</code>) and <code>min_leaf_rows</code> out of
+bag (regression only, not with <code>deterministic = TRUE</code>, at least 10 tree
+families). <code>TRUE</code> runs the full search (<code><a href="tune_control.html">tune_control()</a></code>), <code>"quick"</code> the
+two-forest preset, and a <code><a href="tune_control.html">tune_control()</a></code> object your own. Every forest of
+the search has <code>splits</code> chosen out of bag and is pruned, so <code>tune</code> implies
+<code>splits = NULL</code> and <code>prune = TRUE</code>, and giving <code>split_try</code>, <code>t_try</code> or
+<code>min_leaf_rows</code> with it is an error. See "Tuning out of bag" in Details.</p></dd>
+
+
 <dt id="arg-purify">purify<a class="anchor" aria-label="anchor" href="#arg-purify"></a></dt>
 <dd><p><code>[logical(1): FALSE]</code>: Whether to purify the forest after fitting, which
 <code><a href="predict_components.html">predict_components()</a></code> requires, with the defaults of <code><a href="purify.html">purify()</a></code>. For other
-settings, call <code><a href="purify.html">purify()</a></code> after fitting instead.</p></dd>
+settings, call <code><a href="purify.html">purify()</a></code> after fitting instead. Not used with
+<code>prune = TRUE</code>: the pruned model stores the components it keeps.</p></dd>
 
 
 <dt id="arg-nthreads">nthreads<a class="anchor" aria-label="anchor" href="#arg-nthreads"></a></dt>
@@ -317,8 +357,8 @@ settings, call <code><a href="purify.html">purify()</a></code> after fitting ins
 
 <dt id="arg-export-forest">export_forest<a class="anchor" aria-label="anchor" href="#arg-export-forest"></a></dt>
 <dd><p><code>[logical(1): FALSE]</code>: Whether to store the flattened forest in
-the returned object as <code>$forest</code>. If <code>FALSE</code>, <code>$forest</code> is <code>NULL</code>, which
-saves memory.</p></dd>
+the returned object as <code>$forest</code> (with <code>prune = TRUE</code>, in the forest:
+<code>$fit$forest</code>). If <code>FALSE</code>, it is <code>NULL</code>, which saves memory.</p></dd>
 
 
 <dt id="arg-deterministic">deterministic<a class="anchor" aria-label="anchor" href="#arg-deterministic"></a></dt>
@@ -359,7 +399,25 @@ number of training rows with an OOB tree family. With <code>splits = NULL</code>
 <code>$params$splits</code> is the chosen number of splits, <code>$oob_path</code> the path of
 the checkpoints grown, and <code>$splits_oob</code> a list with the chosen <code>splits</code>,
 <code>stopped_at</code> (the number of splits where growing stopped) and <code>capped</code>
-(whether it stopped at the cap while the error was still falling).</p>
+(whether it stopped at the cap while the error was still falling).
+With <code>prune = TRUE</code>, an object of class <code>rpf_pruned</code> (see
+<code><a href="prune_components.html">prune_components()</a></code>), whose element <code>fit</code> is the forest (not purified), with
+the elements above: the pruned model's OOB path is <code>$fit$oob_path</code>, and
+with <code>splits = NULL</code> the chosen number of splits <code>$fit$params$splits</code> and
+the stop <code>$fit$splits_oob</code>.
+With <code>tune</code>, the <code>rpf_pruned</code> model of the chosen forest, with an element
+<code>tune</code>: <code>search</code>, the search table (one row per forest grown, in the order
+grown: <code>step</code>, <code>split_try</code>, <code>t_try</code>, <code>min_leaf_rows</code>, the chosen <code>splits</code>,
+<code>stopped_at</code>, <code>capped</code>, the forest's corrected OOB RMSE <code>oob_rmse_forest</code>
+(as the pruning scores it: its rule <code>"D"</code> at <code>tau = 0</code>, which keeps every
+nonzero component; the OOB path's <code>oob_rmse</code> at the chosen <code>splits</code> leaves
+the rows without OOB families of both halves uncorrected and is higher),
+its pruned model's <code>rule</code>, <code>tau</code>, <code>n_kept</code> and corrected OOB RMSE
+<code>oob_rmse</code> (the score), <code>seconds</code>, whether each step chose it
+(<code>chosen_step1</code>, <code>chosen_step2</code>, <code>chosen_step3</code>; <code>NA</code> if not a candidate of
+the step) and <code>final</code>); <code>steps</code>, each step's candidates and choice;
+<code>settings</code>, the chosen <code>split_try</code>, <code>t_try</code>, <code>min_leaf_rows</code> and <code>splits</code>;
+<code>control</code>, the <code><a href="tune_control.html">tune_control()</a></code> used; and <code>seconds</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -545,6 +603,60 @@ fit alone, measured when it was added: <code>split_try = 3</code>, <code>t_try =
 exact draw, 8 threads).</p>
 </div>
 
+<div class="section">
+<h3 id="pruning">Pruning<a class="anchor" aria-label="anchor" href="#pruning"></a></h3>
+
+
+<p>With <code>prune = TRUE</code>, <code>rpf()</code> fits the forest, then prunes its components
+with <code><a href="prune_components.html">prune_components()</a></code> at that function's defaults, on the
+training rows: the rule and the threshold are chosen out of bag (by
+cross-validation below 10 tree families, with a message), the sparse choice
+<code>select = "1se"</code>, and every kept component of three or more predictors is
+shown in at most <code>max_panels</code> heat maps before the model is pruned again. The
+result is the pruned model, of class <code>rpf_pruned</code>, with methods for
+<code><a href="predict.rpf_pruned.html">predict()</a></code>, <code><a href="predict_components.html">predict_components()</a></code> and <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>. It
+is the same, bit for bit, as
+<code>prune_components(rpf(..., prune = FALSE), data)</code> from the same random
+number state, for every interface. For other settings of the pruning (<code>rule</code>,
+<code>tau</code>, <code>select</code>, <code>select_by</code>, folds or seed), fit with <code>prune = FALSE</code> and call
+<code><a href="prune_components.html">prune_components()</a></code>. Together with <code>splits = NULL</code>, one call chooses the
+number of splits out of bag, prunes and returns the model to show. Pruning
+needs out-of-bag rows and a numeric outcome, so <code>prune = TRUE</code> is an error for
+classification and with <code>deterministic = TRUE</code>.</p>
+</div>
+
+<div class="section">
+<h3 id="tuning-out-of-bag">Tuning out of bag<a class="anchor" aria-label="anchor" href="#tuning-out-of-bag"></a></h3>
+
+
+<p>With <code>tune</code>, <code>rpf()</code> searches the greediness of the split search
+(<code>split_try</code> and <code>t_try</code>, on the ladder of <code><a href="greediness_ladder.html">greediness_ladder()</a></code>) and the
+minimum leaf size <code>min_leaf_rows</code>, without cross-validation. Every forest of
+the search is grown with <code>splits</code> chosen out of bag and pruned by
+<code><a href="prune_components.html">prune_components()</a></code> with its defaults (without the display), and forests are
+compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+wins. A pruned model at 0 (every candidate's correction overshot, see
+<code><a href="prune_components.html">prune_components()</a></code>) is not chosen unless all are. The search is
+coordinate-wise (<code><a href="tune_control.html">tune_control()</a></code>): with <code>tune = TRUE</code>
+the ladder from 10 / 0.4 to 1 / 0.0125 at <code>min_leaf_rows = 1</code>, then
+<code>min_leaf_rows</code> 1, 5, 20 and 100 at the chosen point, then the point's two
+ladder neighbours, about 10 forests in all. <code>tune = "quick"</code> grows two
+forests, 3 / 0.1 and 1 / 0.025 at <code>min_leaf_rows = 1</code>. The chosen forest's
+pruned model is returned, with the display at <code>max_panels</code>, and the search in
+its element <code>tune</code>. Every forest is grown from the same random number state,
+so the result is the model that <code>rpf(splits = NULL, prune = TRUE)</code> returns
+at the chosen settings from that state.</p>
+<p>On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
+search had 10.8% lower test error than <code>rpf()</code>'s 10 / 0.4 (no family of data
+sets worse than +0.9%), and 2.8% lower than 5-fold cross-validation over the
+same settings at 1/24 of its cost; the quick preset had 9.4% lower test
+error (worst +0.4%). In those studies a forest was scored with the pruning's
+choice of the time (the lowest out-of-bag error, R's coefficients fitted in
+sample); the sparse default of <code><a href="prune_components.html">prune_components()</a></code> used here was not
+compared there. A search costs about as many fits as it grows forests, and
+their prunings.</p>
+</div>
+
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -607,6 +719,46 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Fit using <span style="color: #0000BB;">1</span> thread, also the default for `predict()` and `purify()`.</span>
 <span class="r-in"><span><span class="va">rpfit</span><span class="op">$</span><span class="va">params</span><span class="op">$</span><span class="va">splits</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 11</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The whole pipeline: splits chosen out of bag, pruned</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">pruned</span> <span class="op">&lt;-</span> <span class="fu">rpf</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">20</span>, splits <span class="op">=</span> <span class="cn">NULL</span>, prune <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">pruned</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ── Pruned Random Planted Forest ────────────────────────────────────────────────</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 3% of Var(prediction)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chosen by out-of-bag error (1-SE rule; R refitted in 5 folds, seed 1378461094) among 16 candidates.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Nonzero components: 35</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Kept:    4 (by order 1: 4, 2: 0)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Dropped: 31 (by order 1: 6, 2: 25)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Largest dropped: cyl:disp (share 0.14%); dropped shares sum to 0.96%</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> First pruning: rule R, tau = 3%, 4 components kept.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Heat maps of the model: 4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intercept: 19.9539</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Kept components (largest first), share on the training rows, coefficient and heat maps:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  component share beta    heat_maps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  disp      13%   0.02355 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  hp        3.8%  1.47950 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  cyl       3.6%  0.74807 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  wt        3.3%  3.38809 1        </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="co"># Tuning out of bag: the quick preset, two forests</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">400</span> <span class="op">*</span> <span class="fl">4</span>, <span class="op">-</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">4</span>, dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">NULL</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"x"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">x</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span> <span class="op">+</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span> <span class="op">*</span> <span class="va">x</span><span class="op">[</span>, <span class="fl">3</span><span class="op">]</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">400</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu">rpf</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, ntrees <span class="op">=</span> <span class="fl">10</span>, tune <span class="op">=</span> <span class="st">"quick"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">tuned</span><span class="op">$</span><span class="va">tune</span><span class="op">$</span><span class="va">search</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   step split_try t_try min_leaf_rows splits stopped_at capped oob_rmse_forest</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    1         3 0.100             1    141        283  FALSE       0.4089001</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    1         1 0.025             1    141        283  FALSE       0.4914155</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rule tau n_kept oob_rmse seconds chosen_step1 chosen_step2 chosen_step3 final</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    R 0.1      2 0.356234  10.693         TRUE           NA           NA  TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    R 0.1      2 0.357487   0.423        FALSE           NA           NA FALSE</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -9,6 +9,8 @@ Training data is not included; see
 [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
 for the implications. Pruned forests from
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+or
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
 are bundled the same way.
 
 ## Usage

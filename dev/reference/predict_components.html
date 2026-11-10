@@ -75,7 +75,7 @@ The sum of all components equals the overall predicted value for an observation.
 
 
 <dl><dt id="arg-object">object<a class="anchor" aria-label="anchor" href="#arg-object"></a></dt>
-<dd><p><code>[rpf | rpf_pruned]</code>: A fitted <code><a href="rpf.html">rpf</a></code> model, or a pruned one from <code><a href="prune_components.html">prune_components()</a></code>.</p></dd>
+<dd><p><code>[rpf | rpf_pruned]</code>: A fitted <code><a href="rpf.html">rpf</a></code> model, or a pruned one from <code><a href="prune_components.html">prune_components()</a></code> or <code><a href="rpf.html">rpf()</a></code>.</p></dd>
 
 
 <dt id="arg-new-data">new_data<a class="anchor" aria-label="anchor" href="#arg-new-data"></a></dt>
@@ -144,8 +144,8 @@ increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction
     <h2 id="pruned-forests">Pruned forests<a class="anchor" aria-label="anchor" href="#pruned-forests"></a></h2>
 
 
-<p>For an <code>rpf_pruned</code> object from <code><a href="prune_components.html">prune_components()</a></code>, <code>m</code> holds only the kept components, each scaled by its
-coefficient <code>beta_S</code>, and <code>intercept</code> is the pruned model's intercept <code>alpha</code>, so that they sum to
+<p>For an <code>rpf_pruned</code> object from <code><a href="prune_components.html">prune_components()</a></code> or <code><a href="rpf.html">rpf()</a></code>, <code>m</code> holds only the kept components, each scaled
+by its coefficient <code>beta_S</code>, and <code>intercept</code> is the pruned model's intercept <code>alpha</code>, so that they sum to
 <code><a href="predict.rpf_pruned.html">predict()</a></code> of the pruned model. Components that are not kept are absent, not zero columns.
 If <code>predictors</code> or <code>max_interaction</code> leave out kept components, their sum is returned as <code>remainder</code>.</p>
     </div>

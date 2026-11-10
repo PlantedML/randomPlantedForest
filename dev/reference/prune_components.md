@@ -4,7 +4,9 @@ Drops the small components of a regression forest's functional
 decomposition and, optionally, refits one coefficient per kept
 component. The rule and the threshold are chosen out of bag by default,
 from the forest itself without refits, or by K-fold cross-validation on
-the training rows.
+the training rows. By default every kept interaction of three or more
+predictors is then coarsened so that it can be shown in at most
+`max_panels` heat maps, and the model is pruned again.
 
 ## Usage
 
@@ -14,6 +16,7 @@ prune_components(
   data,
   y = NULL,
   ...,
+  max_panels = 10,
   rule = c("D", "R"),
   tau = c(0, 1e-04, 3e-04, 0.001, 0.003, 0.01, 0.03, 0.1),
   select = c("1se", "min"),
@@ -50,6 +53,14 @@ prune_components(
 - ...:
 
   Reserved for future expansion. Unknown arguments are an error.
+
+- max_panels:
+
+  `[numeric(1): 10]`: The display: the most heat maps a kept component
+  of three or more predictors may need; such a component is coarsened to
+  at most `max_panels` heat maps, and the model is pruned again (see
+  Details). A whole number of at least 1, or `Inf` for no display (the
+  first pruning's model).
 
 - rule:
 
@@ -109,7 +120,7 @@ prune_components(
 
 An object of class `rpf_pruned`, a list with elements:
 
-- `fit`: `object` (purified).
+- `fit`: `object`, as it was (not purified by the pruning).
 
 - `rule`, `tau`: the chosen rule and threshold.
 
@@ -122,13 +133,15 @@ An object of class `rpf_pruned`, a list with elements:
 - `sets`: the predictor sets of the kept components, as column indices.
 
 - `components`: a `data.frame` of every nonzero component of `object` on
-  the training rows: `component` (its name, as in
+  the training rows (after a second pruning of the display, only of
+  those the first pruning kept: see below): `component` (its name, as in
   [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)),
   `order`, `share`, `kept`, `beta` (`NA` if dropped).
 
 - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a
   `data.frame` with one row per candidate: `rule`, `tau`, `oob_rmse`
-  (corrected; used for the choice), `se_mse` (from its per-fold MSEs),
+  (corrected; used for the choice; 0 where the correction exceeds the
+  uncorrected MSE, see Details), `se_mse` (from its per-fold MSEs),
   `oob_rmse_raw` and `se_mse_raw` (uncorrected), `n_kept`, `min` and
   `one_se` (the two choices). Its attribute `n_rows` is the number of
   rows with an OOB family.
@@ -142,6 +155,53 @@ An object of class `rpf_pruned`, a list with elements:
   `seed` are `NULL` if no choice was made). For a given rule and `tau`,
   `select_by` is `"oob"` if R's coefficients were fitted out of bag,
   otherwise `NULL`.
+
+- With the display (finite `max_panels`) and a component coarsened, a
+  second pruning runs, and these describe it: its candidates are the
+  components the first pruning kept, with the coarsened ones in place,
+  and `oob` is its table. `components` then lists only these components,
+  and their `share` (which the second pruning's `tau` thresholds) is of
+  the variance of their model (the intercept plus these components) on
+  the training rows, not of the forest's prediction; every nonzero
+  component of `object` with its share of the forest's prediction is in
+  `display$first$components`. Without a coarsened component, they are
+  the first pruning's. With the display, `components` also has `form`
+  (`"full"` for one or two predictors, `"asis"` if its own cut points
+  need at most `max_panels` heat maps, `"coarsened"`; `NA` for a
+  component of three or more predictors the first pruning dropped, so
+  only without a second pruning) and `heat_maps`. The element `display`
+  is a list: `max_panels`; `first`, the first pruning's model (without
+  `fit`); `coarse`, per coarsened component (named as the components):
+  `S` (all the component's predictors), `C` (the coarse predictors,
+  `|S| - 2` of `S`: the panel predictors), `q` (the numbers of intervals
+  aimed at; merged ties can leave fewer, `lengths(cuts) + 1`), `cuts`
+  (per coarse predictor), `cells` (the number of heat maps,
+  `prod(lengths(cuts) + 1)`), `var_kept` (the share of the component's
+  variance kept), `forest_panels`, `kept` (in the final model),
+  `candidates` (every candidate's coarse set, `q`, cells and variance
+  kept), `stored` (what prediction needs; no training data) and
+  `seconds` (the time to choose and build its form); `asis`, per
+  component kept as it is (form `"asis"`), its panels with the same
+  names and meaning: `S` (all the component's predictors), `C` (the
+  panel predictors: the `|S| - 2` of `S` with the fewest own cut points;
+  of ties, the first in `S`), `cuts` (per predictor of `C`, its own cut
+  points: the leaf bounds of the trees containing `S` inside the range
+  of the training values), `forest_panels` (`prod(lengths(cuts) + 1)`)
+  and `kept`; `forms`, per component of three or more predictors the
+  first pruning kept, its form, heat maps and variance kept; `second`
+  (whether a second pruning ran); `seconds` (the time of each step);
+  `cache`, an environment holding the coarsened components' search
+  indices, built at their first
+  [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+  (a cache, not part of the model: rebuilt when missing or invalid, as
+  after saving and loading). In `coarse` and `asis` alike, a panel is a
+  cell of `cuts` (a value `x` of predictor `k` of `C` lies in cell
+  `findInterval(x, cuts[[k]])`), shown as a heat map over the two
+  predictors `setdiff(S, C)` at full resolution.
+
+- `store`: the pieces of the kept components that are not coarsened,
+  from which the model predicts (see **Purification**), and `cache`, an
+  environment holding them built for prediction.
 
 Use
 [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
@@ -199,14 +259,13 @@ small components that add nothing on new data.
 
 **Out of bag** (`select_by = "oob"`). Every tree family of `object` is
 grown on a bootstrap sample of the training rows, and the purification
-works family by family. So `object` is purified once more (as
-[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
-does), and on the way every family's components are evaluated at the
-training rows outside its bootstrap sample. A row's out-of-bag (OOB)
-component is the mean over its OOB families (about 37% of them), and its
-OOB intercept likewise. The purification uses the predictors of all
-training rows, not the outcome, so no outcome information of a row
-enters its OOB components.
+works family by family. So every family's components (see
+**Purification** below) are also evaluated at the training rows outside
+its bootstrap sample. A row's out-of-bag (OOB) component is the mean
+over its OOB families (about 37% of them), and its OOB intercept
+likewise. The purification uses the predictors of all training rows, not
+the outcome, so no outcome information of a row enters its OOB
+components.
 
 - The kept components of every `tau` are those of the final model (the
   shares of `object` on the training rows).
@@ -230,6 +289,13 @@ enters its OOB components.
   correction, the noise of the OOB components makes the candidates look
   worse than they are. The uncorrected values are reported as
   `oob_rmse_raw`.
+
+- If the correction exceeds a candidate's uncorrected MSE, its corrected
+  MSE is reported as 0. That is not a perfect candidate but an
+  overshooting, unreliable estimate (it happens with very few rows, e.g.
+  `"R"` with about as many coefficients as rows, or with almost no
+  noise). Such candidates are not chosen, unless all candidates are at 0
+  (then they tie).
 
 - The OOB RMSE is taken over the rows with at least one OOB family, the
   SE for `"1se"` from the per-fold MSEs.
@@ -278,28 +344,104 @@ squares on the OOB components of `data`'s rows (out of bag) or on its
 components on `data` (by CV). `data` and `y` must therefore be the rows
 `object` was trained on, in the order of the fit (checked).
 
-**Purification.** `object` is purified in place at all orders, as
+**The display** (`max_panels`, default 10; `Inf` switches it off). A
+component of two predictors is one heat map. A kept component `f_S` of
+three or more predictors is shown as heat maps over two of its
+predictors, one per cell of the others. If its own cut points need more
+than `max_panels` such heat maps, it is coarsened:
+
+- Two predictors of `S` stay at full resolution. Each other predictor
+  `k` is cut into `q_k` intervals of equal numbers of training rows
+  (ties merged), with `prod(q) <= max_panels`; `q_k = 1` averages `k`
+  out. Only the maximal `q` vectors (no `q_k` can grow) are considered;
+  they are listed directly, not searched among all
+  `max_panels^(|S| - 2)` vectors.
+
+- Within a cell, `f_S` is averaged over the coarse predictors with the
+  product of their training marginals. The coarsened component is not
+  purified again:
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  identifies the components under the joint distribution of the training
+  rows, not under the product of the marginals, and the averaging
+  changes the component's means along its two full-resolution predictors
+  and its mean over the training rows. It is used as it is (no part of
+  it is moved into the intercept or into components of lower order).
+
+- Of all choices of the two full predictors and the `q` vector, the one
+  keeping the largest share of the variance of `f_S` on the training
+  rows is taken (ties: the first in lexicographic order).
+
+Then the same rule prunes again, on the components the first pruning
+kept, with the coarsened ones in place of the originals. Its shares,
+which `tau` thresholds, are of the variance of that model (the intercept
+plus these components) on the training rows, not of the forest's
+prediction. A pair chosen out of bag is chosen again out of bag, with
+the same candidates and folds, scored with each family's coarsened
+components at its out-of-bag rows (R's coefficients out of bag); a given
+rule and `tau`, or a pair chosen by CV, is applied again as it is (R's
+coefficients out of bag if the first pruning fitted them so, else in
+sample; a CV choice is not repeated, as it would need the display in
+every fold's refit). The prediction then uses the coarsened components,
+so the pruning judges the model that is shown. In simulations (48 data
+sets) this second pruning had 0.49% lower test error than pruning and
+then coarsening, and 0.57% lower than not coarsening; on California
+housing (50 families, order 3) the default keeps 30 components, shown in
+75 heat maps. If no kept component needs coarsening, the model is the
+first pruning's. The display costs about as much again as the out-of-bag
+pruning: a purification restricted to the components being coarsened
+(two at a time) for their candidates, and one for their out-of-bag
+values; the stored coarsened components take a few MB each on 16,000
+rows at order 3, more at higher orders.
+
+**Purification.** The pruning needs every component's values at the
+training rows (and out of bag, its OOB means), not the purified forest:
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
-does, if it is not purified yet. This does not change its predictions. A
-forest purified with a `maxp_interaction` below its order is purified
-again at all orders, with a message: the pruning needs every component.
-The out-of-bag path purifies `object` (again) in mode 2, which gives the
-same components (a mode-1 purification's up to rounding).
+keeps every component of every tree family as pieces, which at high
+orders takes far more memory than the forest (see **Cost**). So each
+family is purified in turn, as
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+does (mode 2, all orders), its components are evaluated at the training
+rows and added up, and the family's pieces are freed. The pruned model
+then stores the pieces of its kept components only, merged over the
+families exactly as
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+stores them, and
+[`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+and
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+evaluate them from there; a coarsened component (the display) is stored
+in its coarsened form. The components equal those of the purified forest
+up to rounding (about `1e-15` relative), and the stored ones are the
+purified forest's bit for bit. `object` itself is not purified: an
+earlier
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md),
+at any `maxp_interaction` or `mode`, is left as it is and does not
+change the result.
 
 **Random numbers.** The folds are drawn after `set.seed(seed)`, and the
 CV's fold fits after it too. Afterwards the random number stream is
 restored to its state on entry (after drawing `seed` if it is `NULL`),
 so the call does not reset the caller's stream.
 
-**Cost.** The out-of-bag choice purifies `object` once and evaluates
-each family's components at its OOB rows; it needs no fit. The CV fits
-and purifies the forest K more times. Both evaluate the components on
-the training rows: only those the purified forest stores (at most
+**Cost.** The out-of-bag choice purifies the families of `object` once
+(see **Purification**); it needs no fit. The CV fits and purifies the
+forest K more times (each fold's forest as
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+does). Only the components the forest has are evaluated (at most
 `sum(choose(p, seq_len(max_interaction)))`, usually far fewer: the
-subsets of the trees' predictor sets), in one pass over the rows. The
-memory is about `n` doubles per stored component, a few times that for
-the out-of-bag choice. `nthreads` speeds up the fits and the
-purification.
+subsets of the trees' predictor sets). The memory is the forest's plus
+about `n` doubles per component, three times that for the out-of-bag
+choice, plus one family's components at a time per thread; storing the
+kept components passes over the families once more. On California
+housing (16,512 rows, 200 families, `split_try = 3`, `t_try = 0.1`, the
+fast draw, 8 threads; measured when this column pass was added) the
+whole call of `rpf(splits = NULL, prune = TRUE)` peaked at 2.3 GB of
+physical footprint (4.1 GB of resident memory, RSS) at order 3, and at
+6.4 GB (9.9 GB RSS) at order 8 (all predictors), most of it the 31
+coarsened components the display keeps; there
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and
+the purification.
 
 Only regression forests are supported.
 
@@ -307,7 +449,9 @@ Only regression forests are supported.
 
 [`predict.rpf_pruned()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md),
 [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md),
-[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md).
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md);
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+with `prune = TRUE` fits and prunes in one call.
 
 ## Examples
 
@@ -331,11 +475,15 @@ pruned
 #> Dropped: 7 (by order 1: 3, 2: 4)
 #> Largest dropped: x1:x3 (share 1.8%); dropped shares sum to 4.4%
 #> 
+#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
+#> First pruning: rule R, tau = 10%, 2 components kept.
+#> Heat maps of the model: 2
+#> 
 #> Intercept: -0.0162521
-#> Kept components (largest first), share on the training rows and coefficient:
-#>  component share beta 
-#>  x1        61%   0.977
-#>  x2:x3     19%   1.863
+#> Kept components (largest first), share on the training rows, coefficient and heat maps:
+#>  component share beta  heat_maps
+#>  x1        61%   0.977 1        
+#>  x2:x3     19%   1.863 1        
 pruned$oob
 #>    rule   tau  oob_rmse     se_mse oob_rmse_raw se_mse_raw n_kept   min one_se
 #> 1     D 0e+00 0.5361833 0.01395762    0.5638097 0.01187499      9 FALSE  FALSE
@@ -366,11 +514,15 @@ prune_components(fit, x, y, select = "min", seed = 1)
 #> Dropped: 7 (by order 1: 3, 2: 4)
 #> Largest dropped: x1:x3 (share 1.8%); dropped shares sum to 4.4%
 #> 
+#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
+#> First pruning: rule R, tau = 10%, 2 components kept.
+#> Heat maps of the model: 2
+#> 
 #> Intercept: -0.0162521
-#> Kept components (largest first), share on the training rows and coefficient:
-#>  component share beta 
-#>  x1        61%   0.977
-#>  x2:x3     19%   1.863
+#> Kept components (largest first), share on the training rows, coefficient and heat maps:
+#>  component share beta  heat_maps
+#>  x1        61%   0.977 1        
+#>  x2:x3     19%   1.863 1        
 
 # ... or by 5-fold CV
 pruned_cv <- prune_components(fit, x, y, select_by = "cv", seed = 1)
@@ -404,13 +556,17 @@ prune_components(fit, x, y, rule = "R", tau = 0.01)
 #> Dropped: 5 (by order 1: 3, 2: 2)
 #> Largest dropped: x2 (share 0.72%); dropped shares sum to 1.3%
 #> 
+#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
+#> First pruning: rule R, tau = 1%, 4 components kept.
+#> Heat maps of the model: 4
+#> 
 #> Intercept: -0.0169604
-#> Kept components (largest first), share on the training rows and coefficient:
-#>  component share beta    
-#>  x1        61%    0.97670
-#>  x2:x3     19%    1.86236
-#>  x1:x3     1.8%  -0.04332
-#>  x1:x2     1.3%   0.06363
+#> Kept components (largest first), share on the training rows, coefficient and heat maps:
+#>  component share beta     heat_maps
+#>  x1        61%    0.97670 1        
+#>  x2:x3     19%    1.86236 1        
+#>  x1:x3     1.8%  -0.04332 1        
+#>  x1:x2     1.3%   0.06363 1        
 
 predict(pruned, x[1:5, ])
 #> # A tibble: 5 × 1
@@ -421,4 +577,34 @@ predict(pruned, x[1:5, ])
 #> 3 -1.08 
 #> 4  1.04 
 #> 5  0.620
+
+# A three-way interaction, shown in at most 4 heat maps
+y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
+fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
+shown
+#> ── Pruned Random Planted Forest ────────────────────────────────────────────────
+#> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 3% of Var(prediction)
+#> Chosen by out-of-bag error (1-SE rule; R refitted in 5 folds, seed 1) among 16 candidates.
+#> 
+#> Nonzero components: 2
+#> Kept:    2 (by order 1: 1, 3: 1)
+#> Dropped: 0
+#> 
+#> Display: every kept component in at most 4 heat maps (coarsened, then pruned again).
+#> First pruning: rule R, tau = 3%, 2 components kept.
+#> Coarsened: 1 component (1 kept by the second pruning); variance kept 0.96.
+#> Kept coarsened components: coarse features (intervals), heat maps, variance kept:
+#>  component coarse heat_maps var_kept
+#>  x2:x3:x4  x4(4)  4         0.963   
+#> Heat maps of the model: 5
+#> 
+#> Intercept: 0.0384576
+#> Kept components (largest first), share on the training rows, coefficient and heat maps:
+#>  component share beta   heat_maps
+#>  x1        95%   0.9841 1        
+#>  x2:x3:x4  5.1%  4.6241 4        
+shown$display$forms
+#>   component order      form forest_panels heat_maps  var_kept
+#> 1  x2:x3:x4     3 coarsened            87         4 0.9633811
 ```

@@ -35,7 +35,9 @@ predict_components(
   `[rpf | rpf_pruned]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   model, or a pruned one from
-  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  or
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
 
 - new_data:
 
@@ -135,7 +137,9 @@ of components will increase drastically to
 ## Pruned forests
 
 For an `rpf_pruned` object from
-[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+or
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
 `m` holds only the kept components, each scaled by its coefficient
 `beta_S`, and `intercept` is the pruned model's intercept `alpha`, so
 that they sum to

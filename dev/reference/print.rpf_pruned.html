@@ -55,7 +55,7 @@
 
 
 <dl><dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
-<dd><p><code>[rpf_pruned]</code>: A pruned forest from <code><a href="prune_components.html">prune_components()</a></code>.</p></dd>
+<dd><p><code>[rpf_pruned]</code>: A pruned forest from <code><a href="prune_components.html">prune_components()</a></code> or <code><a href="rpf.html">rpf()</a></code>.</p></dd>
 
 
 <dt id="arg-n-show">n_show<a class="anchor" aria-label="anchor" href="#arg-n-show"></a></dt>
@@ -90,15 +90,19 @@
 <span class="r-out co"><span class="r-pr">#&gt;</span> Kept:    6 (by order 1: 3, 2: 3)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Dropped: 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> First pruning: rule R, tau = 1%, 6 components kept.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Heat maps of the model: 6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Intercept: -0.0251072</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Kept components (largest first), share on the training rows and coefficient:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  component share beta    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x1        57%    0.90346</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x2:x3     12%    1.83593</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x1:x2     2.8%  -0.06836</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x3        2.6%   0.41588</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x2        2.4%   0.25804</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  x1:x3     1.4%  -0.35157</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Kept components (largest first), share on the training rows, coefficient and heat maps:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  component share beta     heat_maps</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x1        57%    0.90346 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x2:x3     12%    1.83593 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x1:x2     2.8%  -0.06836 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x3        2.6%   0.41588 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x2        2.4%   0.25804 1        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  x1:x3     1.4%  -0.35157 1        </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
