@@ -57,6 +57,14 @@ format.rpf <- function(x, ...) {
     if (params$deterministic) {
       cli::cli_alert_warning("Fit deterministically.")
     }
+    if (
+      isFALSE(params$exact_draw) &&
+        !params$deterministic &&
+        x$mode == "regression" &&
+        params$split_structure == "leaves"
+    ) {
+      cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")
+    }
 
     cli::cli_h3("Tree growing")
     print_params(params[c(
@@ -65,7 +73,9 @@ format.rpf <- function(x, ...) {
       "t_try",
       "max_candidates",
       "split_decay_rate",
-      "delete_leaves"
+      "delete_leaves",
+      # only when set, so that fits without it print as before
+      if (!is.null(params$min_leaf_rows) && params$min_leaf_rows > 1) "min_leaf_rows"
     )])
     if (x$mode == "classification") {
       cli::cli_h3("Loss")

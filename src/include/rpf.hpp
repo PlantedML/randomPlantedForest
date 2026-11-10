@@ -39,6 +39,8 @@ struct RPFParams {
   size_t max_candidates = 50;
   bool delete_leaves = true;
   int split_structure_mode = 3; /**< 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist */
+  int min_leaf_rows = 1;        /**< rows on each side of every split; > 1 only for leaves (mode 3) */
+  bool exact_draw = true;       /**< leaves: the exact draw of candidates (false: the fast draw, LeavesSampler) */
 };
 
 // Forest export for serialization: one entry per tree family.
@@ -214,6 +216,9 @@ protected:
   // exponential‐decay rate for split age
   double split_decay_rate_;
   size_t max_candidates_;
+  // leaves: draw the candidates exactly (one random number per pool entry), or by the fast draw
+  // (LeavesSampler): the same distribution, other random numbers, so other fits
+  bool exact_draw_ = true;
   // LRU cap for per-leaf per-feature caches
   size_t leaf_feature_cache_cap_ = 64;
   // track each split candidate and how long it’s sat unchosen
@@ -226,6 +231,9 @@ protected:
     // expression as before, recomputed only when the age changes, so the draw's weights are bitwise the same.
     double w = 0.0;
     double w_age = std::numeric_limits<double>::quiet_NaN();
+    // leaves with min_leaf_rows_ > 1: whether the leaf has a threshold on dim with min_leaf_rows_ rows on each side
+    // (-1: not yet known). Entries without one are not drawn.
+    signed char rows_ok = -1;
     // legacy ctor without leaf index (defaults to 0) — keep but prefer the 4-arg form from callers
     explicit SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a = 0.0)
         : dim(d), tree(std::move(t)), leaf_idx(0), age(a)
@@ -238,6 +246,8 @@ protected:
   };
   // Which split structure to use (0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist)
   int split_structure_mode_ = 3;
+  // leaves: at least this many rows of the bootstrap sample on each side of every split (1: no limit)
+  int min_leaf_rows_ = 1;
 
   // Histogram mode buffers
   size_t num_bins_ = 64; // total number of global bins per feature (smaller default for speed)

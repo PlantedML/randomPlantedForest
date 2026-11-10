@@ -29,6 +29,9 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
 
 RCPP_MODULE(mod_rpf)
 {
+  // internal, for tests: inclusion counts of the two draws of split_structure = "leaves"
+  Rcpp::function("rpf_leaves_draw_counts", &leaves_draw_counts);
+
   Rcpp::class_<RcppRPF> rpf("RandomPlantedForest");
   rpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector>()
       .constructor<const Rcpp::NumericVector>();
