@@ -542,8 +542,10 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
   }
 
   M <- prune_kept_matrix(object, new_data)
-  # the kept components that use only `predictors` and have at most `max_interaction` predictors
-  feats <- lapply(object$sets, function(s) all_predictors[s])
+  # the kept components that use only `predictors` and have at most `max_interaction` predictors (the sets index the
+  # fit's columns, in which hardhat::mold() puts the factors last)
+  fit_names <- prune_fit_names(object$fit)
+  feats <- lapply(object$sets, function(s) fit_names[s])
   use <- vapply(feats, function(f) length(f) <= max_interaction && all(f %in% predictors), logical(1))
 
   ret <- list(

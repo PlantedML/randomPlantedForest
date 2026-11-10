@@ -185,6 +185,27 @@ test_that("factor predictors are coded per fold, as rpf() codes them", {
   expect_identical(predict(refit, df), predict(direct, df))
 })
 
+test_that("predict_components() selects the right components with a factor before numeric columns", {
+  # hardhat::mold() puts the factors last, so the fit's columns are x1, x2, g, not the data's g, x1, x2
+  set.seed(3)
+  df <- data.frame(g = factor(sample(letters[1:3], 300, replace = TRUE)), x1 = runif(300), x2 = runif(300))
+  df$y <- 2 * (df$g == "b") + df$x1 + df$x1 * df$x2 + rnorm(300, sd = 0.2)
+  set.seed(5)
+  fit <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30)
+  pr <- prune_components(fit, df, rule = "D", tau = 0)
+  all_m <- predict_components(pr, df)$m
+  for (p in list("x1", "g", c("g", "x2"))) {
+    pc <- predict_components(pr, df, predictors = p)
+    comps <- names(pc$m)
+    # exactly the components within p, by their names
+    expect_identical(comps, names(all_m)[vapply(strsplit(names(all_m), ":"), function(f) all(f %in% p), TRUE)])
+    expect_gt(length(comps), 0)
+    expect_equal(rowSums(as.matrix(pc$m)) + pc$remainder, rowSums(as.matrix(all_m)))
+  }
+  pc1 <- predict_components(pr, df, max_interaction = 1)
+  expect_setequal(names(pc1$m), c("x1", "x2", "g"))
+})
+
 test_that("the fold fits use all parameters of the forest", {
   d <- prune_sim(n = 300)
   args <- list(

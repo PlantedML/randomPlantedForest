@@ -523,3 +523,10 @@ calc_remainders_multiclass <- function(m, levels, pred, intercept) {
 
   merged_wide
 }
+
+# The predictors' names as the forest's columns hold them (the order of the sets' indices: hardhat::mold() puts the
+# factors last, so it can differ from the ptype's)
+prune_fit_names <- function(fit) {
+  ptype <- hardhat::forge(fit$blueprint$ptypes$predictors, fit$blueprint)$predictors
+  colnames(preprocess_predictors_predict(fit, ptype))
+}
