@@ -58,7 +58,7 @@ test_that("R chosen out of bag: the chosen tau's components, coefficients fitted
   expect_identical(g$intercept, p$intercept)
   expect_identical(predict(g, d$x), predict(p, d$x))
   expect_output(print(g), "fitted out of bag")
-  expect_output(print(g), "Given, not chosen")
+  expect_output(print(g), "Rule and threshold given")
 
   # in sample (select_by = "cv"): least squares on the forest's own components at the training rows; the OOB fit
   # shrinks the noisier pair
@@ -79,7 +79,7 @@ test_that("R chosen out of bag: the chosen tau's components, coefficients fitted
   pc <- predict_components(p, new)
   expect_equal(rowSums(pc$m) + pc$intercept, manual, tolerance = 1e-10)
 
-  expect_output(print(p), "Rule R \\(drop \\+ refit one coefficient per component, fitted out of bag\\)")
+  expect_output(print(p), "each with one coefficient, fitted out of bag \\(rule R\\)")
   expect_no_match(format(gi), "fitted out of bag")
 })
 
@@ -143,7 +143,7 @@ test_that("D's scores do not depend on R's fit, and D and CV choices are fitted 
   expect_identical(predict(pD, d$x), predict(gD, d$x))
   out <- capture.output(print(pD))
   expect_false(any(grepl("fitted out of bag", out)))
-  expect_true(any(grepl("Rule D \\(drop\\)", out)))
+  expect_true(any(grepl("as they are \\(rule D\\)", out)))
   # R chosen by CV: in sample, as R given at the chosen tau with select_by = "cv"
   pC <- prune_components(fit, d$x, d$y, rule = "R", tau = c(0, 0.01), select_by = "cv", seed = 4)
   gC <- prune_components(fit, d$x, d$y, rule = "R", tau = pC$tau, select_by = "cv")

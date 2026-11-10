@@ -77,7 +77,12 @@ An object of class \code{rpf_pruned}, a list with elements:
 \item \code{sets}: the predictor sets of the kept components, as column indices.
 \item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows (after a second pruning
 of the display, only of those the first pruning kept: see below): \code{component} (its name, as in
-\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
+\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped), and \code{model_share}:
+the share of the final model's component, \verb{Var(beta_S f_S) / Var(prediction of the model)} on the training rows
+(with the display, of \code{f_S} in its heat-map form; for classification, as \code{share}, over the centred score columns;
+\code{NA} if dropped). \code{share} is what \code{tau} thresholds; \code{model_share} is the component's importance in the model,
+which \link[=print.rpf_pruned]{print()} shows. As the components need not be uncorrelated, the shares need not sum to
+1.
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
 \code{tau}, \code{oob_rmse} (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
 Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and

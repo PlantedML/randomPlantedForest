@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}.}
 
-\item{n_show}{\verb{[integer(1): 20]}: The largest number of kept components to list.}
+\item{n_show}{\verb{[integer(1): 20]}: The largest number of components to list.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }
@@ -17,7 +17,9 @@
 Invisibly: \code{x}.
 }
 \description{
-Shows the rule and threshold, how they were chosen, what was kept and dropped, and the coefficients.
+Shows the model: its intercept and its components, each with its importance, the component's share of the variance
+of the model's prediction on the training rows (\code{components$model_share}). How the components were chosen (the
+rule and threshold, what was left out, the heat-map forms) follows briefly at the end.
 }
 \examples{
 set.seed(1)

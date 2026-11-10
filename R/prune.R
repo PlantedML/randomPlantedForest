@@ -198,7 +198,12 @@
 #' - `sets`: the predictor sets of the kept components, as column indices.
 #' - `components`: a `data.frame` of every nonzero component of `object` on the training rows (after a second pruning
 #'   of the display, only of those the first pruning kept: see below): `component` (its name, as in
-#'   [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
+#'   [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped), and `model_share`:
+#'   the share of the final model's component, `Var(beta_S f_S) / Var(prediction of the model)` on the training rows
+#'   (with the display, of `f_S` in its heat-map form; for classification, as `share`, over the centred score columns;
+#'   `NA` if dropped). `share` is what `tau` thresholds; `model_share` is the component's importance in the model,
+#'   which [print()][print.rpf_pruned()] shows. As the components need not be uncorrelated, the shares need not sum to
+#'   1.
 #' - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a `data.frame` with one row per candidate: `rule`,
 #'   `tau`, `oob_rmse` (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
 #'   Details), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and `se_mse_raw` (uncorrected), `n_kept`, `min` and
@@ -444,8 +449,33 @@ prune_run <- function(
     coarse <- names(res$beta) %in% names(res$display$coarse)
     res$store <- prune_store(object, res$sets[!coarse], nthreads)
     res$cache <- new.env(parent = emptyenv())
+    # each component's share of the final model, on the training rows
+    res$components$model_share <- NA_real_
+    X <- preprocess_predictors_predict(object, tr$predictors)
+    res$components$model_share[match(names(res$beta), res$components$component)] <-
+      prune_model_share(res, X, tr$crit, nthreads)
   }
   res
+}
+
+# The share of each component of the model `object` (an rpf_pruned with its store) on the rows X (preprocessed):
+# Var(beta_S f_S) / Var(prediction), f_S in its final form (stored or heat-map form). With V > 1 score columns the
+# variances are those of the score columns centred as `crit` centres them (crit_centred_var(), as the shares of the
+# decomposition). In the order of object$beta.
+prune_model_share <- function(object, X, crit, nthreads) {
+  V <- pruned_V(object)
+  if (length(object$beta) == 0) {
+    return(numeric(0))
+  }
+  M <- prune_kept_matrix_x(object, X, nthreads)
+  size <- if (V == 1L) {
+    function(A) mean((A - mean(A))^2)
+  } else {
+    crit <- crit %||% list(centre = "none")
+    function(A) crit_centred_var(crit, A)
+  }
+  total <- size(pruned_scores(object, M))
+  vapply(seq_along(object$beta), function(k) size(M[, crit_blk(k, V), drop = FALSE]), numeric(1)) / total
 }
 
 # The rpf_pruned model of rule and tau on the decomposition `dec`, with R's (alpha, beta) `rf` (prune_fit_rule())
@@ -1320,6 +1350,12 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
   processed <- hardhat::forge(new_data, fit$blueprint)
   check_no_missing(processed$predictors, "{.arg new_data}", call = call)
   X <- preprocess_predictors_predict(fit, processed$predictors)
+  prune_kept_matrix_x(object, X, nthreads)
+}
+
+# prune_kept_matrix() on the preprocessed predictors X (preprocess_predictors_predict())
+prune_kept_matrix_x <- function(object, X, nthreads = 0L) {
+  fit <- object$fit
   if (nthreads < 1) {
     nthreads <- as.integer(fit$params$nthreads)
   }
@@ -1462,10 +1498,12 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
 
 #' Print a pruned Random Planted Forest
 #'
-#' Shows the rule and threshold, how they were chosen, what was kept and dropped, and the coefficients.
+#' Shows the model: its intercept and its components, each with its importance, the component's share of the variance
+#' of the model's prediction on the training rows (`components$model_share`). How the components were chosen (the
+#' rule and threshold, what was left out, the heat-map forms) follows briefly at the end.
 #'
 #' @param x `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
-#' @param n_show `[integer(1): 20]`: The largest number of kept components to list.
+#' @param n_show `[integer(1): 20]`: The largest number of components to list.
 #' @param ... Further arguments passed to or from other methods.
 #'
 #' @return Invisibly: `x`.
@@ -1486,173 +1524,178 @@ print.rpf_pruned <- function(x, n_show = 20, ...) {
 format.rpf_pruned <- function(x, n_show = 20, ...) {
   checkmate::assert_int(n_show, lower = 0)
   cmp <- x$components
-  rule_name <- c(D = "D (drop)", R = "R (drop + refit one coefficient per component)")[[x$rule]]
-  # chosen out of bag, R's coefficients were fitted on the out-of-bag components
-  if (x$rule == "R" && identical(x$select_by, "oob")) {
-    rule_name <- sub(")$", ", fitted out of bag)", rule_name)
-  }
-  crit <- pruned_crit_name(x)
-  how <- if (!is.null(x$oob)) {
-    sprintf(
-      "Chosen by out-of-bag error (%s; R refitted in %d folds, seed %d) among %d candidates.",
-      if (x$select == "min") paste("lowest OOB", crit) else "1-SE rule",
-      length(unique(x$fold_id)),
-      x$seed,
-      nrow(x$oob)
-    )
-  } else if (is.null(x$cv)) {
-    "Given, not chosen."
-  } else {
-    sprintf(
-      "Chosen by %d-fold CV (%s, seed %d) among %d candidates.",
-      length(unique(x$fold_id)),
-      if (x$select == "min") paste("lowest CV", crit) else "1-SE rule",
-      x$seed,
-      nrow(x$cv)
-    )
-  }
   kept <- cmp[cmp$kept, ]
-  dropped <- cmp[!cmp$kept, ]
-  by_order <- function(d) {
-    if (nrow(d) == 0) {
-      return("0")
-    }
-    tab <- table(factor(d$order, levels = sort(unique(cmp$order))))
-    paste0(nrow(d), " (by order ", paste(names(tab), tab, sep = ": ", collapse = ", "), ")")
+  V <- pruned_V(x)
+  K <- nrow(kept)
+  classif <- identical(x$fit$mode, "classification")
+
+  # the model: what it predicts, its intercept and its components with their importance
+  of <- if (K == 1) "1 component" else paste(K, "components")
+  lines <- if (classif) {
+    lev <- levels(x$fit$blueprint$ptypes$outcomes[[1]])
+    sprintf(
+      "Classification (%s loss), %d classes: %s. Scores = intercept + the sum of %s.",
+      x$fit$params$loss,
+      length(lev),
+      paste(lev, collapse = ", "),
+      of
+    )
+  } else {
+    sprintf("Regression. Prediction = intercept + the sum of %s.", of)
   }
   lines <- c(
-    sprintf("Rule %s, tau = %s of Var(prediction)", rule_name, format_share(x$tau)),
-    how,
-    "",
-    sprintf("Nonzero components: %d", nrow(cmp)),
-    paste("Kept:   ", by_order(kept)),
-    paste("Dropped:", by_order(dropped))
+    lines,
+    if (V > 1L) {
+      sprintf(
+        "Intercept per class: %s",
+        paste(model_outcome_levels(x$fit), format(x$intercept, digits = 6), collapse = ", ")
+      )
+    } else {
+      sprintf("Intercept: %s", format(x$intercept, digits = 6))
+    }
   )
-  if (nrow(dropped) > 0) {
-    big <- dropped[which.max(dropped$share), ]
+  if (K > 0 && n_show > 0) {
+    # importance: the component's share of the model's prediction (models from before model_share: of the forest's)
+    imp <- kept$model_share
+    of_what <- "share of the variance of the prediction on the training rows"
+    if (is.null(imp) || anyNA(imp)) {
+      imp <- kept$share
+      of_what <- "share of the variance of the forest's prediction on the training rows"
+    } else if (V > 1L) {
+      of_what <- "share of the variance of the scores (centred across the classes) on the training rows"
+    }
+    o <- order(-imp)
+    show <- utils::head(o, n_show)
+    tab <- data.frame(component = kept$component[show], importance = vapply(imp[show], format_share, ""))
+    lines <- c(
+      lines,
+      "",
+      sprintf("Components (largest first), importance = %s:", of_what),
+      utils::capture.output(print(tab, row.names = FALSE, right = FALSE))
+    )
+    if (K > n_show) {
+      lines <- c(lines, sprintf("... and %d more", K - n_show))
+    }
+  }
+
+  lines <- c(lines, "", "How it was chosen:", paste0("  ", format_pruned_choice(x)))
+  # format into lines so print() writes to stdout, not cli's message stream
+  c(cli::cli_format_method(cli::cli_rule(left = "Random Planted Forest model")), lines)
+}
+
+# The lines of format.rpf_pruned() on how the components were chosen: the rule and threshold on the forest's
+# components and how they were chosen, what was left out, the heat-map forms (the display) and the tuning
+format_pruned_choice <- function(x) {
+  d <- x$display
+  # without the display, the one pruning; with it, the first (on the forest's components), then the second
+  m <- if (is.null(d)) x else d$first
+  cmp <- m$components
+  rule <- c(
+    D = "as they are",
+    R = if (identical(m$select_by, "oob")) {
+      "each with one coefficient, fitted out of bag"
+    } else {
+      "each with one coefficient"
+    }
+  )[[m$rule]]
+  lines <- sprintf(
+    paste(
+      "From the forest's %d nonzero components (purified): those with a share of at least %s of the forest's",
+      "Var(prediction), %s (rule %s)."
+    ),
+    nrow(cmp),
+    format_share(m$tau),
+    rule,
+    m$rule
+  )
+  crit <- pruned_crit_name(x)
+  lines <- c(
+    lines,
+    if (!is.null(m$oob)) {
+      sprintf(
+        "Rule and threshold chosen by out-of-bag error (%s; %d folds, seed %d) among %d candidates.",
+        if (m$select == "min") paste("lowest OOB", crit) else "1-SE rule",
+        length(unique(m$fold_id)),
+        m$seed,
+        nrow(m$oob)
+      )
+    } else if (!is.null(m$cv)) {
+      sprintf(
+        "Rule and threshold chosen by %d-fold CV (%s, seed %d) among %d candidates.",
+        length(unique(m$fold_id)),
+        if (m$select == "min") paste("lowest CV", crit) else "1-SE rule",
+        m$seed,
+        nrow(m$cv)
+      )
+    } else {
+      "Rule and threshold given."
+    }
+  )
+  out <- cmp[!cmp$kept, ]
+  if (nrow(out) > 0) {
+    big <- out[which.max(out$share), ]
     lines <- c(
       lines,
       sprintf(
-        "Largest dropped: %s (share %s); dropped shares sum to %s",
+        "Left out: %d component%s, shares together %s (largest %s, %s).",
+        nrow(out),
+        if (nrow(out) == 1) "" else "s",
+        format_share(sum(out$share)),
         big$component,
-        format_share(big$share),
-        format_share(sum(dropped$share))
+        format_share(big$share)
       )
     )
+  }
+  if (!is.null(d)) {
+    co <- d$coarse[vapply(d$coarse, function(z) isTRUE(z$kept), logical(1))]
+    if (d$second) {
+      n_out <- sum(!x$components$kept)
+      lines <- c(
+        lines,
+        sprintf(
+          paste(
+            "Components of three or more predictors in at most %d heat maps each, then rule and threshold chosen again on",
+            "these (%s, tau = %s; %s left out)."
+          ),
+          d$max_panels,
+          x$rule,
+          format_share(x$tau),
+          if (n_out == 0) "none" else n_out
+        )
+      )
+    }
+    if (length(co) > 0) {
+      forms <- vapply(
+        names(co),
+        function(nm) {
+          z <- co[[nm]]
+          sprintf(
+            "%s: %s (%s of its variance)",
+            nm,
+            paste0(z$C, " in ", lengths(z$cuts) + 1, " intervals", collapse = ", "),
+            format_share(z$var_kept)
+          )
+        },
+        ""
+      )
+      lines <- c(lines, paste0("Heat-map forms: ", forms))
+    }
   }
   if (!is.null(x$tune)) {
     st <- x$tune$settings
     lines <- c(
+      lines,
       sprintf(
-        "Tuned out of bag (rpf(tune = )): %d forests; chosen split_try = %d, t_try = %s, min_leaf_rows = %d, splits = %d.",
+        "The forest was tuned out of bag (rpf(tune = )): %d forests; split_try = %d, t_try = %s, min_leaf_rows = %d, splits = %d.",
         nrow(x$tune$search),
         st$split_try,
         format(st$t_try),
         st$min_leaf_rows,
         st$splits
-      ),
-      "",
-      lines
-    )
-  }
-  if (!is.null(x$display)) {
-    lines <- c(lines, "", format_display(x, n_show))
-  }
-  if (identical(x$fit$mode, "classification")) {
-    lev <- levels(x$fit$blueprint$ptypes$outcomes[[1]])
-    lines <- c(
-      lines,
-      "",
-      sprintf(
-        "Classification (%s loss), %d classes: %s.",
-        x$fit$params$loss,
-        length(lev),
-        paste(lev, collapse = ", ")
       )
     )
-    if (pruned_V(x) > 1L) {
-      lines <- c(
-        lines,
-        sprintf(
-          "Intercept per class: %s",
-          paste(model_outcome_levels(x$fit), format(x$intercept, digits = 6), collapse = ", ")
-        )
-      )
-    } else {
-      lines <- c(lines, sprintf("Intercept: %s", format(x$intercept, digits = 6)))
-    }
-  } else {
-    lines <- c(lines, "", sprintf("Intercept: %s", format(x$intercept, digits = 6)))
   }
-  if (nrow(kept) > 0 && n_show > 0) {
-    kept <- kept[order(-kept$share), ]
-    show <- utils::head(kept, n_show)
-    tab <- data.frame(
-      component = show$component,
-      share = vapply(show$share, format_share, ""),
-      beta = format(show$beta, digits = 4)
-    )
-    what <- "share on the training rows and coefficient"
-    if (!is.null(x$display)) {
-      tab$heat_maps <- show$heat_maps
-      what <- "share on the training rows, coefficient and heat maps"
-    }
-    lines <- c(
-      lines,
-      sprintf("Kept components (largest first), %s:", what),
-      utils::capture.output(print(tab, row.names = FALSE, right = FALSE))
-    )
-    if (nrow(kept) > n_show) {
-      lines <- c(lines, sprintf("... and %d more", nrow(kept) - n_show))
-    }
-  }
-
-  # format into lines so print() writes to stdout, not cli's message stream
-  c(cli::cli_format_method(cli::cli_rule(left = "Pruned Random Planted Forest")), lines)
-}
-
-# The display's lines of format.rpf_pruned(): the first pruning, the coarsened components, the heat maps
-format_display <- function(x, n_show) {
-  d <- x$display
-  f <- d$first
-  how <- if (d$second) "coarsened, then pruned again" else "nothing to coarsen, so not pruned again"
-  lines <- c(
-    sprintf("Display: every kept component in at most %d heat maps (%s).", d$max_panels, how),
-    sprintf("First pruning: rule %s, tau = %s, %d components kept.", f$rule, format_share(f$tau), length(f$beta))
-  )
-  co <- d$coarse
-  if (length(co) > 0) {
-    kept_co <- vapply(co, function(z) isTRUE(z$kept), logical(1))
-    vk <- round(range(vapply(co, function(z) z$var_kept, numeric(1))), 2)
-    lines <- c(
-      lines,
-      sprintf(
-        "Coarsened: %d component%s (%d kept by the second pruning); variance kept %s.",
-        length(co),
-        if (length(co) == 1) "" else "s",
-        sum(kept_co),
-        if (vk[1] == vk[2]) format(vk[1]) else paste(vk, collapse = "-")
-      )
-    )
-    if (any(kept_co) && n_show > 0) {
-      z <- utils::head(co[kept_co], n_show)
-      tab <- data.frame(
-        component = names(z),
-        coarse = vapply(z, function(v) paste0(v$C, "(", lengths(v$cuts) + 1, ")", collapse = " x "), ""),
-        heat_maps = vapply(z, function(v) v$cells, numeric(1)),
-        var_kept = vapply(z, function(v) format(v$var_kept, digits = 3), "")
-      )
-      lines <- c(
-        lines,
-        "Kept coarsened components: coarse features (intervals), heat maps, variance kept:",
-        utils::capture.output(print(tab, row.names = FALSE, right = FALSE))
-      )
-      if (sum(kept_co) > n_show) {
-        lines <- c(lines, sprintf("... and %d more", sum(kept_co) - n_show))
-      }
-    }
-  }
-  c(lines, sprintf("Heat maps of the model: %g", sum(x$components$heat_maps[x$components$kept])))
+  lines
 }
 
 # The name of what a pruned model was chosen by: the RMSE, or the classification criterion

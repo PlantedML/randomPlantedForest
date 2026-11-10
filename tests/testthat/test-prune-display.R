@@ -176,7 +176,7 @@ test_that("max_panels: at most P heat maps, decomposition, marginal means, Inf =
   expect_identical(predict(pd1, d$x)$.pred, predict(pd, d$x)$.pred)
   out <- capture.output(print(pd))
   expect_true(any(grepl("at most 3 heat maps", out)))
-  expect_true(any(grepl("heat_maps", out)))
+  expect_true(any(grepl("importance", out)))
 })
 
 test_that("full order: components of order >= 6 coarsened with q vectors containing 1s", {

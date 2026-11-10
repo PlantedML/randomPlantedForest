@@ -81,7 +81,7 @@ test_that("predict() is the intercept plus the scaled kept components", {
   # a given R: no choice, but its coefficients are fitted out of bag (test-prune-oob-refit.R)
   expect_identical(pr$select_by, "oob")
   expect_output(print(pr), "fitted out of bag")
-  expect_output(print(pr), "Given, not chosen")
+  expect_output(print(pr), "Rule and threshold given")
 
   new <- as.data.frame(d$x[1:50, ])
   comp <- predict_components(fit, new)$m
@@ -152,7 +152,7 @@ test_that("a threshold above every share keeps no component: the intercept or th
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.99)
   use <- rowSums(fit$fit$purify_oob(0L, 1L)$count) > 0
   expect_equal(pr$intercept, mean(d$y[use]))
-  expect_output(print(pr), "Kept: +0")
+  expect_output(print(pr), "sum of 0 components")
   pin <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.99, select_by = "cv")
   expect_equal(pin$intercept, mean(d$y))
 })
@@ -167,10 +167,10 @@ test_that("the formula interface takes the outcome from data, and print() works"
   expect_length(unique(pr$fold_id), 3)
   expect_identical(pr$seed, 1L)
   expect_equal(nrow(predict(pr, df[1:3, ])), 3)
-  expect_output(print(pr), "Pruned Random Planted Forest")
-  expect_output(print(pr), "Chosen by 3-fold CV")
-  expect_output(print(pr), "Kept components")
-  expect_output(print(pr, n_show = 1), "and [0-9]+ more|Kept components")
+  expect_output(print(pr), "Random Planted Forest model")
+  expect_output(print(pr), "chosen by 3-fold CV")
+  expect_output(print(pr), "Components \\(largest first\\), importance")
+  expect_output(print(pr, n_show = 1), "and [0-9]+ more")
   output <- capture.output(result <- withVisible(print(pr)))
   expect_false(result$visible)
   expect_identical(result$value, pr)
@@ -336,4 +336,46 @@ test_that("bad input gives clear errors", {
   expect_s3_class(suppressMessages(prune_components(cfit, d$x, yc, max_panels = Inf)), "rpf_pruned")
   expect_error(prune_components(cfit, d$x, as.numeric(yc)), "factor outcome")
   expect_error(prune_components(fit, d$x, yc), "numeric outcome")
+})
+
+test_that("model_share is each component's share of the final model", {
+  d <- prune_sim()
+  fit <- prune_fit(d)
+  var_pop <- function(v) mean((v - mean(v))^2)
+  # rule D with tau = 0: the model is the forest, so its shares are the forest's
+  pd <- prune_components(fit, d$x, d$y, rule = "D", tau = 0, max_panels = Inf)
+  expect_equal(pd$components$model_share, pd$components$share, tolerance = 1e-10)
+  # rule R: Var(beta_S f_S) / Var(model) = beta_S^2 share_S Var(forest) / Var(model)
+  pr <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.01, max_panels = Inf)
+  k <- pr$components$kept
+  ratio <- var_pop(predict(fit, d$x)$.pred) / var_pop(predict(pr, d$x)$.pred)
+  expect_equal(pr$components$model_share[k], pr$components$beta[k]^2 * pr$components$share[k] * ratio, tolerance = 1e-8)
+  expect_true(all(is.na(pr$components$model_share[!k])))
+  # print() shows it as the importance, largest first, and names no pruning before "How it was chosen"
+  out <- capture.output(print(pr))
+  top <- pr$components$component[k][which.max(pr$components$model_share[k])]
+  expect_match(out[grep("^ component +importance", out) + 1], paste0("^ ", top, " "))
+  expect_no_match(paste(out[seq_len(grep("How it was chosen", out))], collapse = " "), "pruned|kept|coarsened|display")
+})
+
+test_that("model_share of a three-class model is its share of the centred scores", {
+  set.seed(3)
+  x <- matrix(runif(300 * 3), ncol = 3, dimnames = list(NULL, paste0("x", 1:3)))
+  s <- 2 * x[, 1] + 3 * x[, 2] * x[, 3] + rnorm(300, sd = 0.3)
+  y <- cut(s, quantile(s, c(0, 1 / 3, 2 / 3, 1)), include.lowest = TRUE, labels = c("a", "b", "c"))
+  set.seed(4)
+  fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30)
+  pr <- prune_components(fit, x, y, rule = "R", tau = 0.01, max_panels = Inf)
+  k <- pr$components$kept
+  ms <- pr$components$model_share[k]
+  expect_true(all(is.finite(ms) & ms > 0))
+  # by hand: the scaled components' score columns, centred across the classes as the criterion centres them
+  ns <- asNamespace("randomPlantedForest")
+  tr <- ns$prune_training_data(fit, x, y)
+  M <- ns$prune_kept_matrix(pr, x)
+  V <- ns$pruned_V(pr)
+  total <- ns$crit_centred_var(tr$crit, ns$pruned_scores(pr, M))
+  byhand <- vapply(seq_along(pr$beta), function(j) ns$crit_centred_var(tr$crit, M[, ns$crit_blk(j, V)]), 1) / total
+  expect_equal(ms, unname(byhand[match(pr$components$component[k], names(pr$beta))]), tolerance = 1e-12)
+  expect_output(print(pr), "Intercept per class")
 })

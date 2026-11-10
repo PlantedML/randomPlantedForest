@@ -267,7 +267,7 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   cf <- stats::lm.fit(cbind(1, F_oob), d$y)$coefficients
   expect_equal(unname(c(pr$intercept, pr$beta)), unname(cf), tolerance = 1e-10)
   expect_equal(pr$components$beta[pr$components$kept], unname(pr$beta[pr$components$component[pr$components$kept]]))
-  expect_output(print(pr), "Chosen by out-of-bag error \\(1-SE rule; R refitted in 5 folds, seed 3\\)")
+  expect_output(print(pr), "chosen by out-of-bag error \\(1-SE rule; 5 folds, seed 3\\)")
   expect_output(print(pr), "fitted out of bag")
 
   # select = "min": the same table, the lowest corrected OOB RMSE (here more components)
@@ -310,7 +310,7 @@ test_that("OOB pruning does not depend on nthreads, is the default, and CV is st
   given <- prune_components(oob_fit(d), d$x, d$y, rule = "D", tau = 0.01)
   expect_null(given$select_by)
   expect_null(given$oob)
-  expect_output(print(given), "Given, not chosen")
+  expect_output(print(given), "Rule and threshold given")
 })
 
 test_that("OOB pruning gives clear errors; a deterministic forest falls back to CV by default", {
