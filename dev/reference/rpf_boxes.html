@@ -109,13 +109,13 @@ marshaled with <code>include_data = TRUE</code>.</p>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">5</span>, splits <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">rpf_boxes</span><span class="op">(</span><span class="va">rpfit</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          tree order box      value wt_lower wt_upper hp_lower hp_upper</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (Intercept)     0   1  0.0000000       NA       NA       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2          hp     1   1 24.0800000       NA       NA       52   123.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3          hp     1   2 14.4859561       NA       NA      230   335.02</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4          hp     1   3 17.0200000       NA       NA      123   205.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5          hp     1   4  2.9575758       NA       NA       52    66.00</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6          hp     1   5 -0.3059561       NA       NA       66   335.02</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          tree order box    value wt_lower wt_upper hp_lower hp_upper</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (Intercept)     0   1  0.00000       NA       NA       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2          wt     1   1 21.16364    2.320    3.435       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3          wt     1   2 15.38415    4.070    5.444       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4          wt     1   3 33.90000    1.513    1.935       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5          wt     1   4 27.30000    1.935    2.320       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6          wt     1   5 17.21280    3.435    4.070       NA       NA</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

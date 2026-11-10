@@ -75,11 +75,11 @@ to plot the boxes.
 ``` r
 rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10)
 head(rpf_boxes(rpfit))
-#>          tree order box      value wt_lower wt_upper hp_lower hp_upper
-#> 1 (Intercept)     0   1  0.0000000       NA       NA       NA       NA
-#> 2          hp     1   1 24.0800000       NA       NA       52   123.00
-#> 3          hp     1   2 14.4859561       NA       NA      230   335.02
-#> 4          hp     1   3 17.0200000       NA       NA      123   205.00
-#> 5          hp     1   4  2.9575758       NA       NA       52    66.00
-#> 6          hp     1   5 -0.3059561       NA       NA       66   335.02
+#>          tree order box    value wt_lower wt_upper hp_lower hp_upper
+#> 1 (Intercept)     0   1  0.00000       NA       NA       NA       NA
+#> 2          wt     1   1 21.16364    2.320    3.435       NA       NA
+#> 3          wt     1   2 15.38415    4.070    5.444       NA       NA
+#> 4          wt     1   3 33.90000    1.513    1.935       NA       NA
+#> 5          wt     1   4 27.30000    1.935    2.320       NA       NA
+#> 6          wt     1   5 17.21280    3.435    4.070       NA       NA
 ```

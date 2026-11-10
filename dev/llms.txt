@@ -142,6 +142,15 @@ Enabling and utilizing functional decomposition
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
   : Extract predicted components from a Random Planted Forest
 
+## Pruning
+
+Dropping small components, chosen by cross-validation or out of bag
+
+- [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  : Prune the components of a Random Planted Forest
+- [`predict(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+  : Predictions of a pruned Random Planted Forest
+
 ## Visualization
 
 Inspecting the trees of a forest
@@ -158,12 +167,15 @@ Inspecting the trees of a forest
 - [`print(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_forest.md)
   [`str(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_forest.md)
   : Compact printing of forest structures
+- [`print(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md)
+  : Print a pruned Random Planted Forest
 - [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
   [`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
   : Serialize and restore Random Planted Forests
 - [`rpf_is_valid()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_is_valid.md)
   : Check whether an rpf object's C++ forest is still alive
 - [`bundle(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/bundle.rpf.md)
+  [`bundle(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/bundle.rpf.md)
   : Bundle an rpf model
 
 # Articles

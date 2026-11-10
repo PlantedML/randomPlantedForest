@@ -38,7 +38,7 @@ The sum of all components equals the overall predicted value for an observation.
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Extract predicted components from a Random Planted Forest</h1>
-      <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/R/predict_components.R" class="external-link"><code>R/predict_components.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/R/predict_components.R" class="external-link"><code>R/predict_components.R</code></a>, <a href="https://github.com/PlantedML/randomPlantedForest/blob/master/R/prune.R" class="external-link"><code>R/prune.R</code></a></small>
       <div class="d-none name"><code>predict_components.Rd</code></div>
     </div>
 
@@ -49,7 +49,25 @@ The sum of all components equals the overall predicted value for an observation.
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">predict_components</span><span class="op">(</span><span class="va">object</span>, <span class="va">new_data</span>, max_interaction <span class="op">=</span> <span class="cn">NULL</span>, predictors <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">predict_components</span><span class="op">(</span><span class="va">object</span>, <span class="va">new_data</span>, <span class="va">...</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># S3 method for class 'rpf'</span></span>
+<span><span class="fu">predict_components</span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  <span class="va">new_data</span>,</span>
+<span>  max_interaction <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  predictors <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># S3 method for class 'rpf_pruned'</span></span>
+<span><span class="fu">predict_components</span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  <span class="va">new_data</span>,</span>
+<span>  max_interaction <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  predictors <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -57,11 +75,16 @@ The sum of all components equals the overall predicted value for an observation.
 
 
 <dl><dt id="arg-object">object<a class="anchor" aria-label="anchor" href="#arg-object"></a></dt>
-<dd><p><code>[rpf]</code>: A fitted <code><a href="rpf.html">rpf</a></code> model.</p></dd>
+<dd><p><code>[rpf | rpf_pruned]</code>: A fitted <code><a href="rpf.html">rpf</a></code> model, or a pruned one from <code><a href="prune_components.html">prune_components()</a></code>.</p></dd>
 
 
 <dt id="arg-new-data">new_data<a class="anchor" aria-label="anchor" href="#arg-new-data"></a></dt>
 <dd><p><code>[data.frame | matrix]</code>: New observations to predict.</p></dd>
+
+
+<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
+<dd><p>Not currently used, but required for extensibility. Unknown
+arguments are an error.</p></dd>
 
 
 <dt id="arg-max-interaction">max_interaction<a class="anchor" aria-label="anchor" href="#arg-max-interaction"></a></dt>
@@ -116,6 +139,15 @@ For other settings, such as more threads, call <code><a href="purify.html">purif
     <h2 id="note">Note<a class="anchor" aria-label="anchor" href="#note"></a></h2>
     <p>Depending on the number of predictors and <code>max_interaction</code>, the number of components will
 increase drastically to <code>sum(choose(ncol(new_data), seq_len(max_interaction)))</code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="pruned-forests">Pruned forests<a class="anchor" aria-label="anchor" href="#pruned-forests"></a></h2>
+
+
+<p>For an <code>rpf_pruned</code> object from <code><a href="prune_components.html">prune_components()</a></code>, <code>m</code> holds only the kept components, each scaled by its
+coefficient <code>beta_S</code>, and <code>intercept</code> is the pruned model's intercept <code>alpha</code>, so that they sum to
+<code><a href="predict.rpf_pruned.html">predict()</a></code> of the pruned model. Components that are not kept are absent, not zero columns.
+If <code>predictors</code> or <code>max_interaction</code> leave out kept components, their sum is returned as <code>remainder</code>.</p>
     </div>
 
     <div class="section level2">

@@ -7,12 +7,17 @@ wrapping
 so rpf models work with the standard tidymodels serialization workflow.
 Training data is not included; see
 [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
-for the implications.
+for the implications. Pruned forests from
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+are bundled the same way.
 
 ## Usage
 
 ``` r
 # S3 method for class 'rpf'
+bundle(x, ...)
+
+# S3 method for class 'rpf_pruned'
 bundle(x, ...)
 ```
 
@@ -20,9 +25,10 @@ bundle(x, ...)
 
 - x:
 
-  `[rpf]`: A fitted
+  `[rpf | rpf_pruned]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-  model.
+  model, or a pruned one from
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
 
 - ...:
 
@@ -30,9 +36,10 @@ bundle(x, ...)
 
 ## Value
 
-An object of class `bundled_rpf` for `bundle()`, or the restored
+An object of class `bundled_rpf` (`bundled_rpf_pruned`) for `bundle()`,
+or the restored
 [rpf](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-object for `unbundle()`.
+(`rpf_pruned`) object for `unbundle()`.
 
 ## Examples
 

@@ -9,9 +9,12 @@
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/plot.rpf.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/predict_components.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/print.rpf.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_forest.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/reference/prune_components.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/purify.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/randomPlantedForest-package.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/reference/rpf.html</loc></url>

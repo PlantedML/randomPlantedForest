@@ -7,20 +7,44 @@ for an observation.
 ## Usage
 
 ``` r
-predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
+predict_components(object, new_data, ...)
+
+# S3 method for class 'rpf'
+predict_components(
+  object,
+  new_data,
+  max_interaction = NULL,
+  predictors = NULL,
+  ...
+)
+
+# S3 method for class 'rpf_pruned'
+predict_components(
+  object,
+  new_data,
+  max_interaction = NULL,
+  predictors = NULL,
+  ...
+)
 ```
 
 ## Arguments
 
 - object:
 
-  `[rpf]`: A fitted
+  `[rpf | rpf_pruned]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-  model.
+  model, or a pruned one from
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
 
 - new_data:
 
   `[data.frame | matrix]`: New observations to predict.
+
+- ...:
+
+  Not currently used, but required for extensibility. Unknown arguments
+  are an error.
 
 - max_interaction:
 
@@ -107,6 +131,18 @@ before `predict_components()`.
 Depending on the number of predictors and `max_interaction`, the number
 of components will increase drastically to
 `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
+
+## Pruned forests
+
+For an `rpf_pruned` object from
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
+`m` holds only the kept components, each scaled by its coefficient
+`beta_S`, and `intercept` is the pruned model's intercept `alpha`, so
+that they sum to
+[`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+of the pruned model. Components that are not kept are absent, not zero
+columns. If `predictors` or `max_interaction` leave out kept components,
+their sum is returned as `remainder`.
 
 ## Examples
 

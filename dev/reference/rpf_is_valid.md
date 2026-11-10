@@ -16,9 +16,11 @@ rpf_is_valid(x)
 
 - x:
 
-  `[rpf]`: A fitted
+  `[rpf | rpf_pruned]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-  model, possibly restored from disk.
+  model, or a pruned one from
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
+  possibly restored from disk.
 
 ## Value
 
