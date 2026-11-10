@@ -34,7 +34,7 @@ expect_roundtrip <- function(fit, new_data) {
 }
 
 test_that("regression round-trip, no data", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
   expect_roundtrip(fit, mtcars)
 })
 
@@ -45,7 +45,7 @@ test_that("binary classification round-trip, no data", {
   # `predict()` independently of marshaling (pre-existing hardhat/formula
   # limitation, not specific to this task).
   dat <- transform(mtcars, am = factor(am))
-  fit <- rpf(am ~ wt + hp, data = dat, ntrees = 10, loss = "logit")
+  fit <- rpf_050(am ~ wt + hp, data = dat, ntrees = 10, loss = "logit")
   restored <- expect_roundtrip(fit, dat)
   expect_identical(
     predict(restored, dat, type = "prob"),
@@ -54,7 +54,7 @@ test_that("binary classification round-trip, no data", {
 })
 
 test_that("multiclass round-trip, no data", {
-  fit <- rpf(Species ~ ., data = iris, ntrees = 10, loss = "L2")
+  fit <- rpf_050(Species ~ ., data = iris, ntrees = 10, loss = "L2")
   restored <- expect_roundtrip(fit, iris)
   expect_identical(
     predict(restored, iris, type = "prob"),
@@ -63,7 +63,7 @@ test_that("multiclass round-trip, no data", {
 })
 
 test_that("purified regression round-trip without data", {
-  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 2)
+  fit <- rpf_050(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 2)
   purify(fit)
   comp_before <- predict_components(fit, mtcars)
   restored <- expect_roundtrip(fit, mtcars)
@@ -72,7 +72,7 @@ test_that("purified regression round-trip without data", {
 })
 
 test_that("purified multiclass round-trip without data", {
-  fit <- rpf(Species ~ ., data = iris, ntrees = 10, loss = "L2")
+  fit <- rpf_050(Species ~ ., data = iris, ntrees = 10, loss = "L2")
   purify(fit)
   comp_before <- predict_components(fit, iris)
   restored <- expect_roundtrip(fit, iris)
@@ -81,7 +81,7 @@ test_that("purified multiclass round-trip without data", {
 })
 
 test_that("marshaled blob contains no external pointers", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   blob <- rpf_marshal(fit)
   has_extptr <- function(x) {
     if (typeof(x) == "externalptr") {
@@ -99,7 +99,7 @@ test_that("marshaled blob contains no external pointers", {
 })
 
 test_that("include_data = TRUE allows purify after restore", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, max_interaction = 2)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 10, max_interaction = 2)
 
   restored <- rpf_unmarshal(rpf_marshal(fit, include_data = TRUE))
   purify(restored)
@@ -112,7 +112,7 @@ test_that("include_data = TRUE allows purify after restore", {
 
 test_that("include_data = TRUE stores the in-bag counts", {
   set.seed(3)
-  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 6, max_interaction = 2)
+  fit <- rpf_050(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 6, max_interaction = 2)
   ib <- fit$fit$inbag()
   blob <- rpf_marshal(fit, include_data = TRUE)
   expect_type(blob$fit_state$inbag, "raw")
@@ -137,13 +137,13 @@ test_that("include_data = TRUE stores the in-bag counts", {
 })
 
 test_that("purify on a data-free restored forest errors informatively", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   restored <- rpf_unmarshal(rpf_marshal(fit))
   expect_error(purify(restored), "include_data")
 })
 
 test_that("restored-without-marshal rpf gives actionable error", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   tmp <- tempfile(fileext = ".rds")
   saveRDS(fit, tmp)
   zombie <- readRDS(tmp)
@@ -160,7 +160,7 @@ test_that("rpf_unmarshal errors on malformed blob missing fit_state", {
 })
 
 test_that("corrupt blobs error instead of reading out of bounds", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
 
   # Interval matrix narrower than feature_size
   blob <- rpf_marshal(fit)
@@ -168,7 +168,7 @@ test_that("corrupt blobs error instead of reading out of bounds", {
   expect_error(rpf_unmarshal(blob), "interval matrix")
 
   # Purified grid: values matrix with wrong dimensions
-  pfit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  pfit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   purify(pfit, mode = 1L)
   # trees[[1]] is the null tree whose 1x1 values matrix is legitimately tiny;
   # corrupt a real component tree instead
@@ -188,7 +188,7 @@ test_that("corrupt blobs error instead of reading out of bounds", {
 })
 
 test_that("exported forest is rebuilt instead of duplicated in the blob", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5, export_forest = TRUE)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5, export_forest = TRUE)
   blob <- rpf_marshal(fit)
   expect_null(blob$forest)
   restored <- rpf_unmarshal(blob)
@@ -197,7 +197,7 @@ test_that("exported forest is rebuilt instead of duplicated in the blob", {
 })
 
 test_that("blob records package version and warns when saved with a newer one", {
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   blob <- rpf_marshal(fit)
   expect_identical(blob$fit_state$pkg_version, utils::packageVersion("randomPlantedForest"))
 
@@ -208,7 +208,7 @@ test_that("blob records package version and warns when saved with a newer one", 
 
 test_that("a purification capped by maxp_interaction survives the round trip", {
   set.seed(2)
-  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
   p0 <- predict(fit, mtcars)
   purify(fit, maxp_interaction = 1)
   restored <- expect_roundtrip(fit, mtcars)
@@ -218,7 +218,7 @@ test_that("a purification capped by maxp_interaction survives the round trip", {
 })
 
 test_that("purified round-trip keeps mode 1 grids and mode 2 rectangles apart", {
-  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 10, max_interaction = 3)
   purify(fit, mode = 1L)
   blob <- rpf_marshal(fit)
   expect_null(blob$fit_state$rects)
@@ -253,7 +253,7 @@ test_that("purified round-trip keeps mode 1 grids and mode 2 rectangles apart", 
 
 test_that("a restored capped purification keeps its order, and is purified again only with data", {
   set.seed(2)
-  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
   purify(fit, maxp_interaction = 2)
 
   restored <- expect_roundtrip(fit, mtcars)
@@ -275,7 +275,7 @@ test_that("a restored capped purification keeps its order, and is purified again
 
 test_that("a blob without the cap's order restores a capped purification", {
   set.seed(2)
-  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
   purify(fit, maxp_interaction = 2)
   blob <- rpf_marshal(fit, include_data = TRUE)
   # as written before the field existed: the order is unknown and counts as 1
@@ -292,7 +292,7 @@ test_that("a blob without the cap's order restores a capped purification", {
 test_that("a capped purification keeps its store and its cap through the round trip, in both modes", {
   for (mode in 1:2) {
     set.seed(6)
-    fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+    fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
     p0 <- predict(fit, mtcars)
     purify(fit, maxp_interaction = 2, mode = mode)
     blob <- rpf_marshal(fit, include_data = TRUE)
@@ -331,7 +331,7 @@ prune_marshal_fit <- function(n = 300) {
   x <- matrix(runif(n * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
   y <- 1 + 2 * x[, 1] + 4 * x[, 2] * x[, 3] + rnorm(n, sd = 0.3)
   set.seed(5)
-  fit <- rpf(x, y, max_interaction = 3, ntrees = 10, splits = 40)
+  fit <- rpf_050(x, y, max_interaction = 3, ntrees = 10, splits = 40)
   list(x = x, y = y, fit = fit)
 }
 

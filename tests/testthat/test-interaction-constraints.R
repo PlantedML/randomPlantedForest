@@ -33,7 +33,7 @@ test_that("no tree lies outside the allowed sets, for every split structure, reg
     for (task in c("regression", "L2", "logit", "exponential")) {
       set.seed(3)
       fit <- if (task == "regression") {
-        rpf(
+        rpf_050(
           X_ic,
           y_ic,
           max_interaction = 0,
@@ -43,7 +43,7 @@ test_that("no tree lies outside the allowed sets, for every split structure, reg
           interaction_constraints = sets
         )
       } else {
-        rpf(
+        rpf_050(
           X_ic,
           yc_ic,
           max_interaction = 0,
@@ -66,7 +66,7 @@ test_that("no tree lies outside the allowed sets, for every split structure, reg
 test_that("interaction_constraints composes with max_interaction", {
   for (ss in structures_ic) {
     set.seed(4)
-    fit <- suppressMessages(rpf(
+    fit <- suppressMessages(rpf_050(
       X_ic,
       y_ic,
       max_interaction = 2,
@@ -81,19 +81,19 @@ test_that("interaction_constraints composes with max_interaction", {
   }
   # without max_interaction's cap, the triple {x3, x4, x5} can be grown
   set.seed(4)
-  fit <- rpf(X_ic, y_ic, max_interaction = 0, ntrees = 5, splits = 200, interaction_constraints = list(1:2, 3:5))
+  fit <- rpf_050(X_ic, y_ic, max_interaction = 0, ntrees = 5, splits = 200, interaction_constraints = list(1:2, 3:5))
   expect_true(max(lengths(tree_dims(fit))) == 3)
 })
 
 test_that("a feature in no set is not used", {
   set.seed(5)
-  fit <- rpf(X_ic, y_ic, max_interaction = 0, ntrees = 5, splits = 50, interaction_constraints = list(c(1, 2)))
+  fit <- rpf_050(X_ic, y_ic, max_interaction = 0, ntrees = 5, splits = 50, interaction_constraints = list(c(1, 2)))
   expect_true(all(unlist(tree_dims(fit)) %in% 1:2))
 })
 
 test_that("names, indices and the formula interface give the same fit", {
   set.seed(6)
-  a <- rpf(
+  a <- rpf_050(
     X_ic,
     y_ic,
     max_interaction = 0,
@@ -102,7 +102,7 @@ test_that("names, indices and the formula interface give the same fit", {
     interaction_constraints = list(c("x1", "x2"), "x3")
   )
   set.seed(6)
-  b <- rpf(
+  b <- rpf_050(
     X_ic,
     y_ic,
     max_interaction = 0,
@@ -112,7 +112,7 @@ test_that("names, indices and the formula interface give the same fit", {
   )
   dat <- data.frame(y = y_ic, X_ic)
   set.seed(6)
-  d <- rpf(
+  d <- rpf_050(
     y ~ .,
     data = dat,
     max_interaction = 0,
@@ -129,9 +129,9 @@ test_that("names, indices and the formula interface give the same fit", {
 test_that("without interaction_constraints the fit is unchanged; all sets allowed equals no constraint", {
   for (ss in structures_ic) {
     set.seed(7)
-    a <- rpf(X_ic, y_ic, max_interaction = 3, ntrees = 3, splits = 40, split_structure = ss)
+    a <- rpf_050(X_ic, y_ic, max_interaction = 3, ntrees = 3, splits = 40, split_structure = ss)
     set.seed(7)
-    b <- rpf(
+    b <- rpf_050(
       X_ic,
       y_ic,
       max_interaction = 3,
@@ -141,7 +141,7 @@ test_that("without interaction_constraints the fit is unchanged; all sets allowe
       interaction_constraints = NULL
     )
     set.seed(7)
-    d <- suppressMessages(rpf(
+    d <- suppressMessages(rpf_050(
       X_ic,
       y_ic,
       max_interaction = 3,
@@ -156,9 +156,9 @@ test_that("without interaction_constraints the fit is unchanged; all sets allowe
   }
   # classification too
   set.seed(8)
-  a <- rpf(X_ic, yc_ic, max_interaction = 2, ntrees = 3, splits = 40, loss = "logit")
+  a <- rpf_050(X_ic, yc_ic, max_interaction = 2, ntrees = 3, splits = 40, loss = "logit")
   set.seed(8)
-  d <- suppressMessages(rpf(
+  d <- suppressMessages(rpf_050(
     X_ic,
     yc_ic,
     max_interaction = 2,
@@ -171,7 +171,7 @@ test_that("without interaction_constraints the fit is unchanged; all sets allowe
 })
 
 test_that("bad interaction_constraints give clear errors", {
-  fit <- function(ic) rpf(X_ic, y_ic, ntrees = 2, splits = 5, interaction_constraints = ic)
+  fit <- function(ic) rpf_050(X_ic, y_ic, ntrees = 2, splits = 5, interaction_constraints = ic)
   expect_error(fit(c("x1", "x2")), "must be .*NULL.* or a non-empty list")
   expect_error(fit(list()), "must be .*NULL.* or a non-empty list")
   expect_error(fit(list(c("x1", "nope"))), "unknown predictor")
@@ -182,7 +182,7 @@ test_that("bad interaction_constraints give clear errors", {
   expect_error(fit(list(c(1, NA))), "non-empty vector without")
   expect_error(fit(list(TRUE)), "must be predictor names or column indices")
   expect_message(
-    rpf(X_ic, y_ic, ntrees = 2, splits = 5, max_interaction = 1, interaction_constraints = list(1:2)),
+    rpf_050(X_ic, y_ic, ntrees = 2, splits = 5, max_interaction = 1, interaction_constraints = list(1:2)),
     "Trees use at most 1 predictor"
   )
 })
@@ -192,7 +192,7 @@ test_that("with a formula, indices refer to the formula's predictors in the user
   n <- 200
   df <- data.frame(x1 = runif(n), g = factor(sample(letters[1:3], n, TRUE)), x2 = runif(n))
   df$y <- (df$g == "b") * 2 + df$x1 * df$x2 + rnorm(n, sd = 0.2)
-  fit <- rpf(
+  fit <- rpf_050(
     y ~ x1 + g + x2,
     data = df,
     interaction_constraints = list(c(1, 2)),
@@ -209,19 +209,32 @@ test_that("with a formula, indices refer to the formula's predictors in the user
   expect_false(match("x2", cols) %in% unlist(tree_dims(fit)))
   # the same as giving the names, and `y ~ .` follows the columns of `data`
   set.seed(1)
-  a <- rpf(y ~ x1 + g + x2, data = df, interaction_constraints = list(c(3, 2)), max_interaction = 0, ntrees = 2)
+  a <- rpf_050(y ~ x1 + g + x2, data = df, interaction_constraints = list(c(3, 2)), max_interaction = 0, ntrees = 2)
   set.seed(1)
-  b <- rpf(y ~ x1 + g + x2, data = df, interaction_constraints = list(c("x2", "g")), max_interaction = 0, ntrees = 2)
+  b <- rpf_050(
+    y ~ x1 + g + x2,
+    data = df,
+    interaction_constraints = list(c("x2", "g")),
+    max_interaction = 0,
+    ntrees = 2
+  )
   expect_identical(predict(a, df), predict(b, df))
-  fit_dot <- rpf(y ~ ., data = df, interaction_constraints = list(c(2, 3)), max_interaction = 0, ntrees = 1, splits = 5)
+  fit_dot <- rpf_050(
+    y ~ .,
+    data = df,
+    interaction_constraints = list(c(2, 3)),
+    max_interaction = 0,
+    ntrees = 1,
+    splits = 5
+  )
   expect_setequal(fit_dot$params$interaction_constraints[[1]], c("g", "x2"))
   expect_error(
-    rpf(y ~ x1 + g + x2, data = df, interaction_constraints = list(c(1, 4))),
+    rpf_050(y ~ x1 + g + x2, data = df, interaction_constraints = list(c(1, 4))),
     "formula's predictors"
   )
   # a term that is not one model column can only be given by column names
   expect_error(
-    rpf(y ~ poly(x1, 2) + x2, data = df, interaction_constraints = list(c(1, 2))),
+    rpf_050(y ~ poly(x1, 2) + x2, data = df, interaction_constraints = list(c(1, 2))),
     "not a single model column"
   )
 })
@@ -231,9 +244,9 @@ test_that("with a recipe, interaction_constraints takes names only", {
   dat <- data.frame(y = y_ic, X_ic)
   rec <- recipes::recipe(y ~ ., data = dat)
   set.seed(9)
-  fit <- rpf(rec, dat, max_interaction = 0, ntrees = 2, splits = 30, interaction_constraints = list(c("x1", "x2")))
+  fit <- rpf_050(rec, dat, max_interaction = 0, ntrees = 2, splits = 30, interaction_constraints = list(c("x1", "x2")))
   expect_true(all(unlist(tree_dims(fit)) %in% 1:2))
-  expect_error(rpf(rec, dat, interaction_constraints = list(1:2)), "by predictor names")
+  expect_error(rpf_050(rec, dat, interaction_constraints = list(1:2)), "by predictor names")
 })
 
 # The paths added after interaction_constraints (the OOB path, splits = NULL, the fast draw, min_leaf_rows,
@@ -242,7 +255,7 @@ ic_fit <- function(y, ..., ntrees = 6, exact_draw = TRUE, seed = 5) {
   old <- options(randomPlantedForest.exact_draw = exact_draw)
   on.exit(options(old))
   set.seed(seed)
-  rpf(X_ic, y, max_interaction = 0, ntrees = ntrees, split_try = 5, t_try = 0.5, ...)
+  rpf_050(X_ic, y, max_interaction = 0, ntrees = ntrees, split_try = 5, t_try = 0.5, ...)
 }
 ic_sets <- list(c("x1", "x2"), c("x3", "x4"), "x5")
 ic_idx <- list(1:2, 3:4, 5)

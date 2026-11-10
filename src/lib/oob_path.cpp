@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
 #include <exception>
@@ -174,23 +175,29 @@ OobPath RandomPlantedForest::oob_path() const
 // The adaptive fit: choose the number of splits out of bag while growing, one family at a time.
 //
 // The stopper follows the forest's corrected OOB error checkpoint by checkpoint, as if all families grew together, and
-// stops once its lowest value is `patience` checkpoints back (and at least `floor` splits are grown), or at the last
-// checkpoint. Growing all families together would hold every family's growing state (bootstrap copy, residuals,
-// leaves with their rows and caches, candidate pool) until the stop. Here at most `nthreads` families grow at a time,
-// each alone and to a bound (a number of checkpoints). A family keeps its OOB predictions at the checkpoints it reached
-// and a record of its splits (RpfSplitRecord, 40 bytes a split, and 16 bytes per score column more with value_size >
-// 1). A family's splits depend only on its seed (its own random stream; the budget, the last checkpoint, is the same),
-// so its predictions at a checkpoint are those of growing all families together, and the record rebuilds its leaves
-// there.
+// stops once its lowest value is `patience` checkpoints back, or once that value has improved by at most `tolerance`
+// paired standard errors over the last `patience` checkpoints (a plateau; and at least `floor` splits are grown), or at
+// the last checkpoint. Growing all families together would hold every family's growing state (bootstrap copy,
+// residuals, leaves with their rows and caches, candidate pool) until the stop. Here at most `nthreads` families grow
+// at a time, each alone and to a bound (a number of checkpoints). A family keeps its OOB predictions at the checkpoints
+// it reached and a record of its splits (RpfSplitRecord, 40 bytes a split, and 16 bytes per score column more with
+// value_size > 1). A family's splits depend only on its seed (its own random stream; the budget, the last checkpoint,
+// is the same), so its predictions at a checkpoint are those of growing all families together, and the record rebuilds
+// its leaves there.
 //
 // 1. Pilot: the first `nthreads` families grow together, checkpoint by checkpoint, until the stopper's rule on their
-//    own corrected OOB error (AloneFit::estimate(), the same patience and floor) stops. That is the first bound.
+//    own corrected OOB error (AloneFit::estimate(), the same patience, tolerance and floor) stops. That is the first
+//    bound.
 // 2. The other families grow alone to the bound, `nthreads` at a time; after each one the estimate is made again from
 //    all families so far, and the bound moves to it. A family that reaches the bound pauses there (its thread waits,
 //    holding its growing state with the per-leaf caches freed) while the paused families fit in the pause budget
 //    (`pause_gb`; their size is estimated), and otherwise finishes: its growing state is freed. When the bound rises,
 //    the paused families below it grow on (cheaply); the finished ones are grown again from their seed (the same
-//    splits, further) once every family has been grown.
+//    splits, further) once every family has been grown. A family pauses at most `patience` checkpoints (one doubling)
+//    past the pilot's bound: on a flat OOB curve the estimate from part of the families keeps finding new minima and
+//    would grow every family far past the stop (a three-class logit forest of 200 families on 100 rows grew 2.7 times
+//    the splits it needed), while a paused family that falls short of the stop grows on cheaply in step 3. A family
+//    that cannot pause grows to the uncapped estimate, as a regrowth from its seed is not cheap.
 // 3. The stopper is then called checkpoint by checkpoint with the OOB path there (the families' predictions summed in
 //    family order, as fit() sums them). Where it goes on past the bound, the families grow further first (to the
 //    earliest stop the curve so far allows).
@@ -233,7 +240,8 @@ struct RandomPlantedForest::AloneFit {
   };
   // the settings (set_adaptive())
   AdaptiveStopper stopper;
-  int patience = 4; // the stopper's patience (checkpoints) and floor (splits), for the bound
+  int patience = 4; // the stopper's patience (checkpoints), tolerance (paired SEs) and floor (splits), for the bound
+  double tolerance = 0;
   double floor = 0;
   double pause_budget = 0; // bytes
   // the fit
@@ -243,6 +251,9 @@ struct RandomPlantedForest::AloneFit {
   // with many families paused the system time of those wake-ups was many times the fit's, also at nthreads = 1
   std::unique_ptr<std::condition_variable[]> paused_cv;
   std::atomic<size_t> bound{0}; // a family grows to this many checkpoints (read at each checkpoint)
+  std::atomic<size_t> bound_free{
+      0};                   // the estimate without the cap on pausing (phase 2), for families that cannot pause
+  size_t need_patience = 0; // estimate()'s bound by the patience alone where the curve ends before a stop
   std::atomic<bool> cancel{false};
   std::exception_ptr err;
   std::vector<Family> fam;
@@ -303,70 +314,120 @@ struct RandomPlantedForest::AloneFit {
   }
 
   // The bound: the number of checkpoints the forest would grow to by the stopper's rule (the lowest corrected OOB
-  // error `patience` checkpoints back, at least `floor` splits) on the families counted so far (at each checkpoint,
-  // those that reached it; the curve ends where fewer than min(4, pilot size) are counted). Where every family is
-  // counted, the error is the stopper's (so the bound is its stop, up to the rounding of the sums); elsewhere v_i is
-  // the sample variance over the row's OOB families, on the rows with at least two (with few families the even / odd
-  // estimate, and the rows it leaves uncorrected, stop too early). Where the curve ends before a stop, the earliest
-  // stop that could follow. A row's error is the forest's oob_row_error() (regression: (y - g)^2 - (1 / m - 1 / B) v;
-  // with V > 1 columns and the sample variances, the diagonal of their covariance).
+  // error `patience` checkpoints back, or its gain over the last `patience` checkpoints within `tolerance` paired
+  // standard errors; at least `floor` splits) on the families counted so far (at each checkpoint, those that reached
+  // it; the curve ends where fewer than min(4, pilot size) are counted). Where every family is counted, the error is
+  // the stopper's (so the bound is its stop, up to the rounding of the sums); elsewhere v_i is the sample variance over
+  // the row's OOB families, on the rows with at least two (with few families the even / odd estimate, and the rows it
+  // leaves uncorrected, stop too early). Where the curve ends before a stop, the earliest stop that could follow by
+  // the patience alone. A row's error is the forest's oob_row_error() (regression: (y - g)^2 - (1 / m - 1 / B) v; with
+  // V > 1 columns and the sample variances, the diagonal of their covariance).
   size_t estimate()
   {
     const size_t C = cp.size();
     std::vector<double> e;
     const size_t min_fam = std::min<size_t>(4, std::max<size_t>(1, std::min(B, pilot_n)));
     std::vector<double> g(V), d(V), var(V);
-    for (size_t c = 0; c < C && !s0[c].empty() && n_counted[c] >= min_fam; ++c) {
+    // row i's error at checkpoint c in `err`; false if the row is not counted there
+    auto row_error = [&](size_t c, size_t i, double &err) -> bool {
       const bool all = n_counted[c] == B || n_counted[c] < 2; // (one family: no variance across families)
-      double sum = 0;
+      const int a = m0[c][i], b = m1[c][i], m = a + b;
+      if (m == 0 || (!all && m < 2))
+        return false;
+      for (size_t v = 0; v < V; ++v) {
+        const double g0 = s0[c][i * V + v], g1 = s1[c][i * V + v];
+        g[v] = (g0 + g1) / m;
+        if (!all)
+          var[v] = (q[c][i * V + v] - m * g[v] * g[v]) / (m - 1);
+        else if (a > 0 && b > 0)
+          d[v] = g0 / a - g1 / b;
+      }
+      const double coef = 1.0 / m - 1.0 / (double)B;
+      if (!all)
+        err = forest->oob_row_error(i, g.data(), nullptr, 0.0, var.data(), coef);
+      else if (a > 0 && b > 0)
+        err = forest->oob_row_error(i, g.data(), d.data(), 1.0 / a + 1.0 / b, nullptr, coef);
+      else
+        err = forest->oob_row_error(i, g.data(), nullptr, 0.0, nullptr, coef);
+      return true;
+    };
+    for (size_t c = 0; c < C && !s0[c].empty() && n_counted[c] >= min_fam; ++c) {
+      double sum = 0, err = 0;
       size_t n_ok = 0;
       for (size_t i = 0; i < N; ++i) {
-        const int a = m0[c][i], b = m1[c][i], m = a + b;
-        if (m == 0 || (!all && m < 2))
+        if (!row_error(c, i, err))
           continue;
-        for (size_t v = 0; v < V; ++v) {
-          const double g0 = s0[c][i * V + v], g1 = s1[c][i * V + v];
-          g[v] = (g0 + g1) / m;
-          if (!all)
-            var[v] = (q[c][i * V + v] - m * g[v] * g[v]) / (m - 1);
-          else if (a > 0 && b > 0)
-            d[v] = g0 / a - g1 / b;
-        }
-        const double coef = 1.0 / m - 1.0 / (double)B;
-        if (!all)
-          sum += forest->oob_row_error(i, g.data(), nullptr, 0.0, var.data(), coef);
-        else if (a > 0 && b > 0)
-          sum += forest->oob_row_error(i, g.data(), d.data(), 1.0 / a + 1.0 / b, nullptr, coef);
-        else
-          sum += forest->oob_row_error(i, g.data(), nullptr, 0.0, nullptr, coef);
+        sum += err;
         ++n_ok;
       }
       if (n_ok == 0)
         break;
       e.push_back(sum / (double)n_ok);
     }
+    // the plateau: the gain of the lowest error from checkpoint a to checkpoint b is at most `tolerance` standard
+    // errors of the rows' paired differences (over the rows counted at both)
+    auto plateau = [&](size_t a, size_t b) -> bool {
+      const double gain = e[a] - e[b];
+      if (gain <= 0)
+        return true;
+      double mean = 0, m2 = 0, ea = 0, eb = 0;
+      size_t n = 0;
+      for (size_t i = 0; i < N; ++i) {
+        if (!row_error(a, i, ea) || !row_error(b, i, eb))
+          continue;
+        const double x = ea - eb, dx = x - mean;
+        ++n;
+        mean += dx / (double)n;
+        m2 += dx * (x - mean);
+      }
+      if (n < 2)
+        return false;
+      return gain <= tolerance * std::sqrt(m2 / (double)(n - 1) / (double)n);
+    };
     size_t need = C;
     const size_t L = e.size();
     if (L == 0)
-      return std::min<size_t>(C, 1);
-    double mn = e[0];
-    size_t best = 0;
-    bool stopped = false;
-    for (size_t c = 0; c < L && !stopped; ++c) {
+      return need_patience = std::min<size_t>(C, 1);
+    double mn = e[0], mn_lag = e[0];
+    size_t best = 0, best_lag = 0; // the first lowest error up to c, and up to c - patience
+    // the stop by the patience alone (need_patience) and by the patience or the plateau (need). Before every family is
+    // counted the rows' errors are noisier, so the plateau's SE is larger and its estimate can stop early: the bound
+    // for families that cannot pause (a regrowth from the seed is not cheap) is the patience's.
+    bool stopped = false, stopped_patience = false;
+    need_patience = C;
+    for (size_t c = 0; c < L && !stopped_patience; ++c) {
       mn = std::min(mn, e[c]);
       while (!(e[best] <= mn * (1 + 1e-12) || e[best] == mn))
         ++best;
       if ((c - best >= (size_t)patience && cp[c] >= floor) || c + 1 == C) {
-        need = c + 1;
+        need_patience = c + 1;
+        stopped_patience = true;
+        if (!stopped)
+          need = c + 1;
         stopped = true;
+      } else if (!stopped && tolerance > 0 && c >= (size_t)patience) {
+        mn_lag = std::min(mn_lag, e[c - patience]);
+        while (!(e[best_lag] <= mn_lag * (1 + 1e-12) || e[best_lag] == mn_lag))
+          ++best_lag;
+        if (cp[c] >= floor && plateau(best_lag, best)) {
+          need = c + 1;
+          stopped = true;
+        }
       }
     }
-    if (!stopped) {
-      size_t c = std::max(L, best + (size_t)patience);
+    // where the curve ends before a stop: the earliest stop by the patience alone; with the plateau on, the
+    // checkpoint after the next one (the next one, where the plateau could stop first, made families pause and resume
+    // at every checkpoint on long paths: three times the pauses and up to 14% more time on a three-class exponential
+    // fit of 566 splits; two further gave back most of the time saved on short logit paths)
+    auto earliest = [&](size_t c) {
       while (c < C && cp[c] < floor)
         ++c;
-      need = std::min(C, c + 1);
-    }
+      return std::min(C, c + 1);
+    };
+    if (!stopped_patience)
+      need_patience = earliest(std::max(L, best + (size_t)patience));
+    if (!stopped)
+      need = tolerance > 0 ? std::min(earliest(L + 1), need_patience) : need_patience;
     stats.bound_trace.push_back((int)need);
     return need;
   }
@@ -392,13 +453,17 @@ struct RandomPlantedForest::AloneFit {
     }
   }
 
-  // After a family is counted (under the lock): the bound moves to the new estimate, and the finished families short
-  // of it are queued to grow again (the paused ones resume on their own)
+  // After a family is counted (under the lock): the bound moves to the new estimate, at most `patience` checkpoints
+  // past the pilot's bound (bound_free keeps the estimate by the patience alone, uncapped), and the finished families
+  // short of it are queued to grow again (the paused ones resume on their own)
   void after_count()
   {
     if (!estimating || pilot_on)
       return;
-    const size_t need = estimate();
+    size_t need = estimate();
+    bound_free = need_patience;
+    if (stats.pilot_bound > 0)
+      need = std::min(need, (size_t)stats.pilot_bound + (size_t)patience);
     bound = need;
     for (size_t b = 0; b < fam.size(); ++b)
       if (fam[b].state == 2 && fam[b].reached < need) {
@@ -409,19 +474,25 @@ struct RandomPlantedForest::AloneFit {
 };
 
 void RandomPlantedForest::set_adaptive(
-    const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
+    const std::vector<int> &checkpoints,
+    AdaptiveStopper stopper,
+    int patience,
+    double tolerance,
+    double floor,
+    double pause_gb
 )
 {
   if (deterministic)
     throw std::invalid_argument("The adaptive fit needs out-of-bag rows (deterministic = FALSE).");
   if (checkpoints.empty() || checkpoints.back() != n_splits)
     throw std::invalid_argument("The adaptive fit's last checkpoint must be its number of splits.");
-  if (!stopper || patience < 1 || pause_gb < 0)
-    throw std::invalid_argument("The adaptive fit needs a stopper, patience >= 1 and pause_gb >= 0.");
+  if (!stopper || patience < 1 || !(tolerance >= 0) || pause_gb < 0)
+    throw std::invalid_argument("The adaptive fit needs a stopper, patience >= 1, tolerance >= 0 and pause_gb >= 0.");
   set_oob_path(checkpoints);
   alone_ = std::make_shared<AloneFit>();
   alone_->stopper = std::move(stopper);
   alone_->patience = patience;
+  alone_->tolerance = tolerance;
   alone_->floor = floor;
   alone_->pause_budget = pause_gb * 1e9;
 }
@@ -492,10 +563,12 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     }
     std::unique_lock<std::mutex> lk(A.m);
     AloneFit::Family &F = A.fam[n];
-    // no room to pause: finish one checkpoint past the bound (growing a checkpoint further costs a fifth more splits;
-    // falling short of the stop, a regrowth from the seed)
-    if (A.paused_bytes + bytes > A.pause_budget || !trk.fam)
-      return c + 1 < A.bound.load() + 1 && !A.cancel;
+    // no room to pause: finish one checkpoint past the bound, uncapped while the bound is estimated (growing a
+    // checkpoint further costs a fifth more splits; falling short of the stop, a regrowth from the seed)
+    if (A.paused_bytes + bytes > A.pause_budget || !trk.fam) {
+      const size_t to = A.estimating ? std::max(A.bound.load(), A.bound_free.load()) : A.bound.load();
+      return c + 1 < to + 1 && !A.cancel;
+    }
     // pause: the predictions so far go to the family's record (the stopper reads them there), the bound is estimated
     // again, and the thread gives up its permit until the bound rises past it (or the fit ends)
     F.snaps.resize(std::max(F.snaps.size(), trk.csnaps.size()));
@@ -881,11 +954,16 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
       A.consumed = c;
       if (lack) {
         // the stopper goes on past the bound: every family grows further, to the earliest stop the curve so far
-        // allows (the paused ones resume, the finished ones are grown again)
+        // allows (the paused ones resume, the finished ones are grown again; then by the patience alone, as a
+        // regrowth from the seed is not cheap)
         {
           std::lock_guard<std::mutex> lk(A.m);
           A.estimating = false;
-          A.bound = std::min(C, std::max(c + 1, A.estimate()));
+          size_t need = A.estimate();
+          for (size_t b = 0; b < B; ++b)
+            if (A.fam[b].state == 2 && A.fam[b].reached <= c)
+              need = A.need_patience;
+          A.bound = std::min(C, std::max(c + 1, need));
           for (size_t b = 0; b < B; ++b)
             if (A.fam[b].state == 2 && A.fam[b].reached < A.bound) {
               A.fam[b].state = 3;

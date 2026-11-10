@@ -34,7 +34,9 @@ the \code{tree} column of \code{\link[=rpf_boxes]{rpf_boxes()}}, e.g. \code{c("x
 all trees up to \code{max_interaction}.}
 
 \item{class}{\verb{[character(1) | NULL: NULL]}: For multiclass classification,
-the outcome level whose values to plot. \code{NULL} uses the first level.}
+the outcome level whose values to plot. \code{NULL} uses the first level (for
+\code{loss = "logit"}, the first level after the reference level, which has no
+values of its own).}
 
 \item{factor_levels}{\verb{[logical(1): TRUE]}: Label factors with their
 levels instead of integer codes. Levels are in the order used in the fit:
@@ -79,7 +81,7 @@ plotting functions in \code{glex}.
 }
 \examples{
 \dontshow{if (rlang::is_installed(c("ggplot2", "patchwork"))) withAutoprint(\{ # examplesIf}
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10, prune = FALSE)
 plot(rpfit)
 purify(rpfit)
 plot(rpfit, type = "boxes")

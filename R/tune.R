@@ -3,7 +3,8 @@
 #' The points of greediness that `rpf(tune = )` searches: pairs of `split_try` (thresholds evaluated per split
 #' candidate) and `t_try` (share of the possible splits drawn as candidates in each round), greediest first. Each step
 #' down the ladder halves `t_try` and `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125, except the
-#' first, which takes `t_try` from 1 to 0.8. Row 3 is [rpf()]'s default, 10 / 0.4.
+#' first, which takes `t_try` from 1 to 0.8. Row 3 is the other split structures' default, 10 / 0.4; row 5 is
+#' [rpf()]'s default for `split_structure = "leaves"`, 3 / 0.1.
 #'
 #' @return A `data.frame` with columns `split_try` and `t_try`, one row per point, greediest first.
 #' @seealso [tune_control()], [rpf()]
@@ -58,6 +59,7 @@ greediness_ladder <- function() {
 #' tuned <- rpf(
 #'   x,
 #'   y,
+#'   max_interaction = 2,
 #'   ntrees = 10,
 #'   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 #' )
@@ -118,7 +120,8 @@ tune_resolve <- function(tune, call) {
 # Which of the settings that `tune` takes over the user gave in the call of an rpf() method (its environment)
 tune_given <- function(env) {
   args <- c("splits", "split_try", "t_try", "min_leaf_rows", "prune")
-  vapply(args, function(a) !eval(call("missing", as.name(a)), env), logical(1))
+  # an argument given as NULL counts as not given (NULL is the default of each)
+  vapply(args, function(a) !eval(call("missing", as.name(a)), env) && !is.null(get(a, envir = env)), logical(1))
 }
 
 # The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none

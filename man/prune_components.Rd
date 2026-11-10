@@ -77,7 +77,12 @@ An object of class \code{rpf_pruned}, a list with elements:
 \item \code{sets}: the predictor sets of the kept components, as column indices.
 \item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows (after a second pruning
 of the display, only of those the first pruning kept: see below): \code{component} (its name, as in
-\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
+\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped), and \code{model_share}:
+the share of the final model's component, \verb{Var(beta_S f_S) / Var(prediction of the model)} on the training rows
+(with the display, of \code{f_S} in its heat-map form; for classification, as \code{share}, over the centred score columns;
+\code{NA} if dropped). \code{share} is what \code{tau} thresholds; \code{model_share} is the component's importance in the model,
+which \link[=print.rpf_pruned]{print()} shows. As the components need not be uncorrelated, the shares need not sum to
+1.
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
 \code{tau}, \code{oob_rmse} (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
 Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and
@@ -291,7 +296,7 @@ per component and score column, named as for the forest.
 set.seed(1)
 x <- matrix(runif(600 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50)
+fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50, prune = FALSE)
 
 # Rule and threshold chosen out of bag (no refits): the largest tau within one SE
 # of the lowest error
@@ -313,7 +318,7 @@ predict(pruned, x[1:5, ])
 
 # A three-way interaction, shown in at most 4 heat maps
 y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
-fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100, prune = FALSE)
 shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 shown
 shown$display$forms

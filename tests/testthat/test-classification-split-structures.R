@@ -53,9 +53,9 @@ test_that("classification with loss L2 reproduces regression on a 0/1 response",
 test_that("classification cur_trees_1 differs from cur_trees_2", {
   for (loss in c("logit", "exponential", "L2")) {
     set.seed(3)
-    f1 <- rpf(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_1")
+    f1 <- rpf_050(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_1")
     set.seed(3)
-    f2 <- rpf(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_2")
+    f2 <- rpf_050(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_2")
     p1 <- predict(f1, dat_cs, type = "prob")
     p2 <- predict(f2, dat_cs, type = "prob")
     expect_gt(max(abs(as.matrix(p1) - as.matrix(p2))), 1e-6, label = loss)
@@ -65,7 +65,15 @@ test_that("classification cur_trees_1 differs from cur_trees_2", {
 test_that("classification cur_trees_2 and res_trees refine leaves within their own tree", {
   for (s in c("cur_trees_2", "res_trees", "cur_trees_1", "leaves", "hist")) {
     set.seed(4)
-    f <- rpf(y ~ ., data = dat_cs, loss = "logit", ntrees = 5, splits = 40, max_interaction = 2, split_structure = s)
+    f <- rpf_050(
+      y ~ .,
+      data = dat_cs,
+      loss = "logit",
+      ntrees = 5,
+      splits = 40,
+      max_interaction = 2,
+      split_structure = s
+    )
     expect_gt(own_dim_interior(f, X_cs), 0, label = s)
   }
 })
@@ -73,7 +81,14 @@ test_that("classification cur_trees_2 and res_trees refine leaves within their o
 test_that("split_decay_rate changes a res_trees classification fit", {
   fits <- lapply(c(0, 2), function(rate) {
     set.seed(6)
-    f <- rpf(y ~ ., data = dat_cs, loss = "logit", ntrees = 5, split_structure = "res_trees", split_decay_rate = rate)
+    f <- rpf_050(
+      y ~ .,
+      data = dat_cs,
+      loss = "logit",
+      ntrees = 5,
+      split_structure = "res_trees",
+      split_decay_rate = rate
+    )
     as.matrix(predict(f, dat_cs, type = "prob"))
   })
   expect_gt(max(abs(fits[[1]] - fits[[2]])), 1e-6)
@@ -120,7 +135,7 @@ test_that("deterministic res_trees and cur_trees_2 learn in classification", {
   pt <- plogis(eta(Xt))
   for (loss in c("logit", "L2")) {
     for (ss in c("res_trees", "cur_trees_2")) {
-      fit <- rpf(
+      fit <- rpf_050(
         x = X,
         y = y,
         max_interaction = 2,

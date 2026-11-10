@@ -10,7 +10,7 @@ fix_sim <- function(n = 300, p = 4, seed = 11) {
 
 fix_fit <- function(d, max_interaction = 2, ntrees = 20, splits = 40, ...) {
   set.seed(5)
-  rpf(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits, ...)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits, ...)
 }
 
 # The decomposition over every predictor set up to the forest's order, for comparison
@@ -50,7 +50,7 @@ test_that("many predictors at full order: only the stored components, not 2^p - 
   # 2^20 - 1 candidate sets, a few hundred stored components
   d <- fix_sim(n = 200, p = 20)
   set.seed(5)
-  fit <- rpf(d$x, d$y, max_interaction = 20, ntrees = 3, splits = 15)
+  fit <- rpf_050(d$x, d$y, max_interaction = 20, ntrees = 3, splits = 15)
   t0 <- proc.time()[["elapsed"]]
   pr <- prune_components(fit, d$x, d$y, rule = "R", tau = c(0, 0.01), select_by = "cv", folds = 2, seed = 1)
   expect_lt(proc.time()[["elapsed"]] - t0, 60)
@@ -241,8 +241,11 @@ expect_oob_choice <- function(oob) {
 test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   # 32 rows, 10 families: R at a small tau has about as many coefficients as a fold has rows, its predictions differ
   # wildly between the two halves of the families, and the correction can exceed the uncorrected OOB MSE
+  # (0.5.0's defaults and the exact draw: the fit the clamped candidates below are named for)
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   set.seed(1)
-  pm <- rpf(mpg ~ ., data = mtcars, ntrees = 10, splits = NULL, prune = TRUE, nthreads = 1)
+  pm <- rpf_050(mpg ~ ., data = mtcars, ntrees = 10, splits = NULL, prune = TRUE, nthreads = 1)
   expect_s3_class(pm, "rpf_pruned")
   oob <- pm$oob
   zero <- oob$oob_rmse == 0
@@ -268,7 +271,7 @@ test_that("noiseless data: corrected OOB errors of 0 are left out, and the choic
   x <- data.frame(x1 = (i - 0.5) / n, x2 = ((i * 7) %% n) / n)
   y <- x$x1
   set.seed(1)
-  fit <- rpf(x, y, max_interaction = 1, ntrees = 10, splits = 10, nthreads = 1)
+  fit <- rpf_050(x, y, max_interaction = 1, ntrees = 10, splits = 10, nthreads = 1)
   pr <- prune_components(fit, x, y, seed = 1, nthreads = 1)
   oob <- pr$oob
   zero <- oob$oob_rmse == 0

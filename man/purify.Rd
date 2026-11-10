@@ -62,7 +62,7 @@ with the default \code{NULL}) is purified again, which needs its training data: 
 \code{\link[=rpf_unmarshal]{rpf_unmarshal()}} without it can only be purified up to its earlier cap.
 }
 \examples{
-rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
 is_purified(rpfit)
 purify(rpfit)
 is_purified(rpfit)

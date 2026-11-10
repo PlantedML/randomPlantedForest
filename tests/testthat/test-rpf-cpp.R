@@ -5,7 +5,7 @@ test_that("C-level functionality works", {
 
   ntrees <- 35
   set.seed(23)
-  rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = ntrees)
+  rpfit <- rpf_050(mpg ~ ., data = train, max_interaction = 3, ntrees = ntrees)
   pred <- predict(rpfit, test)
 
   mse <- rpfit$fit$MSE(as.matrix(pred$.pred), as.matrix(test$mpg))

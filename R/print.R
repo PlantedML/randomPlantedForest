@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
+#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
 print.rpf <- function(x, ...) {
   cat(format(x, ...), sep = "\n")
   invisible(x)
@@ -93,11 +93,11 @@ format.rpf <- function(x, ...) {
       cli::cli_alert_warning("Fit deterministically.")
     }
     if (
-      isFALSE(params$exact_draw) &&
+      isTRUE(params$exact_draw %||% TRUE) &&
         !params$deterministic &&
         params$split_structure == "leaves"
     ) {
-      cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")
+      cli::cli_alert_info("Candidates drawn by the exact draw ({.code randomPlantedForest.exact_draw = TRUE}).")
     }
     if (!is.null(params$interaction_constraints)) {
       sets <- vapply(params$interaction_constraints, function(s) paste0("{", paste(s, collapse = ", "), "}"), "")
@@ -152,7 +152,7 @@ print_params <- function(params) {
 #' @export
 #' @examples
 #'
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE)
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE, prune = FALSE)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {

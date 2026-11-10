@@ -9,7 +9,7 @@ stop_sim <- function(n = 300, seed = 1) {
 
 stop_fit <- function(d, splits, ...) {
   set.seed(5)
-  rpf(d$x, d$y, max_interaction = 2, ntrees = 6, splits = splits, ...)
+  rpf_050(d$x, d$y, max_interaction = 2, ntrees = 6, splits = splits, ...)
 }
 
 # The OOB path at one checkpoint, as the C++ fit passes it to the stopper: rows i with OOB families of both halves
@@ -20,6 +20,9 @@ path_at <- function(v) {
 }
 
 test_that("splits = NULL stops one doubling past the lowest corrected OOB error and returns that forest", {
+  # the patience alone (no plateau stop)
+  old <- options(randomPlantedForest.adaptive_tolerance = 0)
+  on.exit(options(old))
   d <- stop_sim()
   ad <- stop_fit(d, NULL)
   path <- ad$oob_path
@@ -85,6 +88,97 @@ test_that("the stopper: patience, floor, the cap and ties", {
   expect_identical(randomPlantedForest:::oob_lowest(c(0.2, 0, 0.1, 0.1 * (1 + 1e-13), -1)), c(3L, 4L))
 })
 
+test_that("the stopper's plateau: a gain within `tolerance` paired standard errors stops; tolerance 0 is the patience", {
+  # 4 rows with y = 0 whose corrected errors at checkpoint c are 1 - g * c plus +-0.05 in a pattern that changes from
+  # checkpoint to checkpoint and sums to 0: the mean error falls by g per checkpoint, so it never stops by the patience,
+  # and the paired differences of the rows have a standard error of about 0.05
+  y <- rep(0, 4)
+  pat <- list(c(1, -1, 1, -1), c(1, 1, -1, -1), c(1, -1, -1, 1))
+  rows_at <- function(c, g) (1 - g * c) + 0.05 * pat[[(c %% 3) + 1]]
+  run <- function(st, g, C = 10) {
+    out <- 0L
+    for (c in seq_len(C)) {
+      out <- st$step(c, path_at(sqrt(rows_at(c, g))))
+      if (out > 0) break
+    }
+    list(sel = out, c = c, res = st$result())
+  }
+  stopper <- function(...) randomPlantedForest:::oob_stopper(y, 2, 1:10, patience = 4L, ...)
+  # a gain of 4 x 0.001 per doubling (4 checkpoints) is within one paired SE: P stops at the first chance (c = 5) and
+  # chooses the lowest error (c = 5); the patience alone grows to the cap
+  p <- run(stopper(tolerance = 1), 0.001)
+  expect_identical(p[c("sel", "c")], list(sel = 5L, c = 5L))
+  expect_false(p$res$capped)
+  se <- sd(rows_at(1, 0.001) - rows_at(5, 0.001)) / 2
+  expect_lt(4 * 0.001, se)
+  t0 <- run(stopper(tolerance = 0), 0.001)
+  expect_identical(t0[c("sel", "c")], list(sel = 10L, c = 10L))
+  expect_true(t0$res$capped)
+  # tolerance 0 is the patience alone, on this path and on the paths of the test above
+  expect_identical(t0, run(stopper(), 0.001))
+  # a floor of 8 splits: the plateau stops at 8
+  expect_identical(run(stopper(tolerance = 1, floor = 8), 0.001)[c("sel", "c")], list(sel = 8L, c = 8L))
+  # a gain of 4 x 0.03 is not within one SE (about 0.05), nor within 2; it is within 3
+  expect_identical(run(stopper(tolerance = 1), 0.03)[c("sel", "c")], list(sel = 10L, c = 10L))
+  expect_identical(run(stopper(tolerance = 2), 0.03)[c("sel", "c")], list(sel = 10L, c = 10L))
+  expect_identical(run(stopper(tolerance = 3), 0.03)[c("sel", "c")], list(sel = 5L, c = 5L))
+  # where the patience stops, the plateau changes nothing (the lowest error 4 checkpoints back)
+  v <- c(0.5, 0.4, 0.3, 0.35, 0.36, 0.37, 0.38, 0.39, 0.4, 0.41)
+  run1 <- function(st) {
+    for (c in seq_along(v)) {
+      out <- st$step(c, path_at(rep(v[c], 3)))
+      if (out > 0) break
+    }
+    list(sel = out, c = c, res = st$result())
+  }
+  st <- function(tol) randomPlantedForest:::oob_stopper(rep(0, 3), 2, 1:10, patience = 4L, tolerance = tol)
+  expect_identical(run1(st(1)), run1(st(0)))
+})
+
+test_that("the plateau keeps the rows it compares when a corrected error is below 0", {
+  # checkpoint 2's correction overshoots (OOB means 0.5 and -0.5 around y = 0, 100 families: corrected MSE -0.245), so
+  # it is left out of the choice; the plateau compares the lowest of the others (checkpoint 3) with the best and must
+  # keep its rows: the stop runs to the last checkpoint and chooses 7, the lowest error above 0
+  neg <- list(checkpoints = 1L, sum0 = matrix(rep(0.5, 3)), sum1 = matrix(rep(-0.5, 3)), count = matrix(1L, 3, 2))
+  st <- randomPlantedForest:::oob_stopper(rep(0, 3), 100, 1:10, patience = 4L, tolerance = 1)
+  v <- c(0.5, NA, 0.4, 0.45, 0.46, 0.47, 0.39, 0.395, 0.396, 0.397)
+  for (c in seq_along(v)) {
+    out <- st$step(c, if (is.na(v[c])) neg else path_at(rep(v[c], 3)))
+    if (out > 0) break
+  }
+  expect_identical(c(out = out, c = c), c(out = 7L, c = 10L))
+  expect_lt(st$points[2, 1], 0)
+})
+
+test_that("splits = NULL with the plateau stop: no later than the patience alone, the same forest at the same choice", {
+  d <- stop_sim()
+  fit_tol <- function(tol, ...) {
+    old <- options(randomPlantedForest.adaptive_tolerance = tol)
+    on.exit(options(old))
+    stop_fit(d, NULL, ...)
+  }
+  p <- fit_tol(1)
+  expect_identical(p$splits_oob, stop_fit(d, NULL)$splits_oob) # the default is tolerance 1
+  t0 <- fit_tol(0)
+  expect_lte(p$splits_oob$stopped_at, t0$splits_oob$stopped_at)
+  # the path is the first checkpoints of today's, the choice its lowest error
+  path <- p$oob_path
+  expect_identical(path$splits, t0$oob_path$splits[seq_len(nrow(path))])
+  expect_identical(path$oob_rmse, t0$oob_path$oob_rmse[seq_len(nrow(path))])
+  expect_identical(p$params$splits, path$splits[which.min(path$oob_rmse)])
+  expect_identical(p$fit$get_model(), stop_fit(d, p$params$splits)$fit$get_model())
+  if (p$params$splits == t0$params$splits) {
+    expect_identical(p$fit$get_model(), t0$fit$get_model())
+  }
+  # the families grow no further than with the patience alone
+  expect_lte(p$fit$adaptive_stats()$splits_grown, t0$fit$adaptive_stats()$splits_grown)
+  old <- options(randomPlantedForest.adaptive_tolerance = -1)
+  expect_error(stop_fit(d, NULL), "adaptive_tolerance")
+  options(randomPlantedForest.adaptive_tolerance = NA_real_)
+  expect_error(stop_fit(d, NULL), "adaptive_tolerance")
+  options(old)
+})
+
 test_that("growing stops at the cap with a warning while the error still falls", {
   d <- stop_sim()
   ref <- stop_fit(d, 30)
@@ -110,15 +204,15 @@ test_that("splits = NULL is chosen out of bag for classification too, and is 30 
   d <- stop_sim()
   yc <- factor(d$y > median(d$y))
   set.seed(5)
-  a <- rpf(d$x, yc, ntrees = 3, splits = NULL)
+  a <- rpf_050(d$x, yc, ntrees = 3, splits = NULL)
   set.seed(5)
-  b <- rpf(d$x, yc, ntrees = 3, splits = a$params$splits)
+  b <- rpf_050(d$x, yc, ntrees = 3, splits = a$params$splits)
   expect_identical(a$splits_oob$splits, a$params$splits)
   expect_identical(attr(a$oob_path, "criterion"), "logloss")
   expect_identical(a$fit$get_model(), b$fit$get_model())
-  det <- rpf(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
   expect_identical(det$params$splits, 30L)
-  expect_identical(det$fit$get_model(), rpf(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())
+  expect_identical(det$fit$get_model(), rpf_050(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())
 })
 
 test_that("splits = NULL: arguments, options and errors", {
@@ -135,6 +229,7 @@ test_that("splits = NULL: arguments, options and errors", {
     checkpoints = 1:20,
     stopper = function(c, path) if (c == 3) stop("boom") else 0L,
     patience = 4L,
+    tolerance = 1,
     floor = 0,
     pause_gb = 1
   )
@@ -144,6 +239,8 @@ test_that("splits = NULL: arguments, options and errors", {
   expect_error(randomPlantedForest:::rpf_impl(data$Y, data$X, "regression", params, adaptive = boom), "boom")
   bad <- modifyList(boom, list(stopper = function(c, path) 99L))
   expect_error(randomPlantedForest:::rpf_impl(data$Y, data$X, "regression", params, adaptive = bad), "stopper")
+  bad <- modifyList(boom, list(stopper = function(c, path) 0L, tolerance = -1))
+  expect_error(randomPlantedForest:::rpf_impl(data$Y, data$X, "regression", params, adaptive = bad), "tolerance >= 0")
   expect_identical(stop_fit(d, 30)$fit$get_model(), ref$fit$get_model())
 })
 

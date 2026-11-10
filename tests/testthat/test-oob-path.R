@@ -11,7 +11,7 @@ path_sim <- function(n = 300, seed = 1) {
 
 path_fit <- function(d, splits, y = d$y, ...) {
   set.seed(5)
-  rpf(d$x, y, max_interaction = 2, ntrees = 6, splits = splits, ...)
+  rpf_050(d$x, y, max_interaction = 2, ntrees = 6, splits = splits, ...)
 }
 
 # One family's prediction at the rows of X, directly from its leaves
@@ -170,9 +170,9 @@ test_that("oob_path works with every interface and survives marshaling", {
   ref <- path_fit(d, 40, oob_path = TRUE)
   df <- data.frame(d$x, y = d$y)
   set.seed(5)
-  f1 <- rpf(y ~ ., data = df, max_interaction = 2, ntrees = 6, splits = 40, oob_path = TRUE)
+  f1 <- rpf_050(y ~ ., data = df, max_interaction = 2, ntrees = 6, splits = 40, oob_path = TRUE)
   set.seed(5)
-  f2 <- rpf(df[, 1:4], df$y, max_interaction = 2, ntrees = 6, splits = 40, oob_path = TRUE)
+  f2 <- rpf_050(df[, 1:4], df$y, max_interaction = 2, ntrees = 6, splits = 40, oob_path = TRUE)
   expect_identical(f1$oob_path, ref$oob_path)
   expect_identical(f2$oob_path, ref$oob_path)
   restored <- rpf_unmarshal(rpf_marshal(ref))
@@ -185,11 +185,11 @@ test_that("oob_path arguments are checked", {
   expect_error(path_fit(d, 20, oob_path = c(5, 30)), "increasing")
   expect_error(path_fit(d, 20, oob_path = 2.5), "increasing")
   expect_error(path_fit(d, 20, oob_path = NA), "increasing")
-  expect_error(rpf(d$x, d$y, ntrees = 1, splits = 20, oob_path = TRUE, deterministic = TRUE), "deterministic")
+  expect_error(rpf_050(d$x, d$y, ntrees = 1, splits = 20, oob_path = TRUE, deterministic = TRUE), "deterministic")
   # classification: the path of its criterion (test-classification-pipeline.R)
   yc <- factor(d$y > stats::median(d$y))
   expect_named(
-    rpf(d$x, yc, splits = 20, oob_path = TRUE)$oob_path,
+    rpf_050(d$x, yc, splits = 20, oob_path = TRUE)$oob_path,
     c("splits", "oob_loss", "oob_loss_raw", "se_loss", "se_loss_raw")
   )
   # the core checks the checkpoints too

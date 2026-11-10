@@ -68,8 +68,9 @@ oob_path_table <- function(path, y, ntrees, call = rlang::caller_env()) {
 
 # One checkpoint of the OOB path, over the rows with an OOB family: the corrected and the plain OOB mean squared
 # error and their standard errors, from s0 / s1, the rows' OOB predictions summed over the families of even / odd
-# index, and count, the number of OOB families of each half (see rpf()'s details)
-oob_path_point <- function(s0, s1, count, y, ntrees) {
+# index, and count, the number of OOB families of each half (see rpf()'s details). rows = TRUE: a list of that (point)
+# and the rows' corrected errors (rows; over the rows with an OOB family), for the adaptive fit's plateau.
+oob_path_point <- function(s0, s1, count, y, ntrees, rows = FALSE) {
   m0 <- count[, 1]
   m1 <- count[, 2]
   m <- m0 + m1
@@ -80,13 +81,15 @@ oob_path_point <- function(s0, s1, count, y, ntrees) {
   v <- numeric(length(y))
   v[both] <- (s0[both] / m0[both] - s1[both] / m1[both])^2 / (1 / m0[both] + 1 / m1[both])
   corr <- e2 - (1 / m - 1 / ntrees) * v
-  c(mean(corr[ok]), mean(e2[ok]), stats::sd(corr[ok]) / sqrt(n_ok), stats::sd(e2[ok]) / sqrt(n_ok))
+  point <- c(mean(corr[ok]), mean(e2[ok]), stats::sd(corr[ok]) / sqrt(n_ok), stats::sd(e2[ok]) / sqrt(n_ok))
+  if (rows) list(point = point, rows = corr[ok]) else point
 }
 
 # oob_path_point() for a classification criterion `crit` (oob_score_y()): the mean corrected and plain criterion over
 # the rows with an OOB family and their standard errors, from s0 / s1 (n x V: the sums of the families of even / odd
-# index) and count. Rows whose OOB families are all even or all odd are not corrected (as for regression).
-oob_path_point_crit <- function(s0, s1, count, crit, ntrees) {
+# index) and count. Rows whose OOB families are all even or all odd are not corrected (as for regression). rows: as
+# for oob_path_point().
+oob_path_point_crit <- function(s0, s1, count, crit, ntrees, rows = FALSE) {
   m0 <- count[, 1]
   m1 <- count[, 2]
   m <- m0 + m1
@@ -105,7 +108,8 @@ oob_path_point_crit <- function(s0, s1, count, crit, ntrees) {
     ntrees,
     impute = FALSE
   )
-  c(mean(r$corr), mean(r$e), stats::sd(r$corr) / sqrt(n_ok), stats::sd(r$e) / sqrt(n_ok))
+  point <- c(mean(r$corr), mean(r$e), stats::sd(r$corr) / sqrt(n_ok), stats::sd(r$e) / sqrt(n_ok))
+  if (rows) list(point = point, rows = r$corr) else point
 }
 
 # The table from the checkpoints' oob_path_point() rows. With a classification criterion `crit`, the columns are the

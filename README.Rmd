@@ -44,6 +44,11 @@ $$\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k < l} \hat m_{kl}(x_k, x_
 Each component can be inspected and plotted on its own, and together they sum
 to the prediction.
 
+By default `rpf()` fits up to three-way interactions, chooses the number of
+splits out of bag while the forest grows, and leaves out the components that
+are too small to matter, so it returns a sparse final model (`prune = FALSE`
+returns the whole forest).
+
 ## Installation
 
 Install the development version from [r-universe][r-universe] with
@@ -68,14 +73,18 @@ and `predict()` returns a tibble as in tidymodels:
 library(randomPlantedForest)
 
 mtcars$cyl <- factor(mtcars$cyl)
-rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
+rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars)
 rpfit
 
 head(predict(rpfit, new_data = mtcars))
 ```
 
-`predict_components()` returns the decomposition: one column per main effect
-and interaction, plus the intercept.
+On these 32 cars the final model has the three main effects; the
+interactions, which explain less than 1% of the variance of the prediction,
+are left out.
+
+`predict_components()` returns the decomposition: one column per component of
+the model, plus the intercept.
 
 ```{r components}
 components <- predict_components(rpfit, new_data = mtcars)
@@ -89,8 +98,7 @@ library(glex)
 library(ggplot2)
 library(patchwork)
 
-(autoplot(components, "wt") + autoplot(components, "hp")) /
-  (autoplot(components, "cyl") + autoplot(components, c("wt", "hp")))
+autoplot(components, "wt") + autoplot(components, "hp") + autoplot(components, "cyl")
 ```
 
 The [Get started][get-started] guide covers classification, recipes, saving

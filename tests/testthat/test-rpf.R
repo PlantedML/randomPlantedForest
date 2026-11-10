@@ -1,5 +1,5 @@
 test_that("Formula interface", {
-  rpf_fit <- rpf(mpg ~ wt + cyl, data = mtcars)
+  rpf_fit <- rpf_050(mpg ~ wt + cyl, data = mtcars)
 
   expect_s3_class(rpf_fit, "rpf")
   expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
@@ -7,7 +7,7 @@ test_that("Formula interface", {
 
 test_that("XY data.frame interface", {
   pred_df <- mtcars[, c(2, 6)]
-  rpf_fit <- rpf(x = pred_df, y = mtcars$mpg)
+  rpf_fit <- rpf_050(x = pred_df, y = mtcars$mpg)
 
   expect_s3_class(rpf_fit, "rpf")
   expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
@@ -15,7 +15,7 @@ test_that("XY data.frame interface", {
 
 test_that("XY matrix interface", {
   pred_mat <- as.matrix(mtcars[, c(2, 6)])
-  rpf_fit <- rpf(x = pred_mat, y = mtcars$mpg)
+  rpf_fit <- rpf_050(x = pred_mat, y = mtcars$mpg)
 
   expect_s3_class(rpf_fit, "rpf")
   expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
@@ -25,7 +25,7 @@ test_that("recipe interface", {
   skip_if_not_installed("recipes")
 
   rec <- recipes::recipe(mpg ~ ., data = mtcars)
-  rpf_fit <- rpf(rec, data = mtcars)
+  rpf_fit <- rpf_050(rec, data = mtcars)
 
   expect_s3_class(rpf_fit, "rpf")
   expect_s4_class(rpf_fit$fit, "Rcpp_RandomPlantedForest")
@@ -33,7 +33,7 @@ test_that("recipe interface", {
 
 test_that("Unsupported interface", {
   pred_tab <- as.table(as.matrix(mtcars[, c(2, 6)]))
-  expect_error(rpf(x = pred_tab, y = mtcars$mpg))
+  expect_error(rpf_050(x = pred_tab, y = mtcars$mpg))
 })
 
 
@@ -41,15 +41,15 @@ test_that("Unsupported interface", {
 
 test_that("Setting max_interaction = 0 works", {
   set.seed(100)
-  rpf_fit0 <- rpf(mpg ~ ., data = mtcars[1:20, ], max_interaction = 0)
+  rpf_fit0 <- rpf_050(mpg ~ ., data = mtcars[1:20, ], max_interaction = 0)
   pred0 <- predict(rpf_fit0, new_data = mtcars[21:32, ])
 
   set.seed(100)
-  rpf_fit10 <- rpf(mpg ~ ., data = mtcars[1:20, ], max_interaction = 10)
+  rpf_fit10 <- rpf_050(mpg ~ ., data = mtcars[1:20, ], max_interaction = 10)
   pred10 <- predict(rpf_fit10, new_data = mtcars[21:32, ])
 
   set.seed(100)
-  rpf_fit_default <- rpf(mpg ~ ., data = mtcars[1:20, ])
+  rpf_fit_default <- rpf_050(mpg ~ ., data = mtcars[1:20, ])
   pred_default <- predict(rpf_fit_default, new_data = mtcars[21:32, ])
 
   # Sanity: pred of default (max_interaction = 1) should be different
@@ -61,19 +61,19 @@ test_that("Setting max_interaction = 0 works", {
 })
 
 test_that("unknown arguments are an error", {
-  expect_error(rpf(mpg ~ cyl + wt, data = mtcars, max_interactions = 2), class = "rlib_error_dots_nonempty")
-  expect_error(rpf(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg, cv = TRUE), class = "rlib_error_dots_nonempty")
+  expect_error(rpf_050(mpg ~ cyl + wt, data = mtcars, max_interactions = 2), class = "rlib_error_dots_nonempty")
+  expect_error(rpf_050(x = mtcars[, c("cyl", "wt")], y = mtcars$mpg, cv = TRUE), class = "rlib_error_dots_nonempty")
 })
 
 test_that("deterministic fits are seed-independent and warn about redundant trees", {
   fit_det <- function(seed) {
     set.seed(seed)
-    rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 1, max_interaction = 2, deterministic = TRUE)
+    rpf_050(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 1, max_interaction = 2, deterministic = TRUE)
   }
   expect_identical(predict(fit_det(1), mtcars), predict(fit_det(2), mtcars))
 
   expect_warning(
-    rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 5, deterministic = TRUE),
+    rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 5, deterministic = TRUE),
     "all 5 tree families are identical"
   )
 })

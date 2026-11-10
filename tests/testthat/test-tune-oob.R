@@ -241,7 +241,7 @@ test_that("the formula interface tunes the same as x/y; print() and marshal show
   expect_identical(a$tune$search[cols], b$tune$search[cols])
   expect_identical(predict(a, df)$.pred, predict(b, d$x)$.pred)
   out <- capture.output(print(a))
-  expect_true(any(grepl("Tuned out of bag", out, fixed = TRUE)))
+  expect_true(any(grepl("tuned out of bag", out, fixed = TRUE)))
   restored <- rpf_unmarshal(rpf_marshal(a))
   expect_identical(restored$tune, a$tune)
   expect_identical(predict(restored, df), predict(a, df))
@@ -249,7 +249,7 @@ test_that("the formula interface tunes the same as x/y; print() and marshal show
 
 test_that("rpf(tune = ) and tune_control() check their arguments", {
   d <- to_sim(n = 100)
-  f <- function(...) rpf(d$x, d$y, ntrees = 10, ...)
+  f <- function(...) rpf_050(d$x, d$y, ntrees = 10, ...)
   expect_error(f(tune = "full"), "tune")
   expect_error(f(tune = NA), "tune")
   expect_error(f(tune = TRUE, split_try = 3), "split_try")

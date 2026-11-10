@@ -7,7 +7,7 @@ mlr_sim <- function(n = 300, seed = 1) {
 
 mlr_fit <- function(d, ..., splits = 60, ntrees = 5) {
   set.seed(5)
-  rpf(d$x, d$y, ntrees = ntrees, splits = splits, ...)
+  rpf_050(d$x, d$y, ntrees = ntrees, splits = splits, ...)
 }
 
 # Rows of x in every leaf of every tree except the constant one (leaves are [lower, upper) boxes)
@@ -58,7 +58,7 @@ test_that("a binary feature is split when both sides keep `min_leaf_rows` rows",
   xb <- cbind(b = rbinom(200, 1, 0.5))
   yb <- 2 * xb[, 1] + rnorm(200, sd = 0.1)
   set.seed(1)
-  fb <- rpf(xb, yb, ntrees = 3, splits = 5, min_leaf_rows = 20)
+  fb <- rpf_050(xb, yb, ntrees = 3, splits = 5, min_leaf_rows = 20)
   pb <- predict(fb, cbind(b = c(0, 1)))$.pred
   expect_gt(pb[2] - pb[1], 1.5)
 })

@@ -11,7 +11,7 @@
 #' @return An object of class `bundled_rpf` (`bundled_rpf_pruned`) for `bundle()`,
 #'   or the restored [rpf] (`rpf_pruned`) object for `unbundle()`.
 #' @examplesIf requireNamespace("bundle", quietly = TRUE)
-#' fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
+#' fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, prune = FALSE)
 #' b <- bundle::bundle(fit)
 #' tmp <- tempfile(fileext = ".rds")
 #' saveRDS(b, tmp)

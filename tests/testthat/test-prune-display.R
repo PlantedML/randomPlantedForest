@@ -9,8 +9,11 @@ pd_data <- function(n = 400, p = 6, seed = 1) {
 }
 
 pd_fit <- function(d, max_interaction = ncol(d$x), nthreads = 1L) {
+  # the exact draw: the tests below loop over this fit's coarsened components (fewer with the fast draw)
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   set.seed(2)
-  rpf(
+  rpf_050(
     d$x,
     d$y,
     max_interaction = max_interaction,
@@ -176,7 +179,7 @@ test_that("max_panels: at most P heat maps, decomposition, marginal means, Inf =
   expect_identical(predict(pd1, d$x)$.pred, predict(pd, d$x)$.pred)
   out <- capture.output(print(pd))
   expect_true(any(grepl("at most 3 heat maps", out)))
-  expect_true(any(grepl("heat_maps", out)))
+  expect_true(any(grepl("importance", out)))
 })
 
 test_that("full order: components of order >= 6 coarsened with q vectors containing 1s", {
@@ -260,7 +263,7 @@ test_that("the display after a given rule, a CV choice and a deterministic fores
   }
   # a deterministic forest: the default scores by CV, the display runs
   set.seed(3)
-  fd <- rpf(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 60, deterministic = TRUE)
+  fd <- rpf_050(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 60, deterministic = TRUE)
   pdd <- prune_components(fd, d$x, d$y, max_panels = 2, folds = 3L, seed = 1)
   expect_identical(pdd$select_by, "cv")
   expect_false(is.null(pdd$display))

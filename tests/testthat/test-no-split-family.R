@@ -12,13 +12,20 @@ test_that("a family without a split predicts the mean of its rows", {
   constant <- dat
   constant[c("x1", "x2")] <- 1
   for (structure in c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees")) {
-    fit <- rpf(y ~ x1 + x2, data = constant, ntrees = 1, splits = 5, split_structure = structure, deterministic = TRUE)
+    fit <- rpf_050(
+      y ~ x1 + x2,
+      data = constant,
+      ntrees = 1,
+      splits = 5,
+      split_structure = structure,
+      deterministic = TRUE
+    )
     expect_equal(predict(fit, dat[1:3, ])$.pred, rep(mean(dat$y), 3), label = structure)
   }
 
   # a single row: every bootstrap sample is that row
   set.seed(1)
-  fit <- rpf(y ~ x1 + x2, data = dat[1, ], ntrees = 5, splits = 5)
+  fit <- rpf_050(y ~ x1 + x2, data = dat[1, ], ntrees = 5, splits = 5)
   expect_equal(predict(fit, dat[1:3, ])$.pred, rep(dat$y[1], 3))
 })
 
@@ -27,16 +34,16 @@ test_that("a classification family without a split predicts the class shares", {
   dat[c("x1", "x2")] <- 1
   shares <- function(y) as.numeric(prop.table(table(y)))
   for (loss in c("exponential", "logit", "L1", "L2")) {
-    fit <- rpf(cl ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss)
+    fit <- rpf_050(cl ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss)
     expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), shares(dat$cl), label = paste(loss, "binary"))
-    fit <- rpf(cl3 ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss)
+    fit <- rpf_050(cl3 ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss)
     expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), shares(dat$cl3), label = paste(loss, "3 classes"))
   }
 
   # logit and exponential truncate the shares to [epsilon, 1 - epsilon], as in every leaf
   dat$rare <- factor(ifelse(seq_len(nrow(dat)) <= 97, "a", "b"))
   for (loss in c("exponential", "logit")) {
-    fit <- rpf(rare ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss, epsilon = 0.1)
+    fit <- rpf_050(rare ~ x1 + x2, data = dat, ntrees = 1, splits = 5, deterministic = TRUE, loss = loss, epsilon = 0.1)
     expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), c(0.9, 0.1), label = loss)
   }
 })
@@ -46,7 +53,7 @@ test_that("in a forest where only some families split, the others predict their 
   x <- data.frame(x = c(0, 0, 1))
   y <- c(1, 10, 100)
   set.seed(3)
-  fit <- rpf(x, y, ntrees = 40, splits = 3, export_forest = TRUE)
+  fit <- rpf_050(x, y, ntrees = 40, splits = 3, export_forest = TRUE)
   null_value <- vapply(
     fit$forest,
     function(family) {
@@ -65,7 +72,7 @@ test_that("in a forest where only some families split, the others predict their 
   pred <- predict(fit, x)$.pred
   for (mode in 1:2) {
     set.seed(3)
-    fit <- rpf(x, y, ntrees = 40, splits = 3)
+    fit <- rpf_050(x, y, ntrees = 40, splits = 3)
     purify(fit, mode = mode)
     components <- predict_components(fit, x)
     expect_equal(predict(fit, x)$.pred, pred)
@@ -79,7 +86,7 @@ test_that("min_leaf_rows above half the rows leaves every family without a split
   for (exact in c(TRUE, FALSE)) {
     old <- options(randomPlantedForest.exact_draw = exact)
     set.seed(1)
-    fit <- rpf(y ~ x1 + x2, data = dat, ntrees = 5, splits = 10, min_leaf_rows = 51, export_forest = TRUE)
+    fit <- rpf_050(y ~ x1 + x2, data = dat, ntrees = 5, splits = 10, min_leaf_rows = 51, export_forest = TRUE)
     options(old)
     expect_true(all(vapply(fit$forest, function(family) length(family$variables) == 1, logical(1))))
     pred <- predict(fit, dat[1:3, ])$.pred
@@ -88,6 +95,6 @@ test_that("min_leaf_rows above half the rows leaves every family without a split
     expect_lt(abs(pred[1] - mean(dat$y)), 0.1)
   }
   # without the bootstrap, the mean itself
-  fit <- rpf(y ~ x1 + x2, data = dat, ntrees = 1, splits = 10, min_leaf_rows = 51, deterministic = TRUE)
+  fit <- rpf_050(y ~ x1 + x2, data = dat, ntrees = 1, splits = 10, min_leaf_rows = 51, deterministic = TRUE)
   expect_equal(predict(fit, dat[1:3, ])$.pred, rep(mean(dat$y), 3))
 })

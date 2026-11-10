@@ -53,6 +53,6 @@ Random Planted Forest Predictions
 }
 \examples{
 # Regression with L2 loss
-rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
+rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")], prune = FALSE)
 predict(rpfit, mtcars[, c("cyl", "wt")])
 }

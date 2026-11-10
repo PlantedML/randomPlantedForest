@@ -305,11 +305,16 @@ public:
   // and `stopper` decides at each of the `checkpoints` (increasing split counts, the last one splits) whether growing
   // goes on, from the corrected OOB error (see AdaptiveStopper). The forest at the chosen checkpoint is rebuilt from
   // the records of the splits, and n_splits becomes its number of splits: the forest that a fit with that many splits
-  // and the same seed gives. `patience` (checkpoints) and `floor` (splits) are the stopper's; with them the fit
-  // estimates how far to grow each family. `pause_gb`: the memory (GB) that families waiting at that estimate may
-  // hold. One fit only: afterwards fits are plain again.
+  // and the same seed gives. `patience` (checkpoints), `tolerance` (paired standard errors) and `floor` (splits) are
+  // the stopper's; with them the fit estimates how far to grow each family. `pause_gb`: the memory (GB) that families
+  // waiting at that estimate may hold. One fit only: afterwards fits are plain again.
   void set_adaptive(
-      const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
+      const std::vector<int> &checkpoints,
+      AdaptiveStopper stopper,
+      int patience,
+      double tolerance,
+      double floor,
+      double pause_gb
   );
   AdaptiveStats adaptive_stats() const;
   // The corrected out-of-bag error of training row i whose OOB score is g (value_size values), as the adaptive fit

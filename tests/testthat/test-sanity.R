@@ -24,7 +24,7 @@ sanity_failures <- function(make_y, check, ...) {
     dat <- data.frame(x = predictor$x, y = make_y(predictor$signal))
     for (structure in c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees")) {
       set.seed(1)
-      fit <- rpf(y ~ x, data = dat, ntrees = 5, splits = 10, split_structure = structure, ...)
+      fit <- rpf_050(y ~ x, data = dat, ntrees = 5, splits = 10, split_structure = structure, ...)
       if (!check(fit, dat, predictor$signal)) {
         failures <- c(failures, paste(name, structure))
       }

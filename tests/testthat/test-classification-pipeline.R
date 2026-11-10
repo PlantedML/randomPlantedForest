@@ -13,7 +13,7 @@ cp_data <- function(n = 400, seed = 1) {
 
 cp_fit <- function(d, y, loss, ntrees = 16, splits = 120, ...) {
   set.seed(3)
-  rpf(d$x, y, loss = loss, max_interaction = 4, ntrees = ntrees, splits = splits, ...)
+  rpf_050(d$x, y, loss = loss, max_interaction = 4, ntrees = ntrees, splits = splits, ...)
 }
 
 cp_ns <- function() asNamespace("randomPlantedForest")
@@ -32,6 +32,9 @@ cp_recon <- function(m, x) {
 test_that("L2 classification on 0/1 is the regression pipeline bitwise (OOB path, splits = NULL, pruning, display, tuner)", {
   skip_on_cran()
   d <- cp_data(500, seed = 11)
+  # the exact draw (the default is the fast one), as this comparison was written for it
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   pipe <- function(y, ...) {
     set.seed(3)
     m <- suppressWarnings(rpf(
@@ -69,15 +72,14 @@ test_that("L2 classification on 0/1 is the regression pipeline bitwise (OOB path
     expect_identical(a$rule, "R")
   }
   # also with min_leaf_rows and the fast draw
-  old <- options(randomPlantedForest.exact_draw = FALSE)
-  on.exit(options(old))
+  options(randomPlantedForest.exact_draw = FALSE)
   expect_identical(pipe(d$yb, loss = "L2", min_leaf_rows = 5), pipe(d$y01, min_leaf_rows = 5))
-  options(old)
+  options(randomPlantedForest.exact_draw = TRUE)
   # the OOB path of a fixed fit, and the tuner
   d <- cp_data(300, seed = 11)
   path <- function(y, ...) {
     set.seed(4)
-    suppressWarnings(rpf(d$x, y, max_interaction = 3, ntrees = 8, splits = 80, oob_path = TRUE, ...))$oob_path
+    suppressWarnings(rpf_050(d$x, y, max_interaction = 3, ntrees = 8, splits = 80, oob_path = TRUE, ...))$oob_path
   }
   expect_identical(path(d$yb, loss = "L2"), path(d$y01))
   # the tuner (two ladder points, two leaf sizes)
@@ -107,7 +109,7 @@ test_that("L2 classification on 0/1 is the regression fit bitwise where candidat
   d <- cp_data(300, seed = 11)
   path <- function(y, seed, ...) {
     set.seed(seed)
-    suppressWarnings(rpf(d$x, y, max_interaction = 3, ntrees = 8, splits = 80, oob_path = TRUE, ...))$oob_path
+    suppressWarnings(rpf_050(d$x, y, max_interaction = 3, ntrees = 8, splits = 80, oob_path = TRUE, ...))$oob_path
   }
   cases <- list(
     list("leaves", 6, 1, TRUE),
@@ -233,6 +235,9 @@ test_that("max_panels = Inf gives the first pruning's model; coarsened multiclas
 test_that("threads do not change the classification pipeline", {
   skip_on_cran()
   d <- cp_data(300)
+  # the exact draw: the three-class fit below has coarsened components with it
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   # splits = NULL (or a fixed fit with its OOB path), pruning and the display
   run <- function(y, loss, nt, splits = NULL) {
     set.seed(5)
@@ -277,7 +282,7 @@ test_that("rpf(prune = TRUE) and rpf(tune = ) of a classification forest are the
     set.seed(8)
     a <- rpf(d$x, y, max_interaction = 3, ntrees = 10, splits = NULL, prune = TRUE, max_panels = 2)
     set.seed(8)
-    f <- rpf(d$x, y, max_interaction = 3, ntrees = 10, splits = NULL)
+    f <- rpf(d$x, y, max_interaction = 3, ntrees = 10, splits = NULL, prune = FALSE)
     b <- prune_components(f, d$x, y, max_panels = 2)
     expect_s3_class(a, "rpf_pruned")
     expect_identical(
@@ -326,7 +331,7 @@ test_that("the criterion: C++ (the adaptive bound) and R agree; the squared erro
   }
   # regression: the squared error with the correction
   set.seed(2)
-  rf <- rpf(d$x, d$y01 + rnorm(nrow(d$x)), ntrees = 2, splits = 5)
+  rf <- rpf_050(d$x, d$y01 + rnorm(nrow(d$x)), ntrees = 2, splits = 5)
   n <- nrow(d$x)
   G <- matrix(rnorm(n), n, 1)
   D <- matrix(rnorm(n), n, 1)
@@ -372,6 +377,50 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
   expect_equal(ns$crit_centred_var(crit, M1), ns$crit_centred_var(crit, M3), tolerance = 1e-12)
 })
 
+test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
+  skip_on_cran()
+  # on macOS arm64 the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the
+  # families kept finding new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A
+  # family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so each
+  # grows to the stop. (the stop on a new minimum alone; the plateau stop, the default, stops this curve at 71 splits
+  # and chooses 42.) Other platforms grow other forests, with other curves: there the bounds are checked at their stops
+  d <- cp_data(300)
+  old <- options(randomPlantedForest.exact_draw = TRUE, randomPlantedForest.adaptive_tolerance = 0)
+  on.exit(options(old))
+  set.seed(8)
+  f <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
+  st <- f$fit$adaptive_stats()
+  stop_f <- f$splits_oob$stopped_at
+  expect_lte(f$params$splits, stop_f)
+  expect_lte(st$splits_grown, 1.2 * 10 * stop_f)
+  # the same forest as the fixed fit at the chosen splits
+  set.seed(8)
+  g <- rpf(
+    d$x,
+    d$ym,
+    loss = "logit",
+    max_interaction = 3,
+    ntrees = 10,
+    split_try = 10,
+    t_try = 0.4,
+    splits = f$params$splits,
+    prune = FALSE
+  )
+  expect_identical(f$fit$get_model(), g$fit$get_model())
+  # the plateau stop (the default tolerance): the families grow only about as far as its stop
+  options(randomPlantedForest.adaptive_tolerance = 1)
+  set.seed(8)
+  p <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
+  expect_lte(p$splits_oob$splits, p$splits_oob$stopped_at)
+  expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * p$splits_oob$stopped_at)
+  # the flat curve of the comment above
+  if (on_macos_arm64()) {
+    expect_identical(f$params$splits, 168L)
+    expect_identical(stop_f, 336L)
+    expect_identical(p$splits_oob[c("splits", "stopped_at")], list(splits = 42L, stopped_at = 71L))
+  }
+})
+
 test_that("the OOB path of a classification forest: prefix property, splits = NULL = the fixed fit", {
   skip_on_cran()
   d <- cp_data(300)
@@ -390,7 +439,7 @@ test_that("the OOB path of a classification forest: prefix property, splits = NU
     for (loss in c("L2", "logit", "exponential")) {
       for (s in c("leaves", "res_trees", "cur_trees_1")) {
         set.seed(5)
-        big <- rpf(
+        big <- rpf_050(
           d$x,
           y,
           loss = loss,
@@ -409,7 +458,15 @@ test_that("the OOB path of a classification forest: prefix property, splits = NU
         expect_equal(V, big$fit$get_shape()$value_size)
         c3 <- 6L
         set.seed(5)
-        fk <- rpf(d$x, y, loss = loss, max_interaction = 3, ntrees = 6, splits = p$checkpoints[c3], split_structure = s)
+        fk <- rpf_050(
+          d$x,
+          y,
+          loss = loss,
+          max_interaction = 3,
+          ntrees = 6,
+          splits = p$checkpoints[c3],
+          split_structure = s
+        )
         cols <- (c3 - 1) * V + seq_len(V)
         expect_equal(
           unname(tot(fk)),
@@ -418,16 +475,16 @@ test_that("the OOB path of a classification forest: prefix property, splits = NU
         )
         # the forest is the fit without the path
         set.seed(5)
-        plain <- rpf(d$x, y, loss = loss, max_interaction = 3, ntrees = 6, splits = 60, split_structure = s)
+        plain <- rpf_050(d$x, y, loss = loss, max_interaction = 3, ntrees = 6, splits = 60, split_structure = s)
         expect_identical(big$fit$get_model(), plain$fit$get_model())
       }
       set.seed(9)
-      tu <- rpf(d$x, y, loss = loss, max_interaction = 3, ntrees = 8, splits = NULL, nthreads = 2)
+      tu <- rpf_050(d$x, y, loss = loss, max_interaction = 3, ntrees = 8, splits = NULL, nthreads = 2)
       expect_s4_class(tu$fit, "Rcpp_ClassificationRPF")
       expect_identical(tu$splits_oob$splits, tu$params$splits)
       expect_output(print(tu), "chosen out of bag")
       set.seed(9)
-      fx <- rpf(d$x, y, loss = loss, max_interaction = 3, ntrees = 8, splits = tu$params$splits)
+      fx <- rpf_050(d$x, y, loss = loss, max_interaction = 3, ntrees = 8, splits = tu$params$splits)
       expect_identical(tu$fit$get_model(), fx$fit$get_model())
       expect_identical(predict(tu, d$x, type = "numeric"), predict(fx, d$x, type = "numeric"))
     }

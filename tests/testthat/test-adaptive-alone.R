@@ -13,7 +13,10 @@ alone_data <- function() {
 alone_fit <- function(d, splits = NULL, ..., pause_gb = NULL) {
   old <- options(randomPlantedForest.adaptive_pause_gb = pause_gb)
   on.exit(options(old))
-  args <- utils::modifyList(list(max_interaction = 3, ntrees = 10, split_try = 5, t_try = 0.5), list(...))
+  args <- utils::modifyList(
+    list(max_interaction = 3, ntrees = 10, split_try = 5, t_try = 0.5, prune = FALSE),
+    list(...)
+  )
   set.seed(11)
   do.call(rpf, c(list(d$x, d$y, splits = splits), args))
 }
@@ -53,7 +56,10 @@ test_that("waiting families and families grown again give the same fit", {
     expect_identical(st$pauses, 0)
     expect_identical(none$fit$get_model(), big$fit$get_model())
   }
-  # the first families stop early, so the later ones that waited or finished at that estimate grow further
+  # the first families stop early, so the later ones that waited or finished at that estimate grow further (with the
+  # stop on a new minimum alone; the plateau stop ends this fit before any family falls short)
+  old <- options(randomPlantedForest.adaptive_tolerance = 0)
+  on.exit(options(old))
   expect_gt(alone_fit(d, split_structure = "cur_trees_1", pause_gb = 0)$fit$adaptive_stats()$regrowths, 0)
 })
 
