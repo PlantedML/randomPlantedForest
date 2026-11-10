@@ -150,7 +150,7 @@ test_that("the plateau keeps the rows it compares when a corrected error is belo
   expect_lt(st$points[2, 1], 0)
 })
 
-test_that("splits = NULL with the plateau stop: no later than the patience alone, the same forest at the same choice", {
+test_that("n_splits = NULL with the plateau stop: no later than the patience alone, the same forest at the same choice", {
   d <- stop_sim()
   fit_tol <- function(tol, ...) {
     old <- options(randomPlantedForest.adaptive_tolerance = tol)
@@ -163,9 +163,9 @@ test_that("splits = NULL with the plateau stop: no later than the patience alone
   expect_lte(p$splits_oob$stopped_at, t0$splits_oob$stopped_at)
   # the path is the first checkpoints of today's, the choice its lowest error
   path <- p$oob_path
-  expect_identical(path$splits, t0$oob_path$splits[seq_len(nrow(path))])
+  expect_identical(path$n_splits, t0$oob_path$n_splits[seq_len(nrow(path))])
   expect_identical(path$oob_rmse, t0$oob_path$oob_rmse[seq_len(nrow(path))])
-  expect_identical(p$params$splits, path$splits[which.min(path$oob_rmse)])
+  expect_identical(p$params$splits, path$n_splits[which.min(path$oob_rmse)])
   expect_identical(p$fit$get_model(), stop_fit(d, p$params$splits)$fit$get_model())
   if (p$params$splits == t0$params$splits) {
     expect_identical(p$fit$get_model(), t0$fit$get_model())

@@ -429,14 +429,23 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
   # the plateau stop (the default tolerance): the families grow only about as far as its stop
   options(randomPlantedForest.adaptive_tolerance = 1)
   set.seed(8)
-  p <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
-  expect_lte(p$splits_oob$splits, p$splits_oob$stopped_at)
+  p <- rpf(
+    d$x,
+    d$ym,
+    loss = "logit",
+    max_interaction = 3,
+    n_families = 10,
+    n_try_split_points = 10,
+    share_candidates = 0.4,
+    prune = FALSE
+  )
+  expect_lte(p$splits_oob$n_splits, p$splits_oob$stopped_at)
   expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * p$splits_oob$stopped_at)
   # the flat curve of the comment above
   if (on_macos_arm64()) {
     expect_identical(f$params$splits, 168L)
     expect_identical(stop_f, 336L)
-    expect_identical(p$splits_oob[c("splits", "stopped_at")], list(splits = 42L, stopped_at = 71L))
+    expect_identical(p$splits_oob[c("n_splits", "stopped_at")], list(n_splits = 42L, stopped_at = 71L))
   }
 })
 
