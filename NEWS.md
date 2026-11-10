@@ -2,6 +2,11 @@
 
 ## New features
 
+* `rpf()` gains `keep_level_order`, to keep the level order of factor predictors instead of ordering their levels by the outcome.
+  `TRUE` keeps it for every factor, ordered or not, and a character vector for the named factors only; splits then separate neighbouring levels in the order of `levels()`.
+  The default, `FALSE`, orders every factor by the outcome as before, and fits are unchanged.
+  The coding is stored in `$factor_levels`, which `predict()`, `predict_components()` and `purify()` use, and `print()` names the factors that keep their order.
+  The details of `?rpf` describe how factor predictors are coded.
 * `plot()` draws the trees of one tree family to illustrate how a Random Planted Forest predicts.
   `type = "tree"` draws a split diagram in the style of Figure 1b of the paper, reconstructed from the fitted leaves, `type = "boxes"` draws the leaves in variable space, before or after purification.
   `rpf_boxes()` returns the leaves as a data frame.

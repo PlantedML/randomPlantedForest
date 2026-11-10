@@ -87,10 +87,53 @@ pca_order <- function(x, y) {
   order(score)
 }
 
-# Sort factor predictors by outcome and re-encode as integer
-# save original factor levels for prediction step
+# Which factor predictors keep their level order: `keep_level_order` is a flag
+# (TRUE: all factors) or names of factor predictors. Returns the names, in the
+# order of the predictors.
+resolve_keep_level_order <- function(keep_level_order, predictors, factor_cols, call = rlang::caller_env()) {
+  if (is.logical(keep_level_order)) {
+    if (!checkmate::test_flag(keep_level_order)) {
+      cli::cli_abort(
+        "{.arg keep_level_order} must be {.code TRUE}, {.code FALSE} or names of factor predictors.",
+        call = call
+      )
+    }
+    return(if (keep_level_order) factor_cols else character(0))
+  }
+  if (!checkmate::test_character(keep_level_order, any.missing = FALSE)) {
+    cli::cli_abort(
+      "{.arg keep_level_order} must be {.code TRUE}, {.code FALSE} or names of factor predictors.",
+      call = call
+    )
+  }
+  unknown <- setdiff(keep_level_order, names(predictors))
+  if (length(unknown) > 0) {
+    cli::cli_abort(
+      c(
+        "{.arg keep_level_order} must name factor predictors.",
+        "x" = "Not a predictor: {.val {unknown}}."
+      ),
+      call = call
+    )
+  }
+  not_factor <- setdiff(keep_level_order, factor_cols)
+  if (length(not_factor) > 0) {
+    cli::cli_abort(
+      c(
+        "{.arg keep_level_order} must name factor predictors.",
+        "x" = "Not a factor: {.val {not_factor}}."
+      ),
+      call = call
+    )
+  }
+  intersect(factor_cols, keep_level_order)
+}
+
+# Sort factor predictors by outcome, except those in `keep_level_order`, which
+# keep the order of their levels, and re-encode as integer.
+# Save the factor levels in that order for the prediction step.
 # Used in rpf_bridge()
-preprocess_predictors_fit <- function(processed) {
+preprocess_predictors_fit <- function(processed, keep_level_order = FALSE, call = rlang::caller_env()) {
   predictors <- as.data.table(processed$predictors)
 
   # Convert logicals to binary integers
@@ -105,16 +148,19 @@ preprocess_predictors_fit <- function(processed) {
     predictors[, (char_cols) := lapply(.SD, factor), .SDcols = char_cols]
   }
 
-  # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339)
+  # Factor predictors: Order by response (see https://doi.org/10.7717/peerj.6339),
+  # unless they keep the order of their levels
   factor_cols <- names(which(sapply(predictors, is.factor)))
-  if (length(factor_cols) > 0) {
+  kept_cols <- resolve_keep_level_order(keep_level_order, predictors, factor_cols, call = call)
+  sorted_cols <- setdiff(factor_cols, kept_cols)
+  if (length(sorted_cols) > 0) {
     predictors[,
-      (factor_cols) := lapply(
+      (sorted_cols) := lapply(
         .SD,
         order_factor_by_response,
         y = processed$outcomes[[1]]
       ),
-      .SDcols = factor_cols
+      .SDcols = sorted_cols
     ]
   }
 
@@ -128,6 +174,7 @@ preprocess_predictors_fit <- function(processed) {
 
   list(
     factor_levels = factor_levels,
+    keep_level_order = kept_cols,
     predictors_matrix = as.matrix(predictors)
   )
 }

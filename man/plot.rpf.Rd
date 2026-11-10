@@ -37,8 +37,9 @@ all trees up to \code{max_interaction}.}
 the outcome level whose values to plot. \code{NULL} uses the first level.}
 
 \item{factor_levels}{\verb{[logical(1): TRUE]}: Label factors with their
-levels instead of integer codes. Levels are ordered by their association
-with the outcome, as used in the fit.}
+levels instead of integer codes. Levels are in the order used in the fit:
+ordered by the outcome, or in their own order with \code{keep_level_order} (see
+\code{\link[=rpf]{rpf()}}).}
 }
 \value{
 A \code{ggplot} for \code{type = "tree"}, a \code{patchwork} for \code{type = "boxes"}.

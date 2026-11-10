@@ -71,6 +71,11 @@
 #'   (`t_try` is ignored) and evenly spaced thresholds. The result does not
 #'   depend on the seed, and all tree families are identical, so use
 #'   `ntrees = 1`. Mainly useful for testing and debugging.
+#' @param keep_level_order `[logical(1) | character: FALSE]`: Which factor
+#'   predictors keep the order of their levels instead of being ordered by the
+#'   outcome. `FALSE` orders every factor by the outcome, `TRUE` keeps the level
+#'   order of every factor, and a character vector keeps it for the named
+#'   factor predictors only. See "Factor predictors" below.
 #'
 #' @return Object of class `"rpf"` with model object contained in `$fit`.
 #' @export
@@ -105,6 +110,29 @@
 #' link scale and are transformed to probabilities, `"exponential"` being faster.
 #' `"L1"` and `"L2"` fit class indicators directly and their probabilities are
 #' truncated to `[0, 1]`.
+#'
+#' ## Factor predictors
+#'
+#' Factor predictors, and character predictors, which are converted to
+#' factors, are coded as integers `1, 2, ...` in an order of their levels, and
+#' splits are thresholds on these codes. A split therefore separates the levels
+#' below a cut from those above it in that order.
+#'
+#' By default, the levels are ordered by the outcome, so that the levels
+#' most alike in the outcome are neighbours (Wright and König, 2019):
+#' - regression: by the mean outcome of each level;
+#' - binary classification: by the share of the second outcome level;
+#' - more than two classes: by the first principal component of the class
+#'   proportions of each level (Coppersmith et al., 1999).
+#'
+#' This applies to ordered factors too. With `keep_level_order`, the chosen
+#' factors are instead coded in the order of `levels()`, as given, ordered or
+#' not, so that every split separates neighbouring levels in that order.
+#'
+#' The coding is stored in the fit as `$factor_levels`, the levels of each
+#' factor in the order of their codes. [predict()][predict.rpf()],
+#' [predict_components()] and [purify()] code new data by these levels, by
+#' name, so the order of the levels in `new_data` does not matter.
 #'
 #' ## `split_structure`
 #'
@@ -159,6 +187,13 @@
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
 #' directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
 #'
+#' Wright, M. N. & König, I. R. (2019). Splitting on categorical predictors in
+#' random forests. PeerJ 7:e6339. \doi{10.7717/peerj.6339}
+#'
+#' Coppersmith, D., Hong, S. J. & Hosking, J. R. (1999). Partitioning nominal
+#' attributes in decision trees. Data Mining and Knowledge Discovery 3:197--217.
+#' \doi{10.1023/A:1009869804967}
+#'
 #' @examples
 #' # Regression with formula
 #' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars)
@@ -168,6 +203,12 @@
 #'
 #' # Classification
 #' rpfit <- rpf(Species ~ ., data = iris, loss = "exponential")
+#'
+#' # A factor that keeps its level order: splits separate neighbouring levels
+#' cars <- mtcars
+#' cars$gear <- factor(cars$gear, levels = c(3, 4, 5))
+#' rpfit <- rpf(mpg ~ gear + wt, data = cars, keep_level_order = "gear")
+#' rpfit$factor_levels
 rpf <- function(x, ...) {
   UseMethod("rpf")
 }
@@ -201,6 +242,7 @@ rpf.formula <- function(
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -231,7 +273,8 @@ rpf.formula <- function(
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
-    deterministic = deterministic
+    deterministic = deterministic,
+    keep_level_order = keep_level_order
   )
 }
 
@@ -258,6 +301,7 @@ rpf.data.frame <- function(
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -281,7 +325,8 @@ rpf.data.frame <- function(
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
-    deterministic = deterministic
+    deterministic = deterministic,
+    keep_level_order = keep_level_order
   )
 }
 
@@ -308,6 +353,7 @@ rpf.matrix <- function(
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -331,7 +377,8 @@ rpf.matrix <- function(
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
-    deterministic = deterministic
+    deterministic = deterministic,
+    keep_level_order = keep_level_order
   )
 }
 
@@ -358,6 +405,7 @@ rpf.recipe <- function(
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -381,7 +429,8 @@ rpf.recipe <- function(
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
-    deterministic = deterministic
+    deterministic = deterministic,
+    keep_level_order = keep_level_order
   )
 }
 
@@ -407,14 +456,15 @@ rpf_bridge <- function(
   purify,
   nthreads,
   export_forest,
-  deterministic
+  deterministic,
+  keep_level_order
 ) {
   # report errors from helpers against the user's rpf() call
   call <- rlang::caller_env()
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   check_no_missing(processed$predictors, "The predictors", call = call)
   check_no_missing(processed$outcomes, "The outcome", call = call)
-  predictors <- preprocess_predictors_fit(processed)
+  predictors <- preprocess_predictors_fit(processed, keep_level_order = keep_level_order, call = call)
   checkmate::assert_string(loss, null.ok = TRUE)
   outcomes <- preprocess_outcome(processed, loss, call = call)
   loss <- outcomes$loss
@@ -482,7 +532,8 @@ rpf_bridge <- function(
     deterministic = deterministic,
     nthreads = nthreads,
     purify = purify,
-    exact_draw = rpf_exact_draw(call = call)
+    exact_draw = rpf_exact_draw(call = call),
+    keep_level_order = predictors$keep_level_order
   )
 
   fit <- rpf_impl(
