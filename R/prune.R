@@ -173,11 +173,18 @@
 #'   (`"full"` for one or two predictors, `"asis"` if its own cut points need at most `max_panels` heat maps,
 #'   `"coarsened"`; `NA` if not kept by the first pruning) and `heat_maps`. The element `display` is a list:
 #'   `max_panels`; `first`, the first pruning's model (without `fit`); `coarse`, per coarsened component (named as the
-#'   components): `S`, `C` (the coarse predictors), `q`, `cuts` (per coarse predictor), `cells`, `var_kept` (the share
-#'   of the component's variance kept), `forest_panels`, `kept` (in the final model), `candidates` (every candidate's
-#'   coarse set, `q`, cells and variance kept) and `stored` (what prediction needs; no training data); `forms`, per
-#'   component of three or more predictors the first pruning kept, its form, heat maps and variance kept; `second`
-#'   (whether a second pruning ran); `seconds` (the time of each step).
+#'   components): `S` (all the component's predictors), `C` (the coarse predictors, `|S| - 2` of `S`: the panel
+#'   predictors), `q`, `cuts` (per coarse predictor), `cells`, `var_kept` (the share of the component's variance
+#'   kept), `forest_panels`, `kept` (in the final model), `candidates` (every candidate's coarse set, `q`, cells and
+#'   variance kept) and `stored` (what prediction needs; no training data); `asis`, per component kept as it is (form
+#'   `"asis"`), its panels with the same names and meaning: `S` (all the component's predictors), `C` (the panel
+#'   predictors: the `|S| - 2` of `S` with the fewest own cut points; of ties, the first in `S`), `cuts` (per
+#'   predictor of `C`, its own cut points: the leaf bounds of the trees containing `S` inside the range of the
+#'   training values), `forest_panels` (`prod(lengths(cuts) + 1)`) and `kept`; `forms`, per component of three or
+#'   more predictors the first pruning kept, its form, heat maps and variance kept; `second` (whether a second pruning
+#'   ran); `seconds` (the time of each step). In `coarse` and `asis` alike, a panel is a cell of `cuts` (a value `x`
+#'   of predictor `k` of `C` lies in cell `findInterval(x, cuts[[k]])`), shown as a heat map over the two predictors
+#'   `setdiff(S, C)` at full resolution.
 #'
 #' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
 #'

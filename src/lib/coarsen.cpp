@@ -413,8 +413,11 @@ RandomPlantedForest::coarsen_select(const std::vector<std::vector<int>> &sets, i
       throw std::invalid_argument("Each set must have at least 3 features in 1..p.");
   }
   // the panels the forest's f_S needs: the product of the |S| - 2 smallest interval counts of its interior cut points
-  // over the leaves of all trees >= S, all families
-  auto panels_of = [&](const std::vector<int> &S) -> double {
+  // over the leaves of all trees >= S, all families. If at most P (f_S kept as it is), R.cpos and R.cuts are its
+  // panels: the |S| - 2 features with the fewest interior cut points (the first of ties), in the order of S, and
+  // those cut points.
+  auto panels_of = [&](Selected &R) -> double {
+    const std::vector<int> &S = R.S;
     const int k = (int)S.size();
     std::vector<std::vector<double>> own(k);
     for (const auto &fam : tree_families)
@@ -441,14 +444,32 @@ RandomPlantedForest::coarsen_select(const std::vector<std::vector<int>> &sets, i
         c += (u > xs.front() && u <= xs.back());
       qn.push_back((double)c + 1);
     }
+    const std::vector<double> counts = qn;
     std::sort(qn.begin(), qn.end());
     double fp = 1;
     for (int q = 0; q < k - 2; ++q)
       fp *= qn[q];
+    if (fp <= (double)P) {
+      std::vector<int> pos;
+      for (int q = 0; q < k; ++q)
+        pos.push_back(q);
+      std::stable_sort(pos.begin(), pos.end(), [&](int a, int b) { return counts[a] < counts[b]; });
+      pos.resize(k - 2);
+      std::sort(pos.begin(), pos.end());
+      R.cpos = pos;
+      for (int q : pos) {
+        const auto &xs = T.xs[S[q] - 1];
+        std::vector<double> t;
+        for (double u : own[q])
+          if (u > xs.front() && u <= xs.back())
+            t.push_back(u);
+        R.cuts.push_back(t);
+      }
+    }
     return fp;
   };
   std::vector<double> fps(K);
-  parallel_for(K, nthreads, [&](size_t i) { fps[i] = panels_of(res[i].S); });
+  parallel_for(K, nthreads, [&](size_t i) { fps[i] = panels_of(res[i]); });
   std::set<std::vector<int>> need;
   for (size_t i = 0; i < K; ++i)
     if (fps[i] > (double)P && pf.comps.count(res[i].S))

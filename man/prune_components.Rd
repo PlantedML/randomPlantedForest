@@ -90,11 +90,18 @@ first pruning kept, with their shares after coarsening, and \code{oob} is its ta
 (\code{"full"} for one or two predictors, \code{"asis"} if its own cut points need at most \code{max_panels} heat maps,
 \code{"coarsened"}; \code{NA} if not kept by the first pruning) and \code{heat_maps}. The element \code{display} is a list:
 \code{max_panels}; \code{first}, the first pruning's model (without \code{fit}); \code{coarse}, per coarsened component (named as the
-components): \code{S}, \code{C} (the coarse predictors), \code{q}, \code{cuts} (per coarse predictor), \code{cells}, \code{var_kept} (the share
-of the component's variance kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's
-coarse set, \code{q}, cells and variance kept) and \code{stored} (what prediction needs; no training data); \code{forms}, per
-component of three or more predictors the first pruning kept, its form, heat maps and variance kept; \code{second}
-(whether a second pruning ran); \code{seconds} (the time of each step).
+components): \code{S} (all the component's predictors), \code{C} (the coarse predictors, \verb{|S| - 2} of \code{S}: the panel
+predictors), \code{q}, \code{cuts} (per coarse predictor), \code{cells}, \code{var_kept} (the share of the component's variance
+kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's coarse set, \code{q}, cells and
+variance kept) and \code{stored} (what prediction needs; no training data); \code{asis}, per component kept as it is (form
+\code{"asis"}), its panels with the same names and meaning: \code{S} (all the component's predictors), \code{C} (the panel
+predictors: the \verb{|S| - 2} of \code{S} with the fewest own cut points; of ties, the first in \code{S}), \code{cuts} (per
+predictor of \code{C}, its own cut points: the leaf bounds of the trees containing \code{S} inside the range of the
+training values), \code{forest_panels} (\code{prod(lengths(cuts) + 1)}) and \code{kept}; \code{forms}, per component of three or
+more predictors the first pruning kept, its form, heat maps and variance kept; \code{second} (whether a second pruning
+ran); \code{seconds} (the time of each step). In \code{coarse} and \code{asis} alike, a panel is a cell of \code{cuts} (a value \code{x}
+of predictor \code{k} of \code{C} lies in cell \code{findInterval(x, cuts[[k]])}), shown as a heat map over the two predictors
+\code{setdiff(S, C)} at full resolution.
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.

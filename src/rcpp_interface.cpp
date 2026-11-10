@@ -507,6 +507,14 @@ List selected_to_list(const rpf_coarse::Selected &R)
       Named("var_forest") = R.var_forest,
       Named("seconds") = R.seconds
   );
+  if (R.form == 1) {
+    // kept as it is: its panels, the features of S with the fewest own cut points and these cut points
+    IntegerVector pfeat;
+    for (int a : R.cpos)
+      pfeat.push_back(R.S[a]);
+    o["C"] = pfeat;
+    o["cuts"] = cuts_to_list(R.cuts);
+  }
   if (R.form != 2)
     return o;
   IntegerVector cfeat, q(R.q.begin(), R.q.end());

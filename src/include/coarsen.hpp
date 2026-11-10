@@ -392,7 +392,8 @@ struct Selected {
   std::vector<int> S; // 1-based, ascending
   int form = 0;       // 0 absent (zero), 1 as it is (its own cut points need at most P panels), 2 coarsened
   double forest_panels = 0, var_forest = 0, var_kept = 1, seconds = 0;
-  // coarsened: positions in S of the coarse and the full features, q, cuts per coarse feature
+  // coarsened: positions in S of the coarse and the full features, q, cuts per coarse feature; as it is: cpos and cuts
+  // are its panels (the |S| - 2 features with the fewest own cut points, and these cut points)
   std::vector<int> cpos, dpos, q;
   std::vector<std::vector<double>> cuts;
   std::vector<Candidate> cands;

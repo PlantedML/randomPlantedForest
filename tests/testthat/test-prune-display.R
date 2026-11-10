@@ -261,6 +261,59 @@ test_that("the display after a given rule, a CV choice and a deterministic fores
   }
 })
 
+test_that("the panels of the components kept as they are: own cut points, forest_panels, coarse and asis cover", {
+  d <- pd_data()
+  fit <- pd_fit(d, 4)
+  P <- 50
+  pd <- prune_components(fit, d$x, d$y, max_panels = P, seed = 5, nthreads = 1L)
+  disp <- pd$display
+  fo <- disp$forms
+  expect_identical(names(disp$asis), fo$component[fo$form == "asis"])
+  expect_identical(names(disp$coarse), fo$component[fo$form == "coarsened"])
+  expect_true(any(names(disp$asis) %in% names(pd$beta)))
+  expect_true(any(names(disp$coarse) %in% names(pd$beta)))
+  # coarse and asis together: every kept component of three or more predictors, once
+  kept_of <- function(z) names(z)[vapply(z, function(e) e$kept, logical(1))]
+  shown <- c(kept_of(disp$coarse), kept_of(disp$asis))
+  expect_setequal(shown, names(pd$beta)[lengths(pd$sets) >= 3])
+  expect_false(anyDuplicated(shown) > 0)
+  # the cuts: f_S's own cut points (the leaf bounds of the trees containing S, inside the training range) on the
+  # |S| - 2 predictors with the fewest (the first of ties); their cells are the forest_panels
+  X <- d$x
+  model <- fit$fit$get_model()
+  if (!is_purified(fit)) {
+    purify(fit)
+  }
+  for (nm in names(disp$asis)) {
+    z <- disp$asis[[nm]]
+    S <- match(z$S, colnames(X))
+    own <- lapply(S, function(k) {
+      b <- unlist(lapply(model, function(fam) {
+        lapply(seq_along(fam$variables), function(t) {
+          if (all(S %in% fam$variables[[t]])) vapply(fam$intervals[[t]], function(iv) iv[, k], numeric(2))
+        })
+      }))
+      b <- sort(unique(b))
+      b[b > min(X[, k]) & b <= max(X[, k])]
+    })
+    pick <- sort(order(lengths(own))[seq_len(length(S) - 2)])
+    expect_identical(z$S, colnames(X)[sort(S)])
+    expect_identical(z$C, colnames(X)[S[pick]])
+    expect_named(z$cuts, z$C)
+    expect_identical(unname(z$cuts), own[pick])
+    expect_identical(z$forest_panels, prod(lengths(z$cuts) + 1))
+    expect_lte(z$forest_panels, P)
+    expect_identical(fo$heat_maps[fo$component == nm], z$forest_panels)
+    expect_identical(z$kept, nm %in% names(pd$beta))
+    # f_S is constant on each panel: averaged within the cells of these cuts, it is itself
+    f <- fit$fit$coarsen_eval(list(S = S, C = integer(0), cuts = list()), X)
+    g <- fit$fit$coarsen_eval(list(S = S, C = S[pick], cuts = unname(z$cuts)), X)
+    expect_lt(max(abs(g - f)), 1e-12 * max(1, sd(f)))
+  }
+  # at max_panels = 3 every one is coarsened: asis is empty
+  expect_length(prune_components(fit, d$x, d$y, max_panels = 3, seed = 5, nthreads = 1L)$display$asis, 0)
+})
+
 test_that("max_panels is checked", {
   d <- pd_data(n = 200)
   fit <- pd_fit(d, 3)

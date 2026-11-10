@@ -12,7 +12,8 @@
 # lexicographic order) and maximal q vectors (lexicographic, listed directly: never P^(|S| - 2) candidates), the one
 # keeping the most of the forest component's variance on the training rows is chosen (ties: the first; a later one must
 # be larger by more than 1e-15). A component whose own cut points (the leaves of all trees containing S) already need
-# at most P heat maps (the product of its |S| - 2 smallest interval counts) stays as it is.
+# at most P heat maps (the product of its |S| - 2 smallest interval counts) stays as it is; its panels (those |S| - 2
+# features and their own cut points) are kept for a plot ($display$asis), as $display$coarse keeps a coarsened one's.
 #
 # The second pruning:
 # - chosen out of bag: the same candidates, folds and correction, on each family's coarsened component at its
@@ -72,6 +73,19 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
       candidates = s$candidates,
       stored = s$stored,
       seconds = s$seconds
+    )
+  })
+  # the components kept as they are: their panels, the |S| - 2 predictors C with the fewest own cut points (the leaf
+  # bounds of all trees containing S inside the training range; the first of ties) cut at these; as in coarse, S is
+  # the whole set and the heat maps are over S minus C
+  as_is <- names(sel)[vapply(sel, function(s) s$form == "asis", logical(1))]
+  asis <- lapply(stats::setNames(as_is, as_is), function(nm) {
+    s <- sel[[nm]]
+    list(
+      S = fnames[s$S],
+      C = fnames[s$C],
+      cuts = stats::setNames(s$cuts, fnames[s$C]),
+      forest_panels = s$forest_panels
     )
   })
 
@@ -164,12 +178,16 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   for (nm in co) {
     coarse[[nm]]$kept <- nm %in% names(res$beta)
   }
+  for (nm in as_is) {
+    asis[[nm]]$kept <- nm %in% names(res$beta)
+  }
   first$fit <- NULL
   secs$total <- tick() - t0
   res$display <- list(
     max_panels = max_panels,
     first = first,
     coarse = coarse,
+    asis = asis,
     forms = forms,
     second = second,
     seconds = secs,

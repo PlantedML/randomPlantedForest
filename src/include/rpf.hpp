@@ -249,7 +249,8 @@ public:
   // hold its training data, and have value size 1 (regression).
   // coarsen_select(): for each set S (1-based) of order >= 3, the panels the forest's f_S needs (forest_panels) and,
   // if more than P, every candidate (coarse features C, maximal q vector, equal-mass cuts) scored by the variance kept
-  // on the training rows; the best one, its training-row values and its stored form.
+  // on the training rows; the best one, its training-row values and its stored form. If at most P, its panels: the
+  // |S| - 2 features with the fewest own cut points and these cut points.
   std::vector<rpf_coarse::Selected> coarsen_select(const std::vector<std::vector<int>> &sets, int P, int nthreads);
   // coarsen_oob(): each family's coarsened components at its out-of-bag rows, summed as purify_oob() sums (needs the
   // in-bag counts).
