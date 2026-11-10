@@ -13,7 +13,7 @@
 #' Components that the purified forest does not hold, such as sets of predictors
 #' that never appear together in a tree, are zero columns.
 #'
-#' The components are only unique for a purified forest.
+#' The components are only unique for a purified forest; [purify()] says how they are identified.
 #' An unpurified forest is purified in place on first use with the defaults of [purify()].
 #' For other settings, such as more threads, call [purify()] before `predict_components()`.
 #'

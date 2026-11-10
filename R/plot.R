@@ -157,7 +157,7 @@ grid_boxes <- function(family) {
 #' tree families.
 #'
 #' * `type = "tree"` draws a split diagram in the style of Figure 1b of
-#'   Hiabu et al. (2023), with the trees in rows by number of variables, each
+#'   Hiabu et al. (2020), with the trees in rows by number of variables, each
 #'   leaf filled by its value. The forest stores only its final leaves, not
 #'   the order of splits or which leaf a tree grew from, so the splits within
 #'   a tree are reconstructed: the diagram shows a split structure consistent
@@ -196,7 +196,7 @@ grid_boxes <- function(family) {
 #'   [rpf()]).
 #'
 #' @return A `ggplot` for `type = "tree"`, a `patchwork` for `type = "boxes"`.
-#' @references Hiabu, M., Mammen, E., Meyer, J. T. (2023). Random Planted
+#' @references Hiabu, M., Mammen, E., Meyer, J. T. (2020). Random Planted
 #'   Forest: a directly interpretable tree ensemble. arXiv:2012.14563.
 #' @importFrom rlang .data
 #' @export

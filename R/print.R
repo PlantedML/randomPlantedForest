@@ -131,7 +131,7 @@ print_params <- function(params) {
 #' @export
 #' @examples
 #'
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10)
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {

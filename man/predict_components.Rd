@@ -58,7 +58,7 @@ All components are evaluated in one pass over the rows of \code{new_data}.
 Components that the purified forest does not hold, such as sets of predictors
 that never appear together in a tree, are zero columns.
 
-The components are only unique for a purified forest.
+The components are only unique for a purified forest; \code{\link[=purify]{purify()}} says how they are identified.
 An unpurified forest is purified in place on first use with the defaults of \code{\link[=purify]{purify()}}.
 For other settings, such as more threads, call \code{\link[=purify]{purify()}} before \code{predict_components()}.
 }

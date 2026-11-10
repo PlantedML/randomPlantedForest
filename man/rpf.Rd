@@ -218,7 +218,7 @@ saves memory.}
 
 \item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
-(\code{t_try} is ignored) and evenly spaced thresholds. The result does not
+(\code{t_try} and \code{split_decay_rate} are ignored) and evenly spaced thresholds. The result does not
 depend on the seed, and all tree families are identical, so use
 \code{ntrees = 1}. Mainly useful for testing and debugging.}
 
@@ -298,8 +298,10 @@ In each round, a \code{t_try} fraction of all possible splits (capped at
 and how its thresholds are evaluated.
 \itemize{
 \item \code{leaves}: Split candidates are (leaf, split-dimension) pairs. For each sampled
-candidate, \code{split_try} thresholds are drawn uniformly from the valid range within
-that leaf and evaluated to choose the best split.
+candidate, \code{split_try} thresholds are drawn uniformly without replacement from the
+distinct values of that predictor among the leaf's rows, leaving out the smallest
+and, with \code{min_leaf_rows}, those that leave fewer rows on either side (all of them
+if there are fewer), and evaluated to choose the best split.
 \item \code{hist}: As \code{leaves}, but thresholds are drawn from boundaries of
 quantile bins computed once per predictor, which makes evaluating them
 faster on large data.
@@ -335,6 +337,15 @@ classification or the other split structures.
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{options(randomPlantedForest.exact_draw = FALSE)
 }\if{html}{\out{</div>}}
+}
+
+\subsection{Reproducibility}{
+
+With the same seed, \code{rpf()} gives the same forest on the same platform, also
+with more threads. Another platform can give another forest for the same
+seed, because the integer sampling of the C++ standard library
+(\code{std::uniform_int_distribution}) differs between implementations, such as
+libc++ and libstdc++.
 }
 }
 \examples{
