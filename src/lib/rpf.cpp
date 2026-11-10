@@ -10,6 +10,7 @@
 #include <vector>
 #include <thread>
 #include "internal_utils.hpp"
+#include "cur_trees_1.hpp"
 
 // Use utilities via namespace alias
 using namespace rpf_utils;
@@ -810,13 +811,14 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         size_t idx_s = curr_split.tree_index->leaves.size() - 1;
         // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
         if ((int)curr_split.tree_index->fenwick_by_dim_v.size() >= this->feature_size) {
+          rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(curr_family[std::set<int>{0}]->ct1_ranks, samples_X);
           for (int kdim = 0; kdim < this->feature_size; ++kdim) {
             auto &bit = curr_split.tree_index->fenwick_by_dim_v[(size_t)kdim];
             auto &wts = curr_split.tree_index->leaf_weights_by_dim_v[(size_t)kdim];
             if (!bit.empty() && wts.size() == bit.size()) {
               // update replaced leaf
               int leaf_min = this->n_leaves[kdim];
-              double w_new_b = leaf_threshold_weight(samples_X, curr_split.tree_index->leaves[idx_b], kdim, leaf_min);
+              double w_new_b = rpf_ct1::leaf_weight(fr, curr_split.tree_index->leaves[idx_b], kdim, leaf_min);
               double delta_b = w_new_b - (idx_b < wts.size() ? wts[idx_b] : 0.0);
               if ((size_t)idx_b < wts.size())
                 wts[idx_b] = w_new_b;
@@ -825,7 +827,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
                 curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += delta_b;
               }
               // append new leaf
-              double w_new_s = leaf_threshold_weight(samples_X, curr_split.tree_index->leaves[idx_s], kdim, leaf_min);
+              double w_new_s = rpf_ct1::leaf_weight(fr, curr_split.tree_index->leaves[idx_s], kdim, leaf_min);
               rpf_utils::fenwick_push_back(bit, w_new_s);
               wts.push_back(w_new_s);
               curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
@@ -839,18 +841,19 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         size_t idx_b = found_tree->leaves.size() - 1;
         // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
         if ((int)found_tree->fenwick_by_dim_v.size() >= this->feature_size) {
+          rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(curr_family[std::set<int>{0}]->ct1_ranks, samples_X);
           for (int kdim = 0; kdim < this->feature_size; ++kdim) {
             auto &bit = found_tree->fenwick_by_dim_v[(size_t)kdim];
             auto &wts = found_tree->leaf_weights_by_dim_v[(size_t)kdim];
             if (!bit.empty() && wts.size() == bit.size()) {
               int leaf_min = this->n_leaves[kdim];
               // append s
-              double w_new_s = leaf_threshold_weight(samples_X, found_tree->leaves[idx_s], kdim, leaf_min);
+              double w_new_s = rpf_ct1::leaf_weight(fr, found_tree->leaves[idx_s], kdim, leaf_min);
               rpf_utils::fenwick_push_back(bit, w_new_s);
               wts.push_back(w_new_s);
               found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
               // append b
-              double w_new_b = leaf_threshold_weight(samples_X, found_tree->leaves[idx_b], kdim, leaf_min);
+              double w_new_b = rpf_ct1::leaf_weight(fr, found_tree->leaves[idx_b], kdim, leaf_min);
               rpf_utils::fenwick_push_back(bit, w_new_b);
               wts.push_back(w_new_b);
               found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_b;
@@ -898,6 +901,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     treePtr->weights_total_by_dim_v.shrink_to_fit();
     treePtr->weights_epoch_by_dim_v.clear();
     treePtr->weights_epoch_by_dim_v.shrink_to_fit();
+    treePtr->ct1_ranks.reset(); // cur_trees_1's ranks of the working rows
     treePtr->leaves.shrink_to_fit();
   }
   tree_families[n] = curr_family;
