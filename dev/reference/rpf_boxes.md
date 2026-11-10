@@ -56,7 +56,10 @@ they are the cells of the purified grid, one non-overlapping set per
 component of the functional decomposition. As
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
 modifies the forest in place, extract the unpurified boxes before
-purifying.
+purifying. After `purify(mode = 2)`, the default, the cells are computed
+from the training data, so a forest restored by
+[`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+needs to have been marshaled with `include_data = TRUE`.
 
 Factor predictors are encoded as integer codes in the order of
 `x$factor_levels`, with a box covering the codes `c` with
@@ -74,9 +77,9 @@ rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10)
 head(rpf_boxes(rpfit))
 #>          tree order box      value wt_lower wt_upper hp_lower hp_upper
 #> 1 (Intercept)     0   1  0.0000000       NA       NA       NA       NA
-#> 2          wt     1   1  8.2166667    2.200    2.320       NA       NA
-#> 3          wt     1   2  0.1649621    3.190    5.444       NA       NA
-#> 4          wt     1   3  1.8166667    1.513    2.200       NA       NA
-#> 5          wt     1   4 -1.7078125    2.320    3.190       NA       NA
-#> 6          hp     1   1 23.2078125       NA       NA       97      105
+#> 2          hp     1   1 24.0800000       NA       NA       52   123.00
+#> 3          hp     1   2 14.4859561       NA       NA      230   335.02
+#> 4          hp     1   3 17.0200000       NA       NA      123   205.00
+#> 5          hp     1   4  2.9575758       NA       NA       52    66.00
+#> 6          hp     1   5 -0.3059561       NA       NA       66   335.02
 ```

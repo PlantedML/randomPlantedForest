@@ -111,8 +111,9 @@ the outcome level whose values to plot. <code>NULL</code> uses the first level.<
 
 <dt id="arg-factor-levels">factor_levels<a class="anchor" aria-label="anchor" href="#arg-factor-levels"></a></dt>
 <dd><p><code>[logical(1): TRUE]</code>: Label factors with their
-levels instead of integer codes. Levels are ordered by their association
-with the outcome, as used in the fit.</p></dd>
+levels instead of integer codes. Levels are in the order used in the fit:
+ordered by the outcome, or in their own order with <code>keep_level_order</code> (see
+<code><a href="rpf.html">rpf()</a></code>).</p></dd>
 
 </dl></div>
     <div class="section level2">

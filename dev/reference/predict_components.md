@@ -48,7 +48,8 @@ A `list` with elements:
   functional decomposition of the prediction. All components together
   with the intercept sum up to the prediction. For multiclass
   classification, the number of output columns is multiplied by the
-  number of levels in the outcome.
+  number of `target_levels`: the levels of the outcome, or for
+  `loss = "logit"` all levels but the first (the reference level).
 
 - `intercept` (`numeric`): Expected value of the prediction. For
   multiclass classification, one value per target level, named by
@@ -82,6 +83,10 @@ The intercept is always included. Optionally `predictors` can be
 specified to only include components including the given variables. If
 `max_interaction` is greater than `length(predictors)`, the
 `max_interaction` will be lowered accordingly.
+
+All components are evaluated in one pass over the rows of `new_data`.
+Components that the purified forest does not hold, such as sets of
+predictors that never appear together in a tree, are zero columns.
 
 The components are only unique for a purified forest. An unpurified
 forest is purified in place on first use with the defaults of

@@ -44,7 +44,11 @@ is_purified(x)
 - mode:
 
   `[integer(1): 2]`: Purification algorithm: `2` is the fast exact
-  KD-tree based algorithm, `1` the original grid-based one.
+  KD-tree based algorithm, which keeps the components as weighted
+  rectangles, `1` the original grid-based one, which stores every
+  component as a dense grid over the split points and can run out of
+  memory from `max_interaction = 3` on. Both give the same components up
+  to rounding.
 
 - nthreads:
 

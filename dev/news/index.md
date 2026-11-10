@@ -4,6 +4,22 @@
 
 ### New features
 
+- [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  gains `keep_level_order`, to keep the level order of factor predictors
+  instead of ordering their levels by the outcome. `TRUE` keeps it for
+  every factor, ordered or not, and a character vector for the named
+  factors only; splits then separate neighbouring levels in the order of
+  [`levels()`](https://rdrr.io/r/base/levels.html). The default,
+  `FALSE`, orders every factor by the outcome as before, and fits are
+  unchanged. The coding is stored in `$factor_levels`, which
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  and
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  use, and [`print()`](https://rdrr.io/r/base/print.html) names the
+  factors that keep their order. The details of
+  [`?rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  describe how factor predictors are coded.
 - [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
   trees of one tree family to illustrate how a Random Planted Forest
   predicts. `type = "tree"` draws a split diagram in the style of Figure
@@ -145,15 +161,29 @@
   rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s
   instead of 1.26 s at 8 threads; with `delete_leaves = FALSE`, 2.9 s
   instead of 10.7 s and 0.71 s instead of 2.07 s.
-
-### Performance
-
 - Fitting regression forests with `split_structure = "cur_trees_1"` is
   about 6 times as fast and needs less memory, for example 1,299 s → 216
   s at 1 thread and 238 s → 38 s at 8 threads on California housing
   (16,512 rows, `max_interaction = 3`, 10,000 splits), with the peak
   memory at 8 threads down from 2.5 GB to 0.9 GB. Fitted models are
   bitwise unchanged.
+- [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  keeps the purified components as weighted rectangles instead of dense
+  grids over all split points (with `mode = 2`, the default, which
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  and `rpf(purify = TRUE)` use). Purification at `max_interaction = 3`
+  and above no longer runs out of memory: on California housing (16,512
+  rows, 50 tree families, 94,138 leaves) order 3 takes 6 s and 0.25 GB
+  with 4 threads, where it was stopped at 6 GB before, and the full
+  order (8) takes 40 s and 2.3 GB. The components equal those of
+  `mode = 1` up to rounding, and
+  [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+  stores the rectangles.
+- [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  evaluates all components in one pass over the rows of `new_data`, and
+  skips those the forest does not hold, instead of one pass per
+  component: on a 10-feature full-order fit (1,023 components, 636 of
+  them not held), 5,000 rows take 0.5 s instead of 2.0 s.
 
 ## randomPlantedForest 0.5.0
 
