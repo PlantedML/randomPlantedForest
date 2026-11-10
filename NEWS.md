@@ -32,6 +32,8 @@
 * The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
+* `predict_components()` accepts a matrix as `new_data`, like `predict()` does.
+  It no longer turns the caller's data.frame into a data.table by reference.
 * `predict()` after `purify(maxp_interaction = k)` with `k` below the fit's `max_interaction` returns the forest's prediction.
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
