@@ -34,6 +34,7 @@ private:
   LossType loss;
   void (ClassificationRPF::*calcLoss)(Split &);
   void create_tree_family(std::vector<Leaf> initial_leaves, size_t n) override;
+  std::vector<double> null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows) override;
   Split calcOptimalSplit(
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,

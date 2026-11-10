@@ -442,6 +442,31 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
   }
 }
 
+// A family whose rounds all ended without a split (constant predictors, a single row, every candidate infeasible)
+// has only its null tree, whose one leaf holds all of the family's rows and starts at 0, so the family would
+// predict 0. It gets the loss's fit of that leaf instead. In a family with a split the null leaf stays at 0 (the
+// first split's leaves carry the level), so those families are unchanged. Y: the family's working outcome, which
+// no split has changed.
+void RandomPlantedForest::fit_null_leaf(TreeFamily &family, const std::vector<std::vector<double>> &Y)
+{
+  for (const auto &tree : family)
+    if (tree.first != std::set<int>{0} && !tree.second->leaves.empty())
+      return; // a split
+  auto null_tree = family.find(std::set<int>{0});
+  if (null_tree == family.end() || null_tree->second->leaves.empty())
+    return;
+  Leaf &leaf = null_tree->second->leaves[0];
+  if (!leaf.individuals.empty())
+    leaf.value = null_leaf_value(Y, leaf.individuals);
+}
+
+// L2: the leaf's mean, as a split's leaves get it (L2_loss)
+std::vector<double>
+RandomPlantedForest::null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows)
+{
+  return calcMean(Y, rows);
+}
+
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
 {
 
@@ -546,6 +571,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         }
       }
     }
+
+    fit_null_leaf(curr_family, samples_Y);
 
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
@@ -771,6 +798,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     // Detach the histogram working buffer; the stack-owned vector frees itself.
     tls_working_bin_id_ptr = nullptr;
 
+    fit_null_leaf(curr_family, samples_Y);
+
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
@@ -951,6 +980,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
   }
+
+  fit_null_leaf(curr_family, samples_Y);
 
   // Final memory cleanup: drop training-only buffers and shrink containers
   auto keys = getKeys(curr_family);
