@@ -5,7 +5,8 @@
 #'
 #' Extracts all possible components up to `max_interaction` degrees,
 #' up to the value set when calling [`rpf()`]. The intercept is always included.
-#' Optionally `predictors` can be specified to only include components including the given variables.
+#' Optionally `predictors` can be specified to only include components made of the given predictors;
+#' the sum of the other components is returned as `remainder`.
 #' If `max_interaction` is greater than `length(predictors)`, the `max_interaction` will be lowered accordingly.
 #'
 #' All components are evaluated in one pass over the rows of `new_data`.
@@ -21,9 +22,10 @@
 #' increase drastically to `sum(choose(ncol(new_data), seq_len(max_interaction)))`.
 #'
 #' @inheritParams predict.rpf
-#' @param predictors `[character | NULL: NULL]`: Vector of one or more column names of predictor variables
-#'   in `new_data` to extract components for.
-#'   If `NULL`, all variables and their interactions are returned.
+#' @param predictors `[character | NULL: NULL]`: Vector of one or more names of the forest's predictors
+#'   to extract components for. These are the columns the forest was fitted on: with a formula, its terms,
+#'   such as `log(x1)`.
+#'   If `NULL`, all predictors and their interactions are returned, in the order of the fit's columns.
 #' @param max_interaction `[integer(1) | NULL: NULL]`: Maximum degree of
 #'   interactions to consider. `NULL` uses the `max_interaction` parameter from the [`rpf`] object.
 #'   Must be between `1` (main effects only) and the `max_interaction` of the [`rpf`] object.
@@ -38,13 +40,13 @@
 #' all levels but the first (the reference level).
 #' - `intercept` (`numeric`): Expected value of the prediction.
 #' For multiclass classification, one value per target level, named by `target_levels`.
-#' - `x` ([`data.table`][data.table::data.table]): Copy of `new_data` containing predictors selected
-#' by `predictors`.
+#' - `x` ([`data.table`][data.table::data.table]): The predictors selected by `predictors`, as the forest
+#' sees them in `new_data` (with a formula, its terms, such as `log(x1)`).
 #' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
 #' which can be used to disassemble `m`, as names include both term and target level.
-#' - `remainder` (`numeric`): Only if `m` leaves out components of the forest: if `max_interaction`
-#' (lowered to the number of `predictors`) is below that of the [`rpf`] object, or if the forest was purified
-#' with a `maxp_interaction` below it (see [purify()]). The prediction minus `intercept` and `m`'s row sums,
+#' - `remainder` (`numeric`): Only if `m` leaves out components of the forest: if `predictors` leaves out
+#' some of the forest's predictors, if `max_interaction` (lowered to the number of `predictors`) is below that
+#' of the [`rpf`] object, or if the forest was purified with a `maxp_interaction` below it (see [purify()]). The prediction minus `intercept` and `m`'s row sums,
 #' so that the three sum to the prediction.
 #' For multiclass classification, one column per target level.
 #'
@@ -95,11 +97,14 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     checkmate::assert_int(max_interaction, lower = 1, upper = object$params$max_interaction)
   }
 
-  # Either use all predictors in the model or a subset of interest (for speed / compactness)
+  # Either use all predictors in the model or a subset of interest (for speed / compactness).
+  # The fit's own columns, in the fit's order: a formula's terms such as log(x1) are columns of their own,
+  # and hardhat::mold() puts factors last.
+  fit_predictors <- fit_predictor_names(object)
   if (is.null(predictors)) {
-    predictors <- names(object$blueprint$ptypes$predictors)
+    predictors <- fit_predictors
   } else {
-    checkmate::assert_subset(predictors, choices = names(object$blueprint$ptypes$predictors))
+    checkmate::assert_subset(predictors, choices = fit_predictors)
   }
 
   if (!is_purified(object)) {
@@ -115,8 +120,9 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   # Encode factors to (re-)ordered integers according to information saved during model fit
   # Need matrix version for model predictions, and keep data.table version for return (for plotting)
   new_data_matrix <- preprocess_predictors_predict(object, processed$predictors)
-  # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table
-  new_data_dt <- data.table::as.data.table(new_data)
+  # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table.
+  # The forged predictors, so that a formula's terms such as log(x1) are columns too
+  new_data_dt <- data.table::as.data.table(processed$predictors)
 
   # all subsets of predictors up to max_interaction, extracted in one pass (the components the purified forest does
   # not store are zero columns)
@@ -126,9 +132,14 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
   )
   all_components <- .predict_components(object, new_data_matrix, combinations)
   # Get intercept (scalar), using only one row of x as input as we don't need it repeated
+  # (the intercept does not depend on the row; with zero rows, one row of zeros, as C++ needs a row)
+  intercept_data <- new_data_matrix[, 1, drop = FALSE]
+  if (nrow(intercept_data) == 0) {
+    intercept_data <- matrix(0, nrow = 1, ncol = 1, dimnames = list(NULL, colnames(new_data_matrix)[1]))
+  }
   intercept <- .predict_single_component(
     object,
-    new_data_matrix[, 1, drop = FALSE],
+    intercept_data,
     predictors = NULL
   )
 
@@ -147,12 +158,21 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
     ret$target_levels <- model_levels
   }
 
-  # If max_interaction here is smaller than that of model fit, we calculate a remainder term
+  # If m leaves out components of the forest (max_interaction here is smaller than that of the model fit,
+  # or predictors leaves out some of the fit's predictors), we calculate a remainder term
   # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
   # The same after purify(maxp_interaction = k) below the fit's order: the components above k
   # are zero columns, and the remainder holds their sum.
 
-  if (max_interaction < object$params$max_interaction || object$fit$is_purify_capped()) {
+  left_out <- max_interaction < object$params$max_interaction || !all(fit_predictors %in% predictors)
+  if ((left_out || object$fit$is_purify_capped()) && nrow(new_data_matrix) == 0) {
+    # zero rows: a remainder with zero rows, as predict() cannot run on them
+    ret$remainder <- if (length(outcome_levels) > 2) {
+      data.table::as.data.table(stats::setNames(rep(list(numeric(0)), length(model_levels)), model_levels))
+    } else {
+      numeric(0)
+    }
+  } else if (left_out || object$fit$is_purify_capped()) {
     pred <- predict.rpf(object, new_data = new_data, type = "numeric")
 
     # handling differs if multiclass
@@ -180,12 +200,17 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 #'   `.predict_single_component()` names its columns.
 .predict_components <- function(object, new_data, sets) {
   idx <- lapply(sets, function(s) sort.int(match(s, colnames(new_data))))
-  ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
   out_names <- vapply(sets, function(s) paste0(sort(s), collapse = ":"), character(1))
   if (length(levels(object$blueprint$ptypes$outcomes[[1]])) > 2) {
     # (model levels: multiclass logit has no column for the reference level)
     model_levels <- model_outcome_levels(object)
     out_names <- paste0(rep(out_names, each = length(model_levels)), "__class:", model_levels)
+  }
+  if (nrow(new_data) == 0) {
+    # the C++ code needs at least one row
+    ret <- matrix(numeric(0), nrow = 0, ncol = length(out_names))
+  } else {
+    ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
   }
   colnames(ret) <- out_names
   ret
