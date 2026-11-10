@@ -193,7 +193,7 @@ test_that("a given R falls back to in-sample coefficients where the choice falls
   )
 })
 
-test_that("the default 1se rule is sparser than min, on the same scores", {
+test_that("the default 1se rule is never larger than min, on the same scores", {
   d <- oobr_data(seed = 2)
   fit <- oobr_fit(d)
   p1 <- prune_components(fit, d$x, d$y, seed = 3)
@@ -201,8 +201,9 @@ test_that("the default 1se rule is sparser than min, on the same scores", {
   expect_identical(p1$oob, pm$oob)
   expect_identical(c(p1$rule, p1$tau), unlist(p1$oob[p1$oob$one_se, c("rule", "tau")], use.names = FALSE))
   expect_identical(c(pm$rule, pm$tau), unlist(pm$oob[pm$oob$min, c("rule", "tau")], use.names = FALSE))
-  # 1se keeps the true components only; min also keeps small false ones here
+  # 1se keeps the true components only; min keeps at least those, and on some platforms also small false ones
+  # (the forest's random draws differ between platforms)
   expect_setequal(names(p1$beta), c("x1", "x4", "x2:x3"))
-  expect_gt(length(pm$beta), length(p1$beta))
+  expect_lte(length(p1$beta), length(pm$beta))
   expect_true(all(names(p1$beta) %in% names(pm$beta)))
 })
