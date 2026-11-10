@@ -51,8 +51,10 @@
 #'   (`ntrees`), the default `select_by` scores by CV instead (with a message); an explicit `select_by = "oob"` warns.
 #' - A deterministic forest has no out-of-bag rows, and a forest restored by [rpf_unmarshal()] from a blob made by an
 #'   earlier version has no in-bag counts: with the default `select_by`, they are scored by CV instead.
-#' - Factor predictors are coded by the mean outcome of all training rows (see [rpf()]), so a row's own outcome
-#'   enters the coding its OOB families split on: with factors the OOB error is somewhat optimistic.
+#' - Factor predictors are coded by the outcome of all training rows: their levels are ordered by the mean outcome
+#'   (regression), by the share of the second class (binary classification) or by the first principal component of
+#'   the class proportions (three or more classes; Coppersmith, Hong and Hosking 1999). So a row's own outcome enters
+#'   the coding its OOB families split on: with factors the OOB error is somewhat optimistic.
 #'
 #' **Cross-validation** (`select_by = "cv"`). For each fold, the forest is refitted with the parameters of `object` on
 #' the other folds (after `set.seed(seed)`, the same for every fold), its components, shares and refit are computed

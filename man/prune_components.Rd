@@ -137,8 +137,10 @@ families with a 3-way interaction), and the OOB choice was as good as the CV's o
 (\code{ntrees}), the default \code{select_by} scores by CV instead (with a message); an explicit \code{select_by = "oob"} warns.
 \item A deterministic forest has no out-of-bag rows, and a forest restored by \code{\link[=rpf_unmarshal]{rpf_unmarshal()}} from a blob made by an
 earlier version has no in-bag counts: with the default \code{select_by}, they are scored by CV instead.
-\item Factor predictors are coded by the mean outcome of all training rows (see \code{\link[=rpf]{rpf()}}), so a row's own outcome
-enters the coding its OOB families split on: with factors the OOB error is somewhat optimistic.
+\item Factor predictors are coded by the outcome of all training rows: their levels are ordered by the mean outcome
+(regression), by the share of the second class (binary classification) or by the first principal component of
+the class proportions (three or more classes; Coppersmith, Hong and Hosking 1999). So a row's own outcome enters
+the coding its OOB families split on: with factors the OOB error is somewhat optimistic.
 }
 
 \strong{Cross-validation} (\code{select_by = "cv"}). For each fold, the forest is refitted with the parameters of \code{object} on
