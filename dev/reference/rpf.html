@@ -80,6 +80,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  keep_level_order <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  oob_path <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -106,6 +107,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  keep_level_order <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  oob_path <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -132,6 +134,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  keep_level_order <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  oob_path <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span>
 <span></span>
@@ -158,6 +161,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  export_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  deterministic <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  keep_level_order <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  oob_path <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -211,10 +215,12 @@ Each family is grown on a bootstrap sample and predictions are averaged.</p></dd
 
 
 <dt id="arg-splits">splits<a class="anchor" aria-label="anchor" href="#arg-splits"></a></dt>
-<dd><p><code>[integer(1): 30]</code>: Number of split rounds per tree family. The main tuning
+<dd><p><code>[integer(1) | NULL: 30]</code>: Number of split rounds per tree family. The main tuning
 parameter: more splits fit more complex functions. A round splits the best of its
 candidates; near saturation, when every candidate's leaf is too small to split, a
-round can make no split.</p></dd>
+round can make no split. <code>NULL</code> chooses it out of bag while the forest grows
+(regression, not with <code>deterministic = TRUE</code>; otherwise <code>NULL</code> means 30). See
+"Choosing <code>splits</code> out of bag" in Details.</p></dd>
 
 
 <dt id="arg-split-structure">split_structure<a class="anchor" aria-label="anchor" href="#arg-split-structure"></a></dt>
@@ -330,10 +336,30 @@ outcome. <code>FALSE</code> orders every factor by the outcome, <code>TRUE</code
 order of every factor, and a character vector keeps it for the named
 factor predictors only. See "Factor predictors" below.</p></dd>
 
+
+<dt id="arg-oob-path">oob_path<a class="anchor" aria-label="anchor" href="#arg-oob-path"></a></dt>
+<dd><p><code>[logical(1) | integer: FALSE]</code>: Whether to track the
+out-of-bag (OOB) error along the splits (regression only, not with
+<code>deterministic = TRUE</code>). <code>TRUE</code> evaluates it at the checkpoints of
+<code><a href="oob_path_checkpoints.html">oob_path_checkpoints()</a></code> for <code>splits</code>, four per doubling; an increasing
+integer vector in <code>1..splits</code> gives the checkpoints. The fitted forest is
+the same as without. See Details. With <code>splits = NULL</code> the path of the
+checkpoints grown is stored either way, and only <code>TRUE</code> or <code>FALSE</code> is
+allowed.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Object of class <code>"rpf"</code> with model object contained in <code>$fit</code>.</p>
+    <p>Object of class <code>"rpf"</code> with model object contained in <code>$fit</code>. With
+<code>oob_path</code>, <code>$oob_path</code> holds the OOB path: a data frame with one row per
+checkpoint, <code>splits</code>, the corrected and the plain OOB root mean squared
+error (<code>oob_rmse</code>, <code>oob_rmse_raw</code>), and the standard errors of the two mean
+squared errors (<code>se_mse</code>, <code>se_mse_raw</code>). Its attribute <code>n_rows</code> is the
+number of training rows with an OOB tree family. With <code>splits = NULL</code>,
+<code>$params$splits</code> is the chosen number of splits, <code>$oob_path</code> the path of
+the checkpoints grown, and <code>$splits_oob</code> a list with the chosen <code>splits</code>,
+<code>stopped_at</code> (the number of splits where growing stopped) and <code>capped</code>
+(whether it stopped at the cap while the error was still falling).</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -448,6 +474,77 @@ seed, because the integer sampling of the C++ standard library
 libc++ and libstdc++.</p>
 </div>
 
+<div class="section">
+<h3 id="the-out-of-bag-path">The out-of-bag path<a class="anchor" aria-label="anchor" href="#the-out-of-bag-path"></a></h3>
+
+
+<p>With the same seed, the forest grown with <code>k</code> splits is exactly the first
+<code>k</code> splits of every tree family of a forest grown with more: nothing in the
+fit depends on the total number of splits. Each family is grown on a
+bootstrap sample, so every training row is out of bag for the families that
+did not draw it (about 37% of them). With <code>oob_path</code>, each family's
+prediction at its OOB rows is updated split by split while it grows, and
+copied at each checkpoint. So one fit gives the OOB error of every forest
+with fewer splits, for example to choose <code>splits</code> without cross-validation.
+This costs <code>2 * nrow(x) * length(checkpoints)</code> doubles and a little time;
+the fit itself is unchanged.</p>
+<p>The OOB prediction of a row is the mean over its OOB families, and the plain
+error (<code>oob_rmse_raw</code>) is the root mean squared error of these predictions
+over the rows with an OOB family. That mean averages fewer families than the
+forest, so the plain error overstates the forest's error by the families'
+extra variance, more so with more splits. The corrected error (<code>oob_rmse</code>)
+subtracts this excess, <code>(1 / m_i - 1 / ntrees) * v_i</code> for row <code>i</code> with <code>m_i</code>
+OOB families, where <code>v_i</code> is the variance across families estimated from the
+OOB means over the families of even and of odd index,
+<code>v_i = (g_even - g_odd)^2 / (1 / m_even + 1 / m_odd)</code>; this is also the
+correction of <code><a href="prune_components.html">prune_components()</a></code>' OOB choice. A row whose OOB families
+are all even or all odd is not corrected here (<code><a href="prune_components.html">prune_components()</a></code> gives
+it the mean estimate of the other rows): about 2% of the rows at 20
+families, 18% at 10 and over half at 4 (none at 50), so with few families
+the corrected error is biased upwards, and above the corrected error
+<code><a href="prune_components.html">prune_components()</a></code> gives the same forest (rule <code>"D"</code> at <code>tau = 0</code>).
+Factor levels are ordered by the outcome of all training rows: by the mean
+outcome (regression), by the share of the second class (binary
+classification) or by the first principal component of the class
+proportions (three or more classes). So a row's own outcome enters the
+ordering its OOB families split on, and the OOB error is somewhat optimistic
+with factor predictors, most so with many levels.</p>
+</div>
+
+<div class="section">
+<h3 id="choosing-splits-out-of-bag">Choosing <code>splits</code> out of bag<a class="anchor" aria-label="anchor" href="#choosing-splits-out-of-bag"></a></h3>
+
+
+<p>With <code>splits = NULL</code> (regression, not deterministic), the number of splits
+is chosen while the forest grows, by the corrected OOB error of the
+out-of-bag path. The families grow to checkpoints, four per doubling of the
+splits (<code><a href="oob_path_checkpoints.html">oob_path_checkpoints()</a></code> up to 25,600), and the forest's corrected
+error is followed checkpoint by checkpoint. Growing stops once the lowest
+error is one doubling of the splits back (for example, no new minimum from
+100 to 200 splits), or at 25,600 splits, with a warning if the error was
+still falling there. The result is the forest at the lowest error (ties go
+to fewer splits; a corrected error at or below 0, a correction that
+overshot, is not chosen unless all are): the forest that <code>rpf()</code> with that
+many <code>splits</code> and the same seed returns. On 52 data sets (44 synthetic, 8 splits of California
+housing) this chose the same <code>splits</code> as the lowest error along a fixed
+budget of 3,200 splits on 50 of them, and a later, lower minimum on the
+other two, while growing 0.72 of the splits.</p>
+<p>The families grow one at a time, <code>nthreads</code> together, each to the stop
+estimated from the families grown before it. A grown family keeps only its
+OOB predictions at the checkpoints and a record of its splits (40 bytes a
+split), from which the chosen forest is rebuilt, without a refit. A family
+that reaches the estimate waits there with its growing state while the
+waiting families fit in <code>getOption("randomPlantedForest.adaptive_pause_gb", 1)</code> GB, so that it can grow on cheaply if the stop comes later; otherwise
+it is freed, and grown again from its seed if needed. The option trades
+memory for time; the fit depends neither on it nor on <code>nthreads</code>. Growing
+all families together would hold every family's growing state until the
+stop: about 18 GB of resident memory (RSS) on California housing (16,512
+rows) at 200 families and <code>max_interaction = 3</code>, where the fit one family at
+a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
+fit alone, measured when it was added: <code>split_try = 3</code>, <code>t_try = 0.1</code>, the
+exact draw, 8 threads).</p>
+</div>
+
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -479,6 +576,37 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> $gear</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "3" "4" "5"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The out-of-bag error along the splits, from one fit</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu">rpf</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">20</span>, splits <span class="op">=</span> <span class="fl">100</span>, oob_path <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rpfit</span><span class="op">$</span><span class="va">oob_path</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/which.min.html" class="external-link">which.min</a></span><span class="op">(</span><span class="va">rpfit</span><span class="op">$</span><span class="va">oob_path</span><span class="op">$</span><span class="va">oob_rmse</span><span class="op">)</span>, <span class="op">]</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   splits oob_rmse oob_rmse_raw   se_mse se_mse_raw</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     11 2.366213     2.553891 1.733812   1.664172</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The number of splits chosen out of bag while growing</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu">rpf</span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">20</span>, splits <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">rpfit</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ── Regression Random Planted Forest ────────────────────────────────────────────</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Formula</span>: `mpg ~ .`</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">20</span> tree families with <span style="color: #0000BB;">11</span> splits each on <span style="color: #0000BB;">10</span> predictors, <span style="font-style: italic;">interactions to degree</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB; font-style: italic;">2</span>.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> `splits` chosen out of bag (lowest corrected OOB RMSE 2.366); growing stopped at</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">21</span> splits.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Forest is not purified.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ── Tree growing </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    split_structure: leaves</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          split_try: 10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              t_try: 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     max_candidates: 50</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   split_decay_rate: 0.1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      delete_leaves: TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Fit using <span style="color: #0000BB;">1</span> thread, also the default for `predict()` and `purify()`.</span>
+<span class="r-in"><span><span class="va">rpfit</span><span class="op">$</span><span class="va">params</span><span class="op">$</span><span class="va">splits</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 11</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

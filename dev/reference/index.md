@@ -9,6 +9,8 @@ Forest models.
   : Random Planted Forest
 - [`predict(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
   : Random Planted Forest Predictions
+- [`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)
+  : Checkpoints of the out-of-bag path
 
 ## Functional decomposition
 

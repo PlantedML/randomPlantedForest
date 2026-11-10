@@ -73,6 +73,39 @@
   [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md),
   [`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
   and `bundle()`.
+- `rpf(oob_path = TRUE)` gives the out-of-bag error along the splits
+  from one regression fit, in `$oob_path`. With the same seed, the
+  forest with `k` splits is exactly the first `k` splits of a forest
+  with more, so while each tree family grows, its prediction at the
+  training rows outside its bootstrap sample is updated split by split.
+  The table has the plain and the corrected out-of-bag RMSE (the
+  correction of
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md))
+  at four checkpoints per doubling of the splits
+  ([`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)),
+  or at given ones. On 52 data sets, choosing `splits` by the lowest
+  corrected error among the values of a cross-validation grid did as
+  well as 5-fold cross-validation over that grid (test error 0.06% lower
+  on average), at 0.9 of its cost. The fitted forest is the same as
+  without `oob_path`, which is off by default.
+- `rpf(splits = NULL)` chooses the number of splits out of bag while the
+  forest grows (regression). The forest’s corrected out-of-bag error is
+  followed at four checkpoints per doubling of the splits, growing stops
+  once its lowest value is one doubling back (at most 25,600 splits),
+  and the forest at the lowest error is returned: the forest that
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  with that many `splits` and the same seed gives. On 52 data sets this
+  chose the same `splits` as the lowest error along a fixed budget of
+  3,200 splits on 50, and a later, lower minimum on the other two, while
+  growing 0.72 of the splits. The tree families grow one at a time,
+  `nthreads` together, and keep only their out-of-bag predictions and a
+  40-byte record per split, from which the chosen forest is rebuilt
+  without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1
+  GB) bounds the memory of families waiting for the stop.
+  [`print()`](https://rdrr.io/r/base/print.html) shows the chosen
+  `splits` and where growing stopped. A corrected out-of-bag error at or
+  below 0 at a checkpoint (a correction that overshot; never observed)
+  is not chosen unless all are. The default stays `splits = 30`.
 - [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   gains `min_leaf_rows`, the minimum number of rows on each side of
   every split, so in every leaf. Values above 1 need regression with
