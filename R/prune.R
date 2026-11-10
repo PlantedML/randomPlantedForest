@@ -133,9 +133,9 @@
 #' trees' predictor sets). The memory is the forest's plus about `n` doubles per component, three times that for the
 #' out-of-bag choice, plus one family's components at a time per thread; storing the kept components passes over the
 #' families once more. On California housing (16,512 rows, 200 families, 8 threads) the whole call of
-#' `rpf(splits = NULL, prune = TRUE)` peaks at 2.3 GB of physical memory at order 3, and at 6.4 GB at order 8 (all
-#' predictors), most of it the 31 coarsened components the display keeps; there [purify()] alone needs more than
-#' 12 GB. `nthreads` speeds up the fits and the purification.
+#' `rpf(splits = NULL, prune = TRUE)` peaks at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at
+#' order 3, and at 6.4 GB (9.9 GB RSS) at order 8 (all predictors), most of it the 31 coarsened components the display
+#' keeps; there [purify()] alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and the purification.
 #'
 #' Only regression forests are supported.
 #'
