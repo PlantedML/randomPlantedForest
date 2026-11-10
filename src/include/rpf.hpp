@@ -9,6 +9,10 @@
 // - purify(): optional post-processing to orthogonalize components;
 //   purify_oob(): the same, plus every family's components at its
 //   out-of-bag training rows (from the in-bag counts of the fit)
+// - set_oob_path() / oob_path(): the out-of-bag error along the splits, from
+//   one fit (`lib/oob_path.cpp`)
+// - set_adaptive(): the next fit() chooses the number of splits out of bag
+//   while growing, one family at a time (`lib/oob_path.cpp`)
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
 //   for serialization
@@ -86,6 +90,35 @@ struct OobComponents {
   std::vector<double> sum0, sum1;             /**< n x (sets.size() * value_size): the two sums */
   std::vector<double> intercept0, intercept1; /**< n x value_size: the sums of the families' intercepts */
   std::vector<int> count;                     /**< n x 2: the number of OOB families of each half */
+};
+
+// The out-of-bag (OOB) path of a fit with checkpoints (set_oob_path()): every family's prediction at each of its OOB
+// training rows (in-bag count 0) after each checkpoint's number of splits, summed per row over the families of even
+// and of odd index (0-based), in family order. All matrices are column-major.
+struct OobPath {
+  std::vector<int> checkpoints;   /**< the split counts, ascending */
+  std::vector<double> sum0, sum1; /**< n x (checkpoints.size() * value_size), column c * value_size + v */
+  std::vector<int> count;         /**< n x 2: the number of OOB families of each half */
+};
+
+// The adaptive fit (set_adaptive()): after every family's prediction at checkpoint c (0-based) is known, the stopper
+// gets the OOB path at that checkpoint alone (as OobPath, one checkpoint) and returns 0 to grow on, or the 1-based
+// index (1..c+1) of the chosen checkpoint to stop there. It is called on the calling thread, checkpoint by checkpoint.
+typedef std::function<int(size_t c, const OobPath &path)> AdaptiveStopper;
+
+// What the last adaptive fit did (adaptive_stats()), for diagnostics
+struct AdaptiveStats {
+  int pilot_bound = 0;          /**< the bound (checkpoints) the first `nthreads` families set together */
+  double growths = 0;           /**< families grown (to a bound, or further when the stop came later) */
+  double regrowths = 0;         /**< of these, grown again from their seed */
+  double splits_grown = 0;      /**< splits grown in all, regrowths included */
+  double pauses = 0;            /**< families paused at the bound */
+  double resumes = 0;           /**< paused families that grew on */
+  double max_paused_gb = 0;     /**< the largest estimated size of the paused families */
+  double seconds_grow = 0;      /**< growing (the calling thread's wall time) */
+  double seconds_stopper = 0;   /**< the stopper's calls */
+  double seconds_rebuild = 0;   /**< rebuilding the chosen forest from the records */
+  std::vector<int> bound_trace; /**< the bound after each estimate */
 };
 
 namespace rpf_cnt {
@@ -182,6 +215,23 @@ public:
   // purify(maxp_interaction, nthreads, 2), and the out-of-bag components of the training rows (see OobComponents).
   // The purified forest is the same as after purify(). Needs the training data and the in-bag counts.
   OobComponents purify_oob(int maxp_interaction, int nthreads);
+  // Track the OOB path in the next fit() (regression): `checkpoints` are increasing split counts in 1..splits; empty
+  // turns it off (the default: a plain fit does none of this). The fit itself is unchanged.
+  void set_oob_path(const std::vector<int> &checkpoints);
+  // Whether the last fit tracked an OOB path; oob_path() returns it (see OobPath).
+  bool has_oob_path() const;
+  OobPath oob_path() const;
+  // The next fit() is adaptive (regression, not deterministic): the families grow one at a time, `nthreads` together,
+  // and `stopper` decides at each of the `checkpoints` (increasing split counts, the last one splits) whether growing
+  // goes on, from the corrected OOB error (see AdaptiveStopper). The forest at the chosen checkpoint is rebuilt from
+  // the records of the splits, and n_splits becomes its number of splits: the forest that a fit with that many splits
+  // and the same seed gives. `patience` (checkpoints) and `floor` (splits) are the stopper's; with them the fit
+  // estimates how far to grow each family. `pause_gb`: the memory (GB) that families waiting at that estimate may
+  // hold. One fit only: afterwards fits are plain again.
+  void set_adaptive(
+      const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
+  );
+  AdaptiveStats adaptive_stats() const;
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -189,6 +239,9 @@ public:
   // Source of per-tree seeds, called once per tree on the calling thread when
   // fitting. Defaults to std::random_device.
   std::function<std::uint64_t()> seed_source;
+  // Called now and then on the calling thread during a long fit (the adaptive fit); it may throw to stop the fit (a
+  // user interrupt). Empty: never called.
+  std::function<void()> check_interrupt;
 
 protected:
   // Write a line to verbose_out, if set.
@@ -225,6 +278,44 @@ protected:
     if (c < 255)
       ++c;
   }
+  // The OOB path (oob_path.cpp). While family n grows, its tracker (path_tracker.hpp, owned by the family's thread)
+  // follows the family's prediction at its OOB rows split by split; after the family is grown, its snapshots are added
+  // to the sums on the calling thread in family order (path_merge), so the sums do not depend on the threads.
+  struct PathTracker;
+  std::vector<int> path_checkpoints_;
+  std::vector<double> path_sum_[2]; /**< as OobPath::sum0 / sum1 */
+  std::vector<std::shared_ptr<PathTracker>> path_family_;
+  // Clear the sums for a new fit (fit()); the checkpoints must lie in 1..n_splits
+  void path_reset();
+  // A tracker for family n (growing as `fam`) after its bootstrap (nullptr if the path is off)
+  std::shared_ptr<PathTracker> path_start(size_t n, TreeFamily *fam);
+  // A split found by the search, before the family's leaves change: move the tracked rows of the split leaf to the two
+  // new leaves and add M_s / M_b to their predictions (the change of the family's prediction); in an adaptive fit,
+  // also record the split
+  void path_split(PathTracker &trk, const Split &split) const;
+  // `k` splits are done: snapshot the predictions if k is the next checkpoint. Returns whether the family grows on
+  // (always, except in an adaptive fit)
+  bool path_step(PathTracker &trk, int k) const;
+  // Family n is grown: its last snapshot, then add its snapshots to the sums and free its tracker
+  void path_merge(size_t n);
+  // The adaptive fit (oob_path.cpp; set_adaptive()): its state, while it runs and (the records) until the rebuild
+  struct AloneFit;
+  std::shared_ptr<AloneFit> alone_;
+  AdaptiveStats alone_stats_;
+  // The fit one family at a time (instead of fit()'s loop), then the forest at the chosen checkpoint
+  void fit_alone(const std::vector<Leaf> &initial_leaves);
+  // path_step() of the adaptive fit, `k` splits done: at a checkpoint, pause, finish or grow on (see oob_path.cpp)
+  bool alone_step(PathTracker &trk, size_t k) const;
+  // Grow families on threads until every one has reached the bound
+  void alone_pool(const std::vector<Leaf> &initial_leaves);
+  // Family n has stopped growing: keep its record and predictions, free the rest
+  void alone_finish(size_t n);
+  // The end of the growing: the paused families finish, all threads are joined
+  void alone_end();
+  // The forest at checkpoint c (0-based), rebuilt from the records
+  void alone_rebuild(size_t c);
+  // Free the per-leaf caches of a growing family (pure memos of its rows, recomputed on demand: the fit is the same)
+  static void free_leaf_caches(TreeFamily &family);
   GridFamilyExport family_grid_from_rects(size_t f) const;
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */

@@ -31,10 +31,12 @@
 #'   the number of predictors are reduced to it.
 #' @param ntrees `[integer(1): 50]`: Number of tree families, i.e. the size of the forest.
 #'   Each family is grown on a bootstrap sample and predictions are averaged.
-#' @param splits `[integer(1): 30]`: Number of split rounds per tree family. The main tuning
+#' @param splits `[integer(1) | NULL: 30]`: Number of split rounds per tree family. The main tuning
 #'   parameter: more splits fit more complex functions. A round splits the best of its
 #'   candidates; near saturation, when every candidate's leaf is too small to split, a
-#'   round can make no split.
+#'   round can make no split. `NULL` chooses it out of bag while the forest grows
+#'   (regression, not with `deterministic = TRUE`; otherwise `NULL` means 30). See
+#'   "Choosing `splits` out of bag" in Details.
 #' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
 #'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
 #'   or `"res_trees"`. See Details.
@@ -101,8 +103,25 @@
 #'   outcome. `FALSE` orders every factor by the outcome, `TRUE` keeps the level
 #'   order of every factor, and a character vector keeps it for the named
 #'   factor predictors only. See "Factor predictors" below.
+#' @param oob_path `[logical(1) | integer: FALSE]`: Whether to track the
+#'   out-of-bag (OOB) error along the splits (regression only, not with
+#'   `deterministic = TRUE`). `TRUE` evaluates it at the checkpoints of
+#'   [oob_path_checkpoints()] for `splits`, four per doubling; an increasing
+#'   integer vector in `1..splits` gives the checkpoints. The fitted forest is
+#'   the same as without. See Details. With `splits = NULL` the path of the
+#'   checkpoints grown is stored either way, and only `TRUE` or `FALSE` is
+#'   allowed.
 #'
-#' @return Object of class `"rpf"` with model object contained in `$fit`.
+#' @return Object of class `"rpf"` with model object contained in `$fit`. With
+#'   `oob_path`, `$oob_path` holds the OOB path: a data frame with one row per
+#'   checkpoint, `splits`, the corrected and the plain OOB root mean squared
+#'   error (`oob_rmse`, `oob_rmse_raw`), and the standard errors of the two mean
+#'   squared errors (`se_mse`, `se_mse_raw`). Its attribute `n_rows` is the
+#'   number of training rows with an OOB tree family. With `splits = NULL`,
+#'   `$params$splits` is the chosen number of splits, `$oob_path` the path of
+#'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
+#'   `stopped_at` (the number of splits where growing stopped) and `capped`
+#'   (whether it stopped at the cap while the error was still falling).
 #' @export
 #' @importFrom methods new
 #' @importFrom hardhat mold
@@ -221,6 +240,74 @@
 #' (`std::uniform_int_distribution`) differs between implementations, such as
 #' libc++ and libstdc++.
 #'
+#' ## The out-of-bag path
+#'
+#' With the same seed, the forest grown with `k` splits is exactly the first
+#' `k` splits of every tree family of a forest grown with more: nothing in the
+#' fit depends on the total number of splits. Each family is grown on a
+#' bootstrap sample, so every training row is out of bag for the families that
+#' did not draw it (about 37% of them). With `oob_path`, each family's
+#' prediction at its OOB rows is updated split by split while it grows, and
+#' copied at each checkpoint. So one fit gives the OOB error of every forest
+#' with fewer splits, for example to choose `splits` without cross-validation.
+#' This costs `2 * nrow(x) * length(checkpoints)` doubles and a little time;
+#' the fit itself is unchanged.
+#'
+#' The OOB prediction of a row is the mean over its OOB families, and the plain
+#' error (`oob_rmse_raw`) is the root mean squared error of these predictions
+#' over the rows with an OOB family. That mean averages fewer families than the
+#' forest, so the plain error overstates the forest's error by the families'
+#' extra variance, more so with more splits. The corrected error (`oob_rmse`)
+#' subtracts this excess, `(1 / m_i - 1 / ntrees) * v_i` for row `i` with `m_i`
+#' OOB families, where `v_i` is the variance across families estimated from the
+#' OOB means over the families of even and of odd index,
+#' `v_i = (g_even - g_odd)^2 / (1 / m_even + 1 / m_odd)`; this is also the
+#' correction of [prune_components()]' OOB choice. A row whose OOB families
+#' are all even or all odd is not corrected here (`prune_components()` gives
+#' it the mean estimate of the other rows): about 2% of the rows at 20
+#' families, 18% at 10 and over half at 4 (none at 50), so with few families
+#' the corrected error is biased upwards, and above the corrected error
+#' `prune_components()` gives the same forest (rule `"D"` at `tau = 0`).
+#' Factor levels are ordered by the outcome of all training rows: by the mean
+#' outcome (regression), by the share of the second class (binary
+#' classification) or by the first principal component of the class
+#' proportions (three or more classes). So a row's own outcome enters the
+#' ordering its OOB families split on, and the OOB error is somewhat optimistic
+#' with factor predictors, most so with many levels.
+#'
+#' ## Choosing `splits` out of bag
+#'
+#' With `splits = NULL` (regression, not deterministic), the number of splits
+#' is chosen while the forest grows, by the corrected OOB error of the
+#' out-of-bag path. The families grow to checkpoints, four per doubling of the
+#' splits ([oob_path_checkpoints()] up to 25,600), and the forest's corrected
+#' error is followed checkpoint by checkpoint. Growing stops once the lowest
+#' error is one doubling of the splits back (for example, no new minimum from
+#' 100 to 200 splits), or at 25,600 splits, with a warning if the error was
+#' still falling there. The result is the forest at the lowest error (ties go
+#' to fewer splits; a corrected error at or below 0, a correction that
+#' overshot, is not chosen unless all are): the forest that `rpf()` with that
+#' many `splits` and the same seed returns. On 52 data sets (44 synthetic, 8 splits of California
+#' housing) this chose the same `splits` as the lowest error along a fixed
+#' budget of 3,200 splits on 50 of them, and a later, lower minimum on the
+#' other two, while growing 0.72 of the splits.
+#'
+#' The families grow one at a time, `nthreads` together, each to the stop
+#' estimated from the families grown before it. A grown family keeps only its
+#' OOB predictions at the checkpoints and a record of its splits (40 bytes a
+#' split), from which the chosen forest is rebuilt, without a refit. A family
+#' that reaches the estimate waits there with its growing state while the
+#' waiting families fit in `getOption("randomPlantedForest.adaptive_pause_gb",
+#' 1)` GB, so that it can grow on cheaply if the stop comes later; otherwise
+#' it is freed, and grown again from its seed if needed. The option trades
+#' memory for time; the fit depends neither on it nor on `nthreads`. Growing
+#' all families together would hold every family's growing state until the
+#' stop: about 18 GB of resident memory (RSS) on California housing (16,512
+#' rows) at 200 families and `max_interaction = 3`, where the fit one family at
+#' a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
+#' fit alone, measured when it was added: `split_try = 3`, `t_try = 0.1`, the
+#' exact draw, 8 threads).
+#'
 #' @references
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
 #' directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
@@ -247,6 +334,17 @@
 #' cars$gear <- factor(cars$gear, levels = c(3, 4, 5))
 #' rpfit <- rpf(mpg ~ gear + wt, data = cars, keep_level_order = "gear")
 #' rpfit$factor_levels
+#'
+#' # The out-of-bag error along the splits, from one fit
+#' set.seed(1)
+#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE)
+#' rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
+#'
+#' # The number of splits chosen out of bag while growing
+#' set.seed(1)
+#' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
+#' rpfit
+#' rpfit$params$splits
 rpf <- function(x, ...) {
   UseMethod("rpf")
 }
@@ -282,6 +380,7 @@ rpf.formula <- function(
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -321,7 +420,8 @@ rpf.formula <- function(
     nthreads = nthreads,
     export_forest = export_forest,
     deterministic = deterministic,
-    keep_level_order = keep_level_order
+    keep_level_order = keep_level_order,
+    oob_path = oob_path
   )
 }
 
@@ -350,6 +450,7 @@ rpf.data.frame <- function(
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -376,7 +477,8 @@ rpf.data.frame <- function(
     nthreads = nthreads,
     export_forest = export_forest,
     deterministic = deterministic,
-    keep_level_order = keep_level_order
+    keep_level_order = keep_level_order,
+    oob_path = oob_path
   )
 }
 
@@ -405,6 +507,7 @@ rpf.matrix <- function(
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -431,7 +534,8 @@ rpf.matrix <- function(
     nthreads = nthreads,
     export_forest = export_forest,
     deterministic = deterministic,
-    keep_level_order = keep_level_order
+    keep_level_order = keep_level_order,
+    oob_path = oob_path
   )
 }
 
@@ -460,6 +564,7 @@ rpf.recipe <- function(
   export_forest = FALSE,
   deterministic = FALSE,
   keep_level_order = FALSE,
+  oob_path = FALSE,
   ...
 ) {
   rlang::check_dots_empty()
@@ -489,7 +594,8 @@ rpf.recipe <- function(
     nthreads = nthreads,
     export_forest = export_forest,
     deterministic = deterministic,
-    keep_level_order = keep_level_order
+    keep_level_order = keep_level_order,
+    oob_path = oob_path
   )
 }
 
@@ -517,7 +623,8 @@ rpf_bridge <- function(
   nthreads,
   export_forest,
   deterministic,
-  keep_level_order
+  keep_level_order,
+  oob_path
 ) {
   # report errors from helpers against the user's rpf() call
   call <- rlang::caller_env()
@@ -545,7 +652,7 @@ rpf_bridge <- function(
   }
 
   checkmate::assert_int(ntrees, lower = 1)
-  checkmate::assert_int(splits, lower = 1)
+  checkmate::assert_int(splits, lower = 1, null.ok = TRUE)
   checkmate::assert_choice(split_structure, choices = c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees"))
   checkmate::assert_int(split_try, lower = 1)
   checkmate::assert_number(t_try, lower = 0, upper = 1)
@@ -595,6 +702,23 @@ rpf_bridge <- function(
       "i" = "Use {.code ntrees = 1} to fit the same model faster."
     ))
   }
+  # splits = NULL: chosen out of bag while growing (random regression), otherwise 30
+  adaptive <- is.null(splits) && outcomes$mode == "regression" && !deterministic
+  if (is.null(splits) && !adaptive) {
+    splits <- 30L
+  }
+  checkpoints <- NULL
+  if (!adaptive) {
+    checkpoints <- check_oob_path(oob_path, splits, outcomes$mode, deterministic, call = call)
+  } else if (!isTRUE(oob_path) && !isFALSE(oob_path)) {
+    cli::cli_abort(
+      c(
+        "With {.code splits = NULL}, {.arg oob_path} must be {.code TRUE} or {.code FALSE}.",
+        "i" = "The out-of-bag path of the checkpoints grown is stored either way."
+      ),
+      call = call
+    )
+  }
 
   interaction_constraints <- check_interaction_constraints(
     interaction_constraints,
@@ -607,7 +731,7 @@ rpf_bridge <- function(
     loss = loss,
     ntrees = ntrees,
     max_interaction = max_interaction,
-    splits = splits,
+    splits = if (adaptive) NA_integer_ else splits,
     split_try = split_try,
     t_try = t_try,
     split_decay_rate = split_decay_rate,
@@ -625,12 +749,19 @@ rpf_bridge <- function(
     keep_level_order = predictors$keep_level_order
   )
 
-  fit <- rpf_impl(
-    Y = outcomes$outcomes,
-    X = predictors$predictors_matrix,
-    mode = outcomes$mode,
-    params = params
-  )
+  if (adaptive) {
+    chosen <- tune_splits_oob(outcomes$outcomes, predictors$predictors_matrix, params, call = call)
+    fit <- chosen$fit
+    params$splits <- chosen$splits
+  } else {
+    fit <- rpf_impl(
+      Y = outcomes$outcomes,
+      X = predictors$predictors_matrix,
+      mode = outcomes$mode,
+      params = params,
+      oob_path = checkpoints
+    )
+  }
 
   # Optionally export a compact R list representation of the forest.
   forest <- NULL
@@ -639,7 +770,7 @@ rpf_bridge <- function(
     class(forest) <- "rpf_forest"
   }
 
-  new_rpf(
+  res <- new_rpf(
     fit = fit,
     blueprint = processed$blueprint,
     mode = outcomes$mode,
@@ -647,6 +778,13 @@ rpf_bridge <- function(
     params = params,
     forest = forest
   )
+  if (adaptive) {
+    res$oob_path <- chosen$path
+    res$splits_oob <- chosen[c("splits", "stopped_at", "capped")]
+  } else if (!is.null(checkpoints)) {
+    res$oob_path <- oob_path_table(fit$oob_path(), outcomes$outcomes[, 1], ntrees, call = call)
+  }
+  res
 }
 
 # Intermediate to hold model object with blueprint used for prediction
@@ -711,21 +849,57 @@ rpf_param_vector <- function(params, mode) {
 }
 
 # Main fitting function and interface to C++ implementation
-rpf_impl <- function(Y, X, mode = c("regression", "classification"), params) {
+# `oob_path`: NULL, or the checkpoints of the OOB path (regression; see check_oob_path())
+# `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, floor and pause_gb (regression; see
+# tune_splits_oob())
+rpf_impl <- function(Y, X, mode = c("regression", "classification"), params, oob_path = NULL, adaptive = NULL) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   mode <- match.arg(mode)
   pars <- rpf_param_vector(params, mode)
 
-  if (is.null(params$interaction_constraints)) {
+  # allowed feature sets as 1-based column indices (NULL: no constraint, the constructors without them)
+  constraints <- if (!is.null(params$interaction_constraints)) {
+    lapply(params$interaction_constraints, match, table = colnames(X))
+  }
+  # configure only (no data, no fit): the constructors that fit give the same forest
+  configure <- function() {
+    if (is.null(constraints)) {
+      if (mode == "classification") new(ClassificationRPF, params$loss, pars) else new(RandomPlantedForest, pars)
+    } else {
+      if (mode == "classification") {
+        new(ClassificationRPF, params$loss, pars, constraints)
+      } else {
+        new(RandomPlantedForest, pars, constraints)
+      }
+    }
+  }
+
+  if (!is.null(adaptive)) {
+    # configure, then fit one family at a time: the forest at the chosen number of splits
+    fit <- configure()
+    fit$set_adaptive(
+      as.integer(adaptive$checkpoints),
+      adaptive$stopper,
+      adaptive$patience,
+      adaptive$floor,
+      adaptive$pause_gb
+    )
+    fit$set_data(Y, X)
+    fit$fit()
+  } else if (!is.null(oob_path)) {
+    # configure, then fit: the same forest as the constructor that fits
+    fit <- configure()
+    fit$set_oob_path(as.integer(oob_path))
+    fit$set_data(Y, X)
+    fit$fit()
+  } else if (is.null(constraints)) {
     if (mode == "classification") {
       fit <- new(ClassificationRPF, Y, X, params$loss, pars)
     } else {
       fit <- new(RandomPlantedForest, Y, X, pars)
     }
   } else {
-    # allowed feature sets as 1-based column indices
-    constraints <- lapply(params$interaction_constraints, match, table = colnames(X))
     if (mode == "classification") {
       fit <- new(ClassificationRPF, Y, X, params$loss, pars, constraints)
     } else {

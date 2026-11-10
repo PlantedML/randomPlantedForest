@@ -46,8 +46,14 @@ RCPP_MODULE(mod_rpf)
   Rcpp::class_<RcppRPF> rpf("RandomPlantedForest");
   rpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector>()
       .constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, const Rcpp::NumericVector, const Rcpp::List>()
-      .constructor<const Rcpp::NumericVector>();
+      .constructor<const Rcpp::NumericVector>()
+      .constructor<const Rcpp::NumericVector, const Rcpp::List>();
   expose_methods(rpf);
+  // the out-of-bag path and the adaptive fit are for regression only
+  rpf.method("set_oob_path", &RcppRPF::set_oob_path)
+      .method("oob_path", &RcppRPF::oob_path)
+      .method("set_adaptive", &RcppRPF::set_adaptive)
+      .method("adaptive_stats", &RcppRPF::adaptive_stats);
 
   Rcpp::class_<RcppCPF> cpf("ClassificationRPF");
   cpf.constructor<const Rcpp::NumericMatrix, const Rcpp::NumericMatrix, std::string, const Rcpp::NumericVector>()
@@ -57,6 +63,7 @@ RCPP_MODULE(mod_rpf)
           std::string,
           const Rcpp::NumericVector,
           const Rcpp::List>()
-      .constructor<std::string, const Rcpp::NumericVector>();
+      .constructor<std::string, const Rcpp::NumericVector>()
+      .constructor<std::string, const Rcpp::NumericVector, const Rcpp::List>();
   expose_methods(cpf);
 }

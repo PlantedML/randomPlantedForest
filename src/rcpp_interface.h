@@ -29,6 +29,8 @@ std::vector<GridFamilyExport> list_to_grid(const Rcpp::List &grid);
 Rcpp::List rects_to_list(const rpf_rect::PurifiedForest *pf);
 rpf_rect::PurifiedForest list_to_rects(const Rcpp::List &x, int value_size);
 Rcpp::List purify_stats_to_list(const PurifyStats &st);
+Rcpp::List oob_path_to_list(const OobPath &o);
+Rcpp::List adaptive_stats_to_list(const AdaptiveStats &st);
 
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
@@ -95,6 +97,17 @@ public:
   // Params-only constructors: no data, no fit. Used by rpf_unmarshal().
   explicit RcppForest(const Rcpp::NumericVector parameters) : core(make_rpf(parameters)) { connect_to_r(core); }
   RcppForest(const std::string loss, const Rcpp::NumericVector parameters) : core(make_cpf(loss, parameters, false))
+  {
+    connect_to_r(core);
+  }
+  // Params-only with interaction constraints: configured for set_data() + fit() (the OOB path, the adaptive fit).
+  RcppForest(const Rcpp::NumericVector parameters, const Rcpp::List constraints)
+      : core(make_rpf(parameters, constraints))
+  {
+    connect_to_r(core);
+  }
+  RcppForest(const std::string loss, const Rcpp::NumericVector parameters, const Rcpp::List constraints)
+      : core(make_cpf(loss, parameters, false, constraints))
   {
     connect_to_r(core);
   }
@@ -296,6 +309,35 @@ public:
         Rcpp::Named("count") = count
     );
   }
+  // The out-of-bag path (regression): set the checkpoints before fit(), read the sums after it (see OobPath)
+  void set_oob_path(const Rcpp::IntegerVector &checkpoints)
+  {
+    core.set_oob_path(Rcpp::as<std::vector<int>>(checkpoints));
+  }
+  Rcpp::List oob_path()
+  {
+    if (!core.has_oob_path())
+      Rcpp::stop("The forest has no OOB path: fit it with `oob_path`.");
+    return oob_path_to_list(core.oob_path());
+  }
+  // The adaptive fit (regression): the next fit() grows to `checkpoints` (the last one the forest's splits) and calls
+  // stopper(c, path) at each checkpoint c (1-based) with the OOB path there (as oob_path() gives it, one column); it
+  // returns 0 to grow on or the index of the chosen checkpoint (see AdaptiveStopper)
+  void set_adaptive(
+      const Rcpp::IntegerVector &checkpoints, Rcpp::Function stopper, int patience, double floor, double pause_gb
+  )
+  {
+    core.set_adaptive(
+        Rcpp::as<std::vector<int>>(checkpoints),
+        [stopper](size_t c, const OobPath &path) -> int {
+          return Rcpp::as<int>(stopper((int)c + 1, oob_path_to_list(path)));
+        },
+        patience,
+        floor,
+        pause_gb
+    );
+  }
+  Rcpp::List adaptive_stats() { return adaptive_stats_to_list(core.adaptive_stats()); }
 
 private:
   Core core;
