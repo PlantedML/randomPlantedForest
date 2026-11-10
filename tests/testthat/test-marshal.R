@@ -224,3 +224,78 @@ test_that("purified round-trip keeps mode 1 grids and mode 2 rectangles apart", 
   bad$fit_state$rects$components[[i]]$groups[[j]]$ids[1] <- 1e6L
   expect_error(rpf_unmarshal(bad), "Corrupt purified components")
 })
+
+test_that("a restored capped purification keeps its order, and is purified again only with data", {
+  set.seed(2)
+  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  purify(fit, maxp_interaction = 2)
+
+  restored <- expect_roundtrip(fit, mtcars)
+  expect_identical(restored$fit$get_purify_cap(), 2L)
+  # at the cap: nothing to do
+  expect_invisible(purify(restored, maxp_interaction = 2))
+  # above it, without training data: a clear error, and the forest is left as it was
+  expect_error(purify(restored), "cannot be purified to higher orders")
+  expect_identical(restored$fit$get_purify_cap(), 2L)
+  expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+
+  # with the training data it is purified again
+  with_data <- rpf_unmarshal(rpf_marshal(fit, include_data = TRUE))
+  purify(with_data)
+  purify(fit)
+  expect_false(with_data$fit$is_purify_capped())
+  expect_identical(predict_components(with_data, mtcars), predict_components(fit, mtcars))
+})
+
+test_that("a blob without the cap's order restores a capped purification", {
+  set.seed(2)
+  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  purify(fit, maxp_interaction = 2)
+  blob <- rpf_marshal(fit, include_data = TRUE)
+  # as written before the field existed: the order is unknown and counts as 1
+  blob$fit_state$purify_cap <- NULL
+  restored <- rpf_unmarshal(blob)
+  expect_true(restored$fit$is_purify_capped())
+  expect_identical(restored$fit$get_purify_cap(), 1L)
+  expect_identical(predict(restored, mtcars), predict(fit, mtcars))
+  purify(restored, maxp_interaction = 2)
+  expect_identical(restored$fit$get_purify_cap(), 2L)
+  expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+})
+
+test_that("a capped purification keeps its store and its cap through the round trip, in both modes", {
+  for (mode in 1:2) {
+    set.seed(6)
+    fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+    p0 <- predict(fit, mtcars)
+    purify(fit, maxp_interaction = 2, mode = mode)
+    blob <- rpf_marshal(fit, include_data = TRUE)
+    # mode 2 stores rectangles, mode 1 grids; either way with the cap's order
+    if (mode == 2) {
+      expect_false(is.null(blob$fit_state$rects))
+      expect_null(blob$fit_state$grid)
+    } else {
+      expect_null(blob$fit_state$rects)
+      expect_false(is.null(blob$fit_state$grid))
+    }
+    expect_identical(blob$fit_state$purify_cap, 2L)
+
+    restored <- rpf_unmarshal(blob)
+    expect_identical(restored$fit$get_purify_cap(), 2L)
+    expect_true(restored$fit$is_purify_capped())
+    expect_identical(predict(restored, mtcars), p0)
+    expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+
+    # purified again above the cap from the restored data, as the original forest is
+    purify(restored, mode = mode)
+    purify(fit, mode = mode)
+    expect_identical(restored$fit$get_purify_cap(), 0L)
+    expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+    expect_null(predict_components(restored, mtcars)$remainder)
+
+    # and the full purification survives a second round trip uncapped
+    again <- rpf_unmarshal(rpf_marshal(restored))
+    expect_identical(again$fit$get_purify_cap(), 0L)
+    expect_identical(predict_components(again, mtcars), predict_components(fit, mtcars))
+  }
+})

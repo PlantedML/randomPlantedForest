@@ -63,6 +63,22 @@ void RandomPlantedForest::set_purify_capped(bool capped)
   if (capped && !purified)
     throw std::invalid_argument("Only a purified forest can have a capped purification.");
   purify_capped = capped;
+  purify_cap = capped ? 1 : 0;
+}
+
+int RandomPlantedForest::get_purify_cap() const
+{
+  return (purified && purify_capped) ? purify_cap : 0;
+}
+
+void RandomPlantedForest::set_purify_cap(int cap)
+{
+  if (cap < 0 || cap >= std::min(max_interaction, feature_size))
+    throw std::invalid_argument("A purification cap must be 0 (all orders) or below the forest's max_interaction.");
+  if (cap > 0 && !purified)
+    throw std::invalid_argument("Only a purified forest can have a capped purification.");
+  purify_capped = cap > 0;
+  purify_cap = cap;
 }
 
 void RandomPlantedForest::L2_loss(Split &split)
@@ -194,6 +210,7 @@ void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
   purified = false;
   purify_capped = false;
   rect_forest_.reset();
+  purify_cap = 0;
 }
 
 std::vector<FamilyExport> RandomPlantedForest::get_model() const
@@ -280,8 +297,9 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
   }
   rect_forest_.reset();
   purified = true;
-  // a full purification unless set_purify_capped() says otherwise
+  // a full purification unless set_purify_cap() or set_purify_capped() says otherwise
   purify_capped = false;
+  purify_cap = 0;
 }
 
 void RandomPlantedForest::set_purified_rects(rpf_rect::PurifiedForest pf)
@@ -294,8 +312,9 @@ void RandomPlantedForest::set_purified_rects(rpf_rect::PurifiedForest pf)
       tree.second->GridLeaves = LeafGrid();
   rect_forest_ = std::make_shared<rpf_rect::PurifiedForest>(std::move(pf));
   purified = true;
-  // a full purification unless set_purify_capped() says otherwise
+  // a full purification unless set_purify_cap() or set_purify_capped() says otherwise
   purify_capped = false;
+  purify_cap = 0;
 }
 
 PurifyStats RandomPlantedForest::purify_stats() const

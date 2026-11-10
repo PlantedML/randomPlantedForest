@@ -77,6 +77,10 @@
   A formula with terms such as `log(x1)`, `I(x1^2)` or `. - x3` no longer makes it fail, and with factor predictors the components come in the order of the fit's columns, which has the factors last.
 * `predict_components()` on a `new_data` with zero rows returns zero rows with the right columns, instead of failing with "Feature vector is empty.".
 * `print()` counts the forest's own predictor columns: with formula terms such as `log(x1)` or `. - x3` it showed the number of raw columns the formula reads.
+* `purify()` on a forest purified with `maxp_interaction = k` purifies it again when asked for more orders (all orders by default).
+  Previously it returned the forest unchanged, so the orders above `k` stayed zero in `predict_components()`.
+  `purify()` also checks its arguments when the forest is already purified.
+  A capped forest restored by `rpf_unmarshal()` without its training data cannot be purified again; asking for more orders is an error that says so.
 
 ## Performance
 

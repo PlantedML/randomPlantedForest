@@ -329,6 +329,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   rect_forest_.reset();
   purified = false;
   purify_capped = false;
+  purify_cap = 0;
 
   if (mode != 2) {
     run_families(
@@ -337,6 +338,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     );
     purified = true;
     purify_capped = capped;
+    purify_cap = capped ? maxp_interaction : 0;
     return;
   }
 
@@ -399,6 +401,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   rect_forest_ = forest;
   purified = true;
   purify_capped = capped;
+  purify_cap = capped ? maxp_interaction : 0;
 }
 
 // The components of purify(mode = 2) of one family on the dense grid over the family's cut points, in the format of

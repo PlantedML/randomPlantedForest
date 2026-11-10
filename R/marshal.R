@@ -40,6 +40,8 @@ rpf_marshal <- function(x, include_data = FALSE) {
     purified = purified,
     # purify(maxp_interaction = k) below the fit's order: predict() keeps using the leaves
     purify_capped = x$fit$is_purify_capped(),
+    # its order, so that a later purify() above it purifies again
+    purify_cap = x$fit$get_purify_cap(),
     grid = if (purified && length(rects) == 0) x$fit$get_grid_leaves(),
     rects = if (length(rects) > 0) rects,
     data = if (include_data) x$fit$get_data(),
@@ -93,8 +95,10 @@ rpf_unmarshal <- function(blob) {
     } else {
       fit$set_grid_leaves(state$grid)
     }
-    # NULL in blobs from versions before the field existed
-    if (isTRUE(state$purify_capped)) {
+    # NULL in blobs from versions before the fields existed
+    if (!is.null(state$purify_cap)) {
+      fit$set_purify_cap(as.integer(state$purify_cap))
+    } else if (isTRUE(state$purify_capped)) {
       fit$set_purify_capped(TRUE)
     }
   }

@@ -104,5 +104,6 @@ void RandomPlantedForest::fit()
     purified = false;
     purify_capped = false;
     rect_forest_.reset();
+    purify_cap = 0;
   }
 }

@@ -82,8 +82,8 @@ test_that("purify(maxp_interaction = k) keeps predict(), and predict_components(
     expect_equal(rowSums(pc$m) + pc$intercept + pc$remainder, p0$.pred, tolerance = 1e-12)
     expect_gt(max(abs(pc$remainder)), 0.01)
     expect_true(fit$fit$is_purify_capped())
-    # purifying all orders again clears the cap (R's purify() leaves a purified forest as it is)
-    fit$fit$purify_threads(0L, 0L, as.integer(mode))
+    # purifying all orders again clears the cap
+    purify(fit, mode = mode)
     expect_false(fit$fit$is_purify_capped())
     expect_equal(predict(fit, Xt)$.pred, p0$.pred, tolerance = 1e-12)
     expect_null(predict_components(fit, Xt)$remainder)
@@ -105,4 +105,62 @@ test_that("purify(maxp_interaction = k) keeps predict() for multiclass classific
       tolerance = 1e-12
     )
   }
+})
+
+test_that("purify() above an earlier cap purifies again, as a fresh purification would", {
+  set.seed(3)
+  n <- 300
+  X <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
+  y <- X$x1 * X$x2 + X$x2 * X$x3 + X$x1 + rnorm(n, sd = 0.2)
+  for (mode in 1:2) {
+    set.seed(1)
+    fit <- rpf(x = X, y = y, max_interaction = 3, ntrees = 5, splits = 40)
+    set.seed(1)
+    fresh <- rpf(x = X, y = y, max_interaction = 3, ntrees = 5, splits = 40)
+    purify(fresh, mode = mode)
+
+    purify(fit, maxp_interaction = 1, mode = mode)
+    expect_identical(fit$fit$get_purify_cap(), 1L)
+    # at or below the cap: returned as it is
+    purify(fit, maxp_interaction = 1, mode = mode)
+    expect_identical(fit$fit$get_purify_cap(), 1L)
+    # above it: purified again, up to the order asked for
+    purify(fit, maxp_interaction = 2, mode = mode)
+    expect_identical(fit$fit$get_purify_cap(), 2L)
+    pc2 <- predict_components(fit, X)
+    expect_true(any(pc2$m[["x1:x2"]] != 0))
+    expect_true(all(pc2$m[["x1:x2:x3"]] == 0))
+    # all orders (the default), as a fresh purification of all orders
+    purify(fit, mode = mode)
+    expect_identical(fit$fit$get_purify_cap(), 0L)
+    expect_false(fit$fit$is_purify_capped())
+    pc <- predict_components(fit, X)
+    expect_identical(pc, predict_components(fresh, X))
+    expect_null(pc$remainder)
+    expect_identical(predict(fit, X), predict(fresh, X))
+    # a full purification covers every cap
+    purify(fit, maxp_interaction = 1, mode = mode)
+    expect_identical(fit$fit$get_purify_cap(), 0L)
+  }
+})
+
+test_that("purify() above an earlier cap purifies again for multiclass classification", {
+  set.seed(5)
+  fit <- rpf(Species ~ ., data = iris, max_interaction = 2, ntrees = 5, loss = "L2")
+  set.seed(5)
+  fresh <- rpf(Species ~ ., data = iris, max_interaction = 2, ntrees = 5, loss = "L2")
+  purify(fit, maxp_interaction = 1)
+  purify(fit)
+  purify(fresh)
+  expect_false(fit$fit$is_purify_capped())
+  expect_identical(predict_components(fit, iris), predict_components(fresh, iris))
+})
+
+test_that("purify() checks its arguments on a purified forest too", {
+  fit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 5)
+  purify(fit)
+  expect_error(purify(fit, mode = 99), "mode")
+  expect_error(purify(fit, maxp_interaction = 0), "maxp_interaction")
+  expect_error(purify(fit, nthreads = 0), "nthreads")
+  expect_error(purify(fit, 2), class = "rlib_error_dots_nonempty")
 })
