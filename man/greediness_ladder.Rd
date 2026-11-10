@@ -7,14 +7,14 @@
 greediness_ladder()
 }
 \value{
-A \code{data.frame} with columns \code{split_try} and \code{t_try}, one row per point, greediest first.
+A \code{data.frame} with columns \code{n_try_split_points} and \code{share_candidates}, one row per point, greediest first.
 }
 \description{
-The points of greediness that \code{rpf(tune = )} searches: pairs of \code{split_try} (thresholds evaluated per split
-candidate) and \code{t_try} (share of the possible splits drawn as candidates in each round), greediest first. Each step
-down the ladder halves \code{t_try} and \code{split_try} (rounded up, at least 1), from 40 / 1 to 1 / 0.003125, except the
-first, which takes \code{t_try} from 1 to 0.8. Row 3 is the other split structures' default, 10 / 0.4; row 5 is
-\code{\link[=rpf]{rpf()}}'s default for \code{split_structure = "leaves"}, 3 / 0.1.
+The points of greediness that \code{rpf(tune = )} searches: pairs of \code{n_try_split_points} (split points tried per split
+candidate) and \code{share_candidates} (share of the possible splits drawn as candidates in each round), greediest
+first. Each step down the ladder halves \code{share_candidates} and \code{n_try_split_points} (rounded up, at least 1), from
+40 / 1 to 1 / 0.003125, except the first, which takes \code{share_candidates} from 1 to 0.8. Row 3 is the other split
+structures' default, 10 / 0.4; row 5 is \code{\link[=rpf]{rpf()}}'s default for \code{split_structure = "leaf"}, 3 / 0.1.
 }
 \examples{
 greediness_ladder()

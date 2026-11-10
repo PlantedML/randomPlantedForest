@@ -13,9 +13,9 @@ test_that("type = \"link\" equals type = \"numeric\" for every classification lo
       fit <- rpf_050(
         stats::reformulate(c("x1", "x2", "x3"), outcome),
         data = link_dat,
-        ntrees = 5,
+        n_families = 5,
         max_interaction = 2,
-        splits = 10,
+        n_splits = 10,
         loss = loss,
         nthreads = 1
       )

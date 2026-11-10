@@ -159,7 +159,7 @@ test_that(".predict_single_component is consistent with predictor order", {
 })
 
 test_that("duplicated rows get the same components as their originals", {
-  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, n_families = 10)
   idx <- c(3, 1, 3, 2, 1, 1)
 
   once <- predict_components(rp, mtcars[1:3, ])
@@ -172,7 +172,7 @@ test_that("duplicated rows get the same components as their originals", {
 test_that("predict_components() takes a matrix and leaves a data.frame new_data unchanged", {
   set.seed(54)
   x <- as.matrix(mtcars[, 2:6])
-  fit <- rpf_050(x, mtcars$mpg, max_interaction = 2, ntrees = 8, splits = 30)
+  fit <- rpf_050(x, mtcars$mpg, max_interaction = 2, n_families = 8, n_splits = 30)
   nd <- mtcars[1:12, 2:6]
   nd_before <- nd
 
@@ -226,7 +226,7 @@ test_that("a subset of predictors returns the other components as remainder", {
 
   for (dd in list(d_reg, d_bin, d_3)) {
     set.seed(1)
-    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 30)
+    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, n_families = 5, n_splits = 30)
     for (purified in c(FALSE, TRUE)) {
       # unpurified: predict_components() purifies in place; then on a forest purified with mode = 1
       if (purified) {
@@ -261,7 +261,7 @@ test_that("predict_components() works with formula terms that are not raw column
   )
   for (case in cases) {
     set.seed(1)
-    fit <- rpf_050(case$formula, data = d, max_interaction = 2, ntrees = 5, splits = 20)
+    fit <- rpf_050(case$formula, data = d, max_interaction = 2, n_families = 5, n_splits = 20)
     pc <- predict_components(fit, d[1:30, ], max_interaction = 1)
     expect_named(pc$m, case$names)
     expect_named(pc$x, case$names)
@@ -273,7 +273,7 @@ test_that("predict_components() works with formula terms that are not raw column
   }
   # x holds the term's values, as the forest sees them
   set.seed(1)
-  fit <- rpf_050(y ~ log(x1) + x2, data = d, ntrees = 5, splits = 20)
+  fit <- rpf_050(y ~ log(x1) + x2, data = d, n_families = 5, n_splits = 20)
   expect_equal(predict_components(fit, d[1:30, ])$x[["log(x1)"]], log(d$x1[1:30]))
 })
 
@@ -283,7 +283,7 @@ test_that("components follow the fit's column order when factors come first", {
   d <- data.frame(f = factor(sample(c("u", "v", "w"), n, TRUE)), x1 = runif(n), x2 = runif(n))
   d$y <- as.integer(d$f) * d$x1 + d$x2 + rnorm(n, sd = 0.2)
   set.seed(1)
-  fit <- rpf_050(y ~ ., data = d, max_interaction = 2, ntrees = 5, splits = 30)
+  fit <- rpf_050(y ~ ., data = d, max_interaction = 2, n_families = 5, n_splits = 30)
 
   # hardhat::mold() puts the factor last
   pc <- predict_components(fit, d[1:40, ])
@@ -310,7 +310,7 @@ test_that("zero rows of new_data give zero rows with the right columns", {
 
   for (dd in list(d_reg, d_bin, d_3)) {
     set.seed(1)
-    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 20)
+    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, n_families = 5, n_splits = 20)
     full <- predict_components(fit, dd[1:5, ])
     zero <- predict_components(fit, dd[0, ])
     expect_identical(nrow(zero$m), 0L)

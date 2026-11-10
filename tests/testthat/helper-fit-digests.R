@@ -6,9 +6,9 @@
 # - a purified fit: the predict_components() matrix (columns in the returned order) and intercept; separately the
 #   component names; separately predict() after purify().
 #
-# Every argument whose default differs from master's is given explicitly (max_interaction, ntrees, splits, split_try,
-# t_try, loss, prune = FALSE), and options(randomPlantedForest.exact_draw = TRUE), so the fits are master's settings;
-# the deterministic fits use ntrees = 1. Digests hold per platform only (libm and
+# Every argument whose default differs from master's is given explicitly (max_interaction, n_families, splits, n_try_split_points,
+# share_candidates, loss, prune = FALSE), and options(randomPlantedForest.exact_draw = TRUE), so the fits are master's settings;
+# the deterministic fits use n_families = 1. Digests hold per platform only (libm and
 # std::uniform_int_distribution differ between platforms), so the test pins them for macOS arm64.
 
 port_digest_data <- function() {
@@ -71,7 +71,7 @@ port_purified_numbers <- function(fit, newdata, type = NULL) {
 
 # all numbers, by digest name
 port_fit_numbers_all <- function() {
-  # the exact draw of "leaves" candidates, as master (its default may change)
+  # the exact draw of "leaf" candidates, as master (its default may change)
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old), add = TRUE)
   d <- port_digest_data()
@@ -80,41 +80,50 @@ port_fit_numbers_all <- function() {
   fc <- cl ~ x1 + x2 + x3 + x4 + x5
   fc3 <- cl3 ~ x1 + x2 + x3 + x4 + x5
   out <- list()
-  # every split structure: regression (random at 1 and 2 threads, deterministic) and binary classification
-  for (s in c("leaves", "cur_trees_1", "cur_trees_2", "res_trees", "hist")) {
+  # every split structure: regression (random at 1 and 2 threads, deterministic) and binary classification. The
+  # digests are named by the structures' names of 0.5.0, so that they compare with earlier versions' digests
+  structures <- c(
+    leaves = "leaf",
+    cur_trees_1 = "tree_then_leaf",
+    cur_trees_2 = "tree_then_all_leaves",
+    res_trees = "target_tree_then_leaf",
+    hist = "leaf_binned"
+  )
+  for (lab in names(structures)) {
+    s <- structures[[lab]]
     for (cfg in list(c(det = 0, nt = 1), c(det = 0, nt = 2), c(det = 1, nt = 1))) {
       set.seed(7)
       f <- rpf(
         fo,
         data = d,
         max_interaction = 3,
-        ntrees = if (cfg[["det"]] == 1) 1 else 4,
-        splits = 40,
+        n_families = if (cfg[["det"]] == 1) 1 else 4,
+        n_splits = 40,
         split_structure = s,
-        split_try = 5,
-        t_try = 0.5,
+        n_try_split_points = 5,
+        share_candidates = 0.5,
         prune = FALSE,
         nthreads = cfg[["nt"]],
         deterministic = cfg[["det"]] == 1
       )
-      out[[sprintf("reg_%s_det%d_nt%d", s, cfg[["det"]], cfg[["nt"]])]] <- port_fit_numbers(f, nd)
+      out[[sprintf("reg_%s_det%d_nt%d", lab, cfg[["det"]], cfg[["nt"]])]] <- port_fit_numbers(f, nd)
     }
     set.seed(9)
     f <- rpf(
       fc,
       data = d,
       max_interaction = 2,
-      ntrees = 4,
-      splits = 30,
+      n_families = 4,
+      n_splits = 30,
       split_structure = s,
-      split_try = 5,
-      t_try = 0.5,
+      n_try_split_points = 5,
+      share_candidates = 0.5,
       prune = FALSE,
       loss = "exponential"
     )
-    out[[sprintf("cls_%s", s)]] <- port_fit_numbers(f, nd, type = "prob")
+    out[[sprintf("cls_%s", lab)]] <- port_fit_numbers(f, nd, type = "prob")
   }
-  # every classification loss, binary and three classes ("leaves")
+  # every classification loss, binary and three classes ("leaf")
   for (k in c(2, 3)) {
     for (l in c("L1", "L2", "logit", "exponential")) {
       set.seed(11)
@@ -122,11 +131,11 @@ port_fit_numbers_all <- function() {
         if (k == 2) fc else fc3,
         data = d,
         max_interaction = 2,
-        ntrees = 4,
-        splits = 30,
-        split_structure = "leaves",
-        split_try = 5,
-        t_try = 0.5,
+        n_families = 4,
+        n_splits = 30,
+        split_structure = "leaf",
+        n_try_split_points = 5,
+        share_candidates = 0.5,
         prune = FALSE,
         loss = l
       )
@@ -140,11 +149,11 @@ port_fit_numbers_all <- function() {
       fo,
       data = d,
       max_interaction = mi,
-      ntrees = 4,
-      splits = 40,
-      split_structure = "leaves",
-      split_try = 5,
-      t_try = 0.5,
+      n_families = 4,
+      n_splits = 40,
+      split_structure = "leaf",
+      n_try_split_points = 5,
+      share_candidates = 0.5,
       prune = FALSE,
       loss = if (is.null(type)) NULL else "exponential",
       nthreads = nthreads

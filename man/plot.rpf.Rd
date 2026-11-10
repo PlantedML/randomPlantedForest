@@ -18,7 +18,7 @@
 \arguments{
 \item{x}{\verb{[rpf]}: A fitted \code{\link{rpf}} model.}
 
-\item{family}{\verb{[integer(1): 1]}: Which tree family to extract, between 1 and \code{ntrees}.}
+\item{family}{\verb{[integer(1): 1]}: Which tree family to extract, between 1 and \code{n_families}.}
 
 \item{...}{Reserved for future expansion.}
 
@@ -62,8 +62,8 @@ the order of splits or which leaf a tree grew from, so the splits within
 a tree are reconstructed: the diagram shows a split structure consistent
 with the leaves, and dashed lines link trees to the trees they could
 have grown from. Leaves that overlap other leaves of the same tree hang
-from dotted lines. Readable for small fits, e.g. \code{ntrees = 1} and
-\code{splits = 10}.
+from dotted lines. Readable for small fits, e.g. \code{n_families = 1} and
+\code{n_splits = 10}.
 \item \code{type = "boxes"} draws one panel per tree in variable space: leaves of
 trees on one variable as bars from zero to their value, leaves of trees
 on two variables as rectangles filled by their value. Overlapping leaves
@@ -81,7 +81,7 @@ plotting functions in \code{glex}.
 }
 \examples{
 \dontshow{if (rlang::is_installed(c("ggplot2", "patchwork"))) withAutoprint(\{ # examplesIf}
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10, prune = FALSE)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 1, n_splits = 10, prune = FALSE)
 plot(rpfit)
 purify(rpfit)
 plot(rpfit, type = "boxes")

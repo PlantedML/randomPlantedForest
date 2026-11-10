@@ -42,7 +42,7 @@ components, the table of the choice, the stored kept components, the display's c
 restored model predicts as before, from its stored components, so it needs no training data for that.
 }
 \examples{
-fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, prune = FALSE)
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
 blob <- rpf_marshal(fit)
 tmp <- tempfile(fileext = ".rds")
 saveRDS(blob, tmp)

@@ -21,7 +21,7 @@ These methods are provided to avoid flooding the console with long nested lists 
 }
 \examples{
 
-rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE, prune = FALSE)
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, n_families = 10, export_forest = TRUE, prune = FALSE)
 print(rpfit$forest)
 str(rpfit$forest)
 }

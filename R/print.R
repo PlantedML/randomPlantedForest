@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
+#' rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, n_families = 10, prune = FALSE)
 print.rpf <- function(x, ...) {
   cat(format(x, ...), sep = "\n")
   invisible(x)
@@ -51,10 +51,10 @@ format.rpf <- function(x, ...) {
       degree,
       "."
     )
-    # splits = NULL: chosen out of bag while growing
+    # n_splits = NULL: chosen out of bag while growing
     oob <- x$splits_oob
     if (!is.null(oob)) {
-      at <- match(oob$splits, x$oob_path$splits)
+      at <- match(oob$n_splits, x$oob_path$n_splits)
       # (classification: the loss's criterion, the Brier score or the log-loss)
       crit <- attr(x$oob_path, "criterion")
       err <- if (is.null(crit)) {
@@ -66,7 +66,7 @@ format.rpf <- function(x, ...) {
         )
       }
       cli::cli_alert_info(
-        "{.arg splits} chosen out of bag (lowest corrected OOB {err}); growing stopped at
+        "{.arg n_splits} chosen out of bag (lowest corrected OOB {err}); growing stopped at
         {.val {oob$stopped_at}} split{?s}."
       )
       if (oob$capped) {
@@ -105,7 +105,8 @@ format.rpf <- function(x, ...) {
     }
 
     cli::cli_h3("Tree growing")
-    print_params(params[c(
+    # under the argument names (the stored params keep the old ones, renamed_args)
+    growing <- params[c(
       "split_structure",
       "split_try",
       "t_try",
@@ -114,7 +115,10 @@ format.rpf <- function(x, ...) {
       "delete_leaves",
       # only when set, so that fits without it print as before
       if (!is.null(params$min_leaf_rows) && params$min_leaf_rows > 1) "min_leaf_rows"
-    )])
+    )]
+    growing$split_structure <- split_structure_name(growing$split_structure)
+    names(growing)[match(c("split_try", "t_try"), names(growing))] <- renamed_args[c("split_try", "t_try")]
+    print_params(growing)
     if (x$mode == "classification") {
       cli::cli_h3("Loss")
       loss_params <- if (params$loss %in% c("logit", "exponential")) {
@@ -152,7 +156,7 @@ print_params <- function(params) {
 #' @export
 #' @examples
 #'
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE, prune = FALSE)
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, n_families = 10, export_forest = TRUE, prune = FALSE)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {

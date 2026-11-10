@@ -10,9 +10,17 @@ pl_data <- function(n = 400, p = 5, seed = 1) {
   list(x = x, y = y, xt = matrix(runif(200 * p, -1.1, 1.1), 200, p, dimnames = list(NULL, colnames(x))))
 }
 
-pl_fit <- function(d, max_interaction = ncol(d$x), ntrees = 12) {
+pl_fit <- function(d, max_interaction = ncol(d$x), n_families = 12) {
   set.seed(3)
-  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 80, split_try = 5, t_try = 0.5)
+  rpf_050(
+    d$x,
+    d$y,
+    max_interaction = max_interaction,
+    n_families = n_families,
+    n_splits = 80,
+    n_try_split_points = 5,
+    share_candidates = 0.5
+  )
 }
 
 test_that("purify_columns() gives purify_oob()'s sums and the purified components, and leaves the forest", {
@@ -78,9 +86,9 @@ test_that("store_components() holds the chosen components exactly as purify() st
 test_that("the pruned model stores its kept components only and predicts from them", {
   ns <- asNamespace("randomPlantedForest")
   d <- pl_data(n = 500)
-  fit <- pl_fit(d, ntrees = 20)
+  fit <- pl_fit(d, n_families = 20)
   # the same forest, purified: the reference for the components
-  ref_fit <- pl_fit(d, ntrees = 20)
+  ref_fit <- pl_fit(d, n_families = 20)
   purify(ref_fit)
   for (P in c(Inf, 3)) {
     pr <- prune_components(fit, d$x, d$y, max_panels = P, seed = 4)
@@ -138,7 +146,7 @@ test_that("CV, a given rule and deterministic forests are pruned without purifyi
     expect_length(pr$store$comps, sum(!names(pr$beta) %in% names(pr$display$coarse)))
   }
   set.seed(1)
-  det <- rpf_050(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 30, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, max_interaction = 3, n_families = 1, n_splits = 30, deterministic = TRUE)
   pr <- prune_components(det, d$x, d$y, folds = 2, seed = 1)
   expect_identical(pr$select_by, "cv")
   expect_false(is_purified(det))

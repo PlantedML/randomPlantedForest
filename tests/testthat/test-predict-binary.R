@@ -214,7 +214,7 @@ test_that("prob and classif yield same result", {
 })
 
 test_that("class predictions break ties by level order and leave the RNG alone", {
-  fit <- rpf_050(Species ~ ., data = droplevels(iris[iris$Species != "setosa", ]), ntrees = 2, loss = "L2")
+  fit <- rpf_050(Species ~ ., data = droplevels(iris[iris$Species != "setosa", ]), n_families = 2, loss = "L2")
   local_mocked_bindings(
     predict_rpf_prob = function(object, new_data, nthreads) {
       data.frame(.pred_versicolor = c(0.5, 0.3), .pred_virginica = c(0.5, 0.7))

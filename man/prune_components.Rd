@@ -173,7 +173,7 @@ enters its OOB components.
 only on the rows outside each of K folds (\code{folds}, \code{fold_id}, \code{seed}). They are scored with the OOB components of
 the fold's rows, so that no row scores coefficients fitted on it. The final model's are fitted on all rows with
 at least one OOB family.
-\item An OOB mean averages \code{m_i} families (about 37\% of \code{B = ntrees}), the final model all \code{B}, so the OOB prediction
+\item An OOB mean averages \code{m_i} families (about 37\% of \code{B = n_families}), the final model all \code{B}, so the OOB prediction
 scatters more around its expectation. The OOB MSE is therefore corrected: per row it subtracts
 \code{(1 / m_i - 1 / B) * v_i}, with \code{v_i} the across-family variance of the candidate's prediction, estimated from
 the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
@@ -189,7 +189,7 @@ families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB err
 within 1.5\% of the test error at 4, 10, 20 and 50 families, that of \code{"R"} within 4.4\% except once (+11.5\% at 10
 families with a 3-way interaction), and the OOB choice was as good as the CV's or better from 10 families on
 (within 0.4\% in test error, or better by 7-10\% where the CV's fold fits choose poorly). Below 10 families
-(\code{ntrees}), the default \code{select_by} scores by CV instead (with a message); an explicit \code{select_by = "oob"} warns.
+(\code{n_families}), the default \code{select_by} scores by CV instead (with a message); an explicit \code{select_by = "oob"} warns.
 \item A deterministic forest has no out-of-bag rows, and a forest restored by \code{\link[=rpf_unmarshal]{rpf_unmarshal()}} from a blob made by an
 earlier version has no in-bag counts (with a message): with the default \code{select_by}, they are scored by CV
 instead.
@@ -263,8 +263,8 @@ CV fits and purifies the forest K more times (each fold's forest as \code{\link[
 forest has are evaluated (at most \code{sum(choose(p, seq_len(max_interaction)))}, usually far fewer: the subsets of the
 trees' predictor sets). The memory is the forest's plus about \code{n} doubles per component, three times that for the
 out-of-bag choice, plus one family's components at a time per thread; storing the kept components passes over the
-families once more. On California housing (16,512 rows, 200 families, \code{split_try = 3}, \code{t_try = 0.1}, the fast
-draw, 8 threads; measured when this column pass was added) the whole call of \code{rpf(splits = NULL, prune = TRUE)}
+families once more. On California housing (16,512 rows, 200 families, \code{n_try_split_points = 3}, \code{share_candidates = 0.1}, the fast
+draw, 8 threads; measured when this column pass was added) the whole call of \code{rpf(n_splits = NULL, prune = TRUE)}
 peaked at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at order 3, and at 6.4 GB (9.9 GB RSS) at
 order 8 (all predictors), most of it the 31 coarsened components the display keeps; there \code{\link[=purify]{purify()}} alone needs
 more than 12 GB of RSS. \code{nthreads} speeds up the fits and the purification.
@@ -296,7 +296,7 @@ per component and score column, named as for the forest.
 set.seed(1)
 x <- matrix(runif(600 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50, prune = FALSE)
+fit <- rpf(x, y, max_interaction = 2, n_families = 20, n_splits = 50, prune = FALSE)
 
 # Rule and threshold chosen out of bag (no refits): the largest tau within one SE
 # of the lowest error
@@ -318,7 +318,7 @@ predict(pruned, x[1:5, ])
 
 # A three-way interaction, shown in at most 4 heat maps
 y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
-fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100, prune = FALSE)
+fit3 <- rpf(x, y3, max_interaction = 3, n_families = 20, n_splits = 100, prune = FALSE)
 shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 shown
 shown$display$forms

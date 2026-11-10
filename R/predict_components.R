@@ -69,7 +69,7 @@
 #' test <-  mtcars[21:32, 1:4]
 #'
 #' set.seed(23)
-#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, prune = FALSE)
+#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, n_families = 30, prune = FALSE)
 #'
 #' # Extract all components, including main effects and interaction terms up to `max_interaction`
 #' (components <- predict_components(rpfit, test))
@@ -244,7 +244,7 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
 #' test <-  mtcars[21:32, 1:4]
 #'
 #' set.seed(23)
-#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, ntrees = 30, prune = FALSE)
+#' rpfit <- rpf(mpg ~ ., data = train, max_interaction = 3, n_families = 30, prune = FALSE)
 #'
 #' # Internal data preprocessing only done in predict_components to save time
 #' processed <- hardhat::forge(test, rpfit$blueprint)

@@ -17,7 +17,7 @@ boundary_data <- function(n = 400) {
 
 fit_boundary <- function(dat, max_interaction) {
   set.seed(43)
-  rpf_050(y ~ ., data = dat, max_interaction = max_interaction, ntrees = 10, splits = 30)
+  rpf_050(y ~ ., data = dat, max_interaction = max_interaction, n_families = 10, n_splits = 30)
 }
 
 for (order in 2:3) {

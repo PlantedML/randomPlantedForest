@@ -64,6 +64,6 @@ test_that("predictions do not depend on nthreads", {
 })
 
 test_that("predict() rejects unknown arguments", {
-  fit <- rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ cyl + wt, data = mtcars, n_families = 5)
   expect_error(predict(fit, mtcars, newdata = mtcars), class = "rlib_error_dots_nonempty")
 })

@@ -10,10 +10,10 @@ eta_cs <- 2 * (X_cs[, 1] - 0.5) + X_cs[, 4] - 0.5 + 3 * (X_cs[, 2] - 0.5) * (X_c
 Y_cs <- matrix(rbinom(n_cs, 1, plogis(eta_cs)), ncol = 1)
 dat_cs <- data.frame(y = factor(Y_cs[, 1]), X_cs)
 
-# Low-level parameter vectors: max_interaction, ntrees, splits, split_try, t_try, purify, deterministic,
-# nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure (+ delta, epsilon)
-reg_params <- function(mode, deterministic = 0, ntrees = 3, splits = 25) {
-  c(2, ntrees, splits, 5, 0.4, 0, deterministic, 1, 0, 0.1, 50, 1, mode)
+# Low-level parameter vectors: max_interaction, n_families, n_splits, n_try_split_points, share_candidates, purify,
+# deterministic, nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure (+ delta, epsilon)
+reg_params <- function(mode, deterministic = 0, n_families = 3, n_splits = 25) {
+  c(2, n_families, n_splits, 5, 0.4, 0, deterministic, 1, 0, 0.1, 50, 1, mode)
 }
 
 # Leaves of a tree D that have both bounds inside the data range in some d in D: such a leaf comes from
@@ -53,9 +53,23 @@ test_that("classification with loss L2 reproduces regression on a 0/1 response",
 test_that("classification cur_trees_1 differs from cur_trees_2", {
   for (loss in c("logit", "exponential", "L2")) {
     set.seed(3)
-    f1 <- rpf_050(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_1")
+    f1 <- rpf_050(
+      y ~ .,
+      data = dat_cs,
+      loss = loss,
+      n_families = 5,
+      max_interaction = 2,
+      split_structure = "tree_then_leaf"
+    )
     set.seed(3)
-    f2 <- rpf_050(y ~ ., data = dat_cs, loss = loss, ntrees = 5, max_interaction = 2, split_structure = "cur_trees_2")
+    f2 <- rpf_050(
+      y ~ .,
+      data = dat_cs,
+      loss = loss,
+      n_families = 5,
+      max_interaction = 2,
+      split_structure = "tree_then_all_leaves"
+    )
     p1 <- predict(f1, dat_cs, type = "prob")
     p2 <- predict(f2, dat_cs, type = "prob")
     expect_gt(max(abs(as.matrix(p1) - as.matrix(p2))), 1e-6, label = loss)
@@ -63,14 +77,14 @@ test_that("classification cur_trees_1 differs from cur_trees_2", {
 })
 
 test_that("classification cur_trees_2 and res_trees refine leaves within their own tree", {
-  for (s in c("cur_trees_2", "res_trees", "cur_trees_1", "leaves", "hist")) {
+  for (s in c("tree_then_all_leaves", "target_tree_then_leaf", "tree_then_leaf", "leaf", "leaf_binned")) {
     set.seed(4)
     f <- rpf_050(
       y ~ .,
       data = dat_cs,
       loss = "logit",
-      ntrees = 5,
-      splits = 40,
+      n_families = 5,
+      n_splits = 40,
       max_interaction = 2,
       split_structure = s
     )
@@ -85,8 +99,8 @@ test_that("split_decay_rate changes a res_trees classification fit", {
       y ~ .,
       data = dat_cs,
       loss = "logit",
-      ntrees = 5,
-      split_structure = "res_trees",
+      n_families = 5,
+      split_structure = "target_tree_then_leaf",
       split_decay_rate = rate
     )
     as.matrix(predict(f, dat_cs, type = "prob"))
@@ -114,7 +128,7 @@ test_that("all classification losses run under every split structure, binary and
       Yl <- if (startsWith(loss, "exponential")) 2 * Y - 1 else Y
       for (nm in names(structures)) {
         set.seed(8)
-        cls <- new(ClassificationRPF, Yl, X_cs, loss, c(reg_params(structures[[nm]], splits = 15), 0, 0.1))
+        cls <- new(ClassificationRPF, Yl, X_cs, loss, c(reg_params(structures[[nm]], n_splits = 15), 0, 0.1))
         pr <- cls$predict_matrix(X_cs, 0, 1L)
         expect_equal(dim(pr), c(n_cs, ncol(Y)), label = paste(loss, nm))
         expect_true(all(is.finite(pr)), label = paste(loss, nm, ncol(Y)))
@@ -134,13 +148,13 @@ test_that("deterministic res_trees and cur_trees_2 learn in classification", {
   y <- factor(ifelse(runif(nrow(X)) < plogis(eta(X)), "b", "a"))
   pt <- plogis(eta(Xt))
   for (loss in c("logit", "L2")) {
-    for (ss in c("res_trees", "cur_trees_2")) {
+    for (ss in c("target_tree_then_leaf", "tree_then_all_leaves")) {
       fit <- rpf_050(
         x = X,
         y = y,
         max_interaction = 2,
-        ntrees = 1,
-        splits = 100,
+        n_families = 1,
+        n_splits = 100,
         loss = loss,
         deterministic = TRUE,
         split_structure = ss

@@ -49,7 +49,7 @@ rp_both <- function(fit_call, data, y = NULL, max_panels = 3) {
   list(a = a, b = b)
 }
 
-rp_args <- list(max_interaction = 3, ntrees = 12, split_try = 5, t_try = 0.5, max_panels = 3)
+rp_args <- list(max_interaction = 3, n_families = 12, n_try_split_points = 5, share_candidates = 0.5, max_panels = 3)
 
 test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): formula and x/y", {
   d <- rp_data()
@@ -57,7 +57,7 @@ test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): 
   # one formula: its environment is part of the blueprint
   fml <- y ~ .
   for (splits in list(60, NULL)) {
-    args <- c(rp_args, list(splits = splits))
+    args <- c(rp_args, list(n_splits = splits))
     f <- rp_both(function(prune) do.call(rpf, c(list(fml, data = d, prune = prune), args)), d)
     expect_same_pruned(f$a, f$b, d)
     # the display ran: it prunes a second time when a component of order 3 is coarsened to at most 3 heat maps, as
@@ -76,7 +76,7 @@ test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): 
     expect_identical(predict(f$a, d), predict(m$a, xm))
     if (is.null(splits)) {
       expect_false(is.null(f$a$fit$splits_oob))
-      expect_identical(f$a$fit$params$splits, f$a$fit$splits_oob$splits)
+      expect_identical(f$a$fit$params$splits, f$a$fit$splits_oob$n_splits)
     }
   }
 })
@@ -86,7 +86,7 @@ test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): 
   d <- rp_data(n = 250, seed = 2)
   rec <- recipes::step_normalize(recipes::recipe(y ~ ., data = d), recipes::all_numeric_predictors())
   for (splits in list(60, NULL)) {
-    args <- c(rp_args, list(splits = splits))
+    args <- c(rp_args, list(n_splits = splits))
     r <- rp_both(function(prune) do.call(rpf, c(list(x = rec, data = d, prune = prune), args)), d)
     expect_same_pruned(r$a, r$b, d)
   }
@@ -95,7 +95,7 @@ test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): 
 test_that("max_panels = Inf: no display; purify is not used with prune = TRUE", {
   d <- rp_data(n = 250, seed = 3)
   fit_call <- function(prune, ...) {
-    rpf(y ~ ., data = d, max_interaction = 3, ntrees = 12, splits = 60, max_panels = Inf, prune = prune, ...)
+    rpf(y ~ ., data = d, max_interaction = 3, n_families = 12, n_splits = 60, max_panels = Inf, prune = prune, ...)
   }
   f <- rp_both(fit_call, d, max_panels = Inf)
   expect_same_pruned(f$a, f$b, d)
@@ -112,18 +112,18 @@ test_that("max_panels = Inf: no display; purify is not used with prune = TRUE", 
 test_that("prune = TRUE prunes classification forests too, is an error for deterministic ones; arguments are checked", {
   d <- rp_data(n = 100)
   set.seed(1)
-  pi <- suppressMessages(rpf(Species ~ ., data = iris, ntrees = 2, prune = TRUE))
+  pi <- suppressMessages(rpf(Species ~ ., data = iris, n_families = 2, prune = TRUE))
   expect_s3_class(pi, "rpf_pruned")
   expect_identical(colnames(predict(pi, iris)), paste0(".pred_", levels(iris$Species)))
   expect_error(
-    rpf(y ~ ., data = d, ntrees = 1, deterministic = TRUE, prune = TRUE),
+    rpf(y ~ ., data = d, n_families = 1, deterministic = TRUE, prune = TRUE),
     "not available with `deterministic = TRUE`"
   )
-  expect_error(rpf(y ~ ., data = d, ntrees = 2, prune = NA), "prune")
-  expect_error(rpf_050(y ~ ., data = d, ntrees = 2, max_panels = 0), "max_panels")
-  expect_error(rpf_050(y ~ ., data = d, ntrees = 2, max_panels = 2.5), "max_panels")
+  expect_error(rpf(y ~ ., data = d, n_families = 2, prune = NA), "prune")
+  expect_error(rpf_050(y ~ ., data = d, n_families = 2, max_panels = 0), "max_panels")
+  expect_error(rpf_050(y ~ ., data = d, n_families = 2, max_panels = 2.5), "max_panels")
   # the errors name rpf()
-  err <- tryCatch(rpf(y ~ ., data = d, ntrees = 1, deterministic = TRUE, prune = TRUE), error = identity)
+  err <- tryCatch(rpf(y ~ ., data = d, n_families = 1, deterministic = TRUE, prune = TRUE), error = identity)
   expect_match(conditionMessage(err), "deterministic")
   expect_identical(deparse(conditionCall(err)[[1]]), "rpf")
 })

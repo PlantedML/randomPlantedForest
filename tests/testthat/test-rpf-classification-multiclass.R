@@ -39,7 +39,7 @@ test_that("Multiclass logit learns signal (#40)", {
   dat$y <- factor(ifelse(dat$x1 > 0.5, "a", ifelse(dat$x2 > 0.5, "b", "c")))
   idx <- sample(n, 280)
 
-  fit <- rpf_050(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 10, max_interaction = 2)
+  fit <- rpf_050(y ~ ., data = dat[idx, ], loss = "logit", n_families = 10, max_interaction = 2)
   pred <- predict(fit, dat[-idx, ], type = "class")
 
   expect_gt(mean(pred$.pred_class == dat$y[-idx]), 0.85)
@@ -58,7 +58,7 @@ test_that("Remainder is calculcated correctly", {
 
 test_that("Multiclass: components and class-specific intercept sum to prediction", {
   for (loss in c("L2", "logit", "exponential")) {
-    fit <- rpf_050(yfact ~ ., data = xdat, max_interaction = 2, ntrees = 10, loss = loss)
+    fit <- rpf_050(yfact ~ ., data = xdat, max_interaction = 2, n_families = 10, loss = loss)
     components <- predict_components(fit, xdat)
     pred <- predict(fit, xdat, type = "numeric")
 

@@ -1,4 +1,4 @@
-split_structures <- c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees")
+split_structures <- c("leaf", "leaf_binned", "tree_then_leaf", "tree_then_all_leaves", "target_tree_then_leaf")
 
 test_that("every split structure learns a regression signal", {
   set.seed(1)
@@ -8,10 +8,11 @@ test_that("every split structure learns a regression signal", {
 
   for (structure in split_structures) {
     set.seed(2)
-    fit <- rpf_050(y ~ ., data = dat, max_interaction = 2, ntrees = 5, splits = 20, split_structure = structure)
+    fit <- rpf_050(y ~ ., data = dat, max_interaction = 2, n_families = 5, n_splits = 20, split_structure = structure)
     pred <- predict(fit, dat)$.pred
 
-    expect_identical(fit$params$split_structure, structure)
+    # the stored params keep the old code
+    expect_identical(fit$params$split_structure, randomPlantedForest:::split_structure_code(structure))
     expect_gt(cor(pred, dat$y), 0.8, label = structure)
   }
 })
@@ -25,7 +26,7 @@ test_that("every split structure learns a classification signal", {
   for (structure in split_structures) {
     for (loss in c("L2", "exponential")) {
       set.seed(2)
-      fit <- rpf_050(y ~ ., data = dat, ntrees = 5, splits = 20, loss = loss, split_structure = structure)
+      fit <- rpf_050(y ~ ., data = dat, n_families = 5, n_splits = 20, loss = loss, split_structure = structure)
       accuracy <- mean(predict(fit, dat, type = "class")$.pred_class == dat$y)
 
       expect_gt(accuracy, 0.8, label = paste(structure, loss))
@@ -45,8 +46,8 @@ test_that("every split structure is reproducible and independent of nthreads", {
         y ~ .,
         data = dat,
         max_interaction = 2,
-        ntrees = 4,
-        splits = 15,
+        n_families = 4,
+        n_splits = 15,
         split_structure = structure,
         nthreads = nthreads
       )

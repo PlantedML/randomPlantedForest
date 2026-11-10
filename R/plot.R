@@ -20,7 +20,7 @@
 #' `lower <= c < upper`.
 #'
 #' @param x `[rpf]`: A fitted [`rpf`] model.
-#' @param family `[integer(1): 1]`: Which tree family to extract, between 1 and `ntrees`.
+#' @param family `[integer(1): 1]`: Which tree family to extract, between 1 and `n_families`.
 #' @param ... Reserved for future expansion.
 #'
 #' @return A [base::data.frame] with one row per box and columns
@@ -37,7 +37,7 @@
 #' @seealso [plot.rpf()] to plot the boxes.
 #' @export
 #' @examples
-#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
+#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 5, n_splits = 10, prune = FALSE)
 #' head(rpf_boxes(rpfit))
 rpf_boxes <- function(x, family = 1L, ...) {
   checkmate::assert_class(x, "rpf")
@@ -169,8 +169,8 @@ grid_boxes <- function(family) {
 #'   a tree are reconstructed: the diagram shows a split structure consistent
 #'   with the leaves, and dashed lines link trees to the trees they could
 #'   have grown from. Leaves that overlap other leaves of the same tree hang
-#'   from dotted lines. Readable for small fits, e.g. `ntrees = 1` and
-#'   `splits = 10`.
+#'   from dotted lines. Readable for small fits, e.g. `n_families = 1` and
+#'   `n_splits = 10`.
 #' * `type = "boxes"` draws one panel per tree in variable space: leaves of
 #'   trees on one variable as bars from zero to their value, leaves of trees
 #'   on two variables as rectangles filled by their value. Overlapping leaves
@@ -209,7 +209,7 @@ grid_boxes <- function(family) {
 #' @importFrom rlang .data
 #' @export
 #' @examplesIf rlang::is_installed(c("ggplot2", "patchwork"))
-#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10, prune = FALSE)
+#' rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 1, n_splits = 10, prune = FALSE)
 #' plot(rpfit)
 #' purify(rpfit)
 #' plot(rpfit, type = "boxes")

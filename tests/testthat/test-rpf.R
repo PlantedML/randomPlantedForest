@@ -68,12 +68,12 @@ test_that("unknown arguments are an error", {
 test_that("deterministic fits are seed-independent and warn about redundant trees", {
   fit_det <- function(seed) {
     set.seed(seed)
-    rpf_050(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 1, max_interaction = 2, deterministic = TRUE)
+    rpf_050(mpg ~ cyl + wt + hp, data = mtcars, n_families = 1, max_interaction = 2, deterministic = TRUE)
   }
   expect_identical(predict(fit_det(1), mtcars), predict(fit_det(2), mtcars))
 
   expect_warning(
-    rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 5, deterministic = TRUE),
+    rpf_050(mpg ~ cyl + wt, data = mtcars, n_families = 5, deterministic = TRUE),
     "all 5 tree families are identical"
   )
 })

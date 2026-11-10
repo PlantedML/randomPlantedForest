@@ -4,11 +4,13 @@
 \alias{oob_path_checkpoints}
 \title{Checkpoints of the out-of-bag path}
 \usage{
-oob_path_checkpoints(splits)
+oob_path_checkpoints(n_splits, ...)
 }
 \arguments{
-\item{splits}{\verb{[integer(1)]}: The largest number of splits (the \code{splits} of
-the fit).}
+\item{n_splits}{\verb{[integer(1)]}: The largest number of splits (the \code{n_splits} of
+the fit). Was \code{splits}.}
+
+\item{...}{Only the old name \code{splits}, deprecated: it works, with a warning.}
 }
 \value{
 An increasing integer vector.
@@ -16,11 +18,11 @@ An increasing integer vector.
 \description{
 The numbers of splits at which \code{\link[=rpf]{rpf()}} with \code{oob_path = TRUE} evaluates the
 out-of-bag (OOB) error: a geometric grid with four points per doubling,
-\code{round(25 * 2^(j / 4))} from 6 up to \code{splits} (it contains 12, 25, 50, ...,
-1600, 3200), and \code{splits} itself; every number up to 12 if \code{splits <= 12}.
-The error changes slowly in \code{log(splits)}, so a geometric grid resolves it
+\code{round(25 * 2^(j / 4))} from 6 up to \code{n_splits} (it contains 12, 25, 50, ...,
+1600, 3200), and \code{n_splits} itself; every number up to 12 if \code{n_splits <= 12}.
+The error changes slowly in \code{log(n_splits)}, so a geometric grid resolves it
 evenly, and the path's memory, \code{2 * nrow(x) * length(checkpoints)} doubles,
-stays small; every split would cost \code{2 * nrow(x) * splits}.
+stays small; every split would cost \code{2 * nrow(x) * n_splits}.
 }
 \examples{
 oob_path_checkpoints(400)

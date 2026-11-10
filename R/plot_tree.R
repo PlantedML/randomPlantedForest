@@ -359,7 +359,7 @@ plot_family_tree <- function(boxes, family, levels, value_label, remainder) {
   if (n_leaves > 60) {
     cli::cli_inform(c(
       "Drawing {n_leaves} leaves, which may be hard to read.",
-      "i" = "Fit with fewer {.arg splits} for an illustration, or use {.code type = \"boxes\"}."
+      "i" = "Fit with fewer {.arg n_splits} for an illustration, or use {.code type = \"boxes\"}."
     ))
   }
   layout <- layout_family(boxes, levels)

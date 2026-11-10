@@ -27,7 +27,7 @@ Pruned forests from \code{\link[=prune_components]{prune_components()}} or \code
 }
 \examples{
 \dontshow{if (requireNamespace("bundle", quietly = TRUE)) withAutoprint(\{ # examplesIf}
-fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, prune = FALSE)
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
 b <- bundle::bundle(fit)
 tmp <- tempfile(fileext = ".rds")
 saveRDS(b, tmp)

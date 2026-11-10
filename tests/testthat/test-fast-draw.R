@@ -1,5 +1,5 @@
 # options(randomPlantedForest.exact_draw): the exact and the fast draw of
-# candidates for split_structure = "leaves"
+# candidates for split_structure = "leaf"
 
 with_exact_draw <- function(value, code) {
   old <- options(randomPlantedForest.exact_draw = value)
@@ -82,9 +82,9 @@ test_that("the fast draw is without replacement and skips zero weights", {
 
 test_that("the default is the fast draw and is stored with the fit", {
   set.seed(4)
-  fit_default <- rpf_050(mpg ~ ., data = mtcars, ntrees = 3, splits = 20)
+  fit_default <- rpf_050(mpg ~ ., data = mtcars, n_families = 3, n_splits = 20)
   set.seed(4)
-  fit_fast <- with_exact_draw(FALSE, rpf_050(mpg ~ ., data = mtcars, ntrees = 3, splits = 20))
+  fit_fast <- with_exact_draw(FALSE, rpf_050(mpg ~ ., data = mtcars, n_families = 3, n_splits = 20))
   expect_false(fit_default$params$exact_draw)
   expect_identical(fit_default$fit$get_model(), fit_fast$fit$get_model())
 })
@@ -92,7 +92,7 @@ test_that("the default is the fast draw and is stored with the fit", {
 test_that("the fast draw gives other, reproducible fits, the same on any number of threads", {
   fit <- function(seed, nthreads = 1L) {
     set.seed(seed)
-    with_exact_draw(FALSE, rpf_050(mpg ~ ., data = mtcars, ntrees = 3, splits = 20, nthreads = nthreads))
+    with_exact_draw(FALSE, rpf_050(mpg ~ ., data = mtcars, n_families = 3, n_splits = 20, nthreads = nthreads))
   }
   fast <- fit(5)
   expect_false(fast$params$exact_draw)
@@ -100,7 +100,7 @@ test_that("the fast draw gives other, reproducible fits, the same on any number 
   expect_identical(fast$fit$get_model(), fit(5, nthreads = 2L)$fit$get_model())
 
   set.seed(5)
-  exact <- with_exact_draw(TRUE, rpf_050(mpg ~ ., data = mtcars, ntrees = 3, splits = 20))
+  exact <- with_exact_draw(TRUE, rpf_050(mpg ~ ., data = mtcars, n_families = 3, n_splits = 20))
   expect_false(identical(fast$fit$get_model(), exact$fit$get_model()))
   # an equally good fit: in-sample error of the same order
   mse <- function(f) mean((predict(f, mtcars)$.pred - mtcars$mpg)^2)
@@ -115,21 +115,22 @@ test_that("the option does not change other structures or deterministic fits", {
     b <- with_exact_draw(FALSE, rpf_050(...))
     expect_identical(a$fit$get_model(), b$fit$get_model())
   }
-  for (structure in c("hist", "cur_trees_1", "cur_trees_2", "res_trees")) {
-    same_fit(mpg ~ ., data = mtcars, ntrees = 2, splits = 15, split_structure = structure)
+  for (structure in c("leaf_binned", "tree_then_leaf", "tree_then_all_leaves", "target_tree_then_leaf")) {
+    same_fit(mpg ~ ., data = mtcars, n_families = 2, n_splits = 15, split_structure = structure)
   }
-  same_fit(mpg ~ ., data = mtcars, ntrees = 1, splits = 15, deterministic = TRUE)
+  same_fit(mpg ~ ., data = mtcars, n_families = 1, n_splits = 15, deterministic = TRUE)
   cls <- data.frame(y = factor(mtcars$am), mtcars[, c("mpg", "wt", "hp")])
-  same_fit(y ~ ., data = cls, ntrees = 2, splits = 15, split_structure = "hist")
-  same_fit(y ~ ., data = cls, ntrees = 1, splits = 15, deterministic = TRUE)
+  same_fit(y ~ ., data = cls, n_families = 2, n_splits = 15, split_structure = "leaf_binned")
+  same_fit(y ~ ., data = cls, n_families = 1, n_splits = 15, deterministic = TRUE)
 })
 
 test_that("the option is checked", {
-  with_exact_draw("yes", expect_error(rpf_050(mpg ~ ., data = mtcars, ntrees = 1), "exact_draw"))
-  with_exact_draw(NA, expect_error(rpf_050(mpg ~ ., data = mtcars, ntrees = 1), "exact_draw"))
+  with_exact_draw("yes", expect_error(rpf_050(mpg ~ ., data = mtcars, n_families = 1), "exact_draw"))
+  with_exact_draw(NA, expect_error(rpf_050(mpg ~ ., data = mtcars, n_families = 1), "exact_draw"))
 })
 
 test_that("models stored without min_leaf_rows and exact_draw rebuild with 1 and the exact draw", {
+  # a stored model's params: randomPlantedForest 0.5.0's names and split structure codes
   params <- list(
     max_interaction = 2,
     ntrees = 1,
@@ -158,10 +159,10 @@ test_that("models stored without min_leaf_rows and exact_draw rebuild with 1 and
 
 test_that("print() mentions the exact draw (not the default)", {
   set.seed(7)
-  exact <- with_exact_draw(TRUE, rpf_050(mpg ~ ., data = mtcars, ntrees = 1, splits = 5))
+  exact <- with_exact_draw(TRUE, rpf_050(mpg ~ ., data = mtcars, n_families = 1, n_splits = 5))
   expect_match(paste(format(exact), collapse = "\n"), "exact draw")
   set.seed(7)
-  fast <- rpf_050(mpg ~ ., data = mtcars, ntrees = 1, splits = 5)
+  fast <- rpf_050(mpg ~ ., data = mtcars, n_families = 1, n_splits = 5)
   expect_no_match(paste(format(fast), collapse = "\n"), "draw")
 })
 
@@ -222,8 +223,8 @@ test_that("both draws split every round under min_leaf_rows", {
       rpf_050(
         x,
         y,
-        ntrees = 3,
-        splits = 150,
+        n_families = 3,
+        n_splits = 150,
         max_interaction = 1,
         max_candidates = 1,
         min_leaf_rows = 5,
@@ -241,7 +242,7 @@ test_that("both draws split every round under min_leaf_rows", {
   set.seed(5)
   f <- with_exact_draw(
     FALSE,
-    rpf_050(x, y, ntrees = 3, splits = 15, min_leaf_rows = 40, max_candidates = 1, delete_leaves = FALSE)
+    rpf_050(x, y, n_families = 3, n_splits = 15, min_leaf_rows = 40, max_candidates = 1, delete_leaves = FALSE)
   )
   expect_equal(vapply(f$fit$get_model(), function(family) sum(lengths(family$values)), 1), rep(1 + 2 * 15, 3))
 })

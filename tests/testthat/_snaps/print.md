@@ -9,12 +9,12 @@
       i Forest is not purified.
       
       -- Tree growing 
-         split_structure: leaves
-               split_try: 10
-                   t_try: 0.4
-          max_candidates: 50
-        split_decay_rate: 0.1
-           delete_leaves: TRUE
+           split_structure: leaf
+        n_try_split_points: 10
+          share_candidates: 0.4
+            max_candidates: 50
+          split_decay_rate: 0.1
+             delete_leaves: TRUE
       
       i Fit using 1 thread, also the default for `predict()` and `purify()`.
 
@@ -29,12 +29,12 @@
       v Forest is purified.
       
       -- Tree growing 
-         split_structure: leaves
-               split_try: 10
-                   t_try: 0.4
-          max_candidates: 50
-        split_decay_rate: 0.1
-           delete_leaves: TRUE
+           split_structure: leaf
+        n_try_split_points: 10
+          share_candidates: 0.4
+            max_candidates: 50
+          split_decay_rate: 0.1
+             delete_leaves: TRUE
       
       i Fit using 1 thread, also the default for `predict()` and `purify()`.
 
@@ -50,12 +50,12 @@
       ! Fit deterministically.
       
       -- Tree growing 
-         split_structure: leaves
-               split_try: 10
-                   t_try: 0.4
-          max_candidates: 50
-        split_decay_rate: 0.1
-           delete_leaves: TRUE
+           split_structure: leaf
+        n_try_split_points: 10
+          share_candidates: 0.4
+            max_candidates: 50
+          split_decay_rate: 0.1
+             delete_leaves: TRUE
       
       -- Loss 
            loss: logit
@@ -75,12 +75,12 @@
       i Forest is not purified.
       
       -- Tree growing 
-         split_structure: leaves
-               split_try: 10
-                   t_try: 0.4
-          max_candidates: 50
-        split_decay_rate: 0.1
-           delete_leaves: TRUE
+           split_structure: leaf
+        n_try_split_points: 10
+          share_candidates: 0.4
+            max_candidates: 50
+          split_decay_rate: 0.1
+             delete_leaves: TRUE
       
       -- Loss 
         loss: L2
