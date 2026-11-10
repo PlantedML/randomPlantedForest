@@ -102,7 +102,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         sample_idxs.push_back(kv.second);
     }
   } else {
-    for (size_t i = 0; i + n_candidates <= possible_splits.size() && i < n_candidates; ++i)
+    for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
       sample_idxs.push_back(i);
   }
   int best_idx = -1;
@@ -148,28 +148,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         std::vector<double> bit(L, 0.0), wts(L, 0.0);
         double total = 0.0;
         for (size_t li = 0; li < L; ++li) {
-          auto &leaf = tree->leaves[li];
-          // Determine number of unique thresholds available in this leaf for kdim
-          size_t unique_count = 0;
-          auto it_uc = leaf.unique_count_cache.find(kdim);
-          if (it_uc != leaf.unique_count_cache.end()) {
-            unique_count = it_uc->second;
-          } else {
-            // Build or reuse sorted values, then count uniques
-            std::vector<size_t> order_cf;
-            std::vector<double> sorted_vals_cf;
-            ensure_order_and_sorted_vals_for_leaf(X, leaf, kdim, order_cf, sorted_vals_cf);
-            if (!sorted_vals_cf.empty()) {
-              unique_count = 1;
-              for (size_t i = 1; i < sorted_vals_cf.size(); ++i)
-                if (sorted_vals_cf[i] != sorted_vals_cf[i - 1])
-                  ++unique_count;
-            }
-            leaf.unique_count_cache[kdim] = unique_count;
-          }
           // Weight = number of unique thresholds that respect min leaf size
-          const long width_unique = (long)unique_count - 2L * (long)leaf_size + 1L;
-          const double w = (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
+          const double w = leaf_threshold_weight(X, tree->leaves[li], kdim, leaf_size);
           wts[li] = w;
           total += w;
           if (w != 0.0)

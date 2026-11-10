@@ -145,9 +145,10 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
         const size_t m = leaf.individuals.size();
         std::vector<int> samples;
         if (this->deterministic) {
-          int maxp = std::min<int>((int)unique_count - 1, 9);
-          samples.resize(maxp);
-          std::iota(samples.begin(), samples.end(), 1);
+          // split_try thresholds evenly spread over the same range the random draws use
+          samples = compute_even_spread_indices(leaf_size, (int)unique_count - leaf_size + 1, (size_t)this->split_try);
+          if (samples.empty())
+            continue;
         } else {
           samples.resize(this->split_try);
           for (size_t i = 0; i < samples.size(); ++i)

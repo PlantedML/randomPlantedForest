@@ -802,16 +802,15 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         *curr_split.leaf_index = leaf_b;
         curr_split.tree_index->leaves.push_back(leaf_s);
         size_t idx_s = curr_split.tree_index->leaves.size() - 1;
-        // Incrementally update sampling caches if initialized
+        // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
         if ((int)curr_split.tree_index->fenwick_by_dim_v.size() >= this->feature_size) {
           for (int kdim = 0; kdim < this->feature_size; ++kdim) {
             auto &bit = curr_split.tree_index->fenwick_by_dim_v[(size_t)kdim];
             auto &wts = curr_split.tree_index->leaf_weights_by_dim_v[(size_t)kdim];
             if (!bit.empty() && wts.size() == bit.size()) {
               // update replaced leaf
-              double m_b = (double)curr_split.tree_index->leaves[idx_b].individuals.size();
               int leaf_min = this->n_leaves[kdim];
-              double w_new_b = std::max(0.0, m_b - 2.0 * (double)leaf_min);
+              double w_new_b = leaf_threshold_weight(samples_X, curr_split.tree_index->leaves[idx_b], kdim, leaf_min);
               double delta_b = w_new_b - (idx_b < wts.size() ? wts[idx_b] : 0.0);
               if ((size_t)idx_b < wts.size())
                 wts[idx_b] = w_new_b;
@@ -820,13 +819,9 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
                 curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += delta_b;
               }
               // append new leaf
-              double m_s = (double)curr_split.tree_index->leaves[idx_s].individuals.size();
-              double w_new_s = std::max(0.0, m_s - 2.0 * (double)leaf_min);
-              bit.push_back(0.0);
-              wts.push_back(0.0);
-              if (w_new_s != 0.0)
-                rpf_utils::fenwick_add(bit, bit.size(), w_new_s);
-              wts[wts.size() - 1] = w_new_s;
+              double w_new_s = leaf_threshold_weight(samples_X, curr_split.tree_index->leaves[idx_s], kdim, leaf_min);
+              rpf_utils::fenwick_push_back(bit, w_new_s);
+              wts.push_back(w_new_s);
               curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
             }
           }
@@ -836,7 +831,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         found_tree->leaves.push_back(leaf_b);
         size_t idx_s = found_tree->leaves.size() - 2;
         size_t idx_b = found_tree->leaves.size() - 1;
-        // Incrementally update sampling caches if initialized
+        // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
         if ((int)found_tree->fenwick_by_dim_v.size() >= this->feature_size) {
           for (int kdim = 0; kdim < this->feature_size; ++kdim) {
             auto &bit = found_tree->fenwick_by_dim_v[(size_t)kdim];
@@ -844,22 +839,14 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
             if (!bit.empty() && wts.size() == bit.size()) {
               int leaf_min = this->n_leaves[kdim];
               // append s
-              double m_s = (double)found_tree->leaves[idx_s].individuals.size();
-              double w_new_s = std::max(0.0, m_s - 2.0 * (double)leaf_min);
-              bit.push_back(0.0);
-              wts.push_back(0.0);
-              if (w_new_s != 0.0)
-                rpf_utils::fenwick_add(bit, bit.size(), w_new_s);
-              wts[wts.size() - 1] = w_new_s;
+              double w_new_s = leaf_threshold_weight(samples_X, found_tree->leaves[idx_s], kdim, leaf_min);
+              rpf_utils::fenwick_push_back(bit, w_new_s);
+              wts.push_back(w_new_s);
               found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
               // append b
-              double m_b = (double)found_tree->leaves[idx_b].individuals.size();
-              double w_new_b = std::max(0.0, m_b - 2.0 * (double)leaf_min);
-              bit.push_back(0.0);
-              wts.push_back(0.0);
-              if (w_new_b != 0.0)
-                rpf_utils::fenwick_add(bit, bit.size(), w_new_b);
-              wts[wts.size() - 1] = w_new_b;
+              double w_new_b = leaf_threshold_weight(samples_X, found_tree->leaves[idx_b], kdim, leaf_min);
+              rpf_utils::fenwick_push_back(bit, w_new_b);
+              wts.push_back(w_new_b);
               found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_b;
             }
           }
