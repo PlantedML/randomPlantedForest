@@ -34,9 +34,11 @@ predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
 
 - predictors:
 
-  `[character | NULL: NULL]`: Vector of one or more column names of
-  predictor variables in `new_data` to extract components for. If
-  `NULL`, all variables and their interactions are returned.
+  `[character | NULL: NULL]`: Vector of one or more names of the
+  forest's predictors to extract components for. These are the columns
+  the forest was fitted on: with a formula, its terms, such as
+  `log(x1)`. If `NULL`, all predictors and their interactions are
+  returned, in the order of the fit's columns.
 
 ## Value
 
@@ -57,15 +59,17 @@ A `list` with elements:
 
 - `x`
   ([`data.table`](https://rdrr.io/pkg/data.table/man/data.table.html)):
-  Copy of `new_data` containing predictors selected by `predictors`.
+  The predictors selected by `predictors`, as the forest sees them in
+  `new_data` (with a formula, its terms, such as `log(x1)`).
 
 - `target_levels` (`character`): For multiclass classification only:
   Vector of target levels which can be used to disassemble `m`, as names
   include both term and target level.
 
 - `remainder` (`numeric`): Only if `m` leaves out components of the
-  forest: if `max_interaction` (lowered to the number of `predictors`)
-  is below that of the
+  forest: if `predictors` leaves out some of the forest's predictors, if
+  `max_interaction` (lowered to the number of `predictors`) is below
+  that of the
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   object, or if the forest was purified with a `maxp_interaction` below
   it (see
@@ -80,7 +84,8 @@ Extracts all possible components up to `max_interaction` degrees, up to
 the value set when calling
 [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
 The intercept is always included. Optionally `predictors` can be
-specified to only include components including the given variables. If
+specified to only include components made of the given predictors; the
+sum of the other components is returned as `remainder`. If
 `max_interaction` is greater than `length(predictors)`, the
 `max_interaction` will be lowered accordingly.
 
@@ -88,8 +93,10 @@ All components are evaluated in one pass over the rows of `new_data`.
 Components that the purified forest does not hold, such as sets of
 predictors that never appear together in a tree, are zero columns.
 
-The components are only unique for a purified forest. An unpurified
-forest is purified in place on first use with the defaults of
+The components are only unique for a purified forest;
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+says how they are identified. An unpurified forest is purified in place
+on first use with the defaults of
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md).
 For other settings, such as more threads, call
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)

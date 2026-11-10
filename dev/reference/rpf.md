@@ -167,8 +167,10 @@ rpf(
 
 - splits:
 
-  `[integer(1): 30]`: Number of splits per tree family. The main tuning
-  parameter: more splits fit more complex functions.
+  `[integer(1): 30]`: Number of split rounds per tree family. The main
+  tuning parameter: more splits fit more complex functions. A round
+  splits the best of its candidates; near saturation, when every
+  candidate's leaf is too small to split, a round can make no split.
 
 - split_structure:
 
@@ -282,9 +284,10 @@ rpf(
 
   `[logical(1): FALSE]`: Whether to fit without randomness: no
   bootstrap, the first `max_candidates` possible splits as candidates
-  (`t_try` is ignored) and evenly spaced thresholds. The result does not
-  depend on the seed, and all tree families are identical, so use
-  `ntrees = 1`. Mainly useful for testing and debugging.
+  (`t_try` and `split_decay_rate` are ignored) and evenly spaced
+  thresholds. The result does not depend on the seed, and all tree
+  families are identical, so use `ntrees = 1`. Mainly useful for testing
+  and debugging.
 
 - keep_level_order:
 
@@ -363,8 +366,11 @@ In each round, a `t_try` fraction of all possible splits (capped at
 candidate is and how its thresholds are evaluated.
 
 - `leaves`: Split candidates are (leaf, split-dimension) pairs. For each
-  sampled candidate, `split_try` thresholds are drawn uniformly from the
-  valid range within that leaf and evaluated to choose the best split.
+  sampled candidate, `split_try` thresholds are drawn uniformly without
+  replacement from the distinct values of that predictor among the
+  leaf's rows, leaving out the smallest and, with `min_leaf_rows`, those
+  that leave fewer rows on either side (all of them if there are fewer),
+  and evaluated to choose the best split.
 
 - `hist`: As `leaves`, but thresholds are drawn from boundaries of
   quantile bins computed once per predictor, which makes evaluating them
@@ -396,14 +402,24 @@ every round. With `FALSE`, the candidates are drawn from a Fenwick tree
 over the weights, kept up to date between rounds, which costs a few
 random numbers per candidate instead. Both draw from the same
 distribution, but with other random numbers, so the same seed gives
-another (equally good) forest. With `min_leaf_rows`, both leave out the
-same candidates: those whose leaf has no threshold with that many rows
-on each side. The fast draw pays off on large data with many splits. The
-option is read when the forest is fitted and stored in
-`params$exact_draw`; it does not affect classification or the other
-split structures.
+another (equally good) forest. Ties between equally good candidates may
+go to different candidates under the two draws, so with many splits,
+near saturation, their fits differ in distribution, though not in
+accuracy. With `min_leaf_rows`, both leave out the same candidates:
+those whose leaf has no threshold with that many rows on each side. The
+fast draw pays off on large data with many splits. The option is read
+when the forest is fitted and stored in `params$exact_draw`; it does not
+affect classification or the other split structures.
 
     options(randomPlantedForest.exact_draw = FALSE)
+
+### Reproducibility
+
+With the same seed, `rpf()` gives the same forest on the same platform,
+also with more threads. Another platform can give another forest for the
+same seed, because the integer sampling of the C++ standard library
+(`std::uniform_int_distribution`) differs between implementations, such
+as libc++ and libstdc++.
 
 ## References
 

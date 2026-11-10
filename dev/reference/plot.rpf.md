@@ -76,7 +76,7 @@ A `ggplot` for `type = "tree"`, a `patchwork` for `type = "boxes"`.
 ## Details
 
 - `type = "tree"` draws a split diagram in the style of Figure 1b of
-  Hiabu et al. (2023), with the trees in rows by number of variables,
+  Hiabu et al. (2020), with the trees in rows by number of variables,
   each leaf filled by its value. The forest stores only its final
   leaves, not the order of splits or which leaf a tree grew from, so the
   splits within a tree are reconstructed: the diagram shows a split
@@ -105,7 +105,7 @@ e.g. with the plotting functions in `glex`.
 
 ## References
 
-Hiabu, M., Mammen, E., Meyer, J. T. (2023). Random Planted Forest: a
+Hiabu, M., Mammen, E., Meyer, J. T. (2020). Random Planted Forest: a
 directly interpretable tree ensemble. arXiv:2012.14563.
 
 ## Examples
