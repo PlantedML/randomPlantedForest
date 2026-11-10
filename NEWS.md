@@ -17,7 +17,7 @@
   options(randomPlantedForest.exact_draw = TRUE)
   rpf(..., max_interaction = 2, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4, prune = FALSE)
   ```
-  The default call does more work than before: 0.2 s on `mtcars`, 0.4 s on `iris`, and about 2 minutes with a peak of 5 GB of resident memory on California housing (16,512 rows) at 8 threads.
+  The default call does more work than before: 0.2 s on `mtcars`, 0.4 s on `iris`, and about 2 minutes with a peak of 5 GB of resident memory (RSS; 2.4 GB of physical footprint) on California housing (16,512 rows) at 8 threads.
 
 ## New features
 
