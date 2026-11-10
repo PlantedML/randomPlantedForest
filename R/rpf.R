@@ -394,7 +394,7 @@
 #' later, lower minimum on the other two, while growing 0.72 of the splits.
 #' The plateau stop chose the same `splits` as the first rule alone on all 44
 #' synthetic sets, the 4 California sets tried and 24 classification fits
-#' (logit and exponential loss), while growing 10\% (regression) to 29\%
+#' (logit and exponential loss), while growing 10% (regression) to 29%
 #' (classification) fewer splits; it matters most on long, flat out-of-bag
 #' curves.
 #'
