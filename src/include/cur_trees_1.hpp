@@ -1,4 +1,4 @@
-// Helpers of split_structure "cur_trees_1" for regression (lib/splits_cur_trees_1.cpp).
+// Helpers of split_structure "cur_trees_1" (lib/splits_cur_trees_1.cpp), for regression and classification alike.
 //
 // A tree family keeps the dense rank of each of its working rows in each feature (FamilyRanks, held by the family's
 // null tree while the family grows). Ranks order rows exactly as their values do, ties included (-0 and +0 share a

@@ -26,7 +26,7 @@
 // Implementation notes:
 // - Training orchestrated in `lib/training.cpp`
 // - Prediction logic in `lib/predict.cpp`
-// - Split calculators in `lib/splits_*.cpp`
+// - Split calculators in `lib/splits_*.cpp`, for every loss (FamilyLoss; classification's in `lib/cpf.cpp`)
 // - Utilities (RNG, sampling, caching) in `lib/internal_utils.cpp`
 #ifndef RPF_H
 #define RPF_H
@@ -42,6 +42,32 @@
 typedef std::vector<std::vector<double>> Matrix2D; /**< row-major: rows x columns */
 
 struct LeavesScratch; // internal_utils.hpp
+
+// What a loss other than regression's squared error (classification, cpf.hpp) does while a tree family grows. The
+// split searches (splits_*.cpp) and create_tree_family() are the same for every loss; given a FamilyLoss they score
+// the tries with it and let it update the family's rows, otherwise (nullptr: regression) they score by the sums of Y
+// and subtract the leaf means from Y. One object per tree family, owned by create_tree_family().
+struct FamilyLoss {
+  virtual ~FamilyLoss() = default;
+  // The criterion of splitting `leaf` at sp in feature k (0-based): smaller is better, and INF or NaN never wins. The
+  // search has set trial.sum_s / trial.sum_b (value_size each) to the sums of the family's Y over the leaf's rows
+  // below sp and not below, each accumulated in the order in which regression accumulates them; score() may fill
+  // the other fields of `trial`.
+  virtual double score(Split &trial, const Leaf &leaf, int k, double sp, const std::vector<std::vector<double>> &X) = 0;
+  // The search's winner (min_sum finite, tree_index, leaf_index, split_coordinate, split_point, sum_s and sum_b set):
+  // its I_s / I_b and the rest, as score() computes them for it.
+  virtual void finalize(Split &winner, const std::vector<std::vector<double>> &X) = 0;
+  // The split is done: update the family's rows (Y or the loss's own state) and set the two new leaves' increments.
+  virtual void apply(
+      const Split &split,
+      const std::vector<std::vector<double>> &X,
+      std::vector<std::vector<double>> &Y,
+      std::vector<double> &inc_s,
+      std::vector<double> &inc_b
+  ) = 0;
+  // The family (index n) has finished growing.
+  virtual void finish(size_t n) = 0;
+};
 
 struct RPFParams {
   int max_interaction = 1;
@@ -508,7 +534,20 @@ protected:
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
   std::vector<double> predict_single_rect(const std::vector<double> &X, const std::set<int> &component_index) const;
   void L2_loss(Split &split);
-  virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+  // Grow tree family n from the initial leaves (the same code for every loss: see FamilyLoss)
+  void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+  // The loss of a family that grows on the working rows samples_Y (sample_size rows; boot_idx: each one's row in the
+  // data): nullptr for regression (the squared error); ClassificationRPF returns its loss's.
+  virtual std::unique_ptr<FamilyLoss>
+  family_loss(std::vector<std::vector<double>> &samples_Y, const std::vector<int> &boot_idx);
+  // After a split of cur_trees_1 or cur_trees_2: the cached sampling weight of the leaf idx of `tree` in every feature
+  // whose weights are cached, replaced (append = false) or appended
+  void update_leaf_weight(
+      TreeFamily &family, DecisionTree &tree, size_t idx, bool append, const std::vector<std::vector<double>> &X
+  );
+  // A family has finished growing: drop its empty trees and everything only the growing needs (the leaves' rows and
+  // caches, the trees' weight caches, cur_trees_1's ranks), and release spare capacity
+  static void finish_family(TreeFamily &family);
   // A family that made no split: its null leaf gets null_leaf_value() of its rows (rpf.cpp)
   void fit_null_leaf(TreeFamily &family, const std::vector<std::vector<double>> &Y);
   virtual std::vector<double> null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows);
@@ -521,7 +560,8 @@ protected:
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
   // leaves (both outcomes): this round's n_candidates entries of the pool, by the deterministic, exact or fast draw,
   // leaving out entries without a threshold that keeps min_leaf_rows_ rows on each side (splits_leaves.cpp). sc holds
@@ -540,13 +580,15 @@ protected:
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
   Split calcOptimalSplit_curTrees1(
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
   struct ResultingTreeCandidate {
     std::shared_ptr<DecisionTree> tree;
@@ -559,13 +601,15 @@ protected:
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<ResultingTreeCandidate> &possible_trees,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
-  virtual Split calcOptimalSplit(
+  Split calcOptimalSplit(
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
   // exponential‐decay rate for split age
   double split_decay_rate_;
@@ -613,9 +657,6 @@ protected:
   // Moved to thread-local storage in implementation to avoid races under multithreading
   // std::vector<std::vector<int>> working_bin_id_;
 
-  bool leafCandidateExists(
-      const std::vector<SplitCandidate> &, const std::shared_ptr<DecisionTree> &, size_t leaf_idx, int dim
-  );
   bool delete_leaves;
 
   // Mode 4: histogram-binned split evaluation
@@ -623,7 +664,8 @@ protected:
       const std::vector<std::vector<double>> &Y,
       const std::vector<std::vector<double>> &X,
       std::vector<SplitCandidate> &possible_splits,
-      TreeFamily &curr_family
+      TreeFamily &curr_family,
+      FamilyLoss *loss = nullptr
   );
 };
 

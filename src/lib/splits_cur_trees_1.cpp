@@ -254,7 +254,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    TreeFamily &curr_family,
+    FamilyLoss *loss_fn
 )
 {
   Split curr_split, min_split;
@@ -405,7 +406,16 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
       if (t.ns == 0 || t.nb == 0)
         continue;
       double loss = 0.0;
-      if (one_column) {
+      if (loss_fn) { // the loss's criterion (classification), from the same sums
+        if (one_column) {
+          curr_split.sum_s.assign(1, t.s);
+          curr_split.sum_b.assign(1, t.b);
+        } else {
+          curr_split.sum_s = t.sum_s;
+          curr_split.sum_b = t.sum_b;
+        }
+        loss = loss_fn->score(curr_split, *t.leaf, t.k, t.sp, X);
+      } else if (one_column) {
         loss -= (t.s * t.s) / (double)t.ns;
         loss -= (t.b * t.b) / (double)t.nb;
       } else {
@@ -587,6 +597,9 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
-  finalize_split_from_sums(min_split, X, this->value_size);
+  if (loss_fn)
+    loss_fn->finalize(min_split, X);
+  else
+    finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }

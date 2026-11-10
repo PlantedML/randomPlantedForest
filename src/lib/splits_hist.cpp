@@ -9,11 +9,13 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    TreeFamily &curr_family,
+    FamilyLoss *loss_fn
 )
 {
-  Split min_split;
+  Split curr_split, min_split;
   min_split.min_sum = std::numeric_limits<double>::infinity();
+  curr_split.Y = &Y;
   if (possible_splits.empty())
     return min_split;
 
@@ -123,27 +125,37 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
       if (left_n < leaf_min || right_n < leaf_min)
         continue;
 
+      // Map boundary index to actual split point using precomputed cuts
+      double sp = 0.0;
+      if (k >= 0 && k < (int)feature_cut_points_.size() && !feature_cut_points_[k].empty()) {
+        const auto &cuts = feature_cut_points_[k];
+        size_t cp_idx = (size_t)std::min<size_t>((size_t)b_left, cuts.size() - 1);
+        sp = cuts[cp_idx];
+      } else {
+        sp = 0.5 * (leafPtr->intervals[k].first + leafPtr->intervals[k].second);
+      }
       double loss = 0.0;
-      for (size_t p = 0; p < this->value_size; ++p) {
-        double ls = prefix_sum[(size_t)b_left][p];
-        double rs = total_sum[p] - ls;
-        loss -= (ls * ls) / (double)left_n;
-        loss -= (rs * rs) / (double)right_n;
+      if (loss_fn) { // the loss's criterion (classification), from the same sums
+        curr_split.sum_s.resize(this->value_size);
+        curr_split.sum_b.resize(this->value_size);
+        for (size_t p = 0; p < this->value_size; ++p) {
+          curr_split.sum_s[p] = prefix_sum[(size_t)b_left][p];
+          curr_split.sum_b[p] = total_sum[p] - prefix_sum[(size_t)b_left][p];
+        }
+        loss = loss_fn->score(curr_split, *leafPtr, k, sp, X);
+      } else {
+        for (size_t p = 0; p < this->value_size; ++p) {
+          double ls = prefix_sum[(size_t)b_left][p];
+          double rs = total_sum[p] - ls;
+          loss -= (ls * ls) / (double)left_n;
+          loss -= (rs * rs) / (double)right_n;
+        }
       }
       if (loss < min_split.min_sum) {
         min_split.min_sum = loss;
         min_split.tree_index = it->tree;
         min_split.leaf_index = leafPtr;
         min_split.split_coordinate = k + 1;
-        // Map boundary index to actual split point using precomputed cuts
-        double sp = 0.0;
-        if (k >= 0 && k < (int)feature_cut_points_.size() && !feature_cut_points_[k].empty()) {
-          const auto &cuts = feature_cut_points_[k];
-          size_t cp_idx = (size_t)std::min<size_t>((size_t)b_left, cuts.size() - 1);
-          sp = cuts[cp_idx];
-        } else {
-          sp = 0.5 * (leafPtr->intervals[k].first + leafPtr->intervals[k].second);
-        }
         min_split.split_point = sp;
         best_idx = (int)idx;
         // Store sums for this boundary
@@ -158,6 +170,9 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
-  finalize_split_from_sums(min_split, X, this->value_size);
+  if (loss_fn)
+    loss_fn->finalize(min_split, X);
+  else
+    finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }

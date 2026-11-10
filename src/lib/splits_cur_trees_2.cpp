@@ -9,7 +9,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    TreeFamily &curr_family,
+    FamilyLoss *loss_fn
 )
 {
   Split curr_split, min_split;
@@ -171,7 +172,27 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
           if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
             continue;
           double loss = 0.0;
-          if (!single_eval) {
+          if (loss_fn) { // the loss's criterion (classification), from the same sums
+            curr_split.sum_s.assign(this->value_size, 0.0);
+            curr_split.sum_b.assign(this->value_size, 0.0);
+            if (!single_eval) {
+              for (size_t p = 0; p < this->value_size; ++p) {
+                curr_split.sum_s[p] = prefix_cf[p][pos - 1];
+                curr_split.sum_b[p] = total_cf[p] - curr_split.sum_s[p];
+              }
+            } else {
+              for (int ind : leaf.individuals) {
+                if (X[ind][k] < sp) {
+                  for (size_t p = 0; p < this->value_size; ++p)
+                    curr_split.sum_s[p] += Y[ind][p];
+                } else {
+                  for (size_t p = 0; p < this->value_size; ++p)
+                    curr_split.sum_b[p] += Y[ind][p];
+                }
+              }
+            }
+            loss = loss_fn->score(curr_split, leaf, k, sp, X);
+          } else if (!single_eval) {
             for (size_t p = 0; p < this->value_size; ++p) {
               const double sum_s_base = prefix_cf[p][pos - 1];
               const double sum_b_base = total_cf[p] - sum_s_base;
@@ -243,6 +264,9 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
-  finalize_split_from_sums(min_split, X, this->value_size);
+  if (loss_fn)
+    loss_fn->finalize(min_split, X);
+  else
+    finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }
