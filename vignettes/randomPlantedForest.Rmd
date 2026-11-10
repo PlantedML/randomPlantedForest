@@ -67,7 +67,7 @@ model
 With its defaults, `rpf()` does three things in one call:
 
 1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while the families grow: by the error on the training rows that a family's bootstrap sample left out (out of bag), stopping once more splits no longer help (`splits = NULL`).
-2. It prunes the forest's components with `prune_components()`: a component is kept if its share of the variance of the prediction is large enough, and the kept components get one refitted coefficient each, the threshold again chosen out of bag (`prune = NULL`, that is `TRUE`).
+2. It prunes the forest's components with `prune_components()`: a component is kept if its share of the variance of the prediction is large enough, either as it is or with one refitted coefficient per kept component; the rule and the threshold are again chosen out of bag (`prune = NULL`, that is `TRUE`).
 3. It shows every kept component of three predictors in at most 10 heat maps (`max_panels = 10`), coarsening it if needed, and prunes again.
 
 The result is the pruned model.
