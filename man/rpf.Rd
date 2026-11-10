@@ -438,8 +438,9 @@ waiting families fit in \code{getOption("randomPlantedForest.adaptive_pause_gb",
 it is freed, and grown again from its seed if needed. The option trades
 memory for time; the fit depends neither on it nor on \code{nthreads}. Growing
 all families together would hold every family's growing state until the
-stop: about 18 GB on California housing (16,512 rows) at 200 families and
-\code{max_interaction = 3}, where the fit one family at a time peaks at 3.5 GB.
+stop: about 18 GB of resident memory (RSS) on California housing (16,512
+rows) at 200 families and \code{max_interaction = 3}, where the fit one family at
+a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint).
 }
 }
 \examples{
