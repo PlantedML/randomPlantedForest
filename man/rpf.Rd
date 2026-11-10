@@ -385,7 +385,7 @@ and Hastie, 2009): with one score per class, summing to 0, a row's weight is
 \code{exp(-g)}, \code{g} the score of its class, and the probabilities are the softmax
 of the scores. With \code{splits} chosen out of bag and the forest pruned (the
 defaults), \code{"exponential"} was as accurate as \code{"logit"} in simulations and
-about 2.5 times as fast. Nothing bounds its scores once a tree family's
+about twice as fast. Nothing bounds its scores once a tree family's
 bootstrap sample is separated, though, so with a large fixed \code{splits} its
 log-loss can grow with the splits, where \code{"logit"}'s does not. \code{"L1"} and
 \code{"L2"} fit class indicators directly and their probabilities are truncated

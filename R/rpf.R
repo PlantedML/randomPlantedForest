@@ -235,7 +235,7 @@
 #' `exp(-g)`, `g` the score of its class, and the probabilities are the softmax
 #' of the scores. With `splits` chosen out of bag and the forest pruned (the
 #' defaults), `"exponential"` was as accurate as `"logit"` in simulations and
-#' about 2.5 times as fast. Nothing bounds its scores once a tree family's
+#' about twice as fast. Nothing bounds its scores once a tree family's
 #' bootstrap sample is separated, though, so with a large fixed `splits` its
 #' log-loss can grow with the splits, where `"logit"`'s does not. `"L1"` and
 #' `"L2"` fit class indicators directly and their probabilities are truncated
