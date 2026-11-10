@@ -88,17 +88,11 @@
   splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead
   of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000
   rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.
-
-### Performance
-
 - Fitting regression forests with `split_structure = "leaves"` (the
   default) is about 1.4 times as fast on larger data, for example 310 s
   → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing
   (16,512 rows, `max_interaction = 3`, 10,000 splits). Fitted models are
   bitwise unchanged.
-
-### Performance
-
 - [`predict()`](https://rdrr.io/r/stats/predict.html) is about 3x faster
   for forests that are not purified, with bitwise the same predictions.
   From 512 rows on, each tree of more than 64 leaves gets an index of

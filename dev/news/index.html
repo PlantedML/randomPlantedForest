@@ -71,14 +71,8 @@
 <div class="section level3">
 <h3 id="performance-development-version">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version"></a></h3>
 <ul><li>Classification with <code>loss = "logit"</code> fits 3x to 11x faster, with bitwise the same fits. For every candidate split, the logit loss copied the weights of all observations twice, although it reads only those of the leaf being split, so a candidate cost time in proportion to the sample size instead of the leaf size. With 300 rows and 150 splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000 rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="performance-development-version-1">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version-1"></a></h3>
-<ul><li>Fitting regression forests with <code>split_structure = "leaves"</code> (the default) is about 1.4 times as fast on larger data, for example 310 s → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing (16,512 rows, <code>max_interaction = 3</code>, 10,000 splits). Fitted models are bitwise unchanged.</li>
-</ul></div>
-<div class="section level3">
-<h3 id="performance-development-version-2">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version-2"></a></h3>
-<ul><li>
+<li>Fitting regression forests with <code>split_structure = "leaves"</code> (the default) is about 1.4 times as fast on larger data, for example 310 s → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing (16,512 rows, <code>max_interaction = 3</code>, 10,000 splits). Fitted models are bitwise unchanged.</li>
+<li>
 <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> is about 3x faster for forests that are not purified, with bitwise the same predictions. From 512 rows on, each tree of more than 64 leaves gets an index of its leaves (a k-d tree, built per call), so a row is tested only against the leaves that may hold it instead of against every leaf. On California housing (100 tree families, <code>max_interaction = 3</code>, 4,128 rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s instead of 1.26 s at 8 threads; with <code>delete_leaves = FALSE</code>, 2.9 s instead of 10.7 s and 0.71 s instead of 2.07 s.</li>
 </ul></div>
 </div>
