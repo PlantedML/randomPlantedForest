@@ -74,8 +74,10 @@ use.</p>
 
 <dt id="arg-maxp-interaction">maxp_interaction<a class="anchor" aria-label="anchor" href="#arg-maxp-interaction"></a></dt>
 <dd><p><code>[integer(1) | NULL: NULL]</code>: Highest interaction order to purify.
-Higher-order components are set to zero, but still influence lower orders
-during purification, and <code><a href="predict_components.html">predict_components()</a></code> then returns zero for them.
+Higher-order components are not computed, but still influence lower orders
+during purification, which are the same as when purifying all orders.
+<code><a href="predict_components.html">predict_components()</a></code> then returns zero for the higher orders and their sum as <code>remainder</code>.
+<a href="predict.rpf.html">predict()</a> still returns the whole forest's prediction.
 <code>NULL</code> purifies all orders.</p></dd>
 
 

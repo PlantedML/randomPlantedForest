@@ -32,10 +32,14 @@ is_purified(x)
 - maxp_interaction:
 
   `[integer(1) | NULL: NULL]`: Highest interaction order to purify.
-  Higher-order components are set to zero, but still influence lower
-  orders during purification, and
+  Higher-order components are not computed, but still influence lower
+  orders during purification, which are the same as when purifying all
+  orders.
   [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
-  then returns zero for them. `NULL` purifies all orders.
+  then returns zero for the higher orders and their sum as `remainder`.
+  [predict()](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+  still returns the whole forest's prediction. `NULL` purifies all
+  orders.
 
 - mode:
 

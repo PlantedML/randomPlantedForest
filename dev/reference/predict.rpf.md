@@ -38,10 +38,11 @@ predict(
   `[0, 1]`. For `type = "prob"`, these are truncated to ensure this
   property.
 
-  If `loss` is `"logit"` or `"exponential"`, `type = "link"` is an alias
-  for `type = "numeric"`, as in this case the raw predictions have the
-  additional interpretation similar to the linear predictor in a
-  [`glm`](https://rdrr.io/r/stats/glm.html).
+  For classification, `type = "link"` is an alias for
+  `type = "numeric"`. If `loss` is `"logit"` or `"exponential"`, the raw
+  predictions have the additional interpretation similar to the linear
+  predictor in a [`glm`](https://rdrr.io/r/stats/glm.html). If `loss` is
+  `"L1"` or `"L2"`, the link is the identity.
 
 - nthreads:
 

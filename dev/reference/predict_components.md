@@ -62,6 +62,17 @@ A `list` with elements:
   Vector of target levels which can be used to disassemble `m`, as names
   include both term and target level.
 
+- `remainder` (`numeric`): Only if `m` leaves out components of the
+  forest: if `max_interaction` (lowered to the number of `predictors`)
+  is below that of the
+  [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  object, or if the forest was purified with a `maxp_interaction` below
+  it (see
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)).
+  The prediction minus `intercept` and `m`'s row sums, so that the three
+  sum to the prediction. For multiclass classification, one column per
+  target level.
+
 ## Details
 
 Extracts all possible components up to `max_interaction` degrees, up to

@@ -48,13 +48,36 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
-<ul><li>Splits can separate the largest value of a predictor within a leaf. Previously every split structure except <code>"leaves"</code> for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all. Fitted models change for classification and for regression with <code>split_structure</code> other than <code>"leaves"</code>.</li>
+<ul><li>
+<code>split_structure = "cur_trees_1"</code> samples leaves in proportion to their available thresholds, as documented. After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly. Leaves with tied values were then drawn too often, and draws were wasted on leaves that cannot be split. With <code>deterministic = TRUE</code>, <code>"cur_trees_1"</code> evaluated only the first split candidate in every round; it now evaluates the first <code>max_candidates</code>, as the other split structures do. Fitted models change for regression with <code>split_structure = "cur_trees_1"</code>, random and deterministic.</li>
+<li>
+<code>split_structure = "res_trees"</code> with <code>deterministic = TRUE</code> evaluates thresholds evenly spread over all (predictor, leaf, threshold) triples of a candidate. Previously it tried only the lowest thresholds of each leaf and left most of the variance unexplained. Fitted models change for regression with <code>split_structure = "res_trees"</code> and <code>deterministic = TRUE</code> only.</li>
+<li>
+<code>split_structure = "cur_trees_2"</code> with <code>deterministic = TRUE</code> evaluates <code>split_try</code> thresholds evenly spread over each leaf, as <code>"cur_trees_1"</code> does. Previously it tried the 1st to 9th smallest values of each leaf. Fitted models change for regression with <code>split_structure = "cur_trees_2"</code> and <code>deterministic = TRUE</code> only.</li>
+<li>Splits can separate the largest value of a predictor within a leaf. Previously every split structure except <code>"leaves"</code> for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all. Fitted models change for classification and for regression with <code>split_structure</code> other than <code>"leaves"</code>.</li>
 <li>Errors while fitting or purifying with <code>nthreads &gt; 1</code> are reported as R errors. Previously an error in a worker thread terminated the R session.</li>
+<li>
+<code>predict(type = "link")</code> works for classification forests with <code>loss = "L1"</code> or <code>"L2"</code>. It returns the raw predictions, as <code>type = "numeric"</code> does (the link is the identity). Previously it stopped with an error about the size of <code>pred</code>.</li>
 <li>The C++ code compiles without warnings under <code>-Wall -pedantic</code>.</li>
 <li>
 <code><a href="../reference/predict_components.html">predict_components()</a></code> returns one intercept per target level for multiclass classification, named by <code>target_levels</code> (<a href="https://github.com/PlantedML/randomPlantedForest/issues/70" class="external-link">#70</a>). Previously only the first level’s intercept was returned, so components plus intercept did not sum to the prediction for other levels.</li>
 <li>
+<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> after <code>purify(maxp_interaction = k)</code> with <code>k</code> below the fit’s <code>max_interaction</code> returns the forest’s prediction. Previously it returned the intercept plus the components up to order <code>k</code>, leaving out the higher orders. <code><a href="../reference/predict_components.html">predict_components()</a></code> now returns their sum as <code>remainder</code>, so that its result sums to the prediction, and <code><a href="../reference/rpf_marshal.html">rpf_marshal()</a></code> keeps the purification’s cap.</li>
+<li>
 <code><a href="../reference/purify.html">purify()</a></code> with <code>mode = 2</code> no longer drops training rows that lie on a leaf’s lower bound. Purified components and the intercept now equal those of <code>mode = 1</code>.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance-development-version">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version"></a></h3>
+<ul><li>Classification with <code>loss = "logit"</code> fits 3x to 11x faster, with bitwise the same fits. For every candidate split, the logit loss copied the weights of all observations twice, although it reads only those of the leaf being split, so a candidate cost time in proportion to the sample size instead of the leaf size. With 300 rows and 150 splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000 rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance-development-version-1">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version-1"></a></h3>
+<ul><li>Fitting regression forests with <code>split_structure = "leaves"</code> (the default) is about 1.4 times as fast on larger data, for example 310 s → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing (16,512 rows, <code>max_interaction = 3</code>, 10,000 splits). Fitted models are bitwise unchanged.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance-development-version-2">Performance<a class="anchor" aria-label="anchor" href="#performance-development-version-2"></a></h3>
+<ul><li>
+<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> is about 3x faster for forests that are not purified, with bitwise the same predictions. From 512 rows on, each tree of more than 64 leaves gets an index of its leaves (a k-d tree, built per call), so a row is tested only against the leaves that may hold it instead of against every leaf. On California housing (100 tree families, <code>max_interaction = 3</code>, 4,128 rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s instead of 1.26 s at 8 threads; with <code>delete_leaves = FALSE</code>, 2.9 s instead of 10.7 s and 0.71 s instead of 2.07 s.</li>
 </ul></div>
 </div>
     <div class="section level2">

@@ -17,6 +17,27 @@
 
 ### Bug fixes
 
+- `split_structure = "cur_trees_1"` samples leaves in proportion to
+  their available thresholds, as documented. After a split, the sampling
+  weights of new leaves counted rows instead of distinct values, and the
+  cached prefix sums were built incorrectly. Leaves with tied values
+  were then drawn too often, and draws were wasted on leaves that cannot
+  be split. With `deterministic = TRUE`, `"cur_trees_1"` evaluated only
+  the first split candidate in every round; it now evaluates the first
+  `max_candidates`, as the other split structures do. Fitted models
+  change for regression with `split_structure = "cur_trees_1"`, random
+  and deterministic.
+- `split_structure = "res_trees"` with `deterministic = TRUE` evaluates
+  thresholds evenly spread over all (predictor, leaf, threshold) triples
+  of a candidate. Previously it tried only the lowest thresholds of each
+  leaf and left most of the variance unexplained. Fitted models change
+  for regression with `split_structure = "res_trees"` and
+  `deterministic = TRUE` only.
+- `split_structure = "cur_trees_2"` with `deterministic = TRUE`
+  evaluates `split_try` thresholds evenly spread over each leaf, as
+  `"cur_trees_1"` does. Previously it tried the 1st to 9th smallest
+  values of each leaf. Fitted models change for regression with
+  `split_structure = "cur_trees_2"` and `deterministic = TRUE` only.
 - Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaves"` for regression
   excluded that split, so binary predictors were never split on, and
@@ -26,6 +47,10 @@
 - Errors while fitting or purifying with `nthreads > 1` are reported as
   R errors. Previously an error in a worker thread terminated the R
   session.
+- `predict(type = "link")` works for classification forests with
+  `loss = "L1"` or `"L2"`. It returns the raw predictions, as
+  `type = "numeric"` does (the link is the identity). Previously it
+  stopped with an error about the size of `pred`.
 - The C++ code compiles without warnings under `-Wall -pedantic`.
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
   returns one intercept per target level for multiclass classification,
@@ -34,10 +59,51 @@
   Previously only the first level’s intercept was returned, so
   components plus intercept did not sum to the prediction for other
   levels.
+- [`predict()`](https://rdrr.io/r/stats/predict.html) after
+  `purify(maxp_interaction = k)` with `k` below the fit’s
+  `max_interaction` returns the forest’s prediction. Previously it
+  returned the intercept plus the components up to order `k`, leaving
+  out the higher orders.
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  now returns their sum as `remainder`, so that its result sums to the
+  prediction, and
+  [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+  keeps the purification’s cap.
 - [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
   with `mode = 2` no longer drops training rows that lie on a leaf’s
   lower bound. Purified components and the intercept now equal those of
   `mode = 1`.
+
+### Performance
+
+- Classification with `loss = "logit"` fits 3x to 11x faster, with
+  bitwise the same fits. For every candidate split, the logit loss
+  copied the weights of all observations twice, although it reads only
+  those of the leaf being split, so a candidate cost time in proportion
+  to the sample size instead of the leaf size. With 300 rows and 150
+  splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead
+  of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000
+  rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.
+
+### Performance
+
+- Fitting regression forests with `split_structure = "leaves"` (the
+  default) is about 1.4 times as fast on larger data, for example 310 s
+  → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing
+  (16,512 rows, `max_interaction = 3`, 10,000 splits). Fitted models are
+  bitwise unchanged.
+
+### Performance
+
+- [`predict()`](https://rdrr.io/r/stats/predict.html) is about 3x faster
+  for forests that are not purified, with bitwise the same predictions.
+  From 512 rows on, each tree of more than 64 leaves gets an index of
+  its leaves (a k-d tree, built per call), so a row is tested only
+  against the leaves that may hold it instead of against every leaf. On
+  California housing (100 tree families, `max_interaction = 3`, 4,128
+  rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s
+  instead of 1.26 s at 8 threads; with `delete_leaves = FALSE`, 2.9 s
+  instead of 10.7 s and 0.71 s instead of 2.07 s.
 
 ## randomPlantedForest 0.5.0
 

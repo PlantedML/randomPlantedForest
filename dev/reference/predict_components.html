@@ -90,6 +90,11 @@ For multiclass classification, one value per target level, named by <code>target
 by <code>predictors</code>.</p></li>
 <li><p><code>target_levels</code> (<code>character</code>): For multiclass classification only: Vector of target levels
 which can be used to disassemble <code>m</code>, as names include both term and target level.</p></li>
+<li><p><code>remainder</code> (<code>numeric</code>): Only if <code>m</code> leaves out components of the forest: if <code>max_interaction</code>
+(lowered to the number of <code>predictors</code>) is below that of the <code><a href="rpf.html">rpf</a></code> object, or if the forest was purified
+with a <code>maxp_interaction</code> below it (see <code><a href="purify.html">purify()</a></code>). The prediction minus <code>intercept</code> and <code>m</code>'s row sums,
+so that the three sum to the prediction.
+For multiclass classification, one column per target level.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

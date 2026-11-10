@@ -75,9 +75,10 @@ Defaults to <code>"numeric"</code> for regression and <code>"prob"</code> for cl
 <p>For classification and <code>loss = "L1"</code> or <code>"L2"</code>, <code>"numeric"</code> yields raw
 predictions which are not guaranteed to be valid probabilities in <code>[0, 1]</code>.
 For <code>type = "prob"</code>, these are truncated to ensure this property.</p>
-<p>If <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>, <code>type = "link"</code> is an alias
-for <code>type = "numeric"</code>, as in this case the raw predictions have the
-additional interpretation similar to the linear predictor in a <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></code>.</p></dd>
+<p>For classification, <code>type = "link"</code> is an alias for <code>type = "numeric"</code>.
+If <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>, the raw predictions have the
+additional interpretation similar to the linear predictor in a <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></code>.
+If <code>loss</code> is <code>"L1"</code> or <code>"L2"</code>, the link is the identity.</p></dd>
 
 
 <dt id="arg-nthreads">nthreads<a class="anchor" aria-label="anchor" href="#arg-nthreads"></a></dt>
