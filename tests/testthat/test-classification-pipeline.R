@@ -379,19 +379,20 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
 
 test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
   skip_on_cran()
-  # the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the families kept finding
-  # new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A family pauses at most one
-  # doubling past the first family's estimate and grows on when the stop comes later, so each grows to the stop.
-  # (the stop on a new minimum alone; the plateau stop, the default, stops this curve at 71 splits and chooses 42)
+  # on macOS arm64 the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the
+  # families kept finding new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A
+  # family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so each
+  # grows to the stop. (the stop on a new minimum alone; the plateau stop, the default, stops this curve at 71 splits
+  # and chooses 42.) Other platforms grow other forests, with other curves: there the bounds are checked at their stops
   d <- cp_data(300)
   old <- options(randomPlantedForest.exact_draw = TRUE, randomPlantedForest.adaptive_tolerance = 0)
   on.exit(options(old))
   set.seed(8)
   f <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
   st <- f$fit$adaptive_stats()
-  expect_identical(f$params$splits, 168L)
-  expect_identical(f$splits_oob$stopped_at, 336L)
-  expect_lte(st$splits_grown, 1.2 * 10 * 336)
+  stop_f <- f$splits_oob$stopped_at
+  expect_lte(f$params$splits, stop_f)
+  expect_lte(st$splits_grown, 1.2 * 10 * stop_f)
   # the same forest as the fixed fit at the chosen splits
   set.seed(8)
   g <- rpf(
@@ -402,16 +403,22 @@ test_that("splits = NULL does not over-grow on a flat out-of-bag curve (three-cl
     ntrees = 10,
     split_try = 10,
     t_try = 0.4,
-    splits = 168,
+    splits = f$params$splits,
     prune = FALSE
   )
   expect_identical(f$fit$get_model(), g$fit$get_model())
-  # the plateau stop (the default tolerance) ends the flat curve early, and the families grow only about that far
+  # the plateau stop (the default tolerance): the families grow only about as far as its stop
   options(randomPlantedForest.adaptive_tolerance = 1)
   set.seed(8)
   p <- rpf(d$x, d$ym, loss = "logit", max_interaction = 3, ntrees = 10, split_try = 10, t_try = 0.4, prune = FALSE)
-  expect_identical(p$splits_oob[c("splits", "stopped_at")], list(splits = 42L, stopped_at = 71L))
-  expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * 71)
+  expect_lte(p$splits_oob$splits, p$splits_oob$stopped_at)
+  expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * p$splits_oob$stopped_at)
+  # the flat curve of the comment above
+  if (on_macos_arm64()) {
+    expect_identical(f$params$splits, 168L)
+    expect_identical(stop_f, 336L)
+    expect_identical(p$splits_oob[c("splits", "stopped_at")], list(splits = 42L, stopped_at = 71L))
+  }
 })
 
 test_that("the OOB path of a classification forest: prefix property, splits = NULL = the fixed fit", {

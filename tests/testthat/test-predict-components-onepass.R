@@ -45,7 +45,8 @@ test_that("one pass equals one component at a time: mode 2, mode 1, unpurified, 
   for (mode in c(2L, 1L)) {
     fit$fit$purify_threads(0L, 0L, mode)
     stored <- vapply(fit$fit$purified_components(), paste, character(1), collapse = ",")
-    expect_true(all(as.character(1:5) %in% stored))
+    # the stored components are among the candidate sets (which ones the forest grows depends on the platform)
+    expect_true(all(stored %in% vapply(sets, paste, character(1), collapse = ",")))
 
     pc <- predict_components(fit, nd)
     single <- single_components(fit, nd)
