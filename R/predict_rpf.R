@@ -103,8 +103,12 @@ predict_rpf_raw <- function(object, new_data, nthreads = 0L) {
 
 # Predict function for numeric outcome / regression
 predict_rpf_numeric <- function(object, new_data, nthreads = 0L) {
-  pred <- predict_rpf_raw(object, new_data, nthreads)
+  predict_rpf_numeric_raw(object, predict_rpf_raw(object, new_data, nthreads))
+}
 
+# The output of type "numeric" from the raw predictions `pred` (n x value_size) of the forest `object` or of a model
+# built on it (its pruned models)
+predict_rpf_numeric_raw <- function(object, pred) {
   if (ncol(pred) == 1) {
     # Regression or binary case: just return predictions as-is, single column
     # Convert n x 1 matrix to numeric vector
@@ -125,9 +129,13 @@ predict_rpf_numeric <- function(object, new_data, nthreads = 0L) {
 
 # Predict function for classification: Probability prediction
 predict_rpf_prob <- function(object, new_data, nthreads = 0L) {
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  predict_rpf_prob_raw(object, predict_rpf_raw(object, new_data, nthreads))
+}
 
-  pred_raw <- predict_rpf_raw(object, new_data, nthreads)
+# The probabilities of the raw predictions `pred_raw` (n x value_size) of the forest `object` or of a model built on it
+# (its pruned models): the link of the forest's loss
+predict_rpf_prob_raw <- function(object, pred_raw) {
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   if (length(outcome_levels) == 2) {
     # Binary outcome
@@ -173,10 +181,17 @@ predict_rpf_prob <- function(object, new_data, nthreads = 0L) {
 
 # Class prediction: Take probability prediction and convert to class labels
 predict_rpf_class <- function(object, new_data, nthreads = 0L) {
-  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  predict_rpf_class_of_prob(object, predict_rpf_prob(object, new_data, nthreads))
+}
 
-  # Predict probability
-  pred_prob <- predict_rpf_prob(object, new_data, nthreads)
+# The classes of the raw predictions `pred_raw` (the most probable), for the pruned models
+predict_rpf_class_raw <- function(object, pred_raw) {
+  predict_rpf_class_of_prob(object, predict_rpf_prob_raw(object, pred_raw))
+}
+
+# The classes of the probabilities `pred_prob` (as predict_rpf_prob() returns them)
+predict_rpf_class_of_prob <- function(object, pred_prob) {
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   # For each instance, class with higher probability; ties go to the first
   # level so predictions are deterministic and leave the RNG untouched
@@ -187,4 +202,17 @@ predict_rpf_class <- function(object, new_data, nthreads = 0L) {
   out <- hardhat::spruce_class(pred_class)
 
   out
+}
+
+# The output of type `type` from the scores `raw` (n x value_size) of a classification model built on the forest
+# `object` (an rpf): its pruned models. "link" is "numeric" for every loss: the scores.
+predict_rpf_scores <- function(object, raw, type) {
+  raw <- as.matrix(raw)
+  switch(
+    type,
+    numeric = ,
+    link = predict_rpf_numeric_raw(object, raw),
+    class = predict_rpf_class_raw(object, raw),
+    prob = predict_rpf_prob_raw(object, raw)
+  )
 }

@@ -3,15 +3,17 @@
 # The families grow to checkpoints (four per doubling of the splits, up to a cap). At each checkpoint the C++ fit
 # (fit_alone() in oob_path.cpp) passes the OOB path there to the stopper made here: the families' predictions at their
 # OOB rows, summed over the families of even and of odd index, as rpf(oob_path = ) sums them. The stopper computes the
-# forest's corrected OOB error and decides whether growing goes on; the C++ fit then returns the forest at the
-# checkpoint it chose.
+# forest's corrected OOB error (for classification its criterion: criterion.R) and decides whether growing goes on;
+# the C++ fit then returns the forest at the checkpoint it chose.
 
-# The engine of rpf(splits = NULL) (regression, not deterministic): grows to `checkpoints` (the last one is the cap)
-# and stops once the lowest corrected OOB error is `patience` doublings of the splits back (round(4 * patience)
-# checkpoints: four per doubling by default) and at least `floor` splits are grown, or at the cap. The forest at the
-# lowest error is rebuilt from the records of its splits, so it is the forest of rpf() with that many splits and the
-# same seed. Returns that forest (the C++ object), the chosen number of splits, the OOB path's table of the checkpoints
-# grown, where growing stopped, and whether it stopped at the cap with the error still falling (with a warning).
+# The engine of rpf(splits = NULL) (not deterministic): grows to `checkpoints` (the last one is the cap) and stops once
+# the lowest corrected OOB error is `patience` doublings of the splits back (round(4 * patience) checkpoints: four per
+# doubling by default) and at least `floor` splits are grown, or at the cap. The forest at the lowest error is rebuilt
+# from the records of its splits, so it is the forest of rpf() with that many splits and the same seed. Returns that
+# forest (the C++ object), the chosen number of splits, the OOB path's table of the checkpoints grown, where growing
+# stopped, and whether it stopped at the cap with the error still falling (with a warning). Y: the C++ outcome matrix
+# (rpf_impl()); score_y: what the error is (oob_score_y(): the numeric outcome, the default Y[, 1], or a classification
+# criterion, then the forest's own criterion: the Brier score or the log-loss).
 tune_splits_oob <- function(
   Y,
   X,
@@ -19,6 +21,8 @@ tune_splits_oob <- function(
   checkpoints = oob_path_checkpoints(25600L),
   patience = 1,
   floor = 0,
+  mode = "regression",
+  score_y = NULL,
   call = rlang::caller_env()
 ) {
   pause_gb <- getOption("randomPlantedForest.adaptive_pause_gb", 1)
@@ -28,14 +32,14 @@ tune_splits_oob <- function(
       call = call
     )
   }
-  y <- as.numeric(Y[, 1])
+  y <- score_y %||% as.numeric(Y[, 1])
   patience_cp <- max(1L, as.integer(round(4 * patience)))
   st <- oob_stopper(y, params$ntrees, checkpoints, patience = patience_cp, floor = floor)
   params$splits <- max(checkpoints)
   fit <- rpf_impl(
     Y,
     X,
-    mode = "regression",
+    mode = mode,
     params = params,
     adaptive = list(
       checkpoints = checkpoints,
@@ -61,15 +65,20 @@ tune_splits_oob <- function(
   c(list(fit = fit), res)
 }
 
-# The stopper. y: the training response; ntrees: the number of families; checkpoints: the split counts (the last one
-# is the cap); patience: stop once the lowest error is `patience` checkpoints back; floor: but not before `floor`
-# splits. step(c, path) is called at checkpoints c = 1, 2, ... with the OOB path there (list(checkpoints, sum0, sum1,
-# count) with one column, as `$fit$oob_path()` gives it) and returns 0 to grow on, or the chosen checkpoint (its
-# index) to stop: once the patience and the floor allow it, or at the last checkpoint. result() gives the chosen number
-# of splits, the OOB path's table of the checkpoints grown (as oob_path_table() makes it), where growing stopped, and
-# whether it stopped at the cap with the error still falling (its lowest value less than `patience` checkpoints back).
+# The stopper. y: the training response, or a classification criterion (oob_score_y()); ntrees: the number of
+# families; checkpoints: the split counts (the last one is the cap); patience: stop once the lowest error is `patience`
+# checkpoints back; floor: but not before `floor` splits. step(c, path) is called at checkpoints c = 1, 2, ... with the
+# OOB path there (list(checkpoints, sum0, sum1, count) with value_size columns, as `$fit$oob_path()` gives it) and
+# returns 0 to grow on, or the chosen checkpoint (its index) to stop: once the patience and the floor allow it, or at
+# the last checkpoint. The error is the corrected OOB mean squared error, or the mean corrected criterion. result()
+# gives the chosen number of splits, the OOB path's table of the checkpoints grown (as oob_path_table() makes it), where
+# growing stopped, and whether it stopped at the cap with the error still falling (its lowest value less than
+# `patience` checkpoints back).
 oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, floor = 0) {
-  y <- as.numeric(y)
+  crit <- if (inherits(y, "rpf_crit")) y
+  if (is.null(crit)) {
+    y <- as.numeric(y)
+  }
   C <- length(checkpoints)
   st <- new.env(parent = emptyenv())
   st$c <- 0L
@@ -91,7 +100,11 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, floor = 0) {
         return(1L)
       }
     }
-    st$points[c, ] <- oob_path_point(path$sum0[, 1], path$sum1[, 1], path$count, y, ntrees)
+    st$points[c, ] <- if (is.null(crit)) {
+      oob_path_point(path$sum0[, 1], path$sum1[, 1], path$count, y, ntrees)
+    } else {
+      oob_path_point_crit(path$sum0, path$sum1, path$count, crit, ntrees)
+    }
     best <- oob_select(st$points[seq_len(c), 1])
     last <- c == C
     if (last && c - best < patience) {
@@ -107,7 +120,7 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, floor = 0) {
     g <- seq_len(st$c)
     list(
       splits = as.integer(checkpoints[st$sel]),
-      path = oob_path_frame(checkpoints[g], st$points[g, , drop = FALSE], st$n_rows),
+      path = oob_path_frame(checkpoints[g], st$points[g, , drop = FALSE], st$n_rows, crit),
       stopped_at = as.integer(checkpoints[st$c]),
       capped = st$capped
     )
@@ -115,8 +128,8 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, floor = 0) {
   st
 }
 
-# The chosen checkpoint among 1..length(mse) (the corrected OOB mean squared errors grown): the lowest by
-# oob_lowest(); ties go to fewer splits
+# The chosen checkpoint among 1..length(mse) (the corrected OOB mean squared errors grown, or mean criteria): the
+# lowest by oob_lowest(); ties go to fewer splits
 oob_select <- function(mse) {
   oob_lowest(mse)[1]
 }

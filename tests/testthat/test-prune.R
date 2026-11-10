@@ -112,7 +112,10 @@ test_that("predict() is the intercept plus the scaled kept components", {
   expect_error(predict_components(pr, new, max_interaction = 3))
   expect_error(predict_components(pr, new, predictors = "x9"))
   expect_error(predict_components(pr, new, max_interactions = 1), class = "rlib_error_dots_nonempty")
-  expect_error(predict(pr, new, type = "numeric"), class = "rlib_error_dots_nonempty")
+  expect_error(predict(pr, new, foo = 1), class = "rlib_error_dots_nonempty")
+  # `type` as predict.rpf() takes it: regression has "numeric" only
+  expect_identical(predict(pr, new, type = "numeric"), pred)
+  expect_warning(expect_identical(predict(pr, new, type = "prob"), pred), "numeric")
 
   # with select_by = "cv" the refit is least squares of y on the kept components (in sample)
   pin <- prune_components(fit, d$x, d$y, rule = "R", tau = 0.01, select_by = "cv")
@@ -326,8 +329,11 @@ test_that("bad input gives clear errors", {
   expect_error(prune_components(fit, d$x, d$y, rules = "R"), class = "rlib_error_dots_nonempty")
   expect_error(prune_components(list(), d$x, d$y))
 
+  # a classification forest is pruned (here by CV: 5 families), on its factor outcome
   yc <- factor(d$y > 1)
   set.seed(1)
   cfit <- rpf(d$x, yc, ntrees = 5, splits = 10)
-  expect_error(prune_components(cfit, d$x, yc), "regression forests only")
+  expect_s3_class(suppressMessages(prune_components(cfit, d$x, yc, max_panels = Inf)), "rpf_pruned")
+  expect_error(prune_components(cfit, d$x, as.numeric(yc)), "factor outcome")
+  expect_error(prune_components(fit, d$x, yc), "numeric outcome")
 })

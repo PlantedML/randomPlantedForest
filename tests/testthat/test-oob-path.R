@@ -186,8 +186,12 @@ test_that("oob_path arguments are checked", {
   expect_error(path_fit(d, 20, oob_path = 2.5), "increasing")
   expect_error(path_fit(d, 20, oob_path = NA), "increasing")
   expect_error(rpf(d$x, d$y, ntrees = 1, splits = 20, oob_path = TRUE, deterministic = TRUE), "deterministic")
+  # classification: the path of its criterion (test-classification-pipeline.R)
   yc <- factor(d$y > stats::median(d$y))
-  expect_error(rpf(d$x, yc, splits = 20, oob_path = TRUE), "regression only")
+  expect_named(
+    rpf(d$x, yc, splits = 20, oob_path = TRUE)$oob_path,
+    c("splits", "oob_loss", "oob_loss_raw", "se_loss", "se_loss_raw")
+  )
   # the core checks the checkpoints too
   fit <- new(
     randomPlantedForest:::RandomPlantedForest,

@@ -1,7 +1,7 @@
 #' Prune the components of a Random Planted Forest
 #'
-#' Drops the small components of a regression forest's functional decomposition and, optionally, refits one
-#' coefficient per kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
+#' Drops the small components of a forest's functional decomposition and, optionally, refits one coefficient per
+#' kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
 #' without refits, or by K-fold cross-validation on the training rows. By default every kept interaction of three or
 #' more predictors is then coarsened so that it can be shown in at most `max_panels` heat maps, and the model is pruned
 #' again.
@@ -138,14 +138,32 @@
 #' order 8 (all predictors), most of it the 31 coarsened components the display keeps; there [purify()] alone needs
 #' more than 12 GB of RSS. `nthreads` speeds up the fits and the purification.
 #'
-#' Only regression forests are supported.
+#' **Classification.** A classification forest is pruned the same way, with its score columns: one for a binary
+#' outcome, one per class otherwise (`K - 1` for `loss = "logit"`, whose first level is the reference). Every component
+#' then has a column per score column, and:
+#' - A component's share sums its variance over the score columns, centred across the classes (`"logit"`: with the
+#'   reference level's score 0 joined; `"exponential"`: the part all classes share does not count), over the same sum
+#'   for the prediction. One kept list serves all classes.
+#' - `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per score column
+#'   (`"exponential"` with more than two classes: the first is 0), out of bag as for regression.
+#' - The criterion is the forest's loss's own: for `loss = "L1"` or `"L2"` the squared error of the raw scores summed
+#'   over the columns (the Brier score; least squares for `"R"`), for `"logit"` and `"exponential"` the log-loss of the
+#'   probabilities that `predict(type = "prob")` makes (maximum likelihood for `"R"`, by Newton's method from rule
+#'   `"D"`'s model). The OOB correction is its second-order form (see [rpf()], "Classification"). The tables then have
+#'   `oob_loss`, `se_loss`, `oob_loss_raw` and `se_loss_raw` (the mean criterion) instead of the RMSE columns, and
+#'   `cv_loss` and `se_loss` for CV; `select = "1se"` uses the SE of the mean criterion. A binary forest with
+#'   `"L1"` or `"L2"` has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
+#' - The display coarsens a component with one form (`C`, `q`, cuts) for all score columns, chosen by the variance
+#'   kept of the centred columns; its stored form is one per score column.
+#' - [`predict()`][predict.rpf_pruned] takes `type` as [predict.rpf()] does, and [predict_components()] has one column
+#'   per component and score column, named as for the forest.
 #'
-#' @param object `[rpf]`: A fitted regression [`rpf`] model.
+#' @param object `[rpf]`: A fitted [`rpf`] model (regression or classification).
 #' @param data `[data.frame | matrix]`: The training data of `object`, in the order of the fit: the predictors as
 #'   passed to [rpf()] as `x`, or the `data` of the formula or recipe interface. For a formula or recipe fit, `data`
 #'   may contain the outcome.
-#' @param y `[numeric | NULL: NULL]`: The outcome of the training rows. Required unless `data` contains the outcome
-#'   of a formula or recipe fit.
+#' @param y `[numeric | factor | NULL: NULL]`: The outcome of the training rows (the factor for classification).
+#'   Required unless `data` contains the outcome of a formula or recipe fit.
 #' @param ... Reserved for future expansion. Unknown arguments are an error.
 #' @param max_panels `[numeric(1): 10]`: The display: the most heat maps a kept component of three or more predictors
 #'   may need; such a component is coarsened to at most `max_panels` heat maps, and the model is pruned again (see
@@ -174,7 +192,7 @@
 #' @return An object of class `rpf_pruned`, a list with elements:
 #' - `fit`: `object`, as it was (not purified by the pruning).
 #' - `rule`, `tau`: the chosen rule and threshold.
-#' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`).
+#' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for classification one per score column.
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
 #'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
@@ -189,6 +207,7 @@
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
 #' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
 #'   given rule and `tau`, `select_by` is `"oob"` if R's coefficients were fitted out of bag, otherwise `NULL`.
+#' - `criterion` (classification only): `"brier"` or `"logloss"`, what the candidates were scored by.
 #' - With the display (finite `max_panels`) and a component coarsened, a second pruning runs, and these describe it:
 #'   its candidates are the components the first pruning kept, with the coarsened ones in place, and `oob` is its
 #'   table. `components` then lists only these components, and their `share` (which the second pruning's `tau`
@@ -275,12 +294,6 @@ prune_components <- function(
   default_select_by <- missing(select_by)
   checkmate::assert_class(object, "rpf")
   check_rpf_alive(object)
-  if (object$mode != "regression") {
-    cli::cli_abort(c(
-      "{.fn prune_components} supports regression forests only.",
-      "x" = "{.arg object} is a {object$mode} forest."
-    ))
-  }
   if (missing(data) || is.null(data)) {
     cli::cli_abort("{.arg data} is required: the training rows of {.arg object}, as passed to {.fn rpf}.")
   }
@@ -389,7 +402,7 @@ prune_run <- function(
       cv <- prune_cv(object, tr, cand, fold_id, seed, nthreads, verbose)
       table <- cv
     } else {
-      sel <- prune_oob(object, tr, fnames, cand, fold_id, nthreads, verbose, keep_sums = display)
+      sel <- prune_oob(object, tr, fnames, cand, fold_id, nthreads, verbose, keep_sums = display, call = call)
       oob <- sel$table
       dec <- sel$dec
       oob_fit <- sel$oob_fit
@@ -407,7 +420,7 @@ prune_run <- function(
     seed <- NULL
     if (identical(select_by, "oob")) {
       # a given R: the out-of-bag components for its coefficients, as the choice fits them (no scores, no folds)
-      sel <- prune_oob(object, tr, fnames, NULL, NULL, nthreads, verbose, keep_sums = display)
+      sel <- prune_oob(object, tr, fnames, NULL, NULL, nthreads, verbose, keep_sums = display, call = call)
       dec <- sel$dec
       oob_fit <- sel$oob_fit
       sums <- sel$sums
@@ -417,13 +430,15 @@ prune_run <- function(
 
   # The chosen rule and tau on the forest itself, on all training rows (the out-of-bag path has its components). R's
   # coefficients: on the out-of-bag components with select_by = "oob", as each candidate was scored; else in sample
-  dec <- dec %||% prune_columns(object, fnames, nthreads, oob = FALSE)$dec
-  rf <- prune_fit_rule(rule_sel, tau_sel, dec, tr$y, oob = oob_fit)
+  dec <- dec %||% prune_columns(object, fnames, nthreads, oob = FALSE, crit = tr$crit)$dec
+  rf <- prune_fit_rule(rule_sel, tau_sel, dec, prune_score_y(tr), oob = oob_fit)
   res <- prune_result(object, rule_sel, tau_sel, dec, rf, cv, oob, select, select_by, fold_id, seed)
   if (display) {
     rm(oob_fit)
     res <- prune_display(res, object, tr, dec, sums, cand, as.integer(max_panels), nthreads)
   }
+  # classification: what the candidates were scored by
+  res$criterion <- tr$crit$type %||% tr$score_type
   if (store) {
     # the pieces of the kept components that are not coarsened (the display stores those in its own form)
     coarse <- names(res$beta) %in% names(res$display$coarse)
@@ -465,6 +480,7 @@ prune_result <- function(object, rule, tau, dec, rf, cv, oob, select, select_by,
 }
 
 # The training rows: forged predictors (a tibble, as rpf() gets them from hardhat::mold()) and the outcome
+# (prune_rows())
 prune_training_data <- function(object, data, y, call = rlang::caller_env()) {
   if (!is.data.frame(data) && !is.matrix(data)) {
     cli::cli_abort("{.arg data} must be a data.frame or matrix, not {.obj_type_friendly {data}}.", call = call)
@@ -487,19 +503,55 @@ prune_training_data <- function(object, data, y, call = rlang::caller_env()) {
   } else {
     processed <- hardhat::forge(data, bp)
   }
-  if (!is.numeric(y) || anyNA(y)) {
+  check_no_missing(processed$predictors, "{.arg data}", call = call)
+  prune_rows(object, processed$predictors, y, call = call)
+}
+
+# The training rows `tr` of the pruning from the forged predictors and the outcome y: list(predictors, y), with y the
+# numeric outcome. For classification y is the factor outcome (with the forest's levels), and `tr` also holds
+# `outcome` (the factor, for the CV's refits), `Y` (the outcome as the C++ forest codes it, for the check that these are
+# the training rows) and the criterion (oob_score_y()): a binary L1 / L2 forest's 0/1 column is scored as a regression
+# response (y the 0/1 column, score_type "brier"), otherwise `crit` is the classification criterion.
+prune_rows <- function(object, predictors, y, call = rlang::caller_env()) {
+  n <- nrow(predictors)
+  if (identical(object$mode, "classification")) {
+    lev <- levels(object$blueprint$ptypes$outcomes[[1]])
+    if (!is.factor(y)) {
+      y <- factor(y, levels = lev)
+    }
+    if (!identical(levels(y), lev) || anyNA(y)) {
+      cli::cli_abort(
+        "{.arg y} must be the factor outcome of {.arg object} (levels {.val {lev}}) without missing values.",
+        call = call
+      )
+    }
+  } else if (!is.numeric(y) || anyNA(y)) {
     cli::cli_abort("{.arg y} must be a numeric outcome without missing values.", call = call)
   }
-  y <- as.numeric(y)
-  n <- nrow(processed$predictors)
   if (length(y) != n) {
     cli::cli_abort("{.arg y} has {length(y)} value{?s} but {.arg data} has {n} row{?s}.", call = call)
   }
   if (n < 2) {
     cli::cli_abort("{.arg data} must have at least two rows.", call = call)
   }
-  check_no_missing(processed$predictors, "{.arg data}", call = call)
-  list(predictors = processed$predictors, y = y)
+  if (!identical(object$mode, "classification")) {
+    return(list(predictors = predictors, y = as.numeric(y)))
+  }
+  loss <- object$params$loss
+  Y <- preprocess_outcome(list(outcomes = list(y)), loss, call = call)$outcomes
+  crit <- oob_criterion("classification", loss, y)
+  if (crit$V != ncol(Y)) {
+    cli::cli_abort("{.arg y} must have every level of the outcome of {.arg object}.", call = call)
+  }
+  if (crit_is_scalar_mse(crit)) {
+    return(list(predictors = predictors, y = crit$y, outcome = y, Y = Y, score_type = crit$type))
+  }
+  list(predictors = predictors, y = y, outcome = y, Y = Y, crit = crit)
+}
+
+# What the candidates are scored by: the numeric outcome, or the classification criterion of the training rows
+prune_score_y <- function(tr) {
+  tr$crit %||% tr$y
 }
 
 # `data` and `y` must be the training rows of `object`, in the order of the fit (bitwise, as the forest stores them)
@@ -515,7 +567,8 @@ prune_check_training_rows <- function(object, tr, call = rlang::caller_env()) {
     )
   }
   X <- preprocess_predictors_predict(object, tr$predictors)
-  same <- identical(dim(X), dim(train$X)) && all(X == train$X) && all(tr$y == train$Y)
+  Y <- tr$Y %||% tr$y
+  same <- identical(dim(X), dim(train$X)) && all(X == train$X) && length(Y) == length(train$Y) && all(Y == train$Y)
   if (!same) {
     cli::cli_abort(
       "{.arg data} and {.arg y} must be the training rows of {.arg object}, in the order of the fit.",
@@ -545,16 +598,19 @@ prune_restore_rng <- function(rng) {
 # earlier purification, at any order or mode, stays as it is and is not read). Returns `dec`, the decomposition as
 # prune_decompose() gives it (the components in the order of prune_order_sets(), equal to the purified store's up to
 # rounding, its intercept bitwise), and with `oob` also `o`, the out-of-bag sums as purify_oob() gives them
-# (prune_oob_score()). feature_names: the predictors' names.
-prune_columns <- function(object, feature_names, nthreads, oob = TRUE) {
+# (prune_oob_score()). feature_names: the predictors' names. crit: the classification criterion (prune_rows()), with
+# V score columns per component (component-major, as the C++ columns), or NULL.
+prune_columns <- function(object, feature_names, nthreads, oob = TRUE, crit = NULL) {
   cc <- object$fit$purify_columns(0L, nthreads, oob)
+  V <- length(cc$intercept)
   sets <- lapply(cc$sets, as.integer)
   ord <- prune_order_sets(sets)
   # a forest of order k has no component above k; as prune_stored_sets()
   ord <- ord[lengths(sets[ord]) <= object$params$max_interaction]
-  M <- cc$own[, ord, drop = FALSE]
+  M <- cc$own[, crit_blk(ord, V), drop = FALSE]
   cc$own <- NULL
-  dec <- prune_dec_matrix(M, sets[ord], cc$intercept[1], nrow(M), feature_names)
+  intercept <- if (V == 1L) cc$intercept[1] else cc$intercept
+  dec <- prune_dec_matrix(M, sets[ord], intercept, nrow(M), feature_names, crit = crit)
   rm(M)
   list(dec = dec, o = if (oob) cc[c("sets", "sum0", "sum1", "intercept0", "intercept1", "count")])
 }
@@ -609,7 +665,7 @@ prune_set_names <- function(sets, feature_names) {
 # components the purified forest stores are evaluated (the others are zero), not all 2^p - 1 sets. `fit` is purified
 # first if it is not: the CV's fold fits, which need their components at the held-out rows and are discarded
 # afterwards (the forest being pruned is decomposed by prune_columns() instead).
-prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L) {
+prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L, crit = NULL) {
   X <- preprocess_predictors_predict(fit, predictors)
   if (!is_purified(fit)) {
     fit$fit$purify_threads(0L, nthreads, 2L)
@@ -618,13 +674,20 @@ prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L) {
   rows <- c(which(own), if (!is.null(other)) which(other))
   M <- fit$fit$predict_components_matrix(X[rows, , drop = FALSE], sets, nthreads)
   dimnames(M) <- NULL
-  intercept <- as.numeric(fit$fit$predict_matrix(X[1, 1, drop = FALSE], -1, 0L))[1]
-  prune_dec_matrix(M, sets, intercept, sum(own), colnames(X), !is.null(other))
+  intercept <- as.numeric(fit$fit$predict_matrix(X[1, 1, drop = FALSE], -1, 0L))
+  if (length(intercept) == 1L) {
+    intercept <- intercept[1]
+  }
+  prune_dec_matrix(M, sets, intercept, sum(own), colnames(X), !is.null(other), crit = crit)
 }
 
 # The decomposition from the components M (rows: the own rows, then the others; columns: `sets`) and the intercept.
-# The prediction is the intercept plus all columns of M.
-prune_dec_matrix <- function(M, sets, intercept, n_own, feature_names, other = FALSE) {
+# The prediction is the intercept plus all columns of M. With a criterion of V > 1 score columns (crit), M has V
+# columns per set: prune_dec_matrix_v().
+prune_dec_matrix <- function(M, sets, intercept, n_own, feature_names, other = FALSE, crit = NULL) {
+  if (!is.null(crit) && crit$V > 1L) {
+    return(prune_dec_matrix_v(M, sets, intercept, n_own, feature_names, other, crit))
+  }
   M_own <- M[seq_len(n_own), , drop = FALSE]
   # the purified forest's prediction is its intercept plus all its components, which are all in M
   pred_own <- intercept + rowSums(M_own)
@@ -643,6 +706,39 @@ prune_dec_matrix <- function(M, sets, intercept, n_own, feature_names, other = F
     own = M[seq_len(n_own), , drop = FALSE],
     other = if (other) M[-seq_len(n_own), , drop = FALSE]
   )
+}
+
+# prune_dec_matrix() for V > 1 score columns (classification): M has V columns per set, component-major (column
+# (k - 1) * V + v). A component's size is the variance of its score columns centred across the classes, summed
+# (crit_centred_var()), and its share that over the same of the prediction. The decomposition also holds V and the
+# criterion; its matrices' columns are named <component>#<v>.
+prune_dec_matrix_v <- function(M, sets, intercept, n_own, feature_names, other, crit) {
+  V <- crit$V
+  K <- length(sets)
+  M_own <- M[seq_len(n_own), , drop = FALSE]
+  pred_own <- matrix(intercept, n_own, V, byrow = TRUE) + crit_sum_comp(M_own, seq_len(K), V)
+  v_comp <- vapply(seq_len(K), function(k) crit_centred_var(crit, M_own[, crit_blk(k, V), drop = FALSE]), numeric(1))
+  nonzero <- v_comp > 0
+  share <- v_comp[nonzero] / crit_centred_var(crit, pred_own)
+  names(share) <- prune_set_names(sets[nonzero], feature_names)
+  M <- M[, crit_blk(which(nonzero), V), drop = FALSE]
+  colnames(M) <- paste0(rep(names(share), each = V), "#", seq_len(V))
+  list(
+    sets = sets,
+    nonzero = nonzero,
+    share = share,
+    intercept = intercept,
+    V = V,
+    crit = crit,
+    own = M[seq_len(n_own), , drop = FALSE],
+    other = if (other) M[-seq_len(n_own), , drop = FALSE]
+  )
+}
+
+# The columns of the components named `comps` in a decomposition's matrices (V per component when V > 1)
+dec_cols <- function(dec, comps) {
+  i <- match(comps, names(dec$share))
+  if (is.null(dec$V)) i else crit_blk(i, dec$V)
 }
 
 # Minimum-norm least squares (as LAPACK's gelsd with the default cutoff eps * max(dim) * largest singular value)
@@ -666,9 +762,20 @@ prune_lstsq_qr <- function(X, y) {
 
 # The kept components of rule and tau, and R's (alpha, beta) by least squares on the decomposition's own rows; with
 # `oob` (chosen out of bag: prune_oob_score()'s `oob_fit`, list(F = the out-of-bag components of the rows with OOB
-# families, columns as names(dec$share), y = their outcome)) on the out-of-bag components instead
+# families, columns as names(dec$share), y = their outcome)) on the out-of-bag components instead. y_own: the outcome,
+# or a classification criterion (then crit_fit_R(): one beta per component shared by the classes, one alpha per score
+# column; D keeps the forest's intercepts).
 prune_fit_rule <- function(rule, tau, dec, y_own, oob = NULL) {
   kept <- names(dec$share)[dec$share >= tau]
+  if (inherits(y_own, "rpf_crit") && rule == "R") {
+    ki <- match(kept, names(dec$share))
+    coef <- if (is.null(oob)) {
+      crit_fit_R(y_own, dec$own, ki, seq_len(y_own$n), start_alpha = dec$intercept)
+    } else {
+      crit_fit_R(oob$y, oob$F, ki, seq_len(oob$y$n), start_alpha = dec$intercept)
+    }
+    return(list(alpha = coef$alpha, beta = stats::setNames(coef$beta, kept)))
+  }
   if (rule == "D") {
     return(list(alpha = dec$intercept, beta = stats::setNames(rep(1, length(kept)), kept)))
   }
@@ -686,6 +793,7 @@ prune_predict_dec <- function(rf, comp) {
 
 # Refit `object`'s forest on the rows `rows` with all its parameters (as rpf() would fit them, after set.seed(seed)),
 # on `nthreads` threads and without purification. The factor predictors are coded on those rows, as rpf() codes them.
+# y: the numeric outcome, or the factor outcome of a classification forest (coded as rpf() codes it).
 prune_refit <- function(object, predictors, y, rows, seed, nthreads) {
   processed <- list(
     predictors = predictors[rows, , drop = FALSE],
@@ -696,25 +804,33 @@ prune_refit <- function(object, predictors, y, rows, seed, nthreads) {
   params <- object$params
   params$nthreads <- nthreads
   params$purify <- FALSE
+  Y <- if (object$mode == "classification") {
+    preprocess_outcome(processed, params$loss)$outcomes
+  } else {
+    matrix(y[rows], ncol = 1)
+  }
   set.seed(seed)
   fit <- rpf_impl(
-    Y = matrix(y[rows], ncol = 1),
+    Y = Y,
     X = pre$predictors_matrix,
-    mode = "regression",
+    mode = object$mode,
     params = params
   )
   new_rpf(
     fit = fit,
     blueprint = object$blueprint,
-    mode = "regression",
+    mode = object$mode,
     factor_levels = pre$factor_levels,
     params = params
   )
 }
 
-# K-fold CV of every candidate (rule, tau); returns the CV table with the "min" and "1se" choices marked
+# K-fold CV of every candidate (rule, tau); returns the CV table with the "min" and "1se" choices marked. With a
+# classification criterion (tr$crit) the folds' forests are refitted on the factor outcome and the held-out rows are
+# scored by the raw criterion: the table has cv_loss (the mean criterion) and se_loss instead of cv_rmse and se_mse.
 prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   n <- length(tr$y)
+  crit <- tr$crit
   fids <- sort(unique(fold_id))
   sse <- matrix(NA_real_, nrow(cand), length(fids))
   n_kept <- matrix(NA_integer_, nrow(cand), length(fids))
@@ -722,9 +838,10 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   for (k in seq_along(fids)) {
     ho <- fold_id == fids[k]
     t0 <- proc.time()[["elapsed"]]
-    fit_k <- prune_refit(object, tr$predictors, tr$y, !ho, seed, nthreads)
-    dec <- prune_decompose(fit_k, tr$predictors, !ho, other = ho, nthreads = nthreads)
-    y_own <- tr$y[!ho]
+    # (a classification forest is refitted on its factor outcome, also where it is scored as a 0/1 response)
+    fit_k <- prune_refit(object, tr$predictors, tr$outcome %||% tr$y, !ho, seed, nthreads)
+    dec <- prune_decompose(fit_k, tr$predictors, !ho, other = ho, nthreads = nthreads, crit = crit)
+    y_own <- if (is.null(crit)) tr$y[!ho] else crit_subset(crit, which(!ho))
     y_ho <- tr$y[ho]
     n_k[k] <- sum(ho)
     cache <- list()
@@ -733,7 +850,13 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
       key <- paste(cand$rule[i], paste(kept, collapse = ","))
       if (is.null(cache[[key]])) {
         rf <- prune_fit_rule(cand$rule[i], cand$tau[i], dec, y_own)
-        cache[[key]] <- sum((prune_predict_dec(rf, dec$other) - y_ho)^2)
+        cache[[key]] <- if (is.null(crit)) {
+          sum((prune_predict_dec(rf, dec$other) - y_ho)^2)
+        } else {
+          # the held-out rows' criterion of the scores alpha + sum_S beta_S f_S (no correction: the whole forest)
+          G <- crit_predict_R(rf, dec$other, match(names(rf$beta), names(dec$share)), crit$V)
+          sum(crit_loss_raw(crit, which(ho), G))
+        }
       }
       sse[i, k] <- cache[[key]]
       n_kept[i, k] <- length(kept)
@@ -752,6 +875,20 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   mse_k <- sweep(sse, 2, n_k, "/")
   se_mse <- apply(mse_k, 1, stats::sd) / sqrt(length(fids))
   ch <- prune_choose(cv_rmse, se_mse, cand)
+  if (!is.null(crit)) {
+    out <- data.frame(
+      rule = cand$rule,
+      tau = cand$tau,
+      cv_loss = rowSums(sse) / n,
+      se_loss = se_mse,
+      n_kept = rowMeans(n_kept),
+      min = ch$min,
+      one_se = ch$one_se,
+      stringsAsFactors = FALSE
+    )
+    attr(out, "criterion") <- crit$type
+    return(out)
+  }
 
   data.frame(
     rule = cand$rule,
@@ -848,7 +985,7 @@ prune_oob <- function(
 ) {
   t0 <- proc.time()[["elapsed"]]
   # `tr` are the training rows (checked by prune_components())
-  pc <- prune_columns(object, fnames, nthreads)
+  pc <- prune_columns(object, fnames, nthreads, crit = tr$crit)
   o <- pc$o
   dec <- pc$dec
   rm(pc)
@@ -856,7 +993,7 @@ prune_oob <- function(
     o,
     dec,
     fnames,
-    tr$y,
+    prune_score_y(tr),
     cand,
     fold_id,
     object$params$ntrees,
@@ -890,7 +1027,8 @@ prune_oob <- function(
 # an OOB family are left out. The MSE is corrected for the OOB means' larger across-family variance (see below).
 # Returns the table, `dec`, `oob_fit` (list(F = the OOB components, y = the outcome) of the rows with OOB families,
 # for R's final fit by prune_fit_rule()) and `info` (rows used, mean number of OOB families per row). With
-# cand = NULL (a given rule R) nothing is scored and the table is NULL.
+# cand = NULL (a given rule R) nothing is scored and the table is NULL. y_all may be a classification criterion:
+# prune_oob_score_crit().
 prune_oob_score <- function(
   o,
   dec,
@@ -902,6 +1040,9 @@ prune_oob_score <- function(
   deterministic = FALSE,
   call = rlang::caller_env()
 ) {
+  if (inherits(y_all, "rpf_crit")) {
+    return(prune_oob_score_crit(o, dec, feature_names, y_all, cand, fold_id, n_trees, deterministic, call))
+  }
   m0 <- o$count[, 1]
   m1 <- o$count[, 2]
   use <- m0 + m1 > 0
@@ -1033,7 +1174,146 @@ prune_oob_score <- function(
   )
 }
 
-# The kept components (scaled by beta) on new data, as a matrix with one named column per component
+# prune_oob_score() for a classification criterion `crit` (criterion.R; V score columns per component,
+# component-major): the same candidates, folds, rows and choice. D is scored with the OOB intercepts and components; R
+# with crit_fit_R()'s coefficients fitted on the OOB components of the rows outside each fold, applied to the fold's
+# OOB means and half means. The per-row criterion is corrected by crit_rows() (the rows without both halves imputed).
+# The table has oob_loss (the mean corrected criterion; 0 where the correction overshoots, left out of the choice as for
+# regression), se_loss, oob_loss_raw and se_loss_raw; the choice is prune_choose() on it, as on the MSE. oob_fit's y is
+# the criterion of the rows with OOB families.
+prune_oob_score_crit <- function(o, dec, feature_names, crit, cand, fold_id, n_trees, deterministic, call) {
+  V <- crit$V
+  m0 <- o$count[, 1]
+  m1 <- o$count[, 2]
+  use <- m0 + m1 > 0
+  n_use <- sum(use)
+  if (n_use < 2) {
+    why <- if (deterministic) " (it is deterministic)" else ""
+    cli::cli_abort(
+      c(
+        "{.code select_by = \"oob\"} needs training rows outside the bootstrap samples; this forest has {n_use}{why}.",
+        "i" = "Use {.code select_by = \"cv\"}."
+      ),
+      call = call
+    )
+  }
+  m0 <- m0[use]
+  m1 <- m1[use]
+  m <- m0 + m1
+  comp <- names(dec$share)
+  idx <- match(comp, prune_set_names(o$sets, feature_names))
+  half <- function(s) {
+    out <- matrix(0, n_use, length(comp) * V)
+    ok <- which(!is.na(idx))
+    if (length(ok)) {
+      out[, crit_blk(ok, V)] <- s[use, crit_blk(idx[ok], V), drop = FALSE]
+    }
+    out
+  }
+  S0 <- half(o$sum0)
+  S1 <- half(o$sum1)
+  i0 <- o$intercept0[use, , drop = FALSE]
+  i1 <- o$intercept1[use, , drop = FALSE]
+  rm(o)
+  F_oob <- (S0 + S1) / m
+  rows <- which(use)
+  cu <- crit_subset(crit, rows)
+  if (is.null(cand)) {
+    return(list(
+      table = NULL,
+      dec = dec,
+      oob_fit = list(F = F_oob, y = cu),
+      info = list(n_use = n_use, mean_m = mean(m))
+    ))
+  }
+  I_oob <- (i0 + i1) / m
+  F0 <- S0 / pmax(m0, 1)
+  F1 <- S1 / pmax(m1, 1)
+  I0 <- i0 / pmax(m0, 1)
+  I1 <- i1 / pmax(m1, 1)
+  rm(S0, S1)
+  fid <- fold_id[use]
+  fids <- sort(unique(fid))
+  if (length(fids) < 2) {
+    cli::cli_abort(
+      "The training rows with out-of-bag families must lie in at least two folds of {.arg fold_id}.",
+      call = call
+    )
+  }
+  n_k <- vapply(fids, function(k) sum(fid == k), numeric(1))
+  sse <- matrix(NA_real_, nrow(cand), length(fids))
+  sse_corr <- sse
+  n_kept <- integer(nrow(cand))
+  cache <- list()
+  for (i in seq_len(nrow(cand))) {
+    ki <- which(dec$share >= cand$tau[i])
+    key <- paste(cand$rule[i], paste(ki, collapse = ","))
+    if (is.null(cache[[key]])) {
+      if (cand$rule[i] == "D") {
+        G <- I_oob + crit_sum_comp(F_oob, ki, V)
+        G0 <- I0 + crit_sum_comp(F0, ki, V)
+        G1 <- I1 + crit_sum_comp(F1, ki, V)
+      } else {
+        G <- G0 <- G1 <- matrix(0, n_use, V)
+        for (k in fids) {
+          te <- fid == k
+          coef <- crit_fit_R(cu, F_oob, ki, which(!te), start_alpha = dec$intercept)
+          sub <- function(Fm) Fm[te, , drop = FALSE]
+          G[te, ] <- crit_predict_R(coef, sub(F_oob), ki, V)
+          G0[te, ] <- crit_predict_R(coef, sub(F0), ki, V)
+          G1[te, ] <- crit_predict_R(coef, sub(F1), ki, V)
+        }
+      }
+      r <- crit_rows(crit, rows, G, G0, G1, m0, m1, n_trees, impute = TRUE)
+      cache[[key]] <- list(
+        sse = vapply(fids, function(k) sum(r$e[fid == k]), numeric(1)),
+        sse_corr = vapply(fids, function(k) sum(r$corr[fid == k]), numeric(1))
+      )
+    }
+    sse[i, ] <- cache[[key]]$sse
+    sse_corr[i, ] <- cache[[key]]$sse_corr
+    n_kept[i] <- length(ki)
+  }
+  se_of <- function(x) apply(sweep(x, 2, n_k, "/"), 1, stats::sd) / sqrt(length(fids))
+  loss <- pmax(rowSums(sse_corr), 0) / n_use
+  se <- se_of(sse_corr)
+  ch <- prune_choose(sqrt(loss), se, cand, left_out = loss == 0)
+  table <- data.frame(
+    rule = cand$rule,
+    tau = cand$tau,
+    oob_loss = loss,
+    se_loss = se,
+    oob_loss_raw = rowSums(sse) / n_use,
+    se_loss_raw = se_of(sse),
+    n_kept = n_kept,
+    min = ch$min,
+    one_se = ch$one_se,
+    stringsAsFactors = FALSE
+  )
+  attr(table, "n_rows") <- n_use
+  attr(table, "criterion") <- crit$type
+  list(
+    table = table,
+    dec = dec,
+    oob_fit = list(F = F_oob, y = cu),
+    info = list(n_use = n_use, mean_m = mean(m))
+  )
+}
+
+# The root of the corrected mean error of an OOB table (a pruning's, or rpf()'s OOB path): its OOB RMSE, or for a
+# classification criterion the root of the mean corrected criterion (as the tuner compares forests by it)
+oob_table_rmse <- function(tab) {
+  loss <- tab[["oob_loss", exact = TRUE]]
+  if (is.null(loss)) tab[["oob_rmse", exact = TRUE]] else sqrt(pmax(loss, 0))
+}
+
+# The number of score columns of a pruned model (1 for regression and binary classification)
+pruned_V <- function(object) {
+  length(object$intercept)
+}
+
+# The kept components (scaled by beta) on new data, as a matrix with one named column per component (and score
+# column: V per component, named as predict_components() names them, <component>__class:<level>)
 prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::caller_env()) {
   fit <- object$fit
   check_rpf_alive(fit, call = call)
@@ -1044,31 +1324,55 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
     nthreads <- as.integer(fit$params$nthreads)
   }
   # the display's coarsened components from their stored form, the others from the model's store
-  coarse <- names(object$beta) %in% names(object$display$coarse)
-  M <- matrix(0, nrow(X), length(object$beta))
+  V <- pruned_V(object)
+  kept <- names(object$beta)
+  coarse <- kept %in% names(object$display$coarse)
+  M <- matrix(0, nrow(X), length(kept) * V)
   if (!all(coarse)) {
-    M[, !coarse] <- rpf_store_eval(prune_store_built(object), X, lapply(object$sets[!coarse], as.integer), nthreads)
+    M[, crit_blk(which(!coarse), V)] <- rpf_store_eval(
+      prune_store_built(object),
+      X,
+      lapply(object$sets[!coarse], as.integer),
+      nthreads
+    )
   }
   for (k in which(coarse)) {
-    M[, k] <- rpf_coarse_eval(prune_display_built(object, names(object$beta)[k]), X)
+    b <- prune_display_built(object, kept[k])
+    M[, crit_blk(k, V)] <- if (V == 1L) rpf_coarse_eval(b, X) else vapply(b, rpf_coarse_eval, numeric(nrow(X)), X)
   }
-  M <- sweep(M, 2, object$beta, "*")
-  colnames(M) <- names(object$beta)
+  M <- sweep(M, 2, rep(object$beta, each = V), "*")
+  colnames(M) <- if (V == 1L) kept else paste0(rep(kept, each = V), "__class:", model_outcome_levels(object$fit))
   M
+}
+
+# The scores (n x V) of a pruned model from its scaled kept columns M (prune_kept_matrix())
+pruned_scores <- function(object, M) {
+  V <- pruned_V(object)
+  raw <- matrix(object$intercept, nrow(M), V, byrow = TRUE)
+  if (ncol(M) > 0) {
+    for (v in seq_len(V)) {
+      raw[, v] <- raw[, v] + rowSums(M[, seq(v, ncol(M), by = V), drop = FALSE])
+    }
+  }
+  raw
 }
 
 #' Predictions of a pruned Random Planted Forest
 #'
 #' The prediction of a pruned forest is `alpha + sum(beta_S * f_S(x))` over the kept components `f_S` of the forest,
-#' with the intercept `alpha` and the coefficients `beta_S` (see [prune_components()]).
+#' with the intercept `alpha` and the coefficients `beta_S` (see [prune_components()]). For classification these are
+#' the scores, one per score column, which `type` turns into probabilities or classes as [predict.rpf()] does.
 #'
 #' @param object `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param new_data `[data.frame | matrix]`: New observations to predict.
+#' @param type `[character(1)]`: As in [predict.rpf()]: `"numeric"` for regression (the default); for classification
+#'   `"prob"` (the default), `"class"`, or `"numeric"` / `"link"` (the scores `alpha + sum(beta_S * f_S(x))`).
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the forest was fitted
 #'   with.
 #' @param ... Not currently used, but required for extensibility. Unknown arguments are an error.
 #'
-#' @return A [`tbl`][tibble::tibble] with column `.pred` with the same number of rows as `new_data`.
+#' @return A [`tbl`][tibble::tibble] with the same number of rows as `new_data`: for regression column `.pred`; for
+#'   classification the columns of [predict.rpf()] for `type`.
 #' @seealso [prune_components()], [predict_components()].
 #' @export
 #' @examples
@@ -1078,12 +1382,29 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
 #' fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30)
 #' pruned <- prune_components(fit, x, y, rule = "R", tau = 0.01)
 #' predict(pruned, x[1:5, ])
-predict.rpf_pruned <- function(object, new_data, nthreads = NULL, ...) {
+predict.rpf_pruned <- function(
+  object,
+  new_data,
+  type = ifelse(object$fit$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
+  ...
+) {
   rlang::check_dots_empty()
   checkmate::assert_int(nthreads, lower = 1, null.ok = TRUE)
+  type <- rlang::arg_match(type, c("numeric", "class", "prob", "link"))
   # 0 tells C++ to use the forest's own nthreads
   M <- prune_kept_matrix(object, new_data, as.integer(nthreads %||% 0L))
-  out <- hardhat::spruce_numeric(object$intercept + rowSums(M))
+  out <- if (object$fit$mode == "regression") {
+    if (type != "numeric") {
+      cli::cli_warn(c(
+        "Only {.code type = \"numeric\"} is supported for regression.",
+        "i" = "Using it instead of {.val {type}}."
+      ))
+    }
+    hardhat::spruce_numeric(object$intercept + rowSums(M))
+  } else {
+    predict_rpf_scores(object$fit, pruned_scores(object, M), type)
+  }
   hardhat::validate_prediction_size(out, new_data)
   out
 }
@@ -1106,20 +1427,34 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
   }
 
   M <- prune_kept_matrix(object, new_data)
-  # the kept components that use only `predictors` and have at most `max_interaction` predictors (the sets index the
-  # fit's columns, in which hardhat::mold() puts the factors last)
+  V <- pruned_V(object)
+  # the kept components that use only `predictors` and have at most `max_interaction` predictors (and their V columns;
+  # the sets index the fit's columns, in which hardhat::mold() puts the factors last)
   fit_names <- prune_fit_names(object$fit)
   feats <- lapply(object$sets, function(s) fit_names[s])
   use <- vapply(feats, function(f) length(f) <= max_interaction && all(f %in% predictors), logical(1))
+  usec <- rep(use, each = V)
 
   ret <- list(
-    m = data.table::as.data.table(M[, use, drop = FALSE]),
+    m = data.table::as.data.table(M[, usec, drop = FALSE]),
     intercept = object$intercept,
     # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table
     x = data.table::as.data.table(new_data)[, predictors, with = FALSE]
   )
+  # multiclass: per score column, as predict_components() of the forest names them
+  if (V > 1L) {
+    lev <- model_outcome_levels(object$fit)
+    ret$intercept <- stats::setNames(object$intercept, lev)
+    ret$target_levels <- lev
+  }
   if (!all(use)) {
-    ret$remainder <- rowSums(M[, !use, drop = FALSE])
+    ret$remainder <- if (V == 1L) {
+      rowSums(M[, !usec, drop = FALSE])
+    } else {
+      R <- pruned_scores(list(intercept = rep(0, V)), M[, !usec, drop = FALSE])
+      colnames(R) <- model_outcome_levels(object$fit)
+      data.table::as.data.table(R)
+    }
   }
   class(ret) <- c("glex", "rpf_components", class(ret))
   ret
@@ -1156,10 +1491,11 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
   if (x$rule == "R" && identical(x$select_by, "oob")) {
     rule_name <- sub(")$", ", fitted out of bag)", rule_name)
   }
+  crit <- pruned_crit_name(x)
   how <- if (!is.null(x$oob)) {
     sprintf(
       "Chosen by out-of-bag error (%s; R refitted in %d folds, seed %d) among %d candidates.",
-      if (x$select == "min") "lowest OOB RMSE" else "1-SE rule",
+      if (x$select == "min") paste("lowest OOB", crit) else "1-SE rule",
       length(unique(x$fold_id)),
       x$seed,
       nrow(x$oob)
@@ -1170,7 +1506,7 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
     sprintf(
       "Chosen by %d-fold CV (%s, seed %d) among %d candidates.",
       length(unique(x$fold_id)),
-      if (x$select == "min") "lowest CV RMSE" else "1-SE rule",
+      if (x$select == "min") paste("lowest CV", crit) else "1-SE rule",
       x$seed,
       nrow(x$cv)
     )
@@ -1222,7 +1558,32 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
   if (!is.null(x$display)) {
     lines <- c(lines, "", format_display(x, n_show))
   }
-  lines <- c(lines, "", sprintf("Intercept: %s", format(x$intercept, digits = 6)))
+  if (identical(x$fit$mode, "classification")) {
+    lev <- levels(x$fit$blueprint$ptypes$outcomes[[1]])
+    lines <- c(
+      lines,
+      "",
+      sprintf(
+        "Classification (%s loss), %d classes: %s.",
+        x$fit$params$loss,
+        length(lev),
+        paste(lev, collapse = ", ")
+      )
+    )
+    if (pruned_V(x) > 1L) {
+      lines <- c(
+        lines,
+        sprintf(
+          "Intercept per class: %s",
+          paste(model_outcome_levels(x$fit), format(x$intercept, digits = 6), collapse = ", ")
+        )
+      )
+    } else {
+      lines <- c(lines, sprintf("Intercept: %s", format(x$intercept, digits = 6)))
+    }
+  } else {
+    lines <- c(lines, "", sprintf("Intercept: %s", format(x$intercept, digits = 6)))
+  }
   if (nrow(kept) > 0 && n_show > 0) {
     kept <- kept[order(-kept$share), ]
     show <- utils::head(kept, n_show)
@@ -1292,6 +1653,11 @@ format_display <- function(x, n_show) {
     }
   }
   c(lines, sprintf("Heat maps of the model: %g", sum(x$components$heat_maps[x$components$kept])))
+}
+
+# The name of what a pruned model was chosen by: the RMSE, or the classification criterion
+pruned_crit_name <- function(x) {
+  switch(x$criterion %||% "mse", mse = "RMSE", brier = "Brier score", logloss = "log-loss")
 }
 
 format_share <- function(s) {

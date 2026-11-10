@@ -6,6 +6,23 @@
 
 using namespace rpf_utils;
 
+namespace rpf_utils {
+// The distinct-value indices u of a leaf's sorted values (first positions
+// first_pos of the m rows) whose threshold leaves at least leaf_size distinct
+// values and at least min_rows rows on each side: [lo, hi_excl). first_pos is
+// increasing, so these u are contiguous. With min_rows = 1 this is
+// [leaf_size, distinct - leaf_size + 1), the range without a row limit.
+void min_rows_range(const std::vector<size_t> &first_pos, size_t m, int leaf_size, int min_rows, int &lo, int &hi_excl)
+{
+  const int n_distinct = (int)first_pos.size();
+  const size_t mr = (size_t)min_rows;
+  const int a = (int)(std::lower_bound(first_pos.begin(), first_pos.end(), mr) - first_pos.begin());
+  const int b = (m >= mr) ? (int)(std::upper_bound(first_pos.begin(), first_pos.end(), m - mr) - first_pos.begin()) : 0;
+  lo = std::max(leaf_size, a);
+  hi_excl = std::min(n_distinct - leaf_size + 1, b);
+}
+} // namespace rpf_utils
+
 namespace {
 // The leaf's cached stable order and sorted values of feature k, by reference.
 // Computed and cached as ensure_order_and_sorted_vals_for_leaf() does when
@@ -89,21 +106,6 @@ std::vector<size_t> draw_leaf_candidates(
   for (size_t j = 0; j < k; ++j)
     out.push_back(keys[j].second);
   return out;
-}
-
-// The distinct-value indices u of a leaf's sorted values (first positions
-// first_pos of the m rows) whose threshold leaves at least leaf_size distinct
-// values and at least min_rows rows on each side: [lo, hi_excl). first_pos is
-// increasing, so these u are contiguous. With min_rows = 1 this is
-// [leaf_size, distinct - leaf_size + 1), the range without a row limit.
-void min_rows_range(const std::vector<size_t> &first_pos, size_t m, int leaf_size, int min_rows, int &lo, int &hi_excl)
-{
-  const int n_distinct = (int)first_pos.size();
-  const size_t mr = (size_t)min_rows;
-  const int a = (int)(std::lower_bound(first_pos.begin(), first_pos.end(), mr) - first_pos.begin());
-  const int b = (m >= mr) ? (int)(std::upper_bound(first_pos.begin(), first_pos.end(), m - mr) - first_pos.begin()) : 0;
-  lo = std::max(leaf_size, a);
-  hi_excl = std::min(n_distinct - leaf_size + 1, b);
 }
 
 // Whether the leaf has a threshold on feature k with at least min_rows rows and
@@ -326,30 +328,18 @@ std::vector<double> leaves_draw_counts(
 }
 } // namespace rpf_utils
 
-Split RandomPlantedForest::calcOptimalSplit_leaves(
-    const std::vector<std::vector<double>> &Y,
+// This round's candidates of `leaves`, for regression and classification
+// alike (the same entries from the same pool and random numbers). With
+// min_leaf_rows, pool entries whose leaf has no threshold with min_rows rows
+// on each side are not drawn (checked once per leaf and feature), by either
+// draw.
+std::vector<size_t> RandomPlantedForest::draw_leaves_candidates(
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    size_t n_candidates,
+    LeavesScratch &sc
 )
 {
-  Split curr_split, min_split;
-  min_split.min_sum = std::numeric_limits<double>::infinity();
-  curr_split.Y = &Y;
-
-  if (possible_splits.empty())
-    return min_split;
-
-  // Scratch buffers: the tree family's (create_tree_family), else local ones
-  LeavesScratch local_scratch;
-  LeavesScratch &sc = tls_leaves_scratch_ptr ? *tls_leaves_scratch_ptr : local_scratch;
-
-  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
-  unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
-  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
-  // min_leaf_rows: pool entries whose leaf has no threshold with min_rows rows
-  // on each side are not drawn (checked once per leaf and feature), by either
-  // draw
   const int min_rows = this->min_leaf_rows_;
   const bool rows_check = min_rows > 1;
   auto feasible = [&](const SplitCandidate &c) {
@@ -371,6 +361,45 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
         possible_splits, n_candidates, this->split_decay_rate_, sc.sampler, rows_check, feasible
     );
   }
+  return sample_idxs;
+}
+
+// The fast draw's tree: the drawn entries' weights at their new ages.
+void RandomPlantedForest::leaves_sampler_after_aging(
+    std::vector<SplitCandidate> &possible_splits, const std::vector<size_t> &sample_idxs, LeavesScratch &sc
+)
+{
+  if (this->deterministic || this->exact_draw_)
+    return;
+  const bool rows_check = this->min_leaf_rows_ > 1;
+  for (size_t idx : sample_idxs)
+    sc.sampler.set(idx, leaf_weight(possible_splits[idx], this->split_decay_rate_, rows_check));
+}
+
+Split RandomPlantedForest::calcOptimalSplit_leaves(
+    const std::vector<std::vector<double>> &Y,
+    const std::vector<std::vector<double>> &X,
+    std::vector<SplitCandidate> &possible_splits,
+    TreeFamily &curr_family
+)
+{
+  Split curr_split, min_split;
+  min_split.min_sum = std::numeric_limits<double>::infinity();
+  curr_split.Y = &Y;
+
+  if (possible_splits.empty())
+    return min_split;
+
+  // Scratch buffers: the tree family's (create_tree_family), else local ones
+  LeavesScratch local_scratch;
+  LeavesScratch &sc = tls_leaves_scratch_ptr ? *tls_leaves_scratch_ptr : local_scratch;
+
+  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
+  unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
+  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
+  std::vector<size_t> sample_idxs = draw_leaves_candidates(X, possible_splits, n_candidates, sc);
 
   int best_idx = -1;
   for (size_t idx : sample_idxs) {
@@ -481,9 +510,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
-  if (!this->deterministic && !this->exact_draw_) // the fast draw's tree: the drawn entries' new ages
-    for (size_t idx : sample_idxs)
-      sc.sampler.set(idx, leaf_weight(possible_splits[idx], this->split_decay_rate_, rows_check));
+  leaves_sampler_after_aging(possible_splits, sample_idxs, sc);
   finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }

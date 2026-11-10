@@ -46,6 +46,7 @@ bool rpf_store_valid(SEXP store);
 // The panel form of purified components (coarsen.hpp): specs list(S, C, cuts) in, results as R lists out
 rpf_coarse::Spec list_to_spec(const Rcpp::List &sp);
 std::vector<rpf_coarse::Spec> list_to_specs(const Rcpp::List &specs);
+// One component's panel form; with V > 1 score columns `g` is n x V and `stored` a list of V forms
 Rcpp::List selected_to_list(const rpf_coarse::Selected &R);
 Rcpp::List form_to_list(const rpf_coarse::Form &f);
 rpf_coarse::Form list_to_form(const Rcpp::List &x);
@@ -266,6 +267,21 @@ public:
     Rcpp::RNGScope scope;
     core.set_parameters(Rcpp::as<std::vector<std::string>>(keys), Rcpp::as<std::vector<double>>(values));
   }
+  // Internal, for tests (classification only; registered for ClassificationRPF alone): the loss weights each family's
+  // growth ended with after set_parameters("keep_weights", 1), per family list(rows = the data row of each sample row,
+  // 1-based; weights = sample rows x value_size)
+  Rcpp::List kept_weights()
+  {
+    const auto &kw = core.kept_weights();
+    Rcpp::List out(kw.size());
+    for (size_t b = 0; b < kw.size(); ++b) {
+      Rcpp::IntegerVector rows(kw[b].rows.begin(), kw[b].rows.end());
+      rows = rows + 1;
+      out[(R_xlen_t)b] =
+          Rcpp::List::create(Rcpp::Named("rows") = rows, Rcpp::Named("weights") = from_matrix2d(kw[b].weights));
+    }
+    return out;
+  }
   bool is_purified() { return core.is_purified(); }
   bool is_purify_capped() { return core.is_purify_capped(); }
   void set_purify_capped(bool capped) { core.set_purify_capped(capped); }
@@ -364,7 +380,8 @@ public:
     ComponentStore st = core.store_components(S, nthreads);
     return store_to_list(st);
   }
-  // The out-of-bag path (regression): set the checkpoints before fit(), read the sums after it (see OobPath)
+  // The out-of-bag path: set the checkpoints before fit(), read the sums after it (see OobPath; value_size columns per
+  // checkpoint)
   void set_oob_path(const Rcpp::IntegerVector &checkpoints)
   {
     core.set_oob_path(Rcpp::as<std::vector<int>>(checkpoints));
@@ -375,9 +392,9 @@ public:
       Rcpp::stop("The forest has no OOB path: fit it with `oob_path`.");
     return oob_path_to_list(core.oob_path());
   }
-  // The adaptive fit (regression): the next fit() grows to `checkpoints` (the last one the forest's splits) and calls
-  // stopper(c, path) at each checkpoint c (1-based) with the OOB path there (as oob_path() gives it, one column); it
-  // returns 0 to grow on or the index of the chosen checkpoint (see AdaptiveStopper)
+  // The adaptive fit: the next fit() grows to `checkpoints` (the last one the forest's splits) and calls stopper(c,
+  // path) at each checkpoint c (1-based) with the OOB path there (as oob_path() gives it, one checkpoint: value_size
+  // columns); it returns 0 to grow on or the index of the chosen checkpoint (see AdaptiveStopper)
   void set_adaptive(
       const Rcpp::IntegerVector &checkpoints, Rcpp::Function stopper, int patience, double floor, double pause_gb
   )
@@ -393,8 +410,25 @@ public:
     );
   }
   Rcpp::List adaptive_stats() { return adaptive_stats_to_list(core.adaptive_stats()); }
-  // The panel form of purified components (regression; coarsen.hpp). sets: a list of 1-based feature sets; fvals:
-  // their values at the training rows, one column per set (as purify_columns()' `own`)
+  // For checks: the adaptive fit's per-row corrected OOB error (oob_row_error(); G, D n x value_size, a row of D with a
+  // NaN: no d; inv, coef per row)
+  Rcpp::NumericVector oob_row_errors(
+      const Rcpp::NumericMatrix &G,
+      const Rcpp::NumericMatrix &D,
+      const Rcpp::NumericVector &inv,
+      const Rcpp::NumericVector &coef
+  )
+  {
+    std::vector<double> e = core.oob_row_errors(
+        Rcpp::as<std::vector<double>>(G),
+        Rcpp::as<std::vector<double>>(D),
+        Rcpp::as<std::vector<double>>(inv),
+        Rcpp::as<std::vector<double>>(coef)
+    );
+    return Rcpp::NumericVector(e.begin(), e.end());
+  }
+  // The panel form of purified components (coarsen.hpp). sets: a list of 1-based feature sets; fvals: their values at
+  // the training rows, value_size columns per set (as purify_columns()' `own`)
   Rcpp::List coarsen_select(const Rcpp::List sets, int P, int nthreads, const Rcpp::NumericMatrix &fvals)
   {
     std::vector<std::vector<int>> S;
@@ -409,11 +443,11 @@ public:
     }
     return out;
   }
-  // specs: a list of list(S, C, cuts); returns list(sum0, sum1), n x length(specs)
+  // specs: a list of list(S, C, cuts); returns list(sum0, sum1), n x (length(specs) * value_size)
   Rcpp::List coarsen_oob(const Rcpp::List specs, int nthreads)
   {
     rpf_coarse::OobSums o = core.coarsen_oob(list_to_specs(specs), nthreads);
-    const int n = core.get_sample_size(), K = (int)specs.size();
+    const int n = core.get_sample_size(), K = (int)specs.size() * core.get_value_size();
     Rcpp::NumericMatrix sum0(n, K), sum1(n, K);
     std::copy(o.sum0.begin(), o.sum0.end(), sum0.begin());
     std::copy(o.sum1.begin(), o.sum1.end(), sum1.begin());

@@ -45,9 +45,14 @@ struct Boxes {
   }
 };
 
-// One family's (or the merged) accumulator entry of S -> Boxes; ncell[q] = K_d + 1 of the feature at position q
+// One family's (or the merged) accumulator entry of S -> Boxes; ncell[q] = K_d + 1 of the feature at position q; `col`:
+// the score column of the rectangles' weights (0 for a single one)
 inline Boxes boxes_from_groups(
-    int k, double constant, const std::map<int, rpf_rect::RectList> &groups, const std::vector<int32_t> &ncell
+    int k,
+    double constant,
+    const std::map<int, rpf_rect::RectList> &groups,
+    const std::vector<int32_t> &ncell,
+    int col = 0
 )
 {
   Boxes B;
@@ -67,7 +72,8 @@ inline Boxes boxes_from_groups(
         pos.push_back(b);
     const rpf_rect::RectList &rl = g.second;
     for (size_t r = 0; r < rl.size(); ++r) {
-      if (rl.w[r] == 0.0)
+      const double wr = rl.w[r * (size_t)rl.vs + (size_t)col];
+      if (wr == 0.0)
         continue;
       for (int q = 0; q < k; ++q) {
         l[q] = 0;
@@ -77,7 +83,7 @@ inline Boxes boxes_from_groups(
         l[pos[i]] = rl.lo(r)[i];
         h[pos[i]] = rl.hi(r)[i];
       }
-      B.push(l.data(), h.data(), rl.w[r]);
+      B.push(l.data(), h.data(), wr);
     }
   }
   return B;
@@ -419,6 +425,43 @@ inline double var_pop(const std::vector<double> &v)
   return ss / (double)v.size();
 }
 
+// The variance of the score columns cols[v] (n values each) centred across the classes, summed: centre 0 not centred,
+// 1 with the reference score 0 joined (multiclass logit), 2 across the columns (multiclass exponential); see
+// RandomPlantedForest::score_centring()
+inline double centred_var(const std::vector<std::vector<double>> &cols, int centre)
+{
+  const size_t V = cols.size();
+  if (V == 0)
+    return 0.0;
+  if (centre == 0) {
+    double s = 0.0;
+    for (const auto &c : cols)
+      s += var_pop(c);
+    return s;
+  }
+  const size_t n = cols[0].size();
+  const double K = (double)(V + (centre == 1 ? 1 : 0));
+  std::vector<double> mean(n, 0.0);
+  for (const auto &c : cols)
+    for (size_t i = 0; i < n; ++i)
+      mean[i] += c[i];
+  for (auto &m : mean)
+    m /= K;
+  double s = 0.0;
+  std::vector<double> d(n);
+  for (const auto &c : cols) {
+    for (size_t i = 0; i < n; ++i)
+      d[i] = c[i] - mean[i];
+    s += var_pop(d);
+  }
+  if (centre == 1) {
+    for (size_t i = 0; i < n; ++i)
+      d[i] = -mean[i];
+    s += var_pop(d);
+  }
+  return s;
+}
+
 // ---- The results of RandomPlantedForest::coarsen_select() / coarsen_oob() and the predictor of a stored form (std
 // types; the R binding converts them)
 
@@ -442,7 +485,7 @@ struct Candidate {
   double var_kept = 0;
 };
 
-// One component's panel form
+// One component's panel form (V score columns: one form (C, q, cuts), its rectangles' weights per column)
 struct Selected {
   std::vector<int> S; // 1-based, ascending
   int form = 0;       // 0 absent (zero), 1 as it is (its own cut points need at most P panels), 2 coarsened
@@ -452,8 +495,8 @@ struct Selected {
   std::vector<int> cpos, dpos, q;
   std::vector<std::vector<double>> cuts;
   std::vector<Candidate> cands;
-  Form stored;
-  std::vector<double> g; // the coarsened component at the training rows (divided by n_trees)
+  std::vector<Form> stored; // per score column
+  std::vector<double> g;    // the coarsened component at the training rows (divided by n_trees), column-major n x V
   int n_diff = 0, n_kd = 0;
 };
 
@@ -464,7 +507,7 @@ struct Spec {
 };
 
 // Each family's coarsened components at its out-of-bag rows, summed over the families of even (sum0) and odd (sum1)
-// index, in family order: column-major n x specs.size()
+// index, in family order: column-major n x (specs.size() * value_size), column k * value_size + v
 struct OobSums {
   std::vector<double> sum0, sum1;
 };

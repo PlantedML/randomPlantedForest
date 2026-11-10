@@ -54,9 +54,19 @@ format.rpf <- function(x, ...) {
     # splits = NULL: chosen out of bag while growing
     oob <- x$splits_oob
     if (!is.null(oob)) {
-      rmse <- format(signif(x$oob_path$oob_rmse[match(oob$splits, x$oob_path$splits)], 4))
+      at <- match(oob$splits, x$oob_path$splits)
+      # (classification: the loss's criterion, the Brier score or the log-loss)
+      crit <- attr(x$oob_path, "criterion")
+      err <- if (is.null(crit)) {
+        paste("RMSE", format(signif(x$oob_path$oob_rmse[at], 4)))
+      } else {
+        paste(
+          switch(crit, brier = "Brier score", logloss = "log-loss"),
+          format(signif(x$oob_path$oob_loss[at], 4))
+        )
+      }
       cli::cli_alert_info(
-        "{.arg splits} chosen out of bag (lowest corrected OOB RMSE {rmse}); growing stopped at
+        "{.arg splits} chosen out of bag (lowest corrected OOB {err}); growing stopped at
         {.val {oob$stopped_at}} split{?s}."
       )
       if (oob$capped) {
@@ -85,7 +95,6 @@ format.rpf <- function(x, ...) {
     if (
       isFALSE(params$exact_draw) &&
         !params$deterministic &&
-        x$mode == "regression" &&
         params$split_structure == "leaves"
     ) {
       cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")

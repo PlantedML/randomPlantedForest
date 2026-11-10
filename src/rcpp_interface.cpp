@@ -77,18 +77,25 @@ RandomPlantedForest make_rpf(const NumericVector &parameters, const List &constr
   return RandomPlantedForest(params);
 }
 
-// Classification vectors append delta and epsilon to the 13 regression values.
+// Classification vectors append delta and epsilon to the 13 regression values,
+// then min_leaf_rows and exact_draw. Older vectors (marshaled models) lack the
+// last two: 1 and the exact draw.
 ClassificationRPF
 make_cpf(const std::string &loss, const NumericVector &parameters, bool fitting, const List &constraints)
 {
   std::vector<double> pars = as<std::vector<double>>(parameters);
   std::vector<double> base(pars.begin(), pars.begin() + std::min<size_t>(pars.size(), pars.size() >= 13 ? 13 : 12));
   RPFParams params = parse_rpf_params(base);
-  double delta = pars.size() == 15 ? pars[13] : 0.1;
-  double epsilon = pars.size() == 15 ? pars[14] : 0;
-  if (pars.size() != 15) {
+  const bool sized = pars.size() >= 15 && pars.size() <= 17;
+  double delta = sized ? pars[13] : 0.1;
+  double epsilon = sized ? pars[14] : 0;
+  if (pars.size() >= 16 && sized)
+    params.min_leaf_rows = static_cast<int>(pars[15]);
+  if (pars.size() >= 17 && sized)
+    params.exact_draw = (pars[16] != 0);
+  if (!sized) {
     if (!fitting)
-      Rcpp::stop("ClassificationRPF requires 15 parameters, got %d", (int)pars.size());
+      Rcpp::stop("ClassificationRPF requires 15 to 17 parameters, got %d", (int)pars.size());
     Rcout << "Wrong number of parameters - set to default." << std::endl;
     const int mode = params.split_structure_mode;
     params = RPFParams();
@@ -676,7 +683,15 @@ List selected_to_list(const rpf_coarse::Selected &R)
   o["cuts"] = cuts_to_list(R.cuts);
   o["cells"] = cells;
   o["var_kept"] = R.var_kept;
-  o["g"] = NumericVector(R.g.begin(), R.g.end());
+  // one score column: a vector and a form; V > 1: an n x V matrix and a list of V forms
+  const int V = (int)R.stored.size();
+  if (V == 1)
+    o["g"] = NumericVector(R.g.begin(), R.g.end());
+  else {
+    NumericMatrix g((int)(R.g.size() / (size_t)V), V);
+    std::copy(R.g.begin(), R.g.end(), g.begin());
+    o["g"] = g;
+  }
   o["candidates"] = DataFrame::create(
       Named("combo") = cc,
       Named("q") = cq,
@@ -684,7 +699,14 @@ List selected_to_list(const rpf_coarse::Selected &R)
       Named("var_kept") = cvk,
       Named("stringsAsFactors") = false
   );
-  o["stored"] = form_to_list(R.stored);
+  if (V == 1)
+    o["stored"] = form_to_list(R.stored[0]);
+  else {
+    List forms(V);
+    for (int v = 0; v < V; ++v)
+      forms[v] = form_to_list(R.stored[(size_t)v]);
+    o["stored"] = forms;
+  }
   o["n_eval"] = IntegerVector::create(R.n_diff, R.n_kd);
   return o;
 }

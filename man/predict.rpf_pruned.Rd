@@ -4,12 +4,21 @@
 \alias{predict.rpf_pruned}
 \title{Predictions of a pruned Random Planted Forest}
 \usage{
-\method{predict}{rpf_pruned}(object, new_data, nthreads = NULL, ...)
+\method{predict}{rpf_pruned}(
+  object,
+  new_data,
+  type = ifelse(object$fit$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}.}
 
 \item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
+
+\item{type}{\verb{[character(1)]}: As in \code{\link[=predict.rpf]{predict.rpf()}}: \code{"numeric"} for regression (the default); for classification
+\code{"prob"} (the default), \code{"class"}, or \code{"numeric"} / \code{"link"} (the scores \code{alpha + sum(beta_S * f_S(x))}).}
 
 \item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads} the forest was fitted
 with.}
@@ -17,11 +26,13 @@ with.}
 \item{...}{Not currently used, but required for extensibility. Unknown arguments are an error.}
 }
 \value{
-A \code{\link[tibble:tibble]{tbl}} with column \code{.pred} with the same number of rows as \code{new_data}.
+A \code{\link[tibble:tibble]{tbl}} with the same number of rows as \code{new_data}: for regression column \code{.pred}; for
+classification the columns of \code{\link[=predict.rpf]{predict.rpf()}} for \code{type}.
 }
 \description{
 The prediction of a pruned forest is \code{alpha + sum(beta_S * f_S(x))} over the kept components \code{f_S} of the forest,
-with the intercept \code{alpha} and the coefficients \code{beta_S} (see \code{\link[=prune_components]{prune_components()}}).
+with the intercept \code{alpha} and the coefficients \code{beta_S} (see \code{\link[=prune_components]{prune_components()}}). For classification these are
+the scores, one per score column, which \code{type} turns into probabilities or classes as \code{\link[=predict.rpf]{predict.rpf()}} does.
 }
 \examples{
 set.seed(1)

@@ -107,7 +107,7 @@ test_that("the fast draw gives other, reproducible fits, the same on any number 
   expect_lt(mse(fast), 2 * mse(exact))
 })
 
-test_that("the option does not change other structures, deterministic or classification fits", {
+test_that("the option does not change other structures or deterministic fits", {
   same_fit <- function(...) {
     set.seed(6)
     a <- with_exact_draw(TRUE, rpf(...))
@@ -120,7 +120,8 @@ test_that("the option does not change other structures, deterministic or classif
   }
   same_fit(mpg ~ ., data = mtcars, ntrees = 1, splits = 15, deterministic = TRUE)
   cls <- data.frame(y = factor(mtcars$am), mtcars[, c("mpg", "wt", "hp")])
-  same_fit(y ~ ., data = cls, ntrees = 2, splits = 15)
+  same_fit(y ~ ., data = cls, ntrees = 2, splits = 15, split_structure = "hist")
+  same_fit(y ~ ., data = cls, ntrees = 1, splits = 15, deterministic = TRUE)
 })
 
 test_that("the option is checked", {
@@ -149,7 +150,10 @@ test_that("models stored without min_leaf_rows and exact_draw rebuild with 1 and
   expect_equal(pars[14:15], c(1, 1))
   expect_equal(rpf_param_vector(c(params, exact_draw = FALSE), "regression")[14:15], c(1, 0))
   expect_equal(rpf_param_vector(c(params, min_leaf_rows = 5L, exact_draw = FALSE), "regression")[14:15], c(5, 0))
-  expect_length(rpf_param_vector(c(params, delta = 0, epsilon = 0.1), "classification"), 15)
+  # classification: [..., split_mode, delta, epsilon, min_leaf_rows, exact_draw]
+  pars <- rpf_param_vector(c(params, delta = 0, epsilon = 0.1), "classification")
+  expect_length(pars, 17)
+  expect_equal(pars[14:17], c(0, 0.1, 1, 1))
 })
 
 test_that("print() mentions the fast draw", {

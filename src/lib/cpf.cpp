@@ -1,5 +1,6 @@
 
 #include "cpf.hpp"
+#include "path_tracker.hpp"
 #include <cmath>
 #include <numeric>
 #include <algorithm>
@@ -132,8 +133,9 @@ ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, co
 // sampling of candidates, leaves and thresholds (and therefore the same RNG draws), and the same
 // aging. Only the loss differs: every evaluated split is scored with calcLoss, which needs the
 // individuals on both sides (I_s / I_b) and the weights W. The sums sum_s / sum_b are computed in
-// the same order as in regression, so that with loss "L2" a classification fit reproduces the
-// regression fit on the same 0/1 response.
+// the same order as in regression, and L2_loss (rpf.cpp) scores them with regression's expression,
+// so that with loss "L2" a classification fit is the regression fit on the same 0/1 response, bit
+// for bit, ties in loss included.
 
 // Draw this round's split candidates from a pool with the given ages, with weights
 // exp(-split_decay_rate * age), as the regression split modes do.
@@ -393,10 +395,17 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
   if (possible_splits.empty())
     return min_split;
 
-  std::vector<double> ages(possible_splits.size());
-  for (size_t i = 0; i < possible_splits.size(); ++i)
-    ages[i] = possible_splits[i].age;
-  std::vector<size_t> sample_idxs = sampleCandidates(ages);
+  // The draw of regression's leaves (splits_leaves.cpp): deterministic, exact or
+  // fast, leaving out entries that min_leaf_rows rules out. Its scratch (the
+  // fast draw's sampler) is the tree family's (create_tree_family).
+  LeavesScratch local_scratch;
+  LeavesScratch &sc = tls_leaves_scratch_ptr ? *tls_leaves_scratch_ptr : local_scratch;
+  unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(t_try * possible_splits.size()));
+  unsigned int upper = std::min<size_t>(max_candidates_, possible_splits.size());
+  unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  std::vector<size_t> sample_idxs = draw_leaves_candidates(X, possible_splits, n_candidates, sc);
+  const int min_rows = min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
 
   int best_idx = -1;
   for (size_t idx : sample_idxs) {
@@ -411,7 +420,7 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
     const size_t m = leafPtr->individuals.size();
     if (m == 0)
       continue;
-    if (m < static_cast<size_t>(2 * leaf_size))
+    if (m < static_cast<size_t>(2 * leaf_size) || m < static_cast<size_t>(2 * min_rows))
       continue;
 
     std::vector<size_t> order;
@@ -431,6 +440,11 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
 
     int left = leaf_size;
     int right_exclusive = (int)unique.size() - leaf_size + 1;
+    if (rows_check) { // only thresholds with at least min_rows rows on each side
+      min_rows_range(first_pos, m, leaf_size, min_rows, left, right_exclusive);
+      if (left >= right_exclusive)
+        continue;
+    }
     std::vector<int> samples = deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)split_try)
                                              : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)split_try);
 
@@ -447,6 +461,8 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
       if (pos == 0 || pos >= m)
         continue;
       if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
+        continue;
+      if (pos < static_cast<size_t>(min_rows) || (m - pos) < static_cast<size_t>(min_rows))
         continue;
       curr_split.sum_s.assign(value_size, 0.0);
       curr_split.sum_b.assign(value_size, 0.0);
@@ -467,6 +483,7 @@ Split ClassificationRPF::calcOptimalSplit_leaves(
   }
 
   age_pool_by_sample(sample_idxs, best_idx, possible_splits);
+  leaves_sampler_after_aging(possible_splits, sample_idxs, sc);
   return min_split;
 }
 
@@ -1118,12 +1135,17 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   init_inbag(n);
   std::vector<std::vector<double>> samples_X;
   std::vector<std::vector<double>> samples_Y;
+  std::vector<int> kept_rows; // (keep_weights_, tests) each sample row's row in the data
 
   // deterministic
   if (deterministic) {
     samples_X = X;
     samples_Y = Y;
     this->t_try = 1;
+    if (keep_weights_) {
+      kept_rows.resize((size_t)sample_size);
+      std::iota(kept_rows.begin(), kept_rows.end(), 0);
+    }
   } else {
     samples_X = std::vector<std::vector<double>>(sample_size);
     samples_Y = std::vector<std::vector<double>>(sample_size);
@@ -1134,6 +1156,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       add_inbag(n, sample_index);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
+      if (keep_weights_)
+        kept_rows.push_back(sample_index);
     }
   }
 
@@ -1161,9 +1185,23 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       W = std::vector<double>(value_size, 0);
   }
 
+  // The leaves split search's scratch (the exact draw's keys, the fast draw's
+  // sampler), reused across this family's splits, as in rpf.cpp: on this
+  // function's stack, TLS holds only a pointer, detached by the guard.
+  LeavesScratch leaves_scratch;
+  struct LeavesScratchGuard {
+    ~LeavesScratchGuard() { tls_leaves_scratch_ptr = nullptr; }
+  } leaves_scratch_guard;
+  tls_leaves_scratch_ptr = &leaves_scratch;
+
+  // the OOB path (nullptr if off): each OOB row's family prediction, split by split, as in rpf.cpp
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family);
+
   // modify existing or add new trees through splitting
   Split curr_split;
   for (int split_count = 0; split_count < n_splits; ++split_count) {
+    if (path && !path_step(*path, split_count))
+      break;
 
     // find optimal split
     if (split_structure_mode_ == 0)
@@ -1372,6 +1410,30 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       case LossType::exponential: {
 
+        // K >= 3 classes, SAMME (cpf.hpp): the step from the class shares the criterion left in M_s / M_b, clamped
+        // to [epsilon, 1 - epsilon]; each row's one weight times exp(-a_c), c its class
+        if (value_size > 1) {
+          samme_step(curr_split.M_s, epsilon, update_s);
+          samme_step(curr_split.M_b, epsilon, update_b);
+          std::vector<double> fac_s(value_size), fac_b(value_size);
+          for (size_t k = 0; k < value_size; ++k) {
+            fac_s[k] = exp(-update_s[k]);
+            fac_b[k] = exp(-update_b[k]);
+          }
+          for (int individual : curr_split.leaf_index->individuals) {
+            const std::vector<double> &y = samples_Y[individual];
+            size_t k = 0;
+            while (k + 1 < value_size && !(y[k] > 0))
+              ++k;
+            const double f =
+                samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point ? fac_s[k] : fac_b[k];
+            for (double &w : weights[individual])
+              w *= f;
+          }
+          break;
+        }
+
+        // binary
         std::vector<double> sum_s = curr_split.M_s;
         std::vector<double> sum_b = curr_split.M_b;
 
@@ -1474,6 +1536,10 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
       }
 
+      // the OOB path follows the leaves' increments (for logit and exponential not M_s / M_b), before the leaves change
+      if (path)
+        path_split(*path, curr_split, &update_s, &update_b);
+
       // construct new leaves
       Leaf leaf_s, leaf_b;
       {
@@ -1524,7 +1590,16 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         }
         // index before push_back, which may reallocate leaves and invalidate leaf_index
         size_t idx_b = (size_t)(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
-        *curr_split.leaf_index = leaf_b;                 // replace old interval
+        *curr_split.leaf_index = leaf_b; // replace old interval
+        if (min_leaf_rows_ > 1)          // the entries of the overwritten leaf refer to leaf_b now
+          for (size_t i = 0; i < possible_splits.size(); ++i) {
+            SplitCandidate &c = possible_splits[i];
+            if (c.tree.get() == curr_split.tree_index.get() && c.leaf_idx == idx_b) {
+              c.rows_ok = -1;
+              if (!exact_draw_ && !deterministic) // the fast draw sets their weights again
+                leaves_scratch.sampler.dirty.push_back(i);
+            }
+          }
         curr_split.tree_index->leaves.push_back(leaf_s); // add new leaf
         size_t idx_s = curr_split.tree_index->leaves.size() - 1;
         if (split_structure_mode_ == 3 || split_structure_mode_ == 4) {
@@ -1571,11 +1646,16 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   }
 
   tree_families[n] = curr_family;
+
+  // (tests) the weights as the family's growth leaves them (cpf.hpp)
+  if (keep_weights_ && n < kept_weights_.size())
+    kept_weights_[n] = KeptWeights{std::move(kept_rows), std::move(weights)};
 }
 
 // fit forest to new data
 void ClassificationRPF::fit()
 {
+  kept_weights_.assign(keep_weights_ ? (size_t)n_trees : 0, KeptWeights());
   // Use the base class multithreaded trainer with RNG seeding identical to regression
   RandomPlantedForest::fit();
 }
@@ -1637,9 +1717,89 @@ void ClassificationRPF::set_parameters(const std::vector<std::string> &keys, con
       this->split_decay_rate_ = values[i];
     } else if (keys[i] == "max_candidates") {
       this->max_candidates_ = static_cast<size_t>(values[i]);
+    } else if (keys[i] == "keep_weights") { // internal, for tests (cpf.hpp)
+      this->keep_weights_ = values[i] != 0;
     } else {
       warn("Unkown parameter key  '" + keys[i] + "' .");
     }
   }
   this->fit();
+}
+
+// The per-row criterion of a classification forest (rpf.hpp; the same as R's crit_rows()). L1 / L2 (and median): the
+// squared error summed over the score columns (Y holds their 0/1 coding), H = 2I. logit and exponential: the log-loss
+// of the probabilities predict() makes: binary p = 1 / (1 + exp(-g)); multiclass logit the softmax of the K - 1 scores
+// and the reference level's score 0; multiclass exponential the softmax of the K scores. H = diag(p) - pp' over the
+// free score columns.
+double ClassificationRPF::oob_row_error(
+    size_t i, const double *g, const double *d, double inv, const double *var, double coef
+) const
+{
+  const size_t V = value_size;
+  const std::vector<double> &y = Y[i];
+  const bool logit_like =
+      loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4;
+  const bool expo = loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3;
+  if (!logit_like && !expo) {
+    double e = 0, q = 0;
+    for (size_t v = 0; v < V; ++v) {
+      const double r = y[v] - g[v];
+      e += r * r;
+      if (d)
+        q += d[v] * d[v] / inv;
+      else if (var)
+        q += var[v];
+    }
+    return e - coef * q;
+  }
+  // the probabilities of the free score columns, and the log-loss of the row's class
+  std::vector<double> p(V);
+  double e = 0;
+  if (V == 1) {
+    // exponential codes the classes as -1 / 1, logit as 0 / 1
+    const bool second = expo ? y[0] > 0 : y[0] > 0.5;
+    p[0] = 1 / (1 + std::exp(-g[0]));
+    // -log p(y): log(1 + exp(-g)) for the second class, log(1 + exp(g)) for the first, stably
+    const double z = second ? -g[0] : g[0];
+    e = z > 0 ? z + std::log1p(std::exp(-z)) : std::log1p(std::exp(z));
+  } else {
+    // logit: the reference score 0 joins the softmax; exponential: the K = V scores alone
+    double mx = logit_like ? 0.0 : -std::numeric_limits<double>::infinity();
+    for (size_t v = 0; v < V; ++v)
+      mx = std::max(mx, g[v]);
+    double den = logit_like ? std::exp(-mx) : 0.0;
+    for (size_t v = 0; v < V; ++v)
+      den += std::exp(g[v] - mx);
+    const double lse = mx + std::log(den);
+    int cls = -1; // the column of the row's class (-1: the reference level of logit)
+    for (size_t v = 0; v < V; ++v)
+      if (y[v] > (expo ? 0.0 : 0.5))
+        cls = (int)v;
+    for (size_t v = 0; v < V; ++v)
+      p[v] = std::exp(g[v] - lse);
+    e = cls < 0 ? lse : lse - g[cls];
+  }
+  double q = 0;
+  if (d) {
+    double a = 0, b = 0;
+    for (size_t v = 0; v < V; ++v) {
+      a += p[v] * d[v] * d[v];
+      b += p[v] * d[v];
+    }
+    q = 0.5 * (a - b * b) / inv;
+  } else if (var)
+    for (size_t v = 0; v < V; ++v)
+      q += 0.5 * p[v] * (1 - p[v]) * var[v];
+  return e - coef * q;
+}
+
+int ClassificationRPF::score_centring() const
+{
+  if (value_size < 2)
+    return 0;
+  if (loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4)
+    return 1;
+  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
+    return 2;
+  return 0;
 }

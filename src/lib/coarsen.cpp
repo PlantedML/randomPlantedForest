@@ -101,7 +101,9 @@ std::vector<double> eval_train(const Built &b, const V &A, const std::vector<int
 // Grid limit (doubles) of the difference-array evaluation of a candidate; beyond it the k-d index
 const double DIFF_MAX = 8e6;
 
-// fval: the forest's f_S at the training rows (T.n values); pf: the forest's cells
+// fval: the forest's f_S at the training rows (T.n values per score column, V columns); pf: the forest's cells. With
+// V > 1 the boxes, grids and stored forms are per column, and the variance kept is rpf_coarse::centred_var() over the
+// columns (centre: RandomPlantedForest::score_centring()); V = 1 is the single column's arithmetic.
 void select_one(
     Selected &R,
     const rpf_rect::PurifiedForest &pf,
@@ -110,7 +112,9 @@ void select_one(
     const rpf_rect::Accumulator &raw,
     int n_trees,
     int P,
-    const double *fval
+    const double *fval,
+    int V,
+    int centre
 )
 {
   auto t0 = std::chrono::steady_clock::now();
@@ -119,27 +123,36 @@ void select_one(
   R.forest_panels = fp;
 
   bool nonzero = false;
-  for (size_t i = 0; i < T.n && !nonzero; ++i)
+  for (size_t i = 0; i < T.n * (size_t)V && !nonzero; ++i)
     nonzero = fval[i] != 0.0;
   if (!nonzero) {
     R.form = 0;
     return;
   }
   std::vector<int32_t> ncell = ncell_of(T, S);
-  R.var_forest = rpf_coarse::var_pop(std::vector<double>(fval, fval + T.n));
+  if (V == 1)
+    R.var_forest = rpf_coarse::var_pop(std::vector<double>(fval, fval + T.n));
+  else {
+    std::vector<std::vector<double>> fc((size_t)V);
+    for (int v = 0; v < V; ++v)
+      fc[(size_t)v].assign(fval + (size_t)v * T.n, fval + (size_t)(v + 1) * T.n);
+    R.var_forest = rpf_coarse::centred_var(fc, centre);
+  }
   if (fp <= (double)P) {
     R.form = 1;
     R.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     return;
   }
   R.form = 2;
-  // the component's rectangles as the families wrote them, merged
+  // the component's rectangles as the families wrote them, merged: per score column
   auto rw = raw.comps.find(S);
   if (rw == raw.comps.end())
     throw std::logic_error("coarsen_select(): a nonzero component without rectangles.");
-  const Boxes B =
-      rpf_coarse::boxes_from_groups(k, rw->second.first.empty() ? 0.0 : rw->second.first[0], rw->second.second, ncell);
-  const size_t NR = B.size();
+  std::vector<Boxes> Bv((size_t)V);
+  for (int v = 0; v < V; ++v)
+    Bv[(size_t)v] = rpf_coarse::boxes_from_groups(
+        k, rw->second.first.empty() ? 0.0 : rw->second.first[(size_t)v], rw->second.second, ncell, v
+    );
   std::vector<std::vector<int>> qv;
   rpf_coarse::q_vectors(k - 2, P, qv);
   // the coarse sets C: (k - 2)-subsets of the positions, lexicographic (itertools.combinations)
@@ -172,7 +185,15 @@ void select_one(
   std::map<std::pair<int, int>, Axis> axis_cache; // the coarse axis of (position, q)
   double best = -1;
   std::vector<double> gbuf(T.n);
+  std::vector<std::vector<double>> gbufs(V > 1 ? (size_t)V : 0); // V > 1: every column's gbuf
   std::vector<double> W;
+  // per score column: the compressed grid of D's boundaries (0 always in it), the rectangles' and the rows' places
+  struct Grid {
+    size_t Na = 0, Nb = 0;
+    std::vector<int32_t> ia0, ia1, ib0, ib1;
+    std::vector<size_t> rowidx;
+  };
+  std::vector<Grid> grids((size_t)V);
   for (size_t ci = 0; ci < combos.size(); ++ci) {
     const std::vector<int> &cpos = combos[ci];
     std::vector<int> dpos;
@@ -181,34 +202,42 @@ void select_one(
         dpos.push_back(q);
     const int a = dpos[0], b = dpos[1];
     const int fa = S[a] - 1, fb = S[b] - 1;
-    // compressed grid of D's boundaries (0 always in it)
-    std::vector<int32_t> Ba{0}, Bb{0};
-    for (size_t r = 0; r < NR; ++r) {
-      Ba.push_back(B.lo[r * k + a]);
-      Ba.push_back(B.hi[r * k + a]);
-      Bb.push_back(B.lo[r * k + b]);
-      Bb.push_back(B.hi[r * k + b]);
-    }
-    std::sort(Ba.begin(), Ba.end());
-    Ba.erase(std::unique(Ba.begin(), Ba.end()), Ba.end());
-    std::sort(Bb.begin(), Bb.end());
-    Bb.erase(std::unique(Bb.begin(), Bb.end()), Bb.end());
-    const size_t Na = Ba.size(), Nb = Bb.size();
-    std::vector<int32_t> ia0(NR), ia1(NR), ib0(NR), ib1(NR);
-    auto ix = [](const std::vector<int32_t> &v, int32_t x) {
-      return (int32_t)(std::lower_bound(v.begin(), v.end(), x) - v.begin());
-    };
-    for (size_t r = 0; r < NR; ++r) {
-      ia0[r] = ix(Ba, B.lo[r * k + a]);
-      ia1[r] = ix(Ba, B.hi[r * k + a]);
-      ib0[r] = ix(Bb, B.lo[r * k + b]);
-      ib1[r] = ix(Bb, B.hi[r * k + b]);
-    }
-    std::vector<size_t> rowidx(T.n);
-    for (size_t i = 0; i < T.n; ++i) {
-      size_t ra = (size_t)(std::upper_bound(Ba.begin(), Ba.end(), T.cells[fa][i]) - Ba.begin()) - 1;
-      size_t rb = (size_t)(std::upper_bound(Bb.begin(), Bb.end(), T.cells[fb][i]) - Bb.begin()) - 1;
-      rowidx[i] = ra * Nb + rb;
+    for (int v = 0; v < V; ++v) {
+      const Boxes &B = Bv[(size_t)v];
+      const size_t NR = B.size();
+      Grid &gd = grids[(size_t)v];
+      std::vector<int32_t> Ba{0}, Bb{0};
+      for (size_t r = 0; r < NR; ++r) {
+        Ba.push_back(B.lo[r * k + a]);
+        Ba.push_back(B.hi[r * k + a]);
+        Bb.push_back(B.lo[r * k + b]);
+        Bb.push_back(B.hi[r * k + b]);
+      }
+      std::sort(Ba.begin(), Ba.end());
+      Ba.erase(std::unique(Ba.begin(), Ba.end()), Ba.end());
+      std::sort(Bb.begin(), Bb.end());
+      Bb.erase(std::unique(Bb.begin(), Bb.end()), Bb.end());
+      gd.Na = Ba.size();
+      gd.Nb = Bb.size();
+      gd.ia0.resize(NR);
+      gd.ia1.resize(NR);
+      gd.ib0.resize(NR);
+      gd.ib1.resize(NR);
+      auto ix = [](const std::vector<int32_t> &vv, int32_t x) {
+        return (int32_t)(std::lower_bound(vv.begin(), vv.end(), x) - vv.begin());
+      };
+      for (size_t r = 0; r < NR; ++r) {
+        gd.ia0[r] = ix(Ba, B.lo[r * k + a]);
+        gd.ia1[r] = ix(Ba, B.hi[r * k + a]);
+        gd.ib0[r] = ix(Bb, B.lo[r * k + b]);
+        gd.ib1[r] = ix(Bb, B.hi[r * k + b]);
+      }
+      gd.rowidx.resize(T.n);
+      for (size_t i = 0; i < T.n; ++i) {
+        size_t ra = (size_t)(std::upper_bound(Ba.begin(), Ba.end(), T.cells[fa][i]) - Ba.begin()) - 1;
+        size_t rb = (size_t)(std::upper_bound(Bb.begin(), Bb.end(), T.cells[fb][i]) - Bb.begin()) - 1;
+        gd.rowidx[i] = ra * gd.Nb + rb;
+      }
     }
     for (const auto &qs : qv) {
       std::vector<std::vector<double>> cuts;
@@ -225,51 +254,64 @@ void select_one(
         A.push_back(&c->second);
       }
       const int nc = rpf_coarse::n_cells_of(A);
-      W.assign(nc, 0.0);
-      if ((double)Na * (double)Nb * (double)nc <= DIFF_MAX) {
-        R.n_diff++;
-        std::vector<double> G(Na * Nb * (size_t)nc, 0.0);
-        for (size_t r = 0; r < NR; ++r) {
-          rpf_coarse::coarse_weights(B, r, A, W.data(), nc);
-          double *g00 = G.data() + ((size_t)ia0[r] * Nb + ib0[r]) * nc;
-          double *g10 = G.data() + ((size_t)ia1[r] * Nb + ib0[r]) * nc;
-          double *g01 = G.data() + ((size_t)ia0[r] * Nb + ib1[r]) * nc;
-          double *g11 = G.data() + ((size_t)ia1[r] * Nb + ib1[r]) * nc;
-          const bool ha = (size_t)ia1[r] < Na, hb = (size_t)ib1[r] < Nb;
-          for (int c = 0; c < nc; ++c) {
-            g00[c] += W[c];
-            if (ha)
-              g10[c] -= W[c];
-            if (hb)
-              g01[c] -= W[c];
-            if (ha && hb)
-              g11[c] += W[c];
+      for (int v = 0; v < V; ++v) {
+        const Boxes &B = Bv[(size_t)v];
+        const size_t NR = B.size();
+        const Grid &gd = grids[(size_t)v];
+        const size_t Na = gd.Na, Nb = gd.Nb;
+        const std::vector<int32_t> &ia0 = gd.ia0, &ia1 = gd.ia1, &ib0 = gd.ib0, &ib1 = gd.ib1;
+        const std::vector<size_t> &rowidx = gd.rowidx;
+        W.assign(nc, 0.0);
+        if ((double)Na * (double)Nb * (double)nc <= DIFF_MAX) {
+          R.n_diff++;
+          std::vector<double> G(Na * Nb * (size_t)nc, 0.0);
+          for (size_t r = 0; r < NR; ++r) {
+            rpf_coarse::coarse_weights(B, r, A, W.data(), nc);
+            double *g00 = G.data() + ((size_t)ia0[r] * Nb + ib0[r]) * nc;
+            double *g10 = G.data() + ((size_t)ia1[r] * Nb + ib0[r]) * nc;
+            double *g01 = G.data() + ((size_t)ia0[r] * Nb + ib1[r]) * nc;
+            double *g11 = G.data() + ((size_t)ia1[r] * Nb + ib1[r]) * nc;
+            const bool ha = (size_t)ia1[r] < Na, hb = (size_t)ib1[r] < Nb;
+            for (int c = 0; c < nc; ++c) {
+              g00[c] += W[c];
+              if (ha)
+                g10[c] -= W[c];
+              if (hb)
+                g01[c] -= W[c];
+              if (ha && hb)
+                g11[c] += W[c];
+            }
           }
-        }
-        const size_t rowlen = Nb * (size_t)nc;
-        for (size_t i = 1; i < Na; ++i) {
-          double *cur = G.data() + i * rowlen, *prev = cur - rowlen;
-          for (size_t j = 0; j < rowlen; ++j)
-            cur[j] += prev[j];
-        }
-        for (size_t i = 0; i < Na; ++i)
-          for (size_t j = 1; j < Nb; ++j) {
-            double *cur = G.data() + (i * Nb + j) * nc, *prev = cur - nc;
-            for (int c = 0; c < nc; ++c)
-              cur[c] += prev[c];
+          const size_t rowlen = Nb * (size_t)nc;
+          for (size_t i = 1; i < Na; ++i) {
+            double *cur = G.data() + i * rowlen, *prev = cur - rowlen;
+            for (size_t j = 0; j < rowlen; ++j)
+              cur[j] += prev[j];
           }
-        for (size_t i = 0; i < T.n; ++i)
-          gbuf[i] = G[rowidx[i] * nc + coarse_cell(A, T, i)] / n_trees;
-      } else {
-        R.n_kd++;
-        rpf_rect::RectList rl = rpf_coarse::coarse_rects(B, A, dpos);
-        Built bt;
-        bt.build(rl, {T.ncell[fa], T.ncell[fb]});
-        gbuf = eval_train(bt, A, {fa, fb}, T);
-        for (auto &v : gbuf)
-          v /= n_trees;
+          for (size_t i = 0; i < Na; ++i)
+            for (size_t j = 1; j < Nb; ++j) {
+              double *cur = G.data() + (i * Nb + j) * nc, *prev = cur - nc;
+              for (int c = 0; c < nc; ++c)
+                cur[c] += prev[c];
+            }
+          for (size_t i = 0; i < T.n; ++i)
+            gbuf[i] = G[rowidx[i] * nc + coarse_cell(A, T, i)] / n_trees;
+        } else {
+          R.n_kd++;
+          rpf_rect::RectList rl = rpf_coarse::coarse_rects(B, A, dpos);
+          Built bt;
+          bt.build(rl, {T.ncell[fa], T.ncell[fb]});
+          gbuf = eval_train(bt, A, {fa, fb}, T);
+          for (auto &x : gbuf)
+            x /= n_trees;
+        }
+        if (V > 1)
+          gbufs[(size_t)v] = gbuf;
       }
-      const double vk = R.var_forest > 0 ? rpf_coarse::var_pop(gbuf) / R.var_forest : 0.0;
+      const double vk =
+          R.var_forest > 0
+              ? (V == 1 ? rpf_coarse::var_pop(gbuf) : rpf_coarse::centred_var(gbufs, centre)) / R.var_forest
+              : 0.0;
       R.cands.push_back(Candidate{(int)ci, qs, nc, vk});
       if (best < 0 || vk > best + 1e-15) {
         best = vk;
@@ -281,29 +323,36 @@ void select_one(
       }
     }
   }
-  // the chosen candidate's stored form and its training-row values (as predict computes them)
+  // the chosen candidate's stored forms (per score column) and its training-row values (as predict computes them)
   std::vector<Axis> A = axes_of(T, S, R.cpos, R.cuts);
-  rpf_coarse::Form &F = R.stored;
-  F.rects = rpf_coarse::coarse_rects(B, A, R.dpos);
-  F.S = S;
-  F.n_trees = n_trees;
-  Built bt;
   std::vector<int> dfeat;
   std::vector<int32_t> nd;
+  rpf_coarse::Form F0;
+  F0.S = S;
+  F0.n_trees = n_trees;
   for (int q : R.dpos) {
     dfeat.push_back(S[q] - 1);
     nd.push_back(T.ncell[S[q] - 1]);
-    F.dfeat.push_back(S[q]);
-    F.dcuts.push_back(pf.cuts[S[q] - 1]);
+    F0.dfeat.push_back(S[q]);
+    F0.dcuts.push_back(pf.cuts[S[q] - 1]);
   }
   for (size_t i = 0; i < R.cpos.size(); ++i) {
-    F.cfeat.push_back(S[R.cpos[i]]);
-    F.ccuts.push_back(R.cuts[i]);
+    F0.cfeat.push_back(S[R.cpos[i]]);
+    F0.ccuts.push_back(R.cuts[i]);
   }
-  bt.build(F.rects, nd);
-  R.g = eval_train(bt, A, dfeat, T);
-  for (auto &v : R.g)
-    v /= n_trees;
+  R.stored.assign((size_t)V, F0);
+  R.g.clear();
+  R.g.reserve(T.n * (size_t)V);
+  for (int v = 0; v < V; ++v) {
+    rpf_coarse::Form &F = R.stored[(size_t)v];
+    F.rects = rpf_coarse::coarse_rects(Bv[(size_t)v], A, R.dpos);
+    Built bt;
+    bt.build(F.rects, nd);
+    std::vector<double> gv = eval_train(bt, A, dfeat, T);
+    for (auto &x : gv)
+      x /= n_trees;
+    R.g.insert(R.g.end(), gv.begin(), gv.end());
+  }
   R.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
@@ -344,10 +393,8 @@ std::vector<int> sorted_set(std::vector<int> S)
   return S;
 }
 
-void check_coarsen(size_t value_size, bool has_data)
+void check_coarsen(bool has_data)
 {
-  if (value_size != 1)
-    throw std::invalid_argument("Coarsening supports regression forests only.");
   if (!has_data)
     throw std::invalid_argument("Coarsening needs the forest's training data.");
 }
@@ -394,12 +441,16 @@ std::vector<Selected> RandomPlantedForest::coarsen_select(
     const std::vector<std::vector<int>> &sets, int P, int nthreads, const double *fvals, int n_rows, int n_cols
 )
 {
-  check_coarsen(value_size, !X.empty());
+  check_coarsen(!X.empty());
   if (P < 1)
     throw std::invalid_argument("P must be at least 1.");
   const size_t K = sets.size();
-  if (n_rows != sample_size || n_cols != (int)K || (K > 0 && fvals == nullptr))
-    throw std::invalid_argument("`fvals` must have one column per set and one row per training row.");
+  const int V = (int)value_size;
+  if (n_rows != sample_size || n_cols != (int)K * V || (K > 0 && fvals == nullptr))
+    throw std::invalid_argument(
+        "`fvals` must have one column per set (and score column) and one row per training row."
+    );
+  const int centre = score_centring();
   rpf_rect::PurifiedForest pf; // the cells only
   pf.cuts = forest_cuts();
   const Train T = make_train(X, pf, feature_size);
@@ -473,7 +524,7 @@ std::vector<Selected> RandomPlantedForest::coarsen_select(
       need.insert(res[i].S);
   const rpf_rect::Accumulator raw = merged_components(need, nthreads, pf.cuts);
   parallel_for(K, nthreads, [&](size_t i) {
-    select_one(res[i], pf, T, fps[i], raw, n_trees, P, fvals + i * (size_t)sample_size);
+    select_one(res[i], pf, T, fps[i], raw, n_trees, P, fvals + i * (size_t)V * (size_t)sample_size, V, centre);
   });
   return res;
 }
@@ -522,7 +573,7 @@ TrainSpec make_spec(const rpf_coarse::Spec &sp, const Train &T, int p)
 
 rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads)
 {
-  check_coarsen(value_size, !X.empty());
+  check_coarsen(!X.empty());
   bool ok = inbag_.size() == tree_families.size() && !tree_families.empty();
   for (const auto &inb : inbag_)
     ok = ok && inb.size() == (size_t)sample_size;
@@ -531,7 +582,7 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
   rpf_rect::PurifiedForest pf; // the cells only
   pf.cuts = forest_cuts();
   const Train T = make_train(X, pf, feature_size);
-  const size_t K = specs.size(), n = T.n;
+  const size_t K = specs.size(), n = T.n, V = value_size;
   std::vector<TrainSpec> sp;
   std::set<std::vector<int>> only;
   for (size_t k = 0; k < K; ++k) {
@@ -539,14 +590,14 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
     only.insert(sp.back().S);
   }
   rpf_coarse::OobSums out;
-  out.sum0.assign(n * K, 0.0);
-  out.sum1.assign(n * K, 0.0);
+  out.sum0.assign(n * K * V, 0.0);
+  out.sum1.assign(n * K * V, 0.0);
   if (K == 0)
     return out;
   rpf_kd::KDTree kdt;
   rpf_cnt::SubsetCounter counter(&X, feature_size);
   const unsigned nt = (unsigned)std::max(1, nthreads);
-  // per slot: the family's OOB rows and its values there, per spec
+  // per slot: the family's OOB rows and its values there, per spec and score column (k * V + v)
   std::vector<std::vector<int>> rows(nt);
   std::vector<std::vector<std::vector<double>>> vals(nt);
   run_families(
@@ -561,16 +612,22 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
         for (size_t i = 0; i < n; ++i)
           if (inbag_[f][i] == 0)
             rw.push_back((int)i);
-        vals[slot].assign(K, std::vector<double>());
-        for (size_t k = 0; k < K; ++k) {
+        vals[slot].assign(K * V, std::vector<double>());
+        for (size_t kv = 0; kv < K * V; ++kv) {
+          const size_t k = kv / V;
+          const int col = (int)(kv % V);
           const TrainSpec &s = sp[k];
-          std::vector<double> &v = vals[slot][k];
+          std::vector<double> &v = vals[slot][kv];
           v.assign(rw.size(), 0.0);
           auto it = acc.comps.find(s.S);
           if (it == acc.comps.end())
             continue;
           Boxes Bx = rpf_coarse::boxes_from_groups(
-              (int)s.S.size(), it->second.first.empty() ? 0.0 : it->second.first[0], it->second.second, s.ncell
+              (int)s.S.size(),
+              it->second.first.empty() ? 0.0 : it->second.first[(size_t)col],
+              it->second.second,
+              s.ncell,
+              col
           );
           rpf_rect::RectList rl = rpf_coarse::coarse_rects(Bx, s.A, s.dpos);
           Built bt;
@@ -589,7 +646,7 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
         // in family order, on the calling thread: the sums do not depend on the number of threads
         for (size_t i = 0; i < batch; ++i) {
           std::vector<double> &sum = ((start + i) % 2 == 0) ? out.sum0 : out.sum1;
-          for (size_t k = 0; k < K; ++k)
+          for (size_t k = 0; k < K * V; ++k)
             for (size_t r = 0; r < rows[i].size(); ++r)
               sum[k * n + (size_t)rows[i][r]] += vals[i][k][r];
         }
@@ -602,7 +659,9 @@ std::vector<double> RandomPlantedForest::coarsen_eval(const rpf_coarse::Spec &sp
 {
   if (!(purified && rect_forest_))
     throw std::invalid_argument("The forest is not purified (mode 2).");
-  check_coarsen(value_size, !X.empty());
+  if (value_size != 1)
+    throw std::invalid_argument("coarsen_eval() supports forests with one score column only.");
+  check_coarsen(!X.empty());
   if (p != feature_size)
     throw std::invalid_argument("X has the wrong number of columns.");
   const rpf_rect::PurifiedForest &pf = *rect_forest_;

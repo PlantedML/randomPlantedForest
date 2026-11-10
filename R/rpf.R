@@ -35,7 +35,7 @@
 #'   parameter: more splits fit more complex functions. A round splits the best of its
 #'   candidates; near saturation, when every candidate's leaf is too small to split, a
 #'   round can make no split. `NULL` chooses it out of bag while the forest grows
-#'   (regression, not with `deterministic = TRUE`; otherwise `NULL` means 30). See
+#'   (not with `deterministic = TRUE`, where `NULL` means 30). See
 #'   "Choosing `splits` out of bag" in Details.
 #' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
 #'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
@@ -53,8 +53,8 @@
 #' @param min_leaf_rows `[integer(1): 1]`: Minimum number of rows of the
 #'   bootstrap sample on each side of every split, so in every leaf. Leaves
 #'   without a threshold that keeps this many rows on each side are not drawn
-#'   as split candidates. Only for regression with `split_structure = "leaves"`; `1`
-#'   (no limit) otherwise.
+#'   as split candidates. Only for `split_structure = "leaves"` (regression and
+#'   classification); `1` (no limit) otherwise.
 #' @param interaction_constraints `[list | NULL: NULL]`: Feature sets that restrict which
 #'   interactions the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`.
 #'   Each set is given by predictor names or by column indices: with `x`, the
@@ -69,7 +69,8 @@
 #'   the forest on the effects a first fit found, e.g. after dropping its small
 #'   components.
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
-#'   regression, the only supported loss, and `"exponential"` for classification.
+#'   regression, the only supported loss, and `"exponential"` for classification
+#'   (with more than two classes the multiclass exponential loss SAMME).
 #'   Classification also supports `"logit"`, which gives similar results but is
 #'   slower, and `"L1"` and `"L2"`, which fit class indicators directly and do
 #'   not yield proper probability estimates.
@@ -86,7 +87,7 @@
 #'   the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 #'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
 #' @param prune `[logical(1): FALSE]`: Whether to return the pruned model
-#'   instead of the forest (regression only, not with `deterministic = TRUE`):
+#'   instead of the forest (not with `deterministic = TRUE`):
 #'   the forest is pruned by [prune_components()] with its defaults on the
 #'   training rows, and the result is its `rpf_pruned` model. See "Pruning" in
 #'   Details.
@@ -97,8 +98,7 @@
 #'   at least 1, or `Inf` for no coarsening.
 #' @param tune `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether
 #'   to tune the greediness (`split_try`, `t_try`) and `min_leaf_rows` out of
-#'   bag (regression only, not with `deterministic = TRUE`, at least 10 tree
-#'   families). `TRUE` runs the full search ([tune_control()]), `"quick"` the
+#'   bag (not with `deterministic = TRUE`, at least 10 tree families). `TRUE` runs the full search ([tune_control()]), `"quick"` the
 #'   two-forest preset, and a [tune_control()] object your own. Every forest of
 #'   the search has `splits` chosen out of bag and is pruned, so `tune` implies
 #'   `splits = NULL` and `prune = TRUE`, and giving `split_try`, `t_try` or
@@ -123,7 +123,7 @@
 #'   order of every factor, and a character vector keeps it for the named
 #'   factor predictors only. See "Factor predictors" below.
 #' @param oob_path `[logical(1) | integer: FALSE]`: Whether to track the
-#'   out-of-bag (OOB) error along the splits (regression only, not with
+#'   out-of-bag (OOB) error along the splits (not with
 #'   `deterministic = TRUE`). `TRUE` evaluates it at the checkpoints of
 #'   [oob_path_checkpoints()] for `splits`, four per doubling; an increasing
 #'   integer vector in `1..splits` gives the checkpoints. The fitted forest is
@@ -136,7 +136,11 @@
 #'   checkpoint, `splits`, the corrected and the plain OOB root mean squared
 #'   error (`oob_rmse`, `oob_rmse_raw`), and the standard errors of the two mean
 #'   squared errors (`se_mse`, `se_mse_raw`). Its attribute `n_rows` is the
-#'   number of training rows with an OOB tree family. With `splits = NULL`,
+#'   number of training rows with an OOB tree family. For classification with
+#'   `loss = "logit"` or `"exponential"`, or more than two classes, the columns
+#'   are the mean corrected and plain criterion (`oob_loss`, `oob_loss_raw`) and
+#'   their standard errors (`se_loss`, `se_loss_raw`), and the attribute
+#'   `criterion` names it (see "Classification" in Details). With `splits = NULL`,
 #'   `$params$splits` is the chosen number of splits, `$oob_path` the path of
 #'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
@@ -154,7 +158,8 @@
 #'   nonzero component; the OOB path's `oob_rmse` at the chosen `splits` leaves
 #'   the rows without OOB families of both halves uncorrected and is higher),
 #'   its pruned model's `rule`, `tau`, `n_kept` and corrected OOB RMSE
-#'   `oob_rmse` (the score), `seconds`, whether each step chose it
+#'   `oob_rmse` (the score; for classification both are the square root of the
+#'   mean corrected criterion), `seconds`, whether each step chose it
 #'   (`chosen_step1`, `chosen_step2`, `chosen_step3`; `NA` if not a candidate of
 #'   the step) and `final`); `steps`, each step's candidates and choice;
 #'   `settings`, the chosen `split_try`, `t_try`, `min_leaf_rows` and `splits`;
@@ -189,6 +194,10 @@
 #'
 #' For classification, `"exponential"` (the default) and `"logit"` fit on the
 #' link scale and are transformed to probabilities, `"exponential"` being faster.
+#' With more than two classes `"exponential"` is the multiclass exponential
+#' loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): with one score per class,
+#' summing to 0, a row's weight is `exp(-g)`, `g` the score of its class, and
+#' the probabilities are the softmax of the scores.
 #' `"L1"` and `"L2"` fit class indicators directly and their probabilities are
 #' truncated to `[0, 1]`.
 #'
@@ -249,8 +258,9 @@
 #'
 #' ## The draw of candidates for `leaves`
 #'
-#' For regression with `split_structure = "leaves"`, the global option
-#' `randomPlantedForest.exact_draw` chooses how the candidates are drawn.
+#' With `split_structure = "leaves"` (regression and classification), the
+#' global option `randomPlantedForest.exact_draw` chooses how the candidates
+#' are drawn.
 #' With `TRUE` (the default), every possible split gets a random number in
 #' every round. With `FALSE`, the candidates are drawn from a Fenwick tree
 #' over the weights, kept up to date between rounds, which costs a few random
@@ -262,8 +272,8 @@
 #' out the same candidates: those
 #' whose leaf has no threshold with that many rows on each side. The fast draw
 #' pays off on large data with many splits. The option is read when the forest
-#' is fitted and stored in `params$exact_draw`; it does not affect
-#' classification or the other split structures.
+#' is fitted and stored in `params$exact_draw`; it does not affect the other
+#' split structures.
 #'
 #' ```r
 #' options(randomPlantedForest.exact_draw = FALSE)
@@ -314,7 +324,7 @@
 #'
 #' ## Choosing `splits` out of bag
 #'
-#' With `splits = NULL` (regression, not deterministic), the number of splits
+#' With `splits = NULL` (not deterministic), the number of splits
 #' is chosen while the forest grows, by the corrected OOB error of the
 #' out-of-bag path. The families grow to checkpoints, four per doubling of the
 #' splits ([oob_path_checkpoints()] up to 25,600), and the forest's corrected
@@ -361,8 +371,32 @@
 #' `tau`, `select`, `select_by`, folds or seed), fit with `prune = FALSE` and call
 #' [prune_components()]. Together with `splits = NULL`, one call chooses the
 #' number of splits out of bag, prunes and returns the model to show. Pruning
-#' needs out-of-bag rows and a numeric outcome, so `prune = TRUE` is an error for
-#' classification and with `deterministic = TRUE`.
+#' needs out-of-bag rows, so `prune = TRUE` is an error with
+#' `deterministic = TRUE`.
+#'
+#' ## Classification
+#'
+#' A classification forest goes through the same steps (the OOB path,
+#' `splits = NULL`, `prune`, `max_panels` and `tune`) with its score columns:
+#' one for a binary outcome, one per class otherwise (`K - 1` for
+#' `loss = "logit"`: the first level is the reference). Every out-of-bag choice
+#' is scored by the loss's own criterion, corrected for the OOB family count as
+#' above:
+#' - `loss = "L1"` or `"L2"`: the squared error of the raw scores summed over
+#'   the columns (the Brier score, before the scores are truncated to
+#'   probabilities). With two classes this is the regression criterion of the
+#'   0/1 outcome, and the choices are the regression ones, bit for bit.
+#' - `loss = "logit"` or `"exponential"`: the log-loss of the probabilities
+#'   that `predict(type = "prob")` returns. The correction is its second-order
+#'   form, `(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
+#'   with `d = g_even - g_odd` and `H = diag(p) - p p'` over the free score
+#'   columns (for the squared error `H = 2 I`, the correction above).
+#'
+#' The pruning keeps or drops a component for all classes, sizes it by its
+#' variance summed over the score columns centred across the classes, and fits
+#' one coefficient per kept component shared by the classes (see
+#' [prune_components()]). The criterion was checked against the test log-loss
+#' on simulated data; the defaults were chosen on regression and carried over.
 #'
 #' ## Tuning out of bag
 #'
@@ -371,7 +405,8 @@
 #' minimum leaf size `min_leaf_rows`, without cross-validation. Every forest of
 #' the search is grown with `splits` chosen out of bag and pruned by
 #' [prune_components()] with its defaults (without the display), and forests are
-#' compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+#' compared by the corrected out-of-bag RMSE of their pruned model (for
+#' classification by the root of its mean corrected criterion); the lowest
 #' wins. A pruned model at 0 (every candidate's correction overshot, see
 #' [prune_components()]) is not chosen unless all are. The search is
 #' coordinate-wise ([tune_control()]): with `tune = TRUE`
@@ -795,9 +830,9 @@ rpf_bridge <- function(
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
   checkmate::assert_int(min_leaf_rows, lower = 1)
-  if (min_leaf_rows > 1 && (outcomes$mode != "regression" || split_structure != "leaves")) {
+  if (min_leaf_rows > 1 && split_structure != "leaves") {
     cli::cli_abort(
-      "{.arg min_leaf_rows} > 1 needs regression with {.code split_structure = \"leaves\"}.",
+      "{.arg min_leaf_rows} > 1 needs {.code split_structure = \"leaves\"}.",
       call = call
     )
   }
@@ -828,7 +863,7 @@ rpf_bridge <- function(
   # tune: the search chooses split_try, t_try, min_leaf_rows and splits, and prunes every forest
   control <- tune_resolve(tune, call = call)
   if (!is.null(control)) {
-    tune_check_call(control, given, splits, prune, outcomes$mode, deterministic, ntrees, split_structure, call = call)
+    tune_check_call(control, given, splits, prune, deterministic, ntrees, split_structure, call = call)
     splits <- NULL
     prune <- TRUE
   }
@@ -840,15 +875,6 @@ rpf_bridge <- function(
   checkmate::assert_int(nthreads, lower = 1L)
   checkmate::assert_flag(export_forest)
   checkmate::assert_flag(deterministic)
-  if (prune && outcomes$mode != "regression") {
-    cli::cli_abort(
-      c(
-        "{.code prune = TRUE} supports regression only.",
-        "x" = "The outcome is a factor (classification)."
-      ),
-      call = call
-    )
-  }
   if (prune && deterministic) {
     cli::cli_abort(
       c(
@@ -864,14 +890,14 @@ rpf_bridge <- function(
       "i" = "Use {.code ntrees = 1} to fit the same model faster."
     ))
   }
-  # splits = NULL: chosen out of bag while growing (random regression), otherwise 30
-  adaptive <- is.null(splits) && outcomes$mode == "regression" && !deterministic
+  # splits = NULL: chosen out of bag while growing (a random forest), otherwise 30
+  adaptive <- is.null(splits) && !deterministic
   if (is.null(splits) && !adaptive) {
     splits <- 30L
   }
   checkpoints <- NULL
   if (!adaptive) {
-    checkpoints <- check_oob_path(oob_path, splits, outcomes$mode, deterministic, call = call)
+    checkpoints <- check_oob_path(oob_path, splits, deterministic, call = call)
   } else if (!isTRUE(oob_path) && !isFALSE(oob_path)) {
     cli::cli_abort(
       c(
@@ -923,10 +949,21 @@ rpf_bridge <- function(
 }
 
 # The forest of rpf_bridge()'s checked arguments: `adaptive` whether `splits` is chosen out of bag while growing,
-# `checkpoints` those of rpf(oob_path = ) (fixed splits) or NULL
+# `checkpoints` those of rpf(oob_path = ) (fixed splits) or NULL. The OOB error is the regression one or the
+# classification criterion (oob_score_y()).
 rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call) {
+  score_y <- if (adaptive || !is.null(checkpoints)) {
+    oob_score_y(outcomes$mode, params$loss, processed$outcomes[[1]])
+  }
   if (adaptive) {
-    chosen <- tune_splits_oob(outcomes$outcomes, predictors$predictors_matrix, params, call = call)
+    chosen <- tune_splits_oob(
+      outcomes$outcomes,
+      predictors$predictors_matrix,
+      params,
+      mode = outcomes$mode,
+      score_y = score_y,
+      call = call
+    )
     fit <- chosen$fit
     params$splits <- chosen$splits
   } else {
@@ -958,7 +995,7 @@ rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoin
     res$oob_path <- chosen$path
     res$splits_oob <- chosen[c("splits", "stopped_at", "capped")]
   } else if (!is.null(checkpoints)) {
-    res$oob_path <- oob_path_table(fit$oob_path(), outcomes$outcomes[, 1], params$ntrees, call = call)
+    res$oob_path <- oob_path_table(fit$oob_path(), score_y, params$ntrees, call = call)
   }
   res
 }
@@ -969,7 +1006,7 @@ rpf_prune <- function(res, processed, max_panels, store = TRUE, call) {
   defaults <- lapply(formals(prune_components)[c("rule", "tau", "select", "select_by", "folds")], eval)
   prune_run(
     res,
-    list(predictors = processed$predictors, y = as.numeric(processed$outcomes[[1]])),
+    prune_rows(res, processed$predictors, processed$outcomes[[1]]),
     max_panels = max_panels,
     rule = defaults$rule,
     tau = defaults$tau,
@@ -1011,10 +1048,10 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
 }
 
 # Assemble the positional parameter vector for the C++ constructors.
-# 15 elements for regression (+ min_leaf_rows, exact_draw), 15 (+ delta,
-# epsilon) for classification, which has neither. Models saved before these
-# options existed have no such entries in their params and were fitted with
-# min_leaf_rows = 1 and the exact draw.
+# 15 elements for regression (+ min_leaf_rows, exact_draw), 17 (+ delta,
+# epsilon, min_leaf_rows, exact_draw) for classification. Models saved before
+# these options existed have no such entries in their params and were fitted
+# with min_leaf_rows = 1 and the exact draw.
 rpf_param_vector <- function(params, mode) {
   split_mode <- switch(
     params$split_structure,
@@ -1041,22 +1078,18 @@ rpf_param_vector <- function(params, mode) {
   )
   if (mode == "classification") {
     base <- c(base, params$delta, params$epsilon)
-  } else {
-    base <- c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
   }
-  base
+  c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
 }
 
 # Main fitting function and interface to C++ implementation
-# `oob_path`: NULL, or the checkpoints of the OOB path (regression; see check_oob_path())
-# `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, floor and pause_gb (regression; see
-# tune_splits_oob())
+# `oob_path`: NULL, or the checkpoints of the OOB path (see check_oob_path())
+# `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, floor and pause_gb (see tune_splits_oob())
 rpf_impl <- function(Y, X, mode = c("regression", "classification"), params, oob_path = NULL, adaptive = NULL) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   mode <- match.arg(mode)
   pars <- rpf_param_vector(params, mode)
-
   # allowed feature sets as 1-based column indices (NULL: no constraint, the constructors without them)
   constraints <- if (!is.null(params$interaction_constraints)) {
     lapply(params$interaction_constraints, match, table = colnames(X))

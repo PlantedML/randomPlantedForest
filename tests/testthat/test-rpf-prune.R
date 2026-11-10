@@ -105,9 +105,12 @@ test_that("max_panels = Inf: no display; purify is not used with prune = TRUE", 
   expect_s3_class(fit_call(prune = FALSE), "rpf")
 })
 
-test_that("prune = TRUE is an error for classification and deterministic forests; arguments are checked", {
+test_that("prune = TRUE prunes classification forests too, is an error for deterministic ones; arguments are checked", {
   d <- rp_data(n = 100)
-  expect_error(rpf(Species ~ ., data = iris, ntrees = 2, prune = TRUE), "regression only")
+  set.seed(1)
+  pi <- suppressMessages(rpf(Species ~ ., data = iris, ntrees = 2, prune = TRUE))
+  expect_s3_class(pi, "rpf_pruned")
+  expect_identical(colnames(predict(pi, iris)), paste0(".pred_", levels(iris$Species)))
   expect_error(
     rpf(y ~ ., data = d, ntrees = 1, deterministic = TRUE, prune = TRUE),
     "not available with `deterministic = TRUE`"

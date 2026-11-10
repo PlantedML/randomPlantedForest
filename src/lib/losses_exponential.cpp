@@ -1,8 +1,71 @@
 // Classification losses: Exponential family variants. Extracted from cpf.cpp.
 #include "cpf.hpp"
 
+// SAMME's leaf step from the weighted class shares (cpf.hpp)
+void ClassificationRPF::samme_step(const std::vector<double> &share, double clamp, std::vector<double> &a) const
+{
+  const size_t K = share.size();
+  a.assign(K, 0);
+  double m = 0;
+  for (size_t k = 0; k < K; ++k) {
+    a[k] = std::log(std::min(std::max(clamp, share[k]), 1 - clamp));
+    m += a[k];
+  }
+  m /= (double)K;
+  for (size_t k = 0; k < K; ++k)
+    a[k] -= m;
+}
+
+// SAMME's split criterion (cpf.hpp): per side the class weight sums W_k (one weight per row, column 0), the shares
+// p_k = W_k / W (left in M_s / M_b for the update) and the loss change sum_k W_k exp(-a_k) - W at the step a of the
+// delta-clamped shares
+void ClassificationRPF::samme_loss(Split &split)
+{
+  const size_t K = value_size;
+  split.min_sum = 0;
+  split.M_sp = 0;
+  split.M_bp = 0;
+  std::vector<double> W(K), a;
+  for (int side = 0; side < 2; ++side) {
+    const std::vector<int> &I = side == 0 ? split.I_s : split.I_b;
+    if (I.empty()) {
+      split.min_sum = INF;
+      return;
+    }
+    std::fill(W.begin(), W.end(), 0.0);
+    for (int i : I) {
+      // the row's class: its column coded 1
+      const std::vector<double> &y = (*split.Y)[i];
+      size_t k = 0;
+      while (k + 1 < K && !(y[k] > 0))
+        ++k;
+      W[k] += (*split.W)[i][0];
+    }
+    double tot = 0;
+    for (double w : W)
+      tot += w;
+    std::vector<double> &M = side == 0 ? split.M_s : split.M_b;
+    M.assign(K, 0);
+    for (size_t k = 0; k < K; ++k)
+      M[k] = W[k] / tot;
+    samme_step(M, delta, a);
+    for (size_t k = 0; k < K; ++k)
+      split.min_sum += W[k] * std::exp(-a[k]);
+    split.min_sum -= tot;
+  }
+  if (std::isnan(split.min_sum))
+    split.min_sum = INF;
+}
+
+// The exponential loss's split criterion. K >= 3 classes: SAMME (samme_loss()). Binary (one score column, the classes
+// coded -1 / 1): the loss exp(-y F / 2), F the score, at the step log(p / (1 - p)) of the delta-clamped share p of the
+// second class.
 void ClassificationRPF::exponential_loss(Split &split)
 {
+  if (value_size > 1) {
+    samme_loss(split);
+    return;
+  }
   split.min_sum = 0;
   split.M_s = std::vector<double>(value_size, 0);
   split.M_b = std::vector<double>(value_size, 0);
