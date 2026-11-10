@@ -135,6 +135,21 @@ test_that("the stopper's plateau: a gain within `tolerance` paired standard erro
   expect_identical(run1(st(1)), run1(st(0)))
 })
 
+test_that("the plateau keeps the rows it compares when a corrected error is below 0", {
+  # checkpoint 2's correction overshoots (OOB means 0.5 and -0.5 around y = 0, 100 families: corrected MSE -0.245), so
+  # it is left out of the choice; the plateau compares the lowest of the others (checkpoint 3) with the best and must
+  # keep its rows: the stop runs to the last checkpoint and chooses 7, the lowest error above 0
+  neg <- list(checkpoints = 1L, sum0 = matrix(rep(0.5, 3)), sum1 = matrix(rep(-0.5, 3)), count = matrix(1L, 3, 2))
+  st <- randomPlantedForest:::oob_stopper(rep(0, 3), 100, 1:10, patience = 4L, tolerance = 1)
+  v <- c(0.5, NA, 0.4, 0.45, 0.46, 0.47, 0.39, 0.395, 0.396, 0.397)
+  for (c in seq_along(v)) {
+    out <- st$step(c, if (is.na(v[c])) neg else path_at(rep(v[c], 3)))
+    if (out > 0) break
+  }
+  expect_identical(c(out = out, c = c), c(out = 7L, c = 10L))
+  expect_lt(st$points[2, 1], 0)
+})
+
 test_that("splits = NULL with the plateau stop: no later than the patience alone, the same forest at the same choice", {
   d <- stop_sim()
   fit_tol <- function(tol, ...) {

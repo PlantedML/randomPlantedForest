@@ -138,9 +138,9 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, tolerance = 0, fl
         se <- stats::sd(st$rows[[a]] - st$rows[[best]]) / sqrt(st$n_rows)
         done <- e[a] - e[best] <= tolerance * se
       }
-      # the rows of the checkpoints that can no longer be a or b are freed
-      eo <- pmax(e[old], 0)
-      st$rows[old[!(eo <= min(eo) * (1 + 1e-12) | eo == min(eo))]] <- list(NULL)
+      # the rows of the checkpoints that can no longer be a or b are freed: all but the ties of the lowest among
+      # e[old] (oob_lowest(), as oob_select() chooses a)
+      st$rows[old[-oob_lowest(e[old])]] <- list(NULL)
     }
     last <- c == C
     if (last && !done) {

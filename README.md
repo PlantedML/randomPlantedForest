@@ -75,7 +75,7 @@ rpfit
 #>  hp        11%       
 #> 
 #> How it was chosen:
-#>   The forest: 200 tree families of 7 splits (chosen out of bag; growing stopped at 15).
+#>   The forest: 200 tree families of 7 splits (chosen out of bag; growing stopped at 12).
 #>   From the forest's 7 nonzero components (purified): those with a share of at least 3% of the forest's Var(prediction), as they are (rule D).
 #>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.
 #>   Left out: 4 components, shares together 0.41% (largest cyl:wt, 0.21%).
