@@ -9,7 +9,7 @@ stop_sim <- function(n = 300, seed = 1) {
 
 stop_fit <- function(d, splits, ...) {
   set.seed(5)
-  rpf(d$x, d$y, max_interaction = 2, ntrees = 6, splits = splits, ...)
+  rpf_050(d$x, d$y, max_interaction = 2, ntrees = 6, splits = splits, ...)
 }
 
 # The OOB path at one checkpoint, as the C++ fit passes it to the stopper: rows i with OOB families of both halves
@@ -110,15 +110,15 @@ test_that("splits = NULL is chosen out of bag for classification too, and is 30 
   d <- stop_sim()
   yc <- factor(d$y > median(d$y))
   set.seed(5)
-  a <- rpf(d$x, yc, ntrees = 3, splits = NULL)
+  a <- rpf_050(d$x, yc, ntrees = 3, splits = NULL)
   set.seed(5)
-  b <- rpf(d$x, yc, ntrees = 3, splits = a$params$splits)
+  b <- rpf_050(d$x, yc, ntrees = 3, splits = a$params$splits)
   expect_identical(a$splits_oob$splits, a$params$splits)
   expect_identical(attr(a$oob_path, "criterion"), "logloss")
   expect_identical(a$fit$get_model(), b$fit$get_model())
-  det <- rpf(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, ntrees = 1, splits = NULL, deterministic = TRUE)
   expect_identical(det$params$splits, 30L)
-  expect_identical(det$fit$get_model(), rpf(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())
+  expect_identical(det$fit$get_model(), rpf_050(d$x, d$y, ntrees = 1, deterministic = TRUE)$fit$get_model())
 })
 
 test_that("splits = NULL: arguments, options and errors", {

@@ -67,7 +67,7 @@ det_data <- function() {
 test_that("deterministic cur_trees_1, res_trees and cur_trees_2 fit as well as the other structures", {
   d <- det_data()
   for (ss in c("cur_trees_1", "res_trees", "cur_trees_2")) {
-    fit <- rpf(
+    fit <- rpf_050(
       x = d$X,
       y = d$y,
       max_interaction = 2,

@@ -5,6 +5,19 @@
 #' `max_interaction` predictors, so it decomposes into main effects and
 #' interaction components; see [predict_components()].
 #'
+#' By default, `rpf()` returns the pruned model that can be shown, in one call:
+#' 1. it grows 200 tree families of up to three-way interactions, with the
+#'    number of splits chosen out of bag while they grow (`splits = NULL`);
+#' 2. it prunes the forest's components by [prune_components()] with its
+#'    defaults (`prune = NULL`): the sparse rule, chosen out of bag;
+#' 3. it coarsens every kept component of three or more predictors to at most
+#'    `max_panels = 10` heat maps and prunes again.
+#'
+#' The result, of class `rpf_pruned`, has methods for
+#' [`predict()`][predict.rpf_pruned], [predict_components()] and `print()`.
+#' `prune = FALSE` returns the forest (class `rpf`) instead, and
+#' `splits = <number>` fits a fixed number of splits.
+#'
 #' @param x,y `[data.frame | matrix | recipe]`, `[numeric | factor]`:
 #'   Predictors and outcome for the x/y interface.
 #'   `x` holds the predictors, or is a [`recipe`][recipes::recipe] (then supply
@@ -25,24 +38,28 @@
 #'   such as `log(x1)`, are allowed.
 #' @param data `[data.frame]`: Data containing the predictors and the outcome,
 #'   used with `formula` or a recipe `x`.
-#' @param max_interaction `[integer(1): 2]`: Maximum number of predictors a single tree may
+#' @param max_interaction `[integer(1): 3]`: Maximum number of predictors a single tree may
 #'   split on. `1` fits main effects only (an additive model), `2` adds
-#'   pairwise interactions, and so on. `0` uses all predictors and values above
+#'   pairwise interactions, `3` (the default) three-way interactions, and so on. `0` uses all predictors and values above
 #'   the number of predictors are reduced to it.
-#' @param ntrees `[integer(1): 50]`: Number of tree families, i.e. the size of the forest.
+#' @param ntrees `[integer(1): 200]`: Number of tree families, i.e. the size of the forest.
 #'   Each family is grown on a bootstrap sample and predictions are averaged.
-#' @param splits `[integer(1) | NULL: 30]`: Number of split rounds per tree family. The main tuning
+#' @param splits `[integer(1) | NULL: NULL]`: Number of split rounds per tree family. The main tuning
 #'   parameter: more splits fit more complex functions. A round splits the best of its
 #'   candidates; near saturation, when every candidate's leaf is too small to split, a
-#'   round can make no split. `NULL` chooses it out of bag while the forest grows
-#'   (not with `deterministic = TRUE`, where `NULL` means 30). See
+#'   round can make no split. `NULL` (the default) chooses it out of bag while the forest
+#'   grows (with `deterministic = TRUE`, which has no out-of-bag rows, `NULL` means 30). See
 #'   "Choosing `splits` out of bag" in Details.
 #' @param split_structure `[character(1): "leaves"]`: How split candidates are formed and
 #'   sampled; one of `"leaves"`, `"hist"`, `"cur_trees_1"`, `"cur_trees_2"`,
 #'   or `"res_trees"`. See Details.
-#' @param split_try `[integer(1): 10]`: Number of thresholds evaluated per split candidate.
-#' @param t_try `[numeric(1): 0.4]`: Proportion in `(0, 1]` of all possible splits sampled
-#'   as candidates in each round, capped at `max_candidates`.
+#' @param split_try `[integer(1) | NULL: NULL]`: Number of thresholds evaluated per split
+#'   candidate. `NULL` means 3 for `split_structure = "leaves"` and 10 for the
+#'   other structures.
+#' @param t_try `[numeric(1) | NULL: NULL]`: Proportion in `(0, 1]` of all possible splits sampled
+#'   as candidates in each round, capped at `max_candidates`. `NULL` means 0.1
+#'   for `split_structure = "leaves"` and 0.4 for the other structures. See
+#'   "Choosing parameters" in Details.
 #' @param max_candidates `[integer(1): 50]`: Maximum number of split candidates per round.
 #' @param split_decay_rate `[numeric(1): 0.1]`: Down-weights possible splits that were
 #'   sampled as candidates but not chosen. Each such round ages a split by one,
@@ -86,12 +103,13 @@
 #'   updates and acts as regularization: smaller values permit larger jumps on
 #'   the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 #'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
-#' @param prune `[logical(1): FALSE]`: Whether to return the pruned model
-#'   instead of the forest (not with `deterministic = TRUE`):
-#'   the forest is pruned by [prune_components()] with its defaults on the
-#'   training rows, and the result is its `rpf_pruned` model. See "Pruning" in
-#'   Details.
-#' @param max_panels `[numeric(1): 10]`: Used only with `prune = TRUE`: the
+#' @param prune `[logical(1) | NULL: NULL]`: Whether to return the pruned model
+#'   instead of the forest: the forest is pruned by [prune_components()] with
+#'   its defaults on the training rows, and the result is its `rpf_pruned`
+#'   model. `NULL` (the default) means `TRUE`, and `FALSE` with
+#'   `deterministic = TRUE`, where `TRUE` is an error (pruning needs out-of-bag
+#'   rows). `FALSE` returns the forest. See "Pruning" in Details.
+#' @param max_panels `[numeric(1): 10]`: Used only when pruning: the
 #'   most heat maps a kept component of three or more predictors may need; such
 #'   a component is coarsened to at most `max_panels` heat maps and the model is
 #'   pruned again (the `max_panels` of [prune_components()]). A whole number of
@@ -116,7 +134,8 @@
 #'   bootstrap, the first `max_candidates` possible splits as candidates
 #'   (`t_try` and `split_decay_rate` are ignored) and evenly spaced thresholds. The result does not
 #'   depend on the seed, and all tree families are identical, so use
-#'   `ntrees = 1`. Mainly useful for testing and debugging.
+#'   `ntrees = 1`. There are no out-of-bag rows, so `splits = NULL` means 30
+#'   and `prune = NULL` means `FALSE`. Mainly useful for testing and debugging.
 #' @param keep_level_order `[logical(1) | character: FALSE]`: Which factor
 #'   predictors keep the order of their levels instead of being ordered by the
 #'   outcome. `FALSE` orders every factor by the outcome, `TRUE` keeps the level
@@ -131,7 +150,8 @@
 #'   checkpoints grown is stored either way, and only `TRUE` or `FALSE` is
 #'   allowed.
 #'
-#' @return Object of class `"rpf"` with model object contained in `$fit`. With
+#' @return With the defaults, an object of class `rpf_pruned` (see below). With
+#'   `prune = FALSE`, an object of class `"rpf"` with model object contained in `$fit`. With
 #'   `oob_path`, `$oob_path` holds the OOB path: a data frame with one row per
 #'   checkpoint, `splits`, the corrected and the plain OOB root mean squared
 #'   error (`oob_rmse`, `oob_rmse_raw`), and the standard errors of the two mean
@@ -145,9 +165,9 @@
 #'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
 #'   (whether it stopped at the cap while the error was still falling).
-#'   With `prune = TRUE`, an object of class `rpf_pruned` (see
-#'   [prune_components()]), whose element `fit` is the forest (not purified), with
-#'   the elements above: the pruned model's OOB path is `$fit$oob_path`, and
+#'   When pruning (the default), an object of class `rpf_pruned` (see
+#'   [prune_components()]), whose element `fit` is the forest (not purified),
+#'   with the elements above: the pruned model's OOB path is `$fit$oob_path`, and
 #'   with `splits = NULL` the chosen number of splits `$fit$params$splits` and
 #'   the stop `$fit$splits_oob`.
 #'   With `tune`, the `rpf_pruned` model of the chosen forest, with an element
@@ -496,12 +516,12 @@ rpf.default <- function(x, ...) {
 rpf.formula <- function(
   formula,
   data,
-  max_interaction = 2,
-  ntrees = 50,
-  splits = 30,
+  max_interaction = 3,
+  ntrees = 200,
+  splits = NULL,
   split_structure = "leaves",
-  split_try = 10,
-  t_try = 0.4,
+  split_try = NULL,
+  t_try = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -510,7 +530,7 @@ rpf.formula <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  prune = FALSE,
+  prune = NULL,
   max_panels = 10,
   tune = FALSE,
   purify = FALSE,
@@ -573,12 +593,12 @@ rpf.formula <- function(
 rpf.data.frame <- function(
   x,
   y,
-  max_interaction = 2,
-  ntrees = 50,
-  splits = 30,
+  max_interaction = 3,
+  ntrees = 200,
+  splits = NULL,
   split_structure = "leaves",
-  split_try = 10,
-  t_try = 0.4,
+  split_try = NULL,
+  t_try = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -587,7 +607,7 @@ rpf.data.frame <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  prune = FALSE,
+  prune = NULL,
   max_panels = 10,
   tune = FALSE,
   purify = FALSE,
@@ -637,12 +657,12 @@ rpf.data.frame <- function(
 rpf.matrix <- function(
   x,
   y,
-  max_interaction = 2,
-  ntrees = 50,
-  splits = 30,
+  max_interaction = 3,
+  ntrees = 200,
+  splits = NULL,
   split_structure = "leaves",
-  split_try = 10,
-  t_try = 0.4,
+  split_try = NULL,
+  t_try = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -651,7 +671,7 @@ rpf.matrix <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  prune = FALSE,
+  prune = NULL,
   max_panels = 10,
   tune = FALSE,
   purify = FALSE,
@@ -701,12 +721,12 @@ rpf.matrix <- function(
 rpf.recipe <- function(
   x,
   data,
-  max_interaction = 2,
-  ntrees = 50,
-  splits = 30,
+  max_interaction = 3,
+  ntrees = 200,
+  splits = NULL,
   split_structure = "leaves",
-  split_try = 10,
-  t_try = 0.4,
+  split_try = NULL,
+  t_try = NULL,
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
@@ -715,7 +735,7 @@ rpf.recipe <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
-  prune = FALSE,
+  prune = NULL,
   max_panels = 10,
   tune = FALSE,
   purify = FALSE,
@@ -821,8 +841,11 @@ rpf_bridge <- function(
   checkmate::assert_int(ntrees, lower = 1)
   checkmate::assert_int(splits, lower = 1, null.ok = TRUE)
   checkmate::assert_choice(split_structure, choices = c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees"))
-  checkmate::assert_int(split_try, lower = 1)
-  checkmate::assert_number(t_try, lower = 0, upper = 1)
+  checkmate::assert_int(split_try, lower = 1, null.ok = TRUE)
+  checkmate::assert_number(t_try, lower = 0, upper = 1, null.ok = TRUE)
+  # NULL greediness: 3 / 0.1 for "leaves", 10 / 0.4 (master's) for the other structures
+  split_try <- split_try %||% if (split_structure == "leaves") 3 else 10
+  t_try <- t_try %||% if (split_structure == "leaves") 0.1 else 0.4
   if (t_try <= 0) {
     cli::cli_abort("{.arg t_try} must be greater than 0, not {t_try}.", call = call)
   }
@@ -859,7 +882,10 @@ rpf_bridge <- function(
     }
   }
 
-  checkmate::assert_flag(prune)
+  checkmate::assert_flag(prune, null.ok = TRUE)
+  checkmate::assert_flag(deterministic)
+  # prune = NULL: the pruned model for a random forest, the forest with deterministic = TRUE (no out-of-bag rows)
+  prune <- prune %||% !deterministic
   # tune: the search chooses split_try, t_try, min_leaf_rows and splits, and prunes every forest
   control <- tune_resolve(tune, call = call)
   if (!is.null(control)) {
@@ -874,7 +900,6 @@ rpf_bridge <- function(
   checkmate::assert_flag(purify)
   checkmate::assert_int(nthreads, lower = 1L)
   checkmate::assert_flag(export_forest)
-  checkmate::assert_flag(deterministic)
   if (prune && deterministic) {
     cli::cli_abort(
       c(
@@ -1034,10 +1059,10 @@ new_rpf <- function(fit, blueprint, ...) {
 }
 
 # The draw of candidates for split_structure = "leaves": the option
-# randomPlantedForest.exact_draw (TRUE, the default: the exact draw; FALSE: the
-# fast draw, the same distribution with other random numbers).
+# randomPlantedForest.exact_draw (FALSE, the default: the fast draw; TRUE: the
+# exact draw, the same distribution with other random numbers).
 rpf_exact_draw <- function(call = rlang::caller_env()) {
-  exact_draw <- getOption("randomPlantedForest.exact_draw", TRUE)
+  exact_draw <- getOption("randomPlantedForest.exact_draw", FALSE)
   if (!rlang::is_bool(exact_draw)) {
     cli::cli_abort(
       "The option {.code randomPlantedForest.exact_draw} must be {.code TRUE} or {.code FALSE}.",

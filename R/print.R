@@ -93,11 +93,11 @@ format.rpf <- function(x, ...) {
       cli::cli_alert_warning("Fit deterministically.")
     }
     if (
-      isFALSE(params$exact_draw) &&
+      isTRUE(params$exact_draw %||% TRUE) &&
         !params$deterministic &&
         params$split_structure == "leaves"
     ) {
-      cli::cli_alert_info("Candidates drawn by the fast draw ({.code randomPlantedForest.exact_draw = FALSE}).")
+      cli::cli_alert_info("Candidates drawn by the exact draw ({.code randomPlantedForest.exact_draw = TRUE}).")
     }
     if (!is.null(params$interaction_constraints)) {
       sets <- vapply(params$interaction_constraints, function(s) paste0("{", paste(s, collapse = ", "), "}"), "")

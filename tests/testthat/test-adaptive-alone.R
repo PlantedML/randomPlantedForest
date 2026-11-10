@@ -13,7 +13,10 @@ alone_data <- function() {
 alone_fit <- function(d, splits = NULL, ..., pause_gb = NULL) {
   old <- options(randomPlantedForest.adaptive_pause_gb = pause_gb)
   on.exit(options(old))
-  args <- utils::modifyList(list(max_interaction = 3, ntrees = 10, split_try = 5, t_try = 0.5), list(...))
+  args <- utils::modifyList(
+    list(max_interaction = 3, ntrees = 10, split_try = 5, t_try = 0.5, prune = FALSE),
+    list(...)
+  )
   set.seed(11)
   do.call(rpf, c(list(d$x, d$y, splits = splits), args))
 }

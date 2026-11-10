@@ -15,7 +15,7 @@ test_that("boxes reproduce predictions before and after purification", {
   set.seed(1)
   dat <- data.frame(x1 = runif(100), x2 = runif(100), g = factor(sample(c("a", "b", "c"), 100, TRUE)))
   dat$y <- dat$x1 * dat$x2 + (dat$g == "b") + rnorm(100, sd = 0.1)
-  fit <- rpf(y ~ ., data = dat, ntrees = 1, splits = 20)
+  fit <- rpf_050(y ~ ., data = dat, ntrees = 1, splits = 20)
 
   raw <- rpf_boxes(fit)
   expect_equal(predict_from_boxes(fit, raw, dat), predict(fit, dat)$.pred)
@@ -28,7 +28,7 @@ test_that("boxes reproduce predictions before and after purification", {
 
 test_that("boxes are named and bounded by the variables of their tree", {
   set.seed(1)
-  fit <- rpf(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 2, splits = 10)
+  fit <- rpf_050(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 2, splits = 10)
   boxes <- rpf_boxes(fit, family = 2L)
 
   expect_named(
@@ -44,7 +44,7 @@ test_that("boxes are named and bounded by the variables of their tree", {
 test_that("tree names follow the model's columns when factors are reordered", {
   set.seed(1)
   dat <- data.frame(y = mtcars$mpg, f = factor(mtcars$gear), x = mtcars$wt)
-  fit <- rpf(y ~ f + x, data = dat, ntrees = 1, splits = 10)
+  fit <- rpf_050(y ~ f + x, data = dat, ntrees = 1, splits = 10)
   boxes <- rpf_boxes(fit)
 
   x_boxes <- boxes[boxes$tree == "x", ]
@@ -55,11 +55,18 @@ test_that("tree names follow the model's columns when factors are reordered", {
 
 test_that("multiclass boxes have one value column per class", {
   set.seed(1)
-  fit <- rpf(Species ~ ., data = iris, ntrees = 1, splits = 5)
+  fit <- rpf_050(Species ~ ., data = iris, ntrees = 1, splits = 5)
   boxes <- rpf_boxes(fit)
 
   expect_contains(names(boxes), paste0("value_", levels(iris$Species)))
   expect_false("value" %in% names(boxes))
+
+  # logit models the levels after the first, the reference
+  set.seed(1)
+  logit <- rpf_050(Species ~ ., data = iris, ntrees = 1, splits = 5, loss = "logit")
+  boxes <- rpf_boxes(logit)
+  values <- grep("^value", names(boxes), value = TRUE)
+  expect_identical(values, paste0("value_", levels(iris$Species)[-1]))
 })
 
 test_that("box plots draw one panel per tree up to max_interaction", {
@@ -68,7 +75,7 @@ test_that("box plots draw one panel per tree up to max_interaction", {
   set.seed(1)
   dat <- data.frame(x1 = runif(50), x2 = runif(50), x3 = runif(50), g = factor(sample(c("a", "b"), 50, TRUE)))
   dat$y <- dat$x1 * dat$x2 * dat$x3 + rnorm(50, sd = 0.1)
-  fit <- rpf(y ~ ., data = dat, ntrees = 1, splits = 30, max_interaction = 3)
+  fit <- rpf_050(y ~ ., data = dat, ntrees = 1, splits = 30, max_interaction = 3)
   boxes <- rpf_boxes(fit)
   n_panels <- length(unique(boxes$tree[boxes$order %in% 1:2]))
 
@@ -96,12 +103,15 @@ test_that("plot() selects the class for multiclass fits only", {
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("patchwork")
   set.seed(1)
-  fit_multi <- rpf(Species ~ Sepal.Length + Petal.Length, data = iris, ntrees = 1, splits = 5)
-  fit_reg <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 5)
+  fit_multi <- rpf_050(Species ~ Sepal.Length + Petal.Length, data = iris, ntrees = 1, splits = 5)
+  fit_reg <- rpf_050(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 5)
 
   expect_s3_class(plot(fit_multi, type = "boxes", class = "virginica"), "patchwork")
   expect_s3_class(plot(fit_multi, class = "virginica"), "ggplot")
   expect_error(plot(fit_multi, class = "rose"))
+  # logit: the reference level has no values of its own
+  fit_logit <- rpf_050(Species ~ Sepal.Length + Petal.Length, data = iris, ntrees = 1, splits = 5, loss = "logit")
+  expect_error(plot(fit_logit, class = "setosa"))
   expect_error(plot(fit_reg, class = "virginica"), "multiclass")
 })
 
@@ -125,7 +135,7 @@ test_that("split reconstruction uses every leaf once and tiles regions", {
   set.seed(1)
   dat <- data.frame(x1 = runif(200), x2 = runif(200), g = factor(sample(c("a", "b", "c"), 200, TRUE)))
   dat$y <- dat$x1 + 2 * dat$x1 * dat$x2 + (dat$g == "b") + rnorm(200, sd = 0.1)
-  fit <- rpf(y ~ ., data = dat, ntrees = 1, splits = 30)
+  fit <- rpf_050(y ~ ., data = dat, ntrees = 1, splits = 30)
   boxes <- rpf_boxes(fit)
   boxes$.value <- boxes$value
 
@@ -159,7 +169,7 @@ test_that("repeated splits of a region become separate tilings", {
 test_that("tree plots need an unpurified forest", {
   skip_if_not_installed("ggplot2")
   set.seed(1)
-  fit <- rpf(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 1, splits = 10)
+  fit <- rpf_050(mpg ~ wt + hp + cyl, data = mtcars, ntrees = 1, splits = 10)
 
   p <- plot(fit)
   expect_s3_class(p, "ggplot")

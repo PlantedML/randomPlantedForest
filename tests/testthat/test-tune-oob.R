@@ -249,7 +249,7 @@ test_that("the formula interface tunes the same as x/y; print() and marshal show
 
 test_that("rpf(tune = ) and tune_control() check their arguments", {
   d <- to_sim(n = 100)
-  f <- function(...) rpf(d$x, d$y, ntrees = 10, ...)
+  f <- function(...) rpf_050(d$x, d$y, ntrees = 10, ...)
   expect_error(f(tune = "full"), "tune")
   expect_error(f(tune = NA), "tune")
   expect_error(f(tune = TRUE, split_try = 3), "split_try")

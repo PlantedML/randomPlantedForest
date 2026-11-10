@@ -116,8 +116,8 @@ test_that("prune = TRUE prunes classification forests too, is an error for deter
     "not available with `deterministic = TRUE`"
   )
   expect_error(rpf(y ~ ., data = d, ntrees = 2, prune = NA), "prune")
-  expect_error(rpf(y ~ ., data = d, ntrees = 2, max_panels = 0), "max_panels")
-  expect_error(rpf(y ~ ., data = d, ntrees = 2, max_panels = 2.5), "max_panels")
+  expect_error(rpf_050(y ~ ., data = d, ntrees = 2, max_panels = 0), "max_panels")
+  expect_error(rpf_050(y ~ ., data = d, ntrees = 2, max_panels = 2.5), "max_panels")
   # the errors name rpf()
   err <- tryCatch(rpf(y ~ ., data = d, ntrees = 1, deterministic = TRUE, prune = TRUE), error = identity)
   expect_match(conditionMessage(err), "deterministic")

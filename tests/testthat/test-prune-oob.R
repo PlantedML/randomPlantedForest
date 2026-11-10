@@ -10,7 +10,7 @@ oob_sim <- function(n = 400, seed = 11) {
 
 oob_fit <- function(d, max_interaction = 2, ntrees = 20, ...) {
   set.seed(5)
-  rpf(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 40, ...)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 40, ...)
 }
 
 # One family's purified component f_S at the rows of X, directly from its leaves (mode 2's formula):
@@ -76,7 +76,7 @@ test_that("the in-bag counts are the bootstrap samples", {
   expect_true(all(det$fit$inbag() == 1))
   # classification records them too
   set.seed(5)
-  cfit <- rpf(d$x, factor(d$y > 1), ntrees = 4, splits = 10)
+  cfit <- rpf_050(d$x, factor(d$y > 1), ntrees = 4, splits = 10)
   expect_true(all(colSums(cfit$fit$inbag()) == 150))
 })
 
@@ -107,7 +107,7 @@ test_that("the OOB sums equal a per-family evaluation from the leaves", {
   x <- matrix(runif(n * 3), n, 3, dimnames = list(NULL, paste0("x", 1:3)))
   y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(n, sd = 0.3)
   set.seed(11)
-  fit <- rpf(x, y, max_interaction = 3, ntrees = 5, splits = 12)
+  fit <- rpf_050(x, y, max_interaction = 3, ntrees = 5, splits = 12)
   ib <- fit$fit$inbag()
   mod <- fit$fit$get_model()
   o <- fit$fit$purify_oob(0L, 1L)
@@ -143,7 +143,7 @@ test_that("the OOB sums equal a per-family evaluation from the leaves", {
   expect_equal(o$intercept1[, 1] + rowSums(o$sum1), pred1, tolerance = 1e-12)
   # all families together are the forest's components
   set.seed(11)
-  fit_all <- rpf(x, y, max_interaction = 3, ntrees = 5, splits = 12)
+  fit_all <- rpf_050(x, y, max_interaction = 3, ntrees = 5, splits = 12)
   purify(fit_all)
   brute_all <- sapply(seq_along(sets), function(k) {
     Reduce(`+`, lapply(mod, function(fam) family_component(fam, sets[[k]], x, x))) / length(mod)
@@ -184,7 +184,7 @@ test_that("OOB pruning keeps the true components and scores the candidates as do
   # with 20 families (7 OOB families per row) the OOB components are too noisy to tell R(1%) from R(0) here
   oob_fit <- function(d) {
     set.seed(5)
-    rpf(d$x, d$y, max_interaction = 2, ntrees = 100, splits = 40)
+    rpf_050(d$x, d$y, max_interaction = 2, ntrees = 100, splits = 40)
   }
   fit <- oob_fit(d)
   fold_id <- rep_len(1:5, nrow(d$x))

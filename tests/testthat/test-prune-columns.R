@@ -12,7 +12,7 @@ pl_data <- function(n = 400, p = 5, seed = 1) {
 
 pl_fit <- function(d, max_interaction = ncol(d$x), ntrees = 12) {
   set.seed(3)
-  rpf(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 80, split_try = 5, t_try = 0.5)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = 80, split_try = 5, t_try = 0.5)
 }
 
 test_that("purify_columns() gives purify_oob()'s sums and the purified components, and leaves the forest", {
@@ -138,7 +138,7 @@ test_that("CV, a given rule and deterministic forests are pruned without purifyi
     expect_length(pr$store$comps, sum(!names(pr$beta) %in% names(pr$display$coarse)))
   }
   set.seed(1)
-  det <- rpf(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 30, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 30, deterministic = TRUE)
   pr <- prune_components(det, d$x, d$y, folds = 2, seed = 1)
   expect_identical(pr$select_by, "cv")
   expect_false(is_purified(det))

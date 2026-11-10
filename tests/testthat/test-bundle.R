@@ -1,6 +1,6 @@
 test_that("bundle round-trip", {
   skip_if_not_installed("bundle")
-  fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
+  fit <- rpf_050(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   b <- bundle::bundle(fit)
   tmp <- tempfile(fileext = ".rds")
   saveRDS(b, tmp)
@@ -13,7 +13,7 @@ test_that("bundle round-trip of a pruned forest", {
   set.seed(1)
   x <- matrix(runif(200 * 3, -1, 1), ncol = 3, dimnames = list(NULL, paste0("x", 1:3)))
   y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(200, sd = 0.3)
-  fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 20)
+  fit <- rpf_050(x, y, max_interaction = 2, ntrees = 10, splits = 20)
   pr <- prune_components(fit, x, y, rule = "R", tau = 0.01)
   b <- bundle::bundle(pr)
   expect_s3_class(b, "bundled_rpf_pruned")

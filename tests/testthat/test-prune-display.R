@@ -10,7 +10,7 @@ pd_data <- function(n = 400, p = 6, seed = 1) {
 
 pd_fit <- function(d, max_interaction = ncol(d$x), nthreads = 1L) {
   set.seed(2)
-  rpf(
+  rpf_050(
     d$x,
     d$y,
     max_interaction = max_interaction,
@@ -260,7 +260,7 @@ test_that("the display after a given rule, a CV choice and a deterministic fores
   }
   # a deterministic forest: the default scores by CV, the display runs
   set.seed(3)
-  fd <- rpf(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 60, deterministic = TRUE)
+  fd <- rpf_050(d$x, d$y, max_interaction = 3, ntrees = 1, splits = 60, deterministic = TRUE)
   pdd <- prune_components(fd, d$x, d$y, max_panels = 2, folds = 3L, seed = 1)
   expect_identical(pdd$select_by, "cv")
   expect_false(is.null(pdd$display))

@@ -9,8 +9,11 @@ oobr_data <- function(n = 500, seed = 1) {
 }
 
 oobr_fit <- function(d, max_interaction = 3, ntrees = 20, splits = 60) {
+  # the exact draw: the tests below pin the components this fit's pruning keeps
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
   set.seed(1)
-  rpf(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits)
+  rpf_050(d$x, d$y, max_interaction = max_interaction, ntrees = ntrees, splits = splits)
 }
 
 # The OOB sums of purify_oob(), with the components named, and the number of OOB families per row
@@ -173,7 +176,7 @@ test_that("a given R falls back to in-sample coefficients where the choice falls
 
   # a deterministic forest: in sample, silently; an explicit select_by = "oob" is an error
   set.seed(1)
-  det <- rpf(d$x, d$y, max_interaction = 2, ntrees = 1, splits = 20, deterministic = TRUE)
+  det <- rpf_050(d$x, d$y, max_interaction = 2, ntrees = 1, splits = 20, deterministic = TRUE)
   expect_silent(pdet <- prune_components(det, d$x, d$y, rule = "R", tau = 0.01))
   expect_null(pdet$select_by)
   expect_equal(unname(c(pdet$intercept, pdet$beta)), unname(in_sample(det, pdet)), tolerance = 1e-10)

@@ -8,7 +8,7 @@ test_that("every split structure learns a regression signal", {
 
   for (structure in split_structures) {
     set.seed(2)
-    fit <- rpf(y ~ ., data = dat, max_interaction = 2, ntrees = 5, splits = 20, split_structure = structure)
+    fit <- rpf_050(y ~ ., data = dat, max_interaction = 2, ntrees = 5, splits = 20, split_structure = structure)
     pred <- predict(fit, dat)$.pred
 
     expect_identical(fit$params$split_structure, structure)
@@ -25,7 +25,7 @@ test_that("every split structure learns a classification signal", {
   for (structure in split_structures) {
     for (loss in c("L2", "exponential")) {
       set.seed(2)
-      fit <- rpf(y ~ ., data = dat, ntrees = 5, splits = 20, loss = loss, split_structure = structure)
+      fit <- rpf_050(y ~ ., data = dat, ntrees = 5, splits = 20, loss = loss, split_structure = structure)
       accuracy <- mean(predict(fit, dat, type = "class")$.pred_class == dat$y)
 
       expect_gt(accuracy, 0.8, label = paste(structure, loss))
@@ -41,7 +41,7 @@ test_that("every split structure is reproducible and independent of nthreads", {
   for (structure in split_structures) {
     fit_with <- function(nthreads) {
       set.seed(3)
-      fit <- rpf(
+      fit <- rpf_050(
         y ~ .,
         data = dat,
         max_interaction = 2,

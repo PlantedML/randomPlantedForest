@@ -12,14 +12,14 @@ xdat <- data.frame(
 
 # Basic model creation ----------------------------------------------------
 test_that("Binary: All numeric", {
-  bin_fit <- rpf(yfact ~ ., data = xdat)
+  bin_fit <- rpf_050(yfact ~ ., data = xdat)
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
 })
 
 test_that("Binary: All numeric, logit loss", {
-  bin_fit <- rpf(yfact ~ ., data = xdat, loss = "logit")
+  bin_fit <- rpf_050(yfact ~ ., data = xdat, loss = "logit")
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
@@ -27,7 +27,7 @@ test_that("Binary: All numeric, logit loss", {
 })
 
 test_that("Binary: All numeric, exponential loss", {
-  bin_fit <- rpf(yfact ~ ., data = xdat, loss = "exponential")
+  bin_fit <- rpf_050(yfact ~ ., data = xdat, loss = "exponential")
 
   expect_s3_class(bin_fit, "rpf")
   expect_s4_class(bin_fit$fit, "Rcpp_ClassificationRPF")
@@ -38,32 +38,32 @@ test_that("Binary: All numeric, exponential loss", {
 # Binary task detection ---------------------------------------------------
 
 test_that("Binary detection: factor", {
-  y_fact <- rpf(yfact ~ ., xdat)
+  y_fact <- rpf_050(yfact ~ ., xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
 })
 
 # Ambiguous, use regression and warn
 test_that("Binary detection: Regression for 0,1", {
   # y in 0, 1: Ambiguous, expect warning, but should classifybrows
-  expect_warning(rpf(y01 ~ ., xdat), regexp = "binary integer, assuming")
-  y_01 <- suppressWarnings(rpf(y01 ~ ., xdat))
+  expect_warning(rpf_050(y01 ~ ., xdat), regexp = "binary integer, assuming")
+  y_01 <- suppressWarnings(rpf_050(y01 ~ ., xdat))
   expect_s4_class(y_01$fit, "Rcpp_RandomPlantedForest")
 })
 
 test_that("Binary detection: Regression for 1,2", {
   # y in 1, 2: See 0,1
-  expect_warning(rpf(y12 ~ ., xdat), regexp = "binary integer, assuming")
-  y_12 <- suppressWarnings(rpf(y12 ~ ., xdat))
+  expect_warning(rpf_050(y12 ~ ., xdat), regexp = "binary integer, assuming")
+  y_12 <- suppressWarnings(rpf_050(y12 ~ ., xdat))
   expect_s4_class(y_12$fit, "Rcpp_RandomPlantedForest")
 })
 
 test_that("Binary detection: Fail for character, logical", {
   # y two-level character: should fail because ambiguous
   # similar problem as factor but w/o levels no order can be assumed
-  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 
   # y logical: should error and note what it expects
-  expect_error(rpf(ylogi ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ylogi ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ylogi ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ylogi ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 })

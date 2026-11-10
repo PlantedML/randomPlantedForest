@@ -1,5 +1,5 @@
 test_that("predict_components returns correct structure", {
-  rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2)
+  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2)
 
   m <- predict_components(rp, mtcars)
 
@@ -69,7 +69,7 @@ test_that("predict_components returns correct structure", {
 })
 
 test_that("predict_components returns requested predictors, in order", {
-  rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2)
+  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2)
 
   m <- predict_components(rp, mtcars, predictors = c("cyl", "am", "vs"))
 
@@ -81,7 +81,7 @@ test_that("predict_components returns requested predictors, in order", {
 })
 
 test_that("predict_components purifies if needed", {
-  rp <- rpf(mpg ~ ., data = mtcars[, c(1:4)], max_interaction = 2)
+  rp <- rpf_050(mpg ~ ., data = mtcars[, c(1:4)], max_interaction = 2)
 
   expect_false(is_purified(rp))
 
@@ -92,7 +92,7 @@ test_that("predict_components purifies if needed", {
 
 
 test_that("predict_components sums to prediction", {
-  rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
+  rp <- rpf_050(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
   m <- predict_components(rp, mtcars)
 
@@ -103,7 +103,7 @@ test_that("predict_components sums to prediction", {
 })
 
 test_that("predict_components errors appropriately", {
-  rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3)
+  rp <- rpf_050(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3)
 
   # Unknown predictors requested
   expect_error(predict_components(rp, mtcars, predictors = c("x1", "x2")))
@@ -131,7 +131,7 @@ test_that("predict_components errors appropriately", {
 })
 
 test_that(".predict_single_component is consistent with predictor order", {
-  rp <- rpf(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
+  rp <- rpf_050(mpg ~ cyl + am + gear, data = mtcars, max_interaction = 3, purify = TRUE)
 
   # Internal data preprocessing only done in predict_components to save time
   processed <- hardhat::forge(mtcars, rp$blueprint)
@@ -159,7 +159,7 @@ test_that(".predict_single_component is consistent with predictor order", {
 })
 
 test_that("duplicated rows get the same components as their originals", {
-  rp <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+  rp <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
   idx <- c(3, 1, 3, 2, 1, 1)
 
   once <- predict_components(rp, mtcars[1:3, ])
@@ -172,7 +172,7 @@ test_that("duplicated rows get the same components as their originals", {
 test_that("predict_components() takes a matrix and leaves a data.frame new_data unchanged", {
   set.seed(54)
   x <- as.matrix(mtcars[, 2:6])
-  fit <- rpf(x, mtcars$mpg, max_interaction = 2, ntrees = 8, splits = 30)
+  fit <- rpf_050(x, mtcars$mpg, max_interaction = 2, ntrees = 8, splits = 30)
   nd <- mtcars[1:12, 2:6]
   nd_before <- nd
 

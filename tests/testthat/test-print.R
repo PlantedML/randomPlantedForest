@@ -1,5 +1,5 @@
 test_that("print() summarises a regression fit and its purification state", {
-  fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 3)
+  fit <- rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 3)
   expect_snapshot(print(fit))
 
   purify(fit)
@@ -7,15 +7,15 @@ test_that("print() summarises a regression fit and its purification state", {
 })
 
 test_that("print() covers x/y fits, classification losses and deterministic fits", {
-  fit_logit <- rpf(x = iris[, 1:4], y = iris$Species, ntrees = 1, loss = "logit", deterministic = TRUE)
+  fit_logit <- rpf_050(x = iris[, 1:4], y = iris$Species, ntrees = 1, loss = "logit", deterministic = TRUE)
   expect_snapshot(print(fit_logit))
 
-  fit_l2 <- rpf(Species ~ ., data = iris, ntrees = 2, max_interaction = 1, loss = "L2")
+  fit_l2 <- rpf_050(Species ~ ., data = iris, ntrees = 2, max_interaction = 1, loss = "L2")
   expect_snapshot(print(fit_l2))
 })
 
 test_that("print() returns its input invisibly and matches format()", {
-  fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 2)
+  fit <- rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 2)
 
   output <- capture.output(result <- withVisible(print(fit)))
 
@@ -25,7 +25,7 @@ test_that("print() returns its input invisibly and matches format()", {
 })
 
 test_that("an exported forest prints compactly", {
-  fit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 3, export_forest = TRUE)
+  fit <- rpf_050(mpg ~ cyl + wt, data = mtcars, ntrees = 3, export_forest = TRUE)
 
   expect_snapshot({
     print(fit$forest)

@@ -118,7 +118,8 @@ tune_resolve <- function(tune, call) {
 # Which of the settings that `tune` takes over the user gave in the call of an rpf() method (its environment)
 tune_given <- function(env) {
   args <- c("splits", "split_try", "t_try", "min_leaf_rows", "prune")
-  vapply(args, function(a) !eval(call("missing", as.name(a)), env), logical(1))
+  # an argument given as NULL counts as not given (NULL is the default of each)
+  vapply(args, function(a) !eval(call("missing", as.name(a)), env) && !is.null(get(a, envir = env)), logical(1))
 }
 
 # The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none

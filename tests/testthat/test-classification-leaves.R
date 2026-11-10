@@ -67,17 +67,17 @@ test_that("loss L2 on a 0/1 response is the regression fit, bit for bit, with mi
   }
 })
 
-test_that("the defaults are the fit of before; the options change random fits", {
+test_that("the defaults are the fast draw and min_leaf_rows = 1; the options change random fits", {
   d <- cl_sim()
   fit <- function(...) {
     set.seed(9)
-    rpf(d$x, d$y, ntrees = 3, splits = 40, ...)$fit$get_model()
+    rpf_050(d$x, d$y, ntrees = 3, splits = 40, ...)$fit$get_model()
   }
   default <- fit()
   expect_identical(fit(min_leaf_rows = 1L), default)
-  expect_identical(with_exact_draw(TRUE, fit()), default)
+  expect_identical(with_exact_draw(FALSE, fit()), default)
   expect_false(identical(fit(min_leaf_rows = 10L), default))
-  expect_false(identical(with_exact_draw(FALSE, fit()), default))
+  expect_false(identical(with_exact_draw(TRUE, fit()), default))
   # the fast draw is reproducible and the same on any number of threads
   expect_identical(with_exact_draw(FALSE, fit(nthreads = 2L)), with_exact_draw(FALSE, fit()))
 })
@@ -93,7 +93,7 @@ test_that("classification leaves keep min_leaf_rows rows, and no infeasible entr
         set.seed(3)
         with_exact_draw(
           exact,
-          rpf(
+          rpf_050(
             d$x,
             d$y,
             loss = loss,
@@ -121,24 +121,29 @@ test_that("classification leaves keep min_leaf_rows rows, and no infeasible entr
   d <- cl_sim()
   for (exact in c(TRUE, FALSE)) {
     set.seed(4)
-    f <- with_exact_draw(exact, rpf(d$x, d$y, ntrees = 3, splits = 60, min_leaf_rows = 5))
+    f <- with_exact_draw(exact, rpf_050(d$x, d$y, ntrees = 3, splits = 60, min_leaf_rows = 5))
     expect_gte(min(unlist(lapply(cl_leaf_stats(f, d$x), `[[`, "rows"))), 5)
   }
   # deterministic: all rows once
-  f <- rpf(d$x, d$y, ntrees = 1, splits = 60, deterministic = TRUE, min_leaf_rows = 15)
+  f <- rpf_050(d$x, d$y, ntrees = 1, splits = 60, deterministic = TRUE, min_leaf_rows = 15)
   expect_gte(min(unlist(lapply(cl_leaf_stats(f, d$x), `[[`, "rows"))), 15)
 })
 
 test_that("classification min_leaf_rows is validated, stored, printed and restored", {
   d <- cl_sim()
-  expect_error(rpf(d$x, d$y, ntrees = 1, min_leaf_rows = 5, split_structure = "hist"), "leaves")
+  expect_error(rpf_050(d$x, d$y, ntrees = 1, min_leaf_rows = 5, split_structure = "hist"), "leaves")
   set.seed(2)
-  f <- with_exact_draw(FALSE, rpf(d$x, d$y, ntrees = 2, splits = 20, min_leaf_rows = 10))
+  f <- with_exact_draw(FALSE, rpf_050(d$x, d$y, ntrees = 2, splits = 20, min_leaf_rows = 10))
   expect_identical(f$params$min_leaf_rows, 10L)
   expect_false(f$params$exact_draw)
   out <- paste(format(f), collapse = "\n")
   expect_match(out, "min_leaf_rows: 10")
-  expect_match(out, "fast draw")
+  # print() names the draw only when it is the exact one (not the default)
+  expect_no_match(out, "draw")
+  expect_match(
+    paste(format(with_exact_draw(TRUE, rpf_050(d$x, d$y, ntrees = 2, splits = 20))), collapse = "\n"),
+    "exact draw"
+  )
   r <- rpf_unmarshal(rpf_marshal(f))
   expect_identical(predict(r, d$x, type = "prob"), predict(f, d$x, type = "prob"))
   # [..., split_mode, delta, epsilon, min_leaf_rows, exact_draw]; models saved

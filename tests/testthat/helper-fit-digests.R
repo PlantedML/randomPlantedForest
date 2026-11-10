@@ -6,8 +6,9 @@
 # - a purified fit: the predict_components() matrix (columns in the returned order) and intercept; separately the
 #   component names; separately predict() after purify().
 #
-# Every argument whose default may change is given explicitly (max_interaction, ntrees, splits, split_try, t_try,
-# loss), and options(randomPlantedForest.exact_draw = TRUE); the deterministic fits use ntrees = 1. Digests hold per platform only (libm and
+# Every argument whose default differs from master's is given explicitly (max_interaction, ntrees, splits, split_try,
+# t_try, loss, prune = FALSE), and options(randomPlantedForest.exact_draw = TRUE), so the fits are master's settings;
+# the deterministic fits use ntrees = 1. Digests hold per platform only (libm and
 # std::uniform_int_distribution differ between platforms), so the test pins them for macOS arm64.
 
 port_digest_data <- function() {
@@ -92,6 +93,7 @@ port_fit_numbers_all <- function() {
         split_structure = s,
         split_try = 5,
         t_try = 0.5,
+        prune = FALSE,
         nthreads = cfg[["nt"]],
         deterministic = cfg[["det"]] == 1
       )
@@ -107,6 +109,7 @@ port_fit_numbers_all <- function() {
       split_structure = s,
       split_try = 5,
       t_try = 0.5,
+      prune = FALSE,
       loss = "exponential"
     )
     out[[sprintf("cls_%s", s)]] <- port_fit_numbers(f, nd, type = "prob")
@@ -124,6 +127,7 @@ port_fit_numbers_all <- function() {
         split_structure = "leaves",
         split_try = 5,
         t_try = 0.5,
+        prune = FALSE,
         loss = l
       )
       out[[sprintf("loss%d_%s", k, l)]] <- port_fit_numbers(f, nd, type = "prob")
@@ -141,6 +145,7 @@ port_fit_numbers_all <- function() {
       split_structure = "leaves",
       split_try = 5,
       t_try = 0.5,
+      prune = FALSE,
       loss = if (is.null(type)) NULL else "exponential",
       nthreads = nthreads
     )

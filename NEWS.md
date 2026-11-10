@@ -1,5 +1,24 @@
 # randomPlantedForest (development version)
 
+## Breaking changes
+
+* `rpf()` has new defaults: a plain `rpf(y ~ ., data)` now returns the pruned model (class `rpf_pruned`), for regression and classification.
+  The new defaults, each switched by its argument:
+  - `splits = NULL`: the number of splits is chosen out of bag while the forest grows (was 30).
+  - `prune = NULL`: the forest is pruned by `prune_components()` with its defaults, and every kept component of three or more predictors is shown in at most `max_panels = 10` heat maps (was no pruning). With `deterministic = TRUE` it means `prune = FALSE` and `splits = NULL` means 30, as there are no out-of-bag rows.
+  - `split_try = NULL, t_try = NULL`: 3 thresholds per candidate and 10% of the possible splits per round for `split_structure = "leaves"` (was 10 / 0.4, still the default of the other split structures). On 48 simulated and benchmark data sets this greediness had 5.7% to 6.8% lower test error than 10 / 0.4.
+  - The split candidates of `"leaves"` are drawn by the fast draw (`options(randomPlantedForest.exact_draw = FALSE)`, now the default): the same distribution as the exact draw, with other random numbers, so the same seed gives another forest. It is about 2.5 times as fast on larger data.
+  - `max_interaction = 3` (was 2). Order 3 had 15% lower test error than order 2 on simulated data and 1.5% on California housing; no limit (order p) was worse on California housing and 11 to 41 times slower.
+  - `ntrees = 200` (was 50): more families had lower test error at every order (2% per doubling) and sparser pruned models.
+  The loss is unchanged: `"L2"` for regression and `"exponential"` for classification (with more than two classes the multiclass exponential loss SAMME, see Bug fixes).
+  So every default fit changes, regression and classification, and `rpf()` returns an `rpf_pruned` object instead of an `rpf` unless `prune = FALSE`.
+  To fit as before, give master's settings and the exact draw:
+  ```r
+  options(randomPlantedForest.exact_draw = TRUE)
+  rpf(..., max_interaction = 2, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4, prune = FALSE)
+  ```
+  The default call takes longer than before: about 1 s on `mtcars`, 2 s on `iris`, and about 2 minutes on California housing (16,512 rows) at 8 threads.
+
 ## New features
 
 * `rpf()` gains `keep_level_order`, to keep the level order of factor predictors instead of ordering their levels by the outcome.

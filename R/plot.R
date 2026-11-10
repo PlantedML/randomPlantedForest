@@ -29,7 +29,8 @@
 #'   * `order`: The number of variables of the tree, `0` for the intercept.
 #'   * `box`: The index of the box within its tree.
 #'   * `value`: The value of the box. For multiclass classification, one
-#'     column `value_<class>` per outcome level instead.
+#'     column `value_<class>` per outcome level instead (for `loss = "logit"`,
+#'     per level but the first, the reference, whose score is 0).
 #'   * `<variable>_lower`, `<variable>_upper` for every predictor: The bounds of
 #'     the box, `NA` for variables the tree does not use.
 #'
@@ -68,7 +69,12 @@ rpf_boxes <- function(x, family = 1L, ...) {
   if (ncol(values) == 1) {
     out$value <- values[, 1]
   } else {
-    colnames(values) <- paste0("value_", levels(x$blueprint$ptypes$outcomes[[1]]))
+    outcome_levels <- levels(x$blueprint$ptypes$outcomes[[1]])
+    # logit models the K - 1 levels after the first (the reference) against it
+    if (identical(x$params$loss, "logit")) {
+      outcome_levels <- outcome_levels[-1]
+    }
+    colnames(values) <- paste0("value_", outcome_levels)
     out <- cbind(out, values)
   }
 
@@ -189,7 +195,9 @@ grid_boxes <- function(family) {
 #'   the `tree` column of [rpf_boxes()], e.g. `c("x1", "x1:x2")`. `NULL` draws
 #'   all trees up to `max_interaction`.
 #' @param class `[character(1) | NULL: NULL]`: For multiclass classification,
-#'   the outcome level whose values to plot. `NULL` uses the first level.
+#'   the outcome level whose values to plot. `NULL` uses the first level (for
+#'   `loss = "logit"`, the first level after the reference level, which has no
+#'   values of its own).
 #' @param factor_levels `[logical(1): TRUE]`: Label factors with their
 #'   levels instead of integer codes. Levels are in the order used in the fit:
 #'   ordered by the outcome, or in their own order with `keep_level_order` (see
@@ -321,7 +329,7 @@ plot_family_boxes <- function(boxes, family, levels, value_label, remainder) {
 #' @noRd
 value_column <- function(x, boxes, class) {
   if (!"value" %in% names(boxes)) {
-    outcome_levels <- levels(x$blueprint$ptypes$outcomes[[1]])
+    outcome_levels <- sub("^value_", "", grep("^value_", names(boxes), value = TRUE))
     class <- class %||% outcome_levels[1]
     checkmate::assert_choice(class, outcome_levels)
     return(paste0("value_", class))

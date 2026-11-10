@@ -10,7 +10,7 @@ xdat <- data.frame(
 
 # Basic model creation ----------------------------------------------------
 test_that("Multiclass: All numeric", {
-  classif_fit <- rpf(yfact ~ ., data = xdat)
+  classif_fit <- rpf_050(yfact ~ ., data = xdat)
 
   expect_s3_class(classif_fit, "rpf")
   expect_s4_class(classif_fit$fit, "Rcpp_ClassificationRPF")
@@ -19,16 +19,16 @@ test_that("Multiclass: All numeric", {
 # Classif task detection ---------------------------------------------------
 test_that("Multiclass: Detection works", {
   # y 3-level factor
-  y_fact <- rpf(yfact ~ ., xdat)
+  y_fact <- rpf_050(yfact ~ ., xdat)
   expect_s4_class(y_fact$fit, "Rcpp_ClassificationRPF")
 
   # y is integer: should _not_ be treated as classif task
-  y_int <- rpf(yint ~ ., xdat)
+  y_int <- rpf_050(yint ~ ., xdat)
   expect_failure(expect_s4_class(y_int$fit, "Rcpp_ClassificationRPF"))
 
   # y 3-level character
-  expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
+  expect_error(rpf_050(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 })
 
 # Multiclass logit learns signal (#40) -------------------------------------
@@ -39,14 +39,14 @@ test_that("Multiclass logit learns signal (#40)", {
   dat$y <- factor(ifelse(dat$x1 > 0.5, "a", ifelse(dat$x2 > 0.5, "b", "c")))
   idx <- sample(n, 280)
 
-  fit <- rpf(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 10, max_interaction = 2)
+  fit <- rpf_050(y ~ ., data = dat[idx, ], loss = "logit", ntrees = 10, max_interaction = 2)
   pred <- predict(fit, dat[-idx, ], type = "class")
 
   expect_gt(mean(pred$.pred_class == dat$y[-idx]), 0.85)
 })
 
 test_that("Remainder is calculcated correctly", {
-  classif_fit <- rpf(yfact ~ ., data = xdat, max_interaction = 3)
+  classif_fit <- rpf_050(yfact ~ ., data = xdat, max_interaction = 3)
 
   components <- predict_components(classif_fit, xdat, max_interaction = 2)
 
@@ -58,7 +58,7 @@ test_that("Remainder is calculcated correctly", {
 
 test_that("Multiclass: components and class-specific intercept sum to prediction", {
   for (loss in c("L2", "logit", "exponential")) {
-    fit <- rpf(yfact ~ ., data = xdat, max_interaction = 2, ntrees = 10, loss = loss)
+    fit <- rpf_050(yfact ~ ., data = xdat, max_interaction = 2, ntrees = 10, loss = loss)
     components <- predict_components(fit, xdat)
     pred <- predict(fit, xdat, type = "numeric")
 
