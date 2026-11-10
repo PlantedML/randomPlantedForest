@@ -1033,6 +1033,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
   std::vector<ResultingTreeCandidate> possible_trees;
   if (split_structure_mode_ == 0) {
     for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      if (!this->dims_allowed({feature_dim}))
+        continue;
       auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
       curr_family.insert({{feature_dim}, treePtr});
       possible_trees.emplace_back(treePtr);
@@ -1043,7 +1045,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
         std::set<int> res_dims = T->split_dims;
         res_dims.insert(feature_dim);
         res_dims.erase(0);
-        if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction)
+        if (!this->dims_allowed(res_dims))
           continue;
         if (!this->leafCandidateExists(possible_splits, T, li, feature_dim))
           possible_splits.emplace_back(feature_dim, T, li);
@@ -1054,6 +1056,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       add_leaf_candidates(null_tree, 0);
   } else {
     for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      if (!this->dims_allowed({feature_dim}))
+        continue;
       auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
       curr_family.insert({{feature_dim}, treePtr});
       possible_splits.emplace_back(feature_dim, treePtr, (size_t)0);
@@ -1137,7 +1141,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           U.insert(feature_dim);
           if (U.size() == Dprime.size())
             continue;
-          if (max_interaction >= 0 && U.size() > (size_t)max_interaction)
+          if (!this->dims_allowed(U))
             continue;
           if (this->resultingTreeExists(possible_trees, U))
             continue;
@@ -1158,7 +1162,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           curr_dims.erase(0);
           if (possibleExists(feature_dim, possible_splits, curr_dims))
             continue;
-          if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
+          if (!this->dims_allowed(curr_dims))
             continue;
           if (auto found = treeExists(curr_dims, curr_family))
             possible_splits.emplace_back(feature_dim, found, (size_t)0);
@@ -1452,7 +1456,7 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
           std::set<int> res_dims = T->split_dims;
           res_dims.insert(feature_dim);
           res_dims.erase(0);
-          if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction)
+          if (!this->dims_allowed(res_dims))
             continue;
           if (!this->leafCandidateExists(possible_splits, T, li, feature_dim))
             possible_splits.emplace_back(feature_dim, T, li);

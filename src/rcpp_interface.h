@@ -14,8 +14,13 @@ std::set<int> to_int_set(const Rcpp::NumericVector &v);
 
 // Positional parameter vectors as built by rpf_param_vector() in R/rpf.R
 RPFParams parse_rpf_params(const std::vector<double> &pars);
-RandomPlantedForest make_rpf(const Rcpp::NumericVector &parameters);
-ClassificationRPF make_cpf(const std::string &loss, const Rcpp::NumericVector &parameters, bool fitting);
+RandomPlantedForest make_rpf(const Rcpp::NumericVector &parameters, const Rcpp::List &constraints = Rcpp::List());
+ClassificationRPF make_cpf(
+    const std::string &loss,
+    const Rcpp::NumericVector &parameters,
+    bool fitting,
+    const Rcpp::List &constraints = Rcpp::List()
+);
 
 Rcpp::List model_to_list(const std::vector<FamilyExport> &model, int feature_size);
 std::vector<FamilyExport> list_to_model(const Rcpp::List &model, int feature_size);
@@ -56,6 +61,30 @@ public:
       const Rcpp::NumericVector parameters
   )
       : core(make_cpf(loss, parameters, true))
+  {
+    connect_to_r(core);
+    fit_data(samples_Y, samples_X, parameters);
+  }
+  // Construct and fit with interaction constraints (a list of allowed feature sets, 1-based column indices)
+  RcppForest(
+      const Rcpp::NumericMatrix &samples_Y,
+      const Rcpp::NumericMatrix &samples_X,
+      const Rcpp::NumericVector parameters,
+      const Rcpp::List constraints
+  )
+      : core(make_rpf(parameters, constraints))
+  {
+    connect_to_r(core);
+    fit_data(samples_Y, samples_X, parameters);
+  }
+  RcppForest(
+      const Rcpp::NumericMatrix &samples_Y,
+      const Rcpp::NumericMatrix &samples_X,
+      const std::string loss,
+      const Rcpp::NumericVector parameters,
+      const Rcpp::List constraints
+  )
+      : core(make_cpf(loss, parameters, true, constraints))
   {
     connect_to_r(core);
     fit_data(samples_Y, samples_X, parameters);

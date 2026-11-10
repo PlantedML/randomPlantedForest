@@ -57,13 +57,29 @@ RPFParams parse_rpf_params(const std::vector<double> &pars)
   return p;
 }
 
-RandomPlantedForest make_rpf(const NumericVector &parameters)
+std::vector<std::set<int>> parse_constraints(const List &constraints)
 {
-  return RandomPlantedForest(parse_rpf_params(as<std::vector<double>>(parameters)));
+  std::vector<std::set<int>> out;
+  for (R_xlen_t i = 0; i < constraints.size(); ++i) {
+    std::vector<int> dims = as<std::vector<int>>(constraints[i]);
+    for (int d : dims)
+      if (d < 1)
+        Rcpp::stop("interaction constraints: feature indices must be >= 1, got %d", d);
+    out.emplace_back(dims.begin(), dims.end());
+  }
+  return out;
+}
+
+RandomPlantedForest make_rpf(const NumericVector &parameters, const List &constraints)
+{
+  RPFParams params = parse_rpf_params(as<std::vector<double>>(parameters));
+  params.interaction_constraints = parse_constraints(constraints);
+  return RandomPlantedForest(params);
 }
 
 // Classification vectors append delta and epsilon to the 13 regression values.
-ClassificationRPF make_cpf(const std::string &loss, const NumericVector &parameters, bool fitting)
+ClassificationRPF
+make_cpf(const std::string &loss, const NumericVector &parameters, bool fitting, const List &constraints)
 {
   std::vector<double> pars = as<std::vector<double>>(parameters);
   std::vector<double> base(pars.begin(), pars.begin() + std::min<size_t>(pars.size(), pars.size() >= 13 ? 13 : 12));
@@ -78,6 +94,7 @@ ClassificationRPF make_cpf(const std::string &loss, const NumericVector &paramet
     params = RPFParams();
     params.split_structure_mode = mode;
   }
+  params.interaction_constraints = parse_constraints(constraints);
   return ClassificationRPF(loss, params, delta, epsilon);
 }
 

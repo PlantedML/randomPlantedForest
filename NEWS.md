@@ -15,6 +15,10 @@
   This fits about 2.5 times as fast on larger data, for example 218 s → 86 s at 1 thread on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
   It draws from the same distribution and leaves out the same candidates under `min_leaf_rows`, but with other random numbers, so the same seed gives another forest.
   The default `TRUE` fits the same models as before, bit for bit.
+* `rpf()` gains `interaction_constraints`, a list of feature sets that restricts which interactions the forest may form, as in xgboost: a tree on the predictors `T` is grown only if `T` is a subset of one of the sets.
+  The sets are given by predictor names or column indices (with a formula, indices follow the formula's predictors; with a recipe, names only).
+  They apply together with `max_interaction`, for every `split_structure`, in regression and classification, and `print()` shows them.
+  The default `NULL` leaves fits unchanged.
 
 ## Bug fixes
 

@@ -99,6 +99,28 @@ RandomPlantedForest::RandomPlantedForest(const RPFParams &params)
     throw std::invalid_argument("min_leaf_rows > 1 needs split_structure \"leaves\".");
   this->min_leaf_rows_ = params.min_leaf_rows;
   this->exact_draw_ = params.exact_draw;
+  this->interaction_constraints_ = params.interaction_constraints;
+}
+
+bool RandomPlantedForest::dims_allowed(const std::set<int> &dims) const
+{
+  size_t n = dims.size() - dims.count(0);
+  if (max_interaction >= 0 && n > (size_t)max_interaction)
+    return false;
+  if (interaction_constraints_.empty())
+    return true;
+  for (const auto &allowed : interaction_constraints_) {
+    bool subset = true;
+    for (int d : dims) {
+      if (d != 0 && !allowed.count(d)) {
+        subset = false;
+        break;
+      }
+    }
+    if (subset)
+      return true;
+  }
+  return false;
 }
 
 void RandomPlantedForest::warn(const std::string &msg)
@@ -385,6 +407,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   if (split_structure_mode_ == 0) {
     std::vector<ResultingTreeCandidate> possible_trees;
     for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      if (!dims_allowed({feature_dim}))
+        continue;
       auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
       curr_family.insert({{feature_dim}, treePtr});
       possible_trees.emplace_back(treePtr);
@@ -428,7 +452,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
           U.insert(feature_dim);
           if (U.size() == Dprime.size())
             continue;
-          if (max_interaction >= 0 && U.size() > (size_t)max_interaction)
+          if (!dims_allowed(U))
             continue;
           if (resultingTreeExists(possible_trees, U))
             continue;
@@ -555,7 +579,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         std::set<int> res_dims = T->split_dims;
         res_dims.insert(feature_dim);
         res_dims.erase(0);
-        if (max_interaction >= 0 && res_dims.size() > (size_t)max_interaction)
+        if (!dims_allowed(res_dims))
           continue;
         if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
           possible_splits.emplace_back(feature_dim, T, li);
@@ -745,6 +769,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
   // cur_trees_1 and cur_trees_2: initialize with {j} trees
   for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+    if (!dims_allowed({feature_dim}))
+      continue;
     auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
     curr_family.insert({{feature_dim}, treePtr});
     // leaf_idx unused for these modes
@@ -783,7 +809,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         curr_dims.erase(0);
         if (possibleExists(feature_dim, possible_splits, curr_dims))
           continue;
-        if (max_interaction >= 0 && curr_dims.size() > (size_t)max_interaction)
+        if (!dims_allowed(curr_dims))
           continue;
         if (auto found = treeExists(curr_dims, curr_family))
           possible_splits.emplace_back(feature_dim, found, static_cast<size_t>(0));
