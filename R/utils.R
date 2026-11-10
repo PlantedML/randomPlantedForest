@@ -432,6 +432,14 @@ softmax <- function(x) {
   exp(x - lse)
 }
 
+# The fit's predictor columns, in the fit's order (the columns of the C++ forest).
+# Not names(blueprint$ptypes$predictors): those are the raw columns a formula reads, while the fit has a column
+# per term (log(x1), I(x1^2); y ~ . - x3 drops x3), and hardhat::mold() puts factors last.
+fit_predictor_names <- function(object) {
+  ptype <- hardhat::forge(object$blueprint$ptypes$predictors, object$blueprint)$predictors
+  colnames(preprocess_predictors_predict(object, ptype))
+}
+
 # Outcome levels represented by columns of the C++ prediction matrix.
 # Multiclass logit uses reference-class encoding: the first level has no column.
 model_outcome_levels <- function(object) {

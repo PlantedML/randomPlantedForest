@@ -15,9 +15,10 @@ predict_components(object, new_data, max_interaction = NULL, predictors = NULL)
 interactions to consider. \code{NULL} uses the \code{max_interaction} parameter from the \code{\link{rpf}} object.
 Must be between \code{1} (main effects only) and the \code{max_interaction} of the \code{\link{rpf}} object.}
 
-\item{predictors}{\verb{[character | NULL: NULL]}: Vector of one or more column names of predictor variables
-in \code{new_data} to extract components for.
-If \code{NULL}, all variables and their interactions are returned.}
+\item{predictors}{\verb{[character | NULL: NULL]}: Vector of one or more names of the forest's predictors
+to extract components for. These are the columns the forest was fitted on: with a formula, its terms,
+such as \code{log(x1)}.
+If \code{NULL}, all predictors and their interactions are returned, in the order of the fit's columns.}
 }
 \value{
 A \code{list} with elements:
@@ -31,13 +32,13 @@ the number of \code{target_levels}: the levels of the outcome, or for \code{loss
 all levels but the first (the reference level).
 \item \code{intercept} (\code{numeric}): Expected value of the prediction.
 For multiclass classification, one value per target level, named by \code{target_levels}.
-\item \code{x} (\code{\link[data.table:data.table]{data.table}}): Copy of \code{new_data} containing predictors selected
-by \code{predictors}.
+\item \code{x} (\code{\link[data.table:data.table]{data.table}}): The predictors selected by \code{predictors}, as the forest
+sees them in \code{new_data} (with a formula, its terms, such as \code{log(x1)}).
 \item \code{target_levels} (\code{character}): For multiclass classification only: Vector of target levels
 which can be used to disassemble \code{m}, as names include both term and target level.
-\item \code{remainder} (\code{numeric}): Only if \code{m} leaves out components of the forest: if \code{max_interaction}
-(lowered to the number of \code{predictors}) is below that of the \code{\link{rpf}} object, or if the forest was purified
-with a \code{maxp_interaction} below it (see \code{\link[=purify]{purify()}}). The prediction minus \code{intercept} and \code{m}'s row sums,
+\item \code{remainder} (\code{numeric}): Only if \code{m} leaves out components of the forest: if \code{predictors} leaves out
+some of the forest's predictors, if \code{max_interaction} (lowered to the number of \code{predictors}) is below that
+of the \code{\link{rpf}} object, or if the forest was purified with a \code{maxp_interaction} below it (see \code{\link[=purify]{purify()}}). The prediction minus \code{intercept} and \code{m}'s row sums,
 so that the three sum to the prediction.
 For multiclass classification, one column per target level.
 }
@@ -49,7 +50,8 @@ The sum of all components equals the overall predicted value for an observation.
 \details{
 Extracts all possible components up to \code{max_interaction} degrees,
 up to the value set when calling \code{\link[=rpf]{rpf()}}. The intercept is always included.
-Optionally \code{predictors} can be specified to only include components including the given variables.
+Optionally \code{predictors} can be specified to only include components made of the given predictors;
+the sum of the other components is returned as \code{remainder}.
 If \code{max_interaction} is greater than \code{length(predictors)}, the \code{max_interaction} will be lowered accordingly.
 
 All components are evaluated in one pass over the rows of \code{new_data}.

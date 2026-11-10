@@ -188,3 +188,107 @@ test_that("predict_components() takes a matrix and leaves a data.frame new_data 
   expect_identical(names(pc_mat1$x), c("hp", "cyl"))
   expect_identical(class(nd), "data.frame")
 })
+
+# intercept + m + remainder minus predict(type = "numeric"), per class for multiclass
+components_gap <- function(object, pc, new_data) {
+  pred <- as.matrix(predict(object, new_data, type = "numeric"))
+  m <- as.matrix(pc$m)
+  rem <- if (is.null(pc$remainder)) 0 else as.matrix(pc$remainder)
+  if (is.null(pc$target_levels)) {
+    return(max(abs(pc$intercept + rowSums(m) + rem - pred[, 1])))
+  }
+  gaps <- vapply(
+    seq_along(pc$target_levels),
+    function(k) {
+      cols <- endsWith(colnames(m), paste0("__class:", pc$target_levels[k]))
+      rem_k <- if (is.null(pc$remainder)) 0 else rem[, k]
+      max(abs(pc$intercept[[k]] + rowSums(m[, cols, drop = FALSE]) + rem_k - pred[, k]))
+    },
+    numeric(1)
+  )
+  max(gaps)
+}
+
+test_that("a subset of predictors returns the other components as remainder", {
+  set.seed(7)
+  n <- 150
+  d <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
+  lin <- d$x1 + 2 * d$x2 * d$x3
+  d_reg <- cbind(d, y = lin + rnorm(n, sd = 0.2))
+  d_bin <- cbind(d, y = factor(lin > stats::median(lin), labels = c("lo", "hi")))
+  d_3 <- cbind(d, y = cut(lin, stats::quantile(lin, 0:3 / 3), include.lowest = TRUE, labels = c("a", "b", "c")))
+
+  for (dd in list(d_reg, d_bin, d_3)) {
+    set.seed(1)
+    fit <- rpf(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 30)
+    for (purified in c(FALSE, TRUE)) {
+      # unpurified: predict_components() purifies in place; then on a forest purified with mode = 1
+      if (purified) {
+        purify(fit, mode = 1)
+      }
+      for (preds in list(c("x1", "x2"), "x3", c("x3", "x1"))) {
+        # at the fit's order (the default), and below it
+        for (k in list(NULL, 1L)) {
+          pc <- predict_components(fit, dd[1:40, ], max_interaction = k, predictors = preds)
+          expect_false(is.null(pc$remainder))
+          expect_lt(components_gap(fit, pc, dd[1:40, ]), 1e-10)
+        }
+      }
+      # all predictors at the fit's order: nothing left out, no remainder
+      pc <- predict_components(fit, dd[1:40, ])
+      expect_null(pc$remainder)
+      expect_lt(components_gap(fit, pc, dd[1:40, ]), 1e-10)
+    }
+  }
+})
+
+test_that("predict_components() works with formula terms that are not raw columns", {
+  set.seed(8)
+  n <- 120
+  d <- data.frame(x1 = runif(n, 0.1, 1), x2 = runif(n), x3 = runif(n))
+  d$y <- log(d$x1) + d$x2^2 * d$x3 + rnorm(n, sd = 0.1)
+
+  cases <- list(
+    list(formula = y ~ log(x1) + x2 + x3, names = c("log(x1)", "x2", "x3")),
+    list(formula = y ~ I(x2^2) + x1, names = c("I(x2^2)", "x1")),
+    list(formula = y ~ . - x3, names = c("x1", "x2"))
+  )
+  for (case in cases) {
+    set.seed(1)
+    fit <- rpf(case$formula, data = d, max_interaction = 2, ntrees = 5, splits = 20)
+    pc <- predict_components(fit, d[1:30, ], max_interaction = 1)
+    expect_named(pc$m, case$names)
+    expect_named(pc$x, case$names)
+    expect_lt(components_gap(fit, pc, d[1:30, ]), 1e-10)
+
+    pc <- predict_components(fit, d[1:30, ], predictors = case$names[1])
+    expect_named(pc$m, case$names[1])
+    expect_lt(components_gap(fit, pc, d[1:30, ]), 1e-10)
+  }
+  # x holds the term's values, as the forest sees them
+  set.seed(1)
+  fit <- rpf(y ~ log(x1) + x2, data = d, ntrees = 5, splits = 20)
+  expect_equal(predict_components(fit, d[1:30, ])$x[["log(x1)"]], log(d$x1[1:30]))
+})
+
+test_that("components follow the fit's column order when factors come first", {
+  set.seed(9)
+  n <- 150
+  d <- data.frame(f = factor(sample(c("u", "v", "w"), n, TRUE)), x1 = runif(n), x2 = runif(n))
+  d$y <- as.integer(d$f) * d$x1 + d$x2 + rnorm(n, sd = 0.2)
+  set.seed(1)
+  fit <- rpf(y ~ ., data = d, max_interaction = 2, ntrees = 5, splits = 30)
+
+  # hardhat::mold() puts the factor last
+  pc <- predict_components(fit, d[1:40, ])
+  expect_named(pc$m, c("x1", "x2", "f", "x1:x2", "f:x1", "f:x2"))
+  expect_null(pc$remainder)
+  expect_lt(components_gap(fit, pc, d[1:40, ]), 1e-10)
+  expect_identical(pc$x$f, d$f[1:40])
+
+  pc_f <- predict_components(fit, d[1:40, ], predictors = c("f", "x2"))
+  expect_named(pc_f$m, c("f", "x2", "f:x2"))
+  expect_equal(pc_f$m$f, pc$m$f)
+  expect_equal(pc_f$m[["f:x2"]], pc$m[["f:x2"]])
+  expect_lt(components_gap(fit, pc_f, d[1:40, ]), 1e-10)
+})
