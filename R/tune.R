@@ -140,8 +140,14 @@ tune_check_call <- function(control, given, splits, prune, mode, deterministic, 
   if (length(set) > 0) {
     cli::cli_abort(
       c(
-        "{.arg tune} chooses {.arg split_try}, {.arg t_try} and {.arg min_leaf_rows}: don't give {.arg {set}}.",
-        "i" = "Set the values to search with {.fn tune_control}."
+        paste(
+          "{.arg tune} searches {.arg split_try} and {.arg t_try} (the greediness ladder) and {.arg min_leaf_rows}:",
+          "don't give {.arg {set}}, even at {?its/their} default{?s}."
+        ),
+        "i" = paste(
+          "Set the values to search with {.fn tune_control}, for example {.code tune_control(min_leaf_rows = 1)}",
+          "to keep {.arg min_leaf_rows} at 1."
+        )
       ),
       call = call
     )
@@ -238,9 +244,11 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
     res <- fit_at(i, m)
     rng_fit[[k]] <<- get(".Random.seed", envir = globalenv())
     pr <- rpf_prune(res, processed, Inf, call = call)
-    # the chosen candidate's row of the out-of-bag table: its corrected OOB RMSE is the forest's score
+    # the chosen candidate's row of the out-of-bag table: its corrected OOB RMSE is the forest's score. The forest's
+    # own error on the same basis is that of rule D at tau 0, which keeps every nonzero component (the path's own
+    # correction leaves the rows without both halves of OOB families uncorrected: oob_path_table())
     j <- which(pr$oob$rule == pr$rule & pr$oob$tau == pr$tau)[1]
-    path <- res$oob_path
+    j0 <- which(pr$oob$rule == "D" & pr$oob$tau == 0)[1]
     rows[[k]] <<- list(
       ladder = i,
       step = step,
@@ -250,7 +258,7 @@ tune_run <- function(processed, outcomes, predictors, params, control, max_panel
       splits = as.integer(res$params$splits),
       stopped_at = as.integer(res$splits_oob$stopped_at),
       capped = isTRUE(res$splits_oob$capped),
-      oob_rmse_forest = path$oob_rmse[match(res$params$splits, path$splits)],
+      oob_rmse_forest = pr$oob$oob_rmse[j0],
       rule = pr$rule,
       tau = pr$tau,
       n_kept = length(pr$beta),

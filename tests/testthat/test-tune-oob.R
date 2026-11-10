@@ -102,8 +102,11 @@ test_that("a one-point search equals set.seed(s); rpf(splits = NULL, prune = TRU
       r$tune$search[c("rule", "tau", "n_kept")],
       data.frame(rule = p0$rule, tau = p0$tau, n_kept = length(p0$beta))
     )
+    # the forest's own error as the pruning scores it (D at tau 0); the path's corrected error is not lower
+    i0 <- which(p0$oob$rule == "D" & p0$oob$tau == 0)
+    expect_identical(r$tune$search$oob_rmse_forest, p0$oob$oob_rmse[i0])
     path <- p0$fit$oob_path
-    expect_identical(r$tune$search$oob_rmse_forest, path$oob_rmse[match(p0$fit$params$splits, path$splits)])
+    expect_gte(path$oob_rmse[match(p0$fit$params$splits, path$splits)], r$tune$search$oob_rmse_forest * (1 - 1e-12))
   }
 })
 
@@ -246,6 +249,11 @@ test_that("rpf(tune = ) and tune_control() check their arguments", {
   expect_error(f(tune = TRUE, split_try = 3), "split_try")
   expect_error(f(tune = TRUE, t_try = 0.1), "t_try")
   expect_error(f(tune = TRUE, min_leaf_rows = 5), "min_leaf_rows")
+  # even the default value: the message says that tune searches it
+  msg <- tryCatch(f(tune = TRUE, min_leaf_rows = 1), error = conditionMessage)
+  msg <- gsub("\\s+", " ", cli::ansi_strip(msg))
+  expect_match(msg, "searches", fixed = TRUE)
+  expect_match(msg, "don't give `min_leaf_rows`, even at its default", fixed = TRUE)
   expect_error(f(tune = TRUE, splits = 30), "splits")
   expect_error(f(tune = TRUE, prune = FALSE), "prune")
   expect_error(f(tune = TRUE, deterministic = TRUE), "deterministic")

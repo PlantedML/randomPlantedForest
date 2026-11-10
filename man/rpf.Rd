@@ -298,7 +298,10 @@ the stop \verb{$fit$splits_oob}.
 With \code{tune}, the \code{rpf_pruned} model of the chosen forest, with an element
 \code{tune}: \code{search}, the search table (one row per forest grown, in the order
 grown: \code{step}, \code{split_try}, \code{t_try}, \code{min_leaf_rows}, the chosen \code{splits},
-\code{stopped_at}, \code{capped}, the forest's corrected OOB RMSE \code{oob_rmse_forest},
+\code{stopped_at}, \code{capped}, the forest's corrected OOB RMSE \code{oob_rmse_forest}
+(as the pruning scores it: its rule \code{"D"} at \code{tau = 0}, which keeps every
+nonzero component; the OOB path's \code{oob_rmse} at the chosen \code{splits} leaves
+the rows without OOB families of both halves uncorrected and is higher),
 its pruned model's \code{rule}, \code{tau}, \code{n_kept} and corrected OOB RMSE
 \code{oob_rmse} (the score), \code{seconds}, whether each step chose it
 (\code{chosen_step1}, \code{chosen_step2}, \code{chosen_step3}; \code{NA} if not a candidate of

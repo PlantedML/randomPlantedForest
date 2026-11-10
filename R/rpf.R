@@ -149,7 +149,10 @@
 #'   With `tune`, the `rpf_pruned` model of the chosen forest, with an element
 #'   `tune`: `search`, the search table (one row per forest grown, in the order
 #'   grown: `step`, `split_try`, `t_try`, `min_leaf_rows`, the chosen `splits`,
-#'   `stopped_at`, `capped`, the forest's corrected OOB RMSE `oob_rmse_forest`,
+#'   `stopped_at`, `capped`, the forest's corrected OOB RMSE `oob_rmse_forest`
+#'   (as the pruning scores it: its rule `"D"` at `tau = 0`, which keeps every
+#'   nonzero component; the OOB path's `oob_rmse` at the chosen `splits` leaves
+#'   the rows without OOB families of both halves uncorrected and is higher),
 #'   its pruned model's `rule`, `tau`, `n_kept` and corrected OOB RMSE
 #'   `oob_rmse` (the score), `seconds`, whether each step chose it
 #'   (`chosen_step1`, `chosen_step2`, `chosen_step3`; `NA` if not a candidate of
