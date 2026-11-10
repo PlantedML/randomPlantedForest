@@ -48,6 +48,10 @@
 * Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaves"` for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all.
   Fitted models change for classification and for regression with `split_structure` other than `"leaves"`.
+* A tree family that makes no split predicts the mean outcome of its bootstrap sample, and for classification its class shares (truncated to `[epsilon, 1 - epsilon]` with `loss = "logit"` or `"exponential"`).
+  Previously it predicted 0, a probability of 0.5: constant predictors, a single row or `min_leaf_rows` above half the rows gave an all-zero model, and families that could not split pulled the forest towards 0.
+  `purify()` puts that value into the intercept.
+  Fitted models change only where a family made no split.
 * Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
   Previously an error in a worker thread terminated the R session.
 * `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.

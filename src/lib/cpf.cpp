@@ -78,6 +78,55 @@ ClassificationRPF::ClassificationRPF(const std::string &loss, const RPFParams &p
   set_loss_function(loss);
 }
 
+// The fit of one leaf holding the rows of a family that made no split (fit_null_leaf()): the leaf update of
+// create_tree_family() for that leaf, with the initial weights (0 for logit, 1 for exponential). For L1 and L2
+// that is the leaf's mean of the class indicators, for logit and exponential the link of the class shares,
+// truncated to [epsilon, 1 - epsilon] as the update truncates them. Each loss's prediction is then the leaf's
+// class shares (truncated for logit and exponential).
+std::vector<double>
+ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows)
+{
+  if (loss == LossType::median)
+    return calcMedian(Y, rows);
+  std::vector<double> M = calcMean(Y, rows);
+  if (loss == LossType::L1 || loss == LossType::L2)
+    return M;
+  // the class shares: logit codes the classes as 0 / 1, exponential as -1 / 1
+  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
+    for (auto &m : M)
+      m = (m + 1) / 2;
+  const double M_p = 1 - std::accumulate(M.begin(), M.end(), 0.0); // the reference class
+  auto truncated = [this](double m) { return std::min(std::max(epsilon, m), 1 - epsilon); };
+  auto above_eps = [this](double m) { return std::max(epsilon, m); };
+  std::vector<double> value(value_size, 0);
+  switch (this->loss) {
+  case LossType::logit:
+  case LossType::exponential:
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(truncated(M[p]) / truncated(M_p));
+    break;
+  case LossType::logit_2:
+  case LossType::logit_4:
+  case LossType::exponential_2:
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(above_eps(M[p]) / above_eps(1 - M[p]));
+    break;
+  case LossType::logit_3:
+  case LossType::exponential_3: {
+    double mean_log = log(above_eps(M_p));
+    for (size_t p = 0; p < value_size; ++p)
+      mean_log += log(above_eps(M[p]));
+    mean_log /= (double)(value_size + 1);
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(above_eps(M[p])) - mean_log;
+    break;
+  }
+  default:
+    break;
+  }
+  return value;
+}
+
 // ----------------- split modes (classification variants) -----------------
 // Each mode mirrors its regression version in splits_*.cpp: the same candidate pool, the same
 // sampling of candidates, leaves and thresholds (and therefore the same RNG draws), and the same
@@ -1502,6 +1551,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
       }
     }
   }
+
+  fit_null_leaf(curr_family, samples_Y);
 
   // remove empty trees & clear individuals of each tree
   auto keys = getKeys(curr_family);

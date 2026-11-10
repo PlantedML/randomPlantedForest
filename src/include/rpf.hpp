@@ -212,6 +212,9 @@ protected:
   std::vector<double> predict_single_rect(const std::vector<double> &X, const std::set<int> &component_index) const;
   void L2_loss(Split &split);
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+  // A family that made no split: its null leaf gets null_leaf_value() of its rows (rpf.cpp)
+  void fit_null_leaf(TreeFamily &family, const std::vector<std::vector<double>> &Y);
+  virtual std::vector<double> null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows);
   struct SplitCandidate;
   // overload possibleExists for your vector of SplitCandidate
   static bool
