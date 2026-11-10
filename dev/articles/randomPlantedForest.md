@@ -175,7 +175,7 @@ the print method above reports the purification state.
 components <- predict_components(rpfit, new_data = sim)
 
 components$intercept
-#> [1] 0.9862177
+#> [1] 0.9862793
 names(components$m)
 #>  [1] "x1"    "x2"    "x3"    "x4"    "x1:x2" "x1:x3" "x1:x4" "x2:x3" "x2:x4"
 #> [10] "x3:x4"

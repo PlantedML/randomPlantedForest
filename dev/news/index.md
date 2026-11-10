@@ -34,6 +34,10 @@
   Previously only the first level’s intercept was returned, so
   components plus intercept did not sum to the prediction for other
   levels.
+- [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+  with `mode = 2` no longer drops training rows that lie on a leaf’s
+  lower bound. Purified components and the intercept now equal those of
+  `mode = 1`.
 
 ## randomPlantedForest 0.5.0
 
