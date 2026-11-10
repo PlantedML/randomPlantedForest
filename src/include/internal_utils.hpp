@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <limits>
 #include <random>
+#include <utility>
 
 #include "trees.hpp"
 
@@ -84,5 +85,16 @@ inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_
 // its emutls destructor crashes at std::thread exit on Windows (MinGW) when
 // the package DLL is loaded via LoadLibrary.
 extern thread_local std::vector<std::vector<int>> *tls_working_bin_id_ptr;
+
+// Scratch buffers of the `leaves` split search (splits_leaves.cpp), reused
+// across the candidates and splits of one tree family instead of allocated per
+// candidate. Owned by create_tree_family's stack; TLS holds only a pointer to
+// it, for the same reason as above.
+struct LeavesScratch {
+  std::vector<double> unique, prefix, total;
+  std::vector<size_t> first_pos;
+  std::vector<std::pair<double, size_t>> keys;
+};
+extern thread_local LeavesScratch *tls_leaves_scratch_ptr;
 
 #endif // INTERNAL_UTILS_HPP

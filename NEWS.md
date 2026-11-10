@@ -40,6 +40,11 @@
   For every candidate split, the logit loss copied the weights of all observations twice, although it reads only those of the leaf being split, so a candidate cost time in proportion to the sample size instead of the leaf size.
   With 300 rows and 150 splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000 rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.
 
+## Performance
+
+* Fitting regression forests with `split_structure = "leaves"` (the default) is about 1.4 times as fast on larger data, for example 310 s → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing (16,512 rows, `max_interaction = 3`, 10,000 splits).
+  Fitted models are bitwise unchanged.
+
 # randomPlantedForest 0.5.0
 
 ## Breaking changes

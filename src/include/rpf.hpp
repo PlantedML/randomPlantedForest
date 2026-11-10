@@ -21,6 +21,7 @@
 #include "trees.hpp"
 #include <cstdint>
 #include <functional>
+#include <limits>
 
 typedef std::vector<std::vector<double>> Matrix2D; /**< row-major: rows x columns */
 
@@ -221,6 +222,10 @@ protected:
     std::shared_ptr<DecisionTree> tree;
     size_t leaf_idx;
     double age = 0.0;
+    // leaves: exp(-split_decay_rate_ * age) as last computed, for the age w_age (NaN: not yet). The same
+    // expression as before, recomputed only when the age changes, so the draw's weights are bitwise the same.
+    double w = 0.0;
+    double w_age = std::numeric_limits<double>::quiet_NaN();
     // legacy ctor without leaf index (defaults to 0) — keep but prefer the 4-arg form from callers
     explicit SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a = 0.0)
         : dim(d), tree(std::move(t)), leaf_idx(0), age(a)

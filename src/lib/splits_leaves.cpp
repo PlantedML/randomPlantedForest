@@ -2,8 +2,86 @@
 // per-leaf orders and prefix sums, with age-weighted candidate sampling.
 #include "rpf.hpp"
 #include "internal_utils.hpp"
+#include <cmath>
 
 using namespace rpf_utils;
+
+namespace {
+// The leaf's cached stable order and sorted values of feature k, by reference.
+// Computed and cached as ensure_order_and_sorted_vals_for_leaf() does when
+// missing (the same caches, the same conditions), without copying them out.
+// The references stay valid while no entry of these two maps is erased
+// (unordered_map nodes do not move).
+void leaf_order_refs(
+    const std::vector<std::vector<double>> &X,
+    Leaf &leaf,
+    int k,
+    const std::vector<size_t> *&order,
+    const std::vector<double> *&sorted_vals
+)
+{
+  const size_t m = leaf.individuals.size();
+  auto it = leaf.order_cache.find(k);
+  if (it == leaf.order_cache.end() || it->second.size() != m) {
+    std::vector<size_t> &o = leaf.order_cache[k];
+    o.resize(m);
+    std::iota(o.begin(), o.end(), 0);
+    std::stable_sort(o.begin(), o.end(), [&](size_t a, size_t b) {
+      return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k];
+    });
+    it = leaf.order_cache.find(k);
+  }
+  order = &it->second;
+  auto is = leaf.sorted_vals_cache.find(k);
+  if (is == leaf.sorted_vals_cache.end() || is->second.size() != m) {
+    std::vector<double> &sv = leaf.sorted_vals_cache[k];
+    sv.resize(m);
+    for (size_t i = 0; i < m; ++i)
+      sv[i] = X[leaf.individuals[(*order)[i]]][k];
+    is = leaf.sorted_vals_cache.find(k);
+  }
+  sorted_vals = &is->second;
+}
+
+// The age-weighted draw of n_candidates pool entries without replacement, as
+// sample_weighted_indices_filtered() on the weights exp(-decay * age), fused
+// into one pass: the same weights (each entry's exp cached until its age
+// changes), the same random draws in the same order (one per entry with a
+// positive weight), the same keys -log(u) / w in the same order and the same
+// nth_element, so the same sample in the same order.
+template <typename Cand>
+std::vector<size_t> draw_leaf_candidates(
+    std::vector<Cand> &pool, size_t n_candidates, double decay, std::vector<std::pair<double, size_t>> &keys
+)
+{
+  keys.clear();
+  for (size_t i = 0; i < pool.size(); ++i) {
+    Cand &c = pool[i];
+    if (!(c.w_age == c.age)) {
+      c.w = std::exp(-decay * c.age);
+      c.w_age = c.age;
+    }
+    if (c.w > 0.0) {
+      double u = rng_runif01();
+      if (u <= 0.0)
+        u = std::numeric_limits<double>::min();
+      keys.emplace_back(-std::log(u) / c.w, i);
+    }
+  }
+  if (keys.empty()) // no positive weight: uniformly, as sample_weighted_indices_filtered()
+    return sample_weighted_indices_filtered(std::vector<double>(pool.size(), 0.0), n_candidates);
+  const size_t k = std::min(n_candidates, keys.size());
+  if (k < keys.size())
+    std::nth_element(keys.begin(), keys.begin() + k, keys.end(), [](const auto &a, const auto &b) {
+      return a.first < b.first;
+    });
+  std::vector<size_t> out;
+  out.reserve(k);
+  for (size_t j = 0; j < k; ++j)
+    out.push_back(keys[j].second);
+  return out;
+}
+} // namespace
 
 Split RandomPlantedForest::calcOptimalSplit_leaves(
     const std::vector<std::vector<double>> &Y,
@@ -19,17 +97,19 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   if (possible_splits.empty())
     return min_split;
 
+  // Scratch buffers: the tree family's (create_tree_family), else local ones
+  LeavesScratch local_scratch;
+  LeavesScratch &sc = tls_leaves_scratch_ptr ? *tls_leaves_scratch_ptr : local_scratch;
+
   unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
   unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
-  std::vector<double> weights(possible_splits.size());
-  for (size_t i = 0; i < possible_splits.size(); ++i)
-    weights[i] = std::exp(-this->split_decay_rate_ * possible_splits[i].age);
-  std::vector<size_t> sample_idxs =
-      this->deterministic ? std::vector<size_t>() : sample_weighted_indices_filtered(weights, n_candidates);
+  std::vector<size_t> sample_idxs;
   if (this->deterministic) {
     for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
       sample_idxs.push_back(i);
+  } else {
+    sample_idxs = draw_leaf_candidates(possible_splits, n_candidates, this->split_decay_rate_, sc.keys);
   }
 
   int best_idx = -1;
@@ -49,16 +129,23 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     if (m < static_cast<size_t>(2 * leaf_size))
       continue;
 
-    std::vector<size_t> order;
-    std::vector<double> sorted_vals;
-    ensure_order_and_sorted_vals_for_leaf(X, *leafPtr, k, order, sorted_vals);
-    std::vector<double> unique = compute_unique_sorted_values(sorted_vals);
-    // Build first positions of each unique value (same length/order as `unique`)
-    std::vector<size_t> first_pos;
-    first_pos.reserve(unique.size());
+    // The leaf's cached order and sorted values by reference; its distinct
+    // values and their first positions in one pass, into reused buffers
+    const std::vector<size_t> *order_p;
+    const std::vector<double> *sorted_p;
+    leaf_order_refs(X, *leafPtr, k, order_p, sorted_p);
+    const std::vector<size_t> &order = *order_p;
+    const std::vector<double> &sorted_vals = *sorted_p;
+    std::vector<double> &unique = sc.unique;
+    std::vector<size_t> &first_pos = sc.first_pos;
+    unique.clear();
+    first_pos.clear();
     if (!sorted_vals.empty()) {
+      unique.push_back(sorted_vals[0]);
       first_pos.push_back(0);
       for (size_t i = 1; i < sorted_vals.size(); ++i) {
+        if (sorted_vals[i] != unique.back())
+          unique.push_back(sorted_vals[i]);
         if (sorted_vals[i] != sorted_vals[i - 1])
           first_pos.push_back(i);
       }
@@ -73,10 +160,20 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     samples = this->deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try)
                                   : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)this->split_try);
 
-    // Build prefix sums once per candidate evaluation
-    std::vector<std::vector<double>> prefix; // [p][i]
-    std::vector<double> total;               // [p]
-    build_prefix_and_total_given_order(Y, *leafPtr, order, this->value_size, prefix, total);
+    // Prefix sums once per candidate evaluation, into a reused buffer [p * m + i]
+    std::vector<double> &prefix = sc.prefix;
+    std::vector<double> &total = sc.total;
+    prefix.resize(this->value_size * m);
+    total.assign(this->value_size, 0.0);
+    for (size_t p = 0; p < this->value_size; ++p) {
+      double acc = 0.0;
+      double *pp = prefix.data() + p * m;
+      for (size_t i = 0; i < m; ++i) {
+        acc += Y[leafPtr->individuals[order[i]]][p];
+        pp[i] = acc;
+      }
+      total[p] = pp[m - 1];
+    }
 
     for (size_t si = 0; si < samples.size(); ++si) {
       const size_t uidx = static_cast<size_t>(samples[si]);
@@ -91,7 +188,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
 
       double loss = 0.0;
       for (size_t p = 0; p < this->value_size; ++p) {
-        const double sum_s_base = prefix[p][pos - 1];
+        const double sum_s_base = prefix[p * m + pos - 1];
         const double sum_b_base = total[p] - sum_s_base;
         loss -= (sum_s_base * sum_s_base) / static_cast<double>(pos);
         loss -= (sum_b_base * sum_b_base) / static_cast<double>(m - pos);
@@ -107,7 +204,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
         min_split.sum_s.assign(this->value_size, 0.0);
         min_split.sum_b.assign(this->value_size, 0.0);
         for (size_t p = 0; p < this->value_size; ++p) {
-          const double sum_s_base = prefix[p][pos - 1];
+          const double sum_s_base = prefix[p * m + pos - 1];
           const double sum_b_base = total[p] - sum_s_base;
           min_split.sum_s[p] = sum_s_base;
           min_split.sum_b[p] = sum_b_base;
