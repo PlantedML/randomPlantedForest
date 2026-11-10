@@ -14,6 +14,7 @@ reference:
 - contents:
   - rpf
   - predict.rpf
+  - oob_path_checkpoints
 
 - title: Functional decomposition
   desc: Enabling and utilizing functional decomposition
