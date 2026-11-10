@@ -71,6 +71,10 @@
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
 * `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
+* `predict_components()` returns a `remainder` whenever `m` leaves out components of the forest, also when `predictors` leaves out some of the fit's predictors at the fit's `max_interaction`.
+  Previously the intercept and `m` then did not sum to the prediction.
+* `predict_components()` takes the components' predictors from the forest's own columns, in their order.
+  A formula with terms such as `log(x1)`, `I(x1^2)` or `. - x3` no longer makes it fail, and with factor predictors the components come in the order of the fit's columns, which has the factors last.
 
 ## Performance
 
