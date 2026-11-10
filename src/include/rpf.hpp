@@ -153,8 +153,12 @@ public:
   bool is_purified();
   // Whether the last purify() computed the components only up to an order below max_interaction.
   bool is_purify_capped() const;
-  // Restore that state after set_grid_leaves() (serialization path).
+  // Restore that state after set_grid_leaves() (serialization path). The order is not known: it counts as 1.
   void set_purify_capped(bool capped);
+  // The order the last purify() was capped at, or 0 if it computed all orders.
+  int get_purify_cap() const;
+  // Restore it after set_grid_leaves() (serialization path); 0 is a purification of all orders.
+  void set_purify_cap(int cap);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -208,10 +212,15 @@ protected:
   // purify() computed the components only up to an order below max_interaction, so the grids sum to a truncated
   // prediction: predict() of the whole forest then scans the leaves, which purification leaves unchanged
   bool purify_capped = false;
+  // The order of that cap (0: all orders); a later purify() above it purifies again
+  int purify_cap = 0;
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
   std::vector<double> predict_single_rect(const std::vector<double> &X, const std::set<int> &component_index) const;
   void L2_loss(Split &split);
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);
+  // A family that made no split: its null leaf gets null_leaf_value() of its rows (rpf.cpp)
+  void fit_null_leaf(TreeFamily &family, const std::vector<std::vector<double>> &Y);
+  virtual std::vector<double> null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows);
   struct SplitCandidate;
   // overload possibleExists for your vector of SplitCandidate
   static bool

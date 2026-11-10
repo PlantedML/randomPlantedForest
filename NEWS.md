@@ -48,6 +48,10 @@
 * Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaves"` for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all.
   Fitted models change for classification and for regression with `split_structure` other than `"leaves"`.
+* A tree family that makes no split predicts the mean outcome of its bootstrap sample, and for classification its class shares (truncated to `[epsilon, 1 - epsilon]` with `loss = "logit"` or `"exponential"`).
+  Previously it predicted 0, a probability of 0.5: constant predictors, a single row or `min_leaf_rows` above half the rows gave an all-zero model, and families that could not split pulled the forest towards 0.
+  `purify()` puts that value into the intercept.
+  Fitted models change only where a family made no split.
 * Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
   Previously an error in a worker thread terminated the R session.
 * `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.
@@ -67,6 +71,23 @@
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
 * `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
+* `predict_components()` returns a `remainder` whenever `m` leaves out components of the forest, also when `predictors` leaves out some of the fit's predictors at the fit's `max_interaction`.
+  Previously the intercept and `m` then did not sum to the prediction.
+* `predict_components()` takes the components' predictors from the forest's own columns, in their order.
+  A formula with terms such as `log(x1)`, `I(x1^2)` or `. - x3` no longer makes it fail, and with factor predictors the components come in the order of the fit's columns, which has the factors last.
+* `predict_components()` on a `new_data` with zero rows returns zero rows with the right columns, instead of failing with "Feature vector is empty.".
+* `print()` counts the forest's own predictor columns: with formula terms such as `log(x1)` or `. - x3` it showed the number of raw columns the formula reads.
+* `purify()` on a forest purified with `maxp_interaction = k` purifies it again when asked for more orders (all orders by default).
+  Previously it returned the forest unchanged, so the orders above `k` stayed zero in `predict_components()`.
+  `purify()` also checks its arguments when the forest is already purified.
+  A capped forest restored by `rpf_unmarshal()` without its training data cannot be purified again; asking for more orders is an error that says so.
+
+## Documentation
+
+* `?purify` states how the components are identified (the marginal identification over the training rows, Hiabu, Meyer and Wright, 2023), and that the intercept is the mean prediction on the training rows.
+* `?rpf` says that `deterministic = TRUE` also ignores `split_decay_rate`, how `split_structure = "leaves"` draws its thresholds, and that a seed reproduces a fit on the same platform only.
+  `splits` counts rounds: near saturation a round can make no split. Ties between equally good candidates may go to different candidates under the exact and the fast draw, so their fits differ in distribution near saturation, though not in accuracy.
+* `?print.rpf_forest`'s example prints a forest (`export_forest = TRUE`), and `?plot.rpf` cites the RPF paper as 2020.
 
 ## Performance
 
@@ -84,6 +105,9 @@
   Purification at `max_interaction = 3` and above no longer runs out of memory: on California housing (16,512 rows, 50 tree families, 94,138 leaves) order 3 takes 6 s and 0.25 GB with 4 threads, where it was stopped at 6 GB before, and the full order (8) takes 40 s and 2.3 GB.
   The components equal those of `mode = 1` up to rounding, and `rpf_marshal()` stores the rectangles.
 * `predict_components()` evaluates all components in one pass over the rows of `new_data`, and skips those the forest does not hold, instead of one pass per component: on a 10-feature full-order fit (1,023 components, 636 of them not held), 5,000 rows take 0.5 s instead of 2.0 s.
+* A fitted forest takes about 40% less memory: the split search's per-leaf caches are kept apart from the leaves and freed when a tree family is finished, so a leaf takes 80 instead of 232 bytes; finished classification forests now also drop their training rows and caches.
+  On California housing (`max_interaction = 3`, 10,000 splits, 200 tree families) the fitted forest falls from 821 MB to 490 MB and the fit's peak resident memory from about 1.9 GB to 1.6 GB, in the same time.
+  Fitted models are bitwise unchanged.
 
 # randomPlantedForest 0.5.0
 

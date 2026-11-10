@@ -78,6 +78,55 @@ ClassificationRPF::ClassificationRPF(const std::string &loss, const RPFParams &p
   set_loss_function(loss);
 }
 
+// The fit of one leaf holding the rows of a family that made no split (fit_null_leaf()): the leaf update of
+// create_tree_family() for that leaf, with the initial weights (0 for logit, 1 for exponential). For L1 and L2
+// that is the leaf's mean of the class indicators, for logit and exponential the link of the class shares,
+// truncated to [epsilon, 1 - epsilon] as the update truncates them. Each loss's prediction is then the leaf's
+// class shares (truncated for logit and exponential).
+std::vector<double>
+ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows)
+{
+  if (loss == LossType::median)
+    return calcMedian(Y, rows);
+  std::vector<double> M = calcMean(Y, rows);
+  if (loss == LossType::L1 || loss == LossType::L2)
+    return M;
+  // the class shares: logit codes the classes as 0 / 1, exponential as -1 / 1
+  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
+    for (auto &m : M)
+      m = (m + 1) / 2;
+  const double M_p = 1 - std::accumulate(M.begin(), M.end(), 0.0); // the reference class
+  auto truncated = [this](double m) { return std::min(std::max(epsilon, m), 1 - epsilon); };
+  auto above_eps = [this](double m) { return std::max(epsilon, m); };
+  std::vector<double> value(value_size, 0);
+  switch (this->loss) {
+  case LossType::logit:
+  case LossType::exponential:
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(truncated(M[p]) / truncated(M_p));
+    break;
+  case LossType::logit_2:
+  case LossType::logit_4:
+  case LossType::exponential_2:
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(above_eps(M[p]) / above_eps(1 - M[p]));
+    break;
+  case LossType::logit_3:
+  case LossType::exponential_3: {
+    double mean_log = log(above_eps(M_p));
+    for (size_t p = 0; p < value_size; ++p)
+      mean_log += log(above_eps(M[p]));
+    mean_log /= (double)(value_size + 1);
+    for (size_t p = 0; p < value_size; ++p)
+      value[p] = log(above_eps(M[p])) - mean_log;
+    break;
+  }
+  default:
+    break;
+  }
+  return value;
+}
+
 // ----------------- split modes (classification variants) -----------------
 // Each mode mirrors its regression version in splits_*.cpp: the same candidate pool, the same
 // sampling of candidates, leaves and thresholds (and therefore the same RNG draws), and the same
@@ -249,17 +298,17 @@ Split ClassificationRPF::calcOptimalSplit_curTrees2(
         ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order_cf, sorted_vals_cf);
         std::vector<double> *unique_ptr = nullptr;
         size_t unique_count = 0;
-        if (leaf.unique_count_cache.count(k)) {
-          unique_count = leaf.unique_count_cache[k];
-          if (unique_count != 0 && leaf.unique_vals_cache.count(k))
-            unique_ptr = &leaf.unique_vals_cache[k];
+        if (leaf.cache().unique_count_cache.count(k)) {
+          unique_count = leaf.cache().unique_count_cache[k];
+          if (unique_count != 0 && leaf.cache().unique_vals_cache.count(k))
+            unique_ptr = &leaf.cache().unique_vals_cache[k];
         }
         if (!unique_ptr) {
           auto uniques = compute_unique_sorted_values(sorted_vals_cf);
           unique_count = uniques.size();
-          leaf.unique_count_cache[k] = unique_count;
-          leaf.unique_vals_cache[k] = std::move(uniques);
-          unique_ptr = &leaf.unique_vals_cache[k];
+          leaf.cache().unique_count_cache[k] = unique_count;
+          leaf.cache().unique_vals_cache[k] = std::move(uniques);
+          unique_ptr = &leaf.cache().unique_vals_cache[k];
         }
         if (unique_count < 2 * static_cast<size_t>(leaf_size))
           continue;
@@ -671,16 +720,16 @@ Split ClassificationRPF::calcOptimalSplit_curTrees1(
         ensure_order_and_sorted_vals_for_leaf(X, *leaf_ptr, k, order_cf, sorted_vals_cf);
         size_t unique_count = 0;
         std::vector<double> *unique_ptr = nullptr;
-        if (leaf_ptr->unique_vals_cache.count(k)) {
-          unique_ptr = &leaf_ptr->unique_vals_cache[k];
+        if (leaf_ptr->cache().unique_vals_cache.count(k)) {
+          unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
           unique_count = unique_ptr->size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
         } else {
           auto uniques = compute_unique_sorted_values(sorted_vals_cf);
           unique_count = uniques.size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
-          leaf_ptr->unique_vals_cache[k] = std::move(uniques);
-          unique_ptr = &leaf_ptr->unique_vals_cache[k];
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_vals_cache[k] = std::move(uniques);
+          unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
         }
         const int left = leaf_size;
         const int right_exclusive = (int)unique_count - leaf_size + 1;
@@ -699,16 +748,16 @@ Split ClassificationRPF::calcOptimalSplit_curTrees1(
           ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order_cf, sorted_vals_cf);
           size_t unique_count = 0;
           std::vector<double> *unique_ptr = nullptr;
-          if (leaf.unique_vals_cache.count(k)) {
-            unique_ptr = &leaf.unique_vals_cache[k];
+          if (leaf.cache().unique_vals_cache.count(k)) {
+            unique_ptr = &leaf.cache().unique_vals_cache[k];
             unique_count = unique_ptr->size();
-            leaf.unique_count_cache[k] = unique_count;
+            leaf.cache().unique_count_cache[k] = unique_count;
           } else {
             auto uniques = compute_unique_sorted_values(sorted_vals_cf);
             unique_count = uniques.size();
-            leaf.unique_count_cache[k] = unique_count;
-            leaf.unique_vals_cache[k] = std::move(uniques);
-            unique_ptr = &leaf.unique_vals_cache[k];
+            leaf.cache().unique_count_cache[k] = unique_count;
+            leaf.cache().unique_vals_cache[k] = std::move(uniques);
+            unique_ptr = &leaf.cache().unique_vals_cache[k];
           }
           if ((int)unique_count < 2 * leaf_size)
             continue;
@@ -908,16 +957,16 @@ Split ClassificationRPF::calcOptimalSplit_resTrees(
       if (!state.initialized) {
         ensure_order_and_sorted_vals_for_leaf(X, *leaf_ptr, k, state.order_cf, state.sorted_vals);
         size_t unique_count = 0;
-        if (leaf_ptr->unique_vals_cache.count(k)) {
-          state.unique_ptr = &leaf_ptr->unique_vals_cache[k];
+        if (leaf_ptr->cache().unique_vals_cache.count(k)) {
+          state.unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
           unique_count = state.unique_ptr->size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
         } else {
           auto uniques = compute_unique_sorted_values(state.sorted_vals);
           unique_count = uniques.size();
-          leaf_ptr->unique_count_cache[k] = unique_count;
-          leaf_ptr->unique_vals_cache[k] = std::move(uniques);
-          state.unique_ptr = &leaf_ptr->unique_vals_cache[k];
+          leaf_ptr->cache().unique_count_cache[k] = unique_count;
+          leaf_ptr->cache().unique_vals_cache[k] = std::move(uniques);
+          state.unique_ptr = &leaf_ptr->cache().unique_vals_cache[k];
         }
         const int leaf_size_here = n_leaves[k];
         state.left = leaf_size_here;
@@ -1503,7 +1552,9 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     }
   }
 
-  // remove empty trees & clear individuals of each tree
+  fit_null_leaf(curr_family, samples_Y);
+
+  // remove empty trees, and drop the rows and split-search caches of each leaf (needed only while growing)
   auto keys = getKeys(curr_family);
   for (auto &key : keys) {
     if (curr_family[key]->leaves.size() == 0) {
@@ -1512,6 +1563,8 @@ void ClassificationRPF::create_tree_family(std::vector<Leaf> initial_leaves, siz
     }
     for (auto &leaf : curr_family[key]->leaves) {
       leaf.individuals.clear();
+      leaf.individuals.shrink_to_fit();
+      leaf.free_cache();
     }
   }
 

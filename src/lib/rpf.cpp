@@ -63,6 +63,22 @@ void RandomPlantedForest::set_purify_capped(bool capped)
   if (capped && !purified)
     throw std::invalid_argument("Only a purified forest can have a capped purification.");
   purify_capped = capped;
+  purify_cap = capped ? 1 : 0;
+}
+
+int RandomPlantedForest::get_purify_cap() const
+{
+  return (purified && purify_capped) ? purify_cap : 0;
+}
+
+void RandomPlantedForest::set_purify_cap(int cap)
+{
+  if (cap < 0 || cap >= std::min(max_interaction, feature_size))
+    throw std::invalid_argument("A purification cap must be 0 (all orders) or below the forest's max_interaction.");
+  if (cap > 0 && !purified)
+    throw std::invalid_argument("Only a purified forest can have a capped purification.");
+  purify_capped = cap > 0;
+  purify_cap = cap;
 }
 
 void RandomPlantedForest::L2_loss(Split &split)
@@ -194,6 +210,7 @@ void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
   purified = false;
   purify_capped = false;
   rect_forest_.reset();
+  purify_cap = 0;
 }
 
 std::vector<FamilyExport> RandomPlantedForest::get_model() const
@@ -280,8 +297,9 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
   }
   rect_forest_.reset();
   purified = true;
-  // a full purification unless set_purify_capped() says otherwise
+  // a full purification unless set_purify_cap() or set_purify_capped() says otherwise
   purify_capped = false;
+  purify_cap = 0;
 }
 
 void RandomPlantedForest::set_purified_rects(rpf_rect::PurifiedForest pf)
@@ -294,8 +312,9 @@ void RandomPlantedForest::set_purified_rects(rpf_rect::PurifiedForest pf)
       tree.second->GridLeaves = LeafGrid();
   rect_forest_ = std::make_shared<rpf_rect::PurifiedForest>(std::move(pf));
   purified = true;
-  // a full purification unless set_purify_capped() says otherwise
+  // a full purification unless set_purify_cap() or set_purify_capped() says otherwise
   purify_capped = false;
+  purify_cap = 0;
 }
 
 PurifyStats RandomPlantedForest::purify_stats() const
@@ -442,6 +461,31 @@ void RandomPlantedForest::set_data(const Matrix2D &samples_Y, const Matrix2D &sa
   }
 }
 
+// A family whose rounds all ended without a split (constant predictors, a single row, every candidate infeasible)
+// has only its null tree, whose one leaf holds all of the family's rows and starts at 0, so the family would
+// predict 0. It gets the loss's fit of that leaf instead. In a family with a split the null leaf stays at 0 (the
+// first split's leaves carry the level), so those families are unchanged. Y: the family's working outcome, which
+// no split has changed.
+void RandomPlantedForest::fit_null_leaf(TreeFamily &family, const std::vector<std::vector<double>> &Y)
+{
+  for (const auto &tree : family)
+    if (tree.first != std::set<int>{0} && !tree.second->leaves.empty())
+      return; // a split
+  auto null_tree = family.find(std::set<int>{0});
+  if (null_tree == family.end() || null_tree->second->leaves.empty())
+    return;
+  Leaf &leaf = null_tree->second->leaves[0];
+  if (!leaf.individuals.empty())
+    leaf.value = null_leaf_value(Y, leaf.individuals);
+}
+
+// L2: the leaf's mean, as a split's leaves get it (L2_loss)
+std::vector<double>
+RandomPlantedForest::null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows)
+{
+  return calcMean(Y, rows);
+}
+
 void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
 {
 
@@ -547,6 +591,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     }
 
+    fit_null_leaf(curr_family, samples_Y);
+
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
@@ -562,13 +608,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         // Individuals are not used after training; caches are training-only
         leaf.individuals.clear();
         leaf.individuals.shrink_to_fit();
-        // Free per-leaf caches decisively
-        {
-          std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-          std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-          std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-          std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
-        }
+        // Free the per-leaf caches
+        leaf.free_cache();
         // Keep intervals and value but release spare capacity
         leaf.intervals.shrink_to_fit();
         leaf.value.shrink_to_fit();
@@ -771,6 +812,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     // Detach the histogram working buffer; the stack-owned vector frees itself.
     tls_working_bin_id_ptr = nullptr;
 
+    fit_null_leaf(curr_family, samples_Y);
+
     // Final memory cleanup: drop training-only buffers and shrink containers
     auto keys = getKeys(curr_family);
     for (auto &key : keys) {
@@ -785,10 +828,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       for (auto &leaf : treePtr->leaves) {
         leaf.individuals.clear();
         leaf.individuals.shrink_to_fit();
-        std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-        std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-        std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-        std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
+        leaf.free_cache();
         leaf.intervals.shrink_to_fit();
         leaf.value.shrink_to_fit();
       }
@@ -952,6 +992,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     }
   }
 
+  fit_null_leaf(curr_family, samples_Y);
+
   // Final memory cleanup: drop training-only buffers and shrink containers
   auto keys = getKeys(curr_family);
   for (auto &key : keys) {
@@ -966,10 +1008,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     for (auto &leaf : treePtr->leaves) {
       leaf.individuals.clear();
       leaf.individuals.shrink_to_fit();
-      std::unordered_map<int, std::vector<size_t>>().swap(leaf.order_cache);
-      std::unordered_map<int, std::vector<double>>().swap(leaf.sorted_vals_cache);
-      std::unordered_map<int, std::vector<double>>().swap(leaf.unique_vals_cache);
-      std::unordered_map<int, size_t>().swap(leaf.unique_count_cache);
+      leaf.free_cache();
       leaf.intervals.shrink_to_fit();
       leaf.value.shrink_to_fit();
     }

@@ -3,6 +3,7 @@
 
 #include "helper.hpp"
 #include "grid.hpp"
+#include <memory>
 #include <unordered_map>
 
 using namespace utils;
@@ -13,19 +14,57 @@ struct FamilyRanks; // cur_trees_1.hpp
 }
 
 class DecisionTree;
+// The split search's memos for one leaf, for each feature dimension: a stable order of indices into `individuals`
+// sorted by the feature value (reusable across evaluations), the sorted feature values along it (for lower_bound), the
+// unique sorted values (threshold sampling) and the unique count (to skip leaves with too few thresholds). They are
+// functions of the leaf's rows and are needed only while the family grows.
+struct LeafCache {
+  std::unordered_map<int, std::vector<size_t>> order_cache;
+  std::unordered_map<int, std::vector<double>> sorted_vals_cache;
+  std::unordered_map<int, std::vector<double>> unique_vals_cache;
+  std::unordered_map<int, size_t> unique_count_cache;
+};
+
 struct Leaf {
   std::vector<int> individuals;    /**< considered samples for each leaf */
   std::vector<double> value;       /**< residual */
   std::vector<Interval> intervals; /**< min/max for each feature of the interval */
-  // Cache: for each feature dimension store a stable order of indices into `individuals`
-  // sorted by the feature value. This order is reusable across evaluations.
-  std::unordered_map<int, std::vector<size_t>> order_cache;
-  // Cache: sorted feature values along order for lower_bound
-  std::unordered_map<int, std::vector<double>> sorted_vals_cache;
-  // Cache: unique sorted feature values for faster threshold sampling in cur_trees_2
-  std::unordered_map<int, std::vector<double>> unique_vals_cache;
-  // Cache: unique count per feature (to quickly skip leaves with too few thresholds)
-  std::unordered_map<int, size_t> unique_count_cache;
+
+  // The caches sit behind one pointer: allocated on first use, freed by free_cache() when the family has finished
+  // growing, so a finished leaf holds one pointer instead of four hash maps. Copying a leaf copies its caches.
+  LeafCache &cache()
+  {
+    if (!cache_)
+      cache_.reset(new LeafCache());
+    return *cache_;
+  }
+  void free_cache() { cache_.reset(); }
+  bool has_cache() const { return static_cast<bool>(cache_); }
+
+  Leaf() = default;
+  Leaf(const Leaf &o)
+      : individuals(o.individuals), value(o.value), intervals(o.intervals),
+        cache_(o.cache_ ? new LeafCache(*o.cache_) : nullptr)
+  {
+  }
+  Leaf &operator=(const Leaf &o)
+  {
+    if (this != &o) {
+      individuals = o.individuals;
+      value = o.value;
+      intervals = o.intervals;
+      if (o.cache_ && cache_)
+        *cache_ = *o.cache_; // assigns the maps, as the four members did
+      else
+        cache_.reset(o.cache_ ? new LeafCache(*o.cache_) : nullptr);
+    }
+    return *this;
+  }
+  Leaf(Leaf &&) noexcept = default;
+  Leaf &operator=(Leaf &&) noexcept = default;
+
+private:
+  std::unique_ptr<LeafCache> cache_;
 };
 
 /**

@@ -17,7 +17,9 @@ print.rpf <- function(x, ...) {
 #' @export
 format.rpf <- function(x, ...) {
   mode <- switch(x$mode, regression = "Regression", classification = "Classification")
-  p <- length(x$blueprint$ptypes$predictors)
+  # the fit's own columns: a formula's terms such as log(x1) are columns of their own, y ~ . - x3 drops one
+  fit_predictors <- fit_predictor_names(x)
+  p <- length(fit_predictors)
   # max_interaction == p is equivalent to 0: all interactions
   maxint <- if (p == x$params$max_interaction) 0 else x$params$max_interaction
   degree <- switch(
@@ -35,7 +37,7 @@ format.rpf <- function(x, ...) {
     # only formula blueprints carry a formula; xy and recipe fits don't
     if (is.null(x$blueprint$formula)) {
       predictors <- cli::cli_vec(
-        names(x$blueprint$ptypes$predictors),
+        fit_predictors,
         list("vec-trunc" = 5)
       )
       cli::cli_text("{.field Predictors}: {.var {predictors}}")
@@ -129,7 +131,7 @@ print_params <- function(params) {
 #' @export
 #' @examples
 #'
-#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10)
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE)
 #' print(rpfit$forest)
 #' str(rpfit$forest)
 print.rpf_forest <- function(x, ...) {

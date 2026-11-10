@@ -8,6 +8,19 @@
 #include <cmath>
 #include <unordered_map>
 
+// The value of the family's null tree: 0, unless the family made no split, when its one leaf holds the family's
+// fit (fit_null_leaf()). The intercept starts from it.
+static std::vector<double> null_tree_value(const TreeFamily &family, size_t value_size)
+{
+  std::vector<double> value(value_size, 0);
+  auto null_tree = family.find(std::set<int>{0});
+  if (null_tree != family.end())
+    for (const auto &leaf : null_tree->second->get_leaves())
+      for (size_t p = 0; p < value_size && p < leaf.value.size(); ++p)
+        value[p] += leaf.value[p];
+  return value;
+}
+
 // Mode 2 for one family: computes the purified components exactly (KD-tree range counts, one per leaf and subset)
 // and adds them to `acc` as weighted rectangles grouped by (S, j); see rects.hpp. Nothing is rasterised and the
 // family is not modified. Components above maxp_interaction are not produced (they are zero).
@@ -46,7 +59,7 @@ void RandomPlantedForest::purify_fast_exact_family(
     lim_list[d - 1] = bounds;
   }
 
-  acc.intercept.assign(value_size, 0.0);
+  acc.intercept = null_tree_value(curr_family, value_size);
 
   // Precompute tot(U) with half-open domain [front, back)
   std::map<std::set<int>, double, utils::setComp> tot_cache;
@@ -316,6 +329,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   rect_forest_.reset();
   purified = false;
   purify_capped = false;
+  purify_cap = 0;
 
   if (mode != 2) {
     run_families(
@@ -324,6 +338,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
     );
     purified = true;
     purify_capped = capped;
+    purify_cap = capped ? maxp_interaction : 0;
     return;
   }
 
@@ -386,6 +401,7 @@ void RandomPlantedForest::purify(int maxp_interaction, int nthreads_param, int m
   rect_forest_ = forest;
   purified = true;
   purify_capped = capped;
+  purify_cap = capped ? maxp_interaction : 0;
 }
 
 // The components of purify(mode = 2) of one family on the dense grid over the family's cut points, in the format of
@@ -649,7 +665,7 @@ void RandomPlantedForest::purify_3_family(TreeFamily &curr_family, int maxp_inte
   // ------------- create new trees -------------
   grids.insert(grids.begin(), grid::NDGrid());
   values.insert(
-      values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))
+      values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, null_tree_value(curr_family, value_size))
   );
   values_old.insert(
       values_old.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))

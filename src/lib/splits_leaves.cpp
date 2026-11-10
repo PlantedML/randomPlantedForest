@@ -21,24 +21,24 @@ void leaf_order_refs(
 )
 {
   const size_t m = leaf.individuals.size();
-  auto it = leaf.order_cache.find(k);
-  if (it == leaf.order_cache.end() || it->second.size() != m) {
-    std::vector<size_t> &o = leaf.order_cache[k];
+  auto it = leaf.cache().order_cache.find(k);
+  if (it == leaf.cache().order_cache.end() || it->second.size() != m) {
+    std::vector<size_t> &o = leaf.cache().order_cache[k];
     o.resize(m);
     std::iota(o.begin(), o.end(), 0);
     std::stable_sort(o.begin(), o.end(), [&](size_t a, size_t b) {
       return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k];
     });
-    it = leaf.order_cache.find(k);
+    it = leaf.cache().order_cache.find(k);
   }
   order = &it->second;
-  auto is = leaf.sorted_vals_cache.find(k);
-  if (is == leaf.sorted_vals_cache.end() || is->second.size() != m) {
-    std::vector<double> &sv = leaf.sorted_vals_cache[k];
+  auto is = leaf.cache().sorted_vals_cache.find(k);
+  if (is == leaf.cache().sorted_vals_cache.end() || is->second.size() != m) {
+    std::vector<double> &sv = leaf.cache().sorted_vals_cache[k];
     sv.resize(m);
     for (size_t i = 0; i < m; ++i)
       sv[i] = X[leaf.individuals[(*order)[i]]][k];
-    is = leaf.sorted_vals_cache.find(k);
+    is = leaf.cache().sorted_vals_cache.find(k);
   }
   sorted_vals = &is->second;
 }

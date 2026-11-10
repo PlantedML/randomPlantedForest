@@ -32,3 +32,19 @@ test_that("an exported forest prints compactly", {
     str(fit$forest)
   })
 })
+
+test_that("print() counts the fit's own columns, not the formula's raw ones", {
+  set.seed(4)
+  d <- data.frame(x1 = runif(60, 0.1, 1), x2 = runif(60), x3 = runif(60))
+  d$y <- log(d$x1) + d$x2 + rnorm(60, sd = 0.1)
+
+  # y ~ . - x3: two columns, all interactions
+  fit <- rpf(y ~ . - x3, data = d, max_interaction = 2, ntrees = 2, splits = 5)
+  out <- paste(format(fit), collapse = "\n")
+  expect_match(out, "on 2 predictors, all possible interactions", fixed = TRUE)
+
+  # log(x1) + I(x2^2) + x2 + x3: four columns from three raw ones
+  fit <- rpf(y ~ log(x1) + I(x2^2) + x2 + x3, data = d, max_interaction = 4, ntrees = 2, splits = 5)
+  out <- paste(format(fit), collapse = "\n")
+  expect_match(out, "on 4 predictors, all possible interactions", fixed = TRUE)
+})
