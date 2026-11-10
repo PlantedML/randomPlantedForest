@@ -58,6 +58,19 @@
   `"cur_trees_1"` does. Previously it tried the 1st to 9th smallest
   values of each leaf. Fitted models change for regression with
   `split_structure = "cur_trees_2"` and `deterministic = TRUE` only.
+- Classification’s split structures were never completed to match
+  regression’s. They now use the same candidate pool, the same sampling
+  of candidates, leaves and thresholds, and the same aging; only the
+  loss differs. With `loss = "L2"` a classification fit on a 0/1
+  response now equals the regression fit (same seed). Previously
+  `"cur_trees_1"` was `"cur_trees_2"`; `"res_trees"` used another
+  candidate pool and ignored `split_decay_rate`; `"hist"` only ever
+  split the root, so it fitted an additive model of stumps whatever
+  `max_interaction` was; and `"cur_trees_2"` never split the candidate
+  tree’s own leaves. The fixes above for `"cur_trees_1"` sampling and
+  for `deterministic = TRUE` apply to classification too. Classification
+  fits change for every `split_structure` and every loss.
+- The internal loss `"exponential_2"` no longer crashes.
 - Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaves"` for regression
   excluded that split, so binary predictors were never split on, and
