@@ -752,7 +752,8 @@ prune_dec_matrix_v <- function(M, sets, intercept, n_own, feature_names, other, 
   share <- v_comp[nonzero] / crit_centred_var(crit, pred_own)
   names(share) <- prune_set_names(sets[nonzero], feature_names)
   M <- M[, crit_blk(which(nonzero), V), drop = FALSE]
-  colnames(M) <- paste0(rep(names(share), each = V), "#", seq_len(V))
+  # (no component with variance, e.g. every family without a split: no columns)
+  colnames(M) <- if (length(share)) paste0(rep(names(share), each = V), "#", seq_len(V)) else character(0)
   list(
     sets = sets,
     nonzero = nonzero,
@@ -1377,7 +1378,11 @@ prune_kept_matrix_x <- function(object, X, nthreads = 0L) {
     M[, crit_blk(k, V)] <- if (V == 1L) rpf_coarse_eval(b, X) else vapply(b, rpf_coarse_eval, numeric(nrow(X)), X)
   }
   M <- sweep(M, 2, rep(object$beta, each = V), "*")
-  colnames(M) <- if (V == 1L) kept else paste0(rep(kept, each = V), "__class:", model_outcome_levels(object$fit))
+  colnames(M) <- if (V == 1L || !length(kept)) {
+    kept
+  } else {
+    paste0(rep(kept, each = V), "__class:", model_outcome_levels(object$fit))
+  }
   M
 }
 
