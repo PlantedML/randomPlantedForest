@@ -278,8 +278,13 @@ test_that("the panels of the components kept as they are: own cut points, forest
   fo <- disp$forms
   expect_identical(names(disp$asis), fo$component[fo$form == "asis"])
   expect_identical(names(disp$coarse), fo$component[fo$form == "coarsened"])
-  expect_true(any(names(disp$asis) %in% names(pd$beta)))
-  expect_true(any(names(disp$coarse) %in% names(pd$beta)))
+  # which components are shown in which form, and which of them are kept, depends on the platform's forest: check
+  # that the forms, the kept flags and the model agree. Each component has one form, kept means in the model
+  expect_gt(length(disp$asis) + length(disp$coarse), 0)
+  expect_length(intersect(names(disp$asis), names(disp$coarse)), 0)
+  kept_flag <- function(z) vapply(z, function(e) e$kept, logical(1))
+  expect_identical(unname(kept_flag(disp$asis)), names(disp$asis) %in% names(pd$beta))
+  expect_identical(unname(kept_flag(disp$coarse)), names(disp$coarse) %in% names(pd$beta))
   # coarse and asis together: every kept component of three or more predictors, once
   kept_of <- function(z) names(z)[vapply(z, function(e) e$kept, logical(1))]
   shown <- c(kept_of(disp$coarse), kept_of(disp$asis))

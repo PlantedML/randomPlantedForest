@@ -221,9 +221,26 @@ test_that("the adaptive stop, the pruning and the tuner choose the lowest correc
   expect_identical(ns$oob_lowest(c(0, -1, 0)), 1:3)
 })
 
+# The choice in an OOB table, by its definition (prune_choose()): a candidate whose corrected OOB error was clamped
+# to 0 is left out unless all are; among the others, min has the lowest RMSE, and 1se the largest tau whose MSE is
+# within one SE of min's. Which candidates are clamped depends on the forest, and so on the platform's random draws.
+expect_oob_choice <- function(oob) {
+  zero <- oob$oob_rmse == 0
+  use <- if (all(zero)) rep(TRUE, nrow(oob)) else !zero
+  expect_equal(sum(oob$min), 1)
+  expect_equal(sum(oob$one_se), 1)
+  expect_false(any((oob$min | oob$one_se) & !use))
+  best <- which(oob$min)
+  one <- which(oob$one_se)
+  expect_lte(oob$oob_rmse[best], min(oob$oob_rmse[use]) * (1 + 1e-12))
+  within <- use & oob$oob_rmse^2 <= (oob$oob_rmse[best]^2 + oob$se_mse[best]) * (1 + 1e-12)
+  expect_true(within[one])
+  expect_identical(oob$tau[one], max(oob$tau[within]))
+}
+
 test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   # 32 rows, 10 families: R at a small tau has about as many coefficients as a fold has rows, its predictions differ
-  # wildly between the two halves of the families, and the correction exceeds the uncorrected OOB MSE
+  # wildly between the two halves of the families, and the correction can exceed the uncorrected OOB MSE
   set.seed(1)
   pm <- rpf(mpg ~ ., data = mtcars, ntrees = 10, splits = NULL, prune = TRUE, nthreads = 1)
   expect_s3_class(pm, "rpf_pruned")
@@ -238,17 +255,14 @@ test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   pmin <- prune_components(pm$fit, mtcars, select = "min", seed = pm$seed, max_panels = Inf, nthreads = 1)
   expect_identical(pmin$oob, oob)
   expect_identical(c(pmin$rule, pmin$tau), unlist(oob[oob$min, c("rule", "tau")], use.names = FALSE))
-  # this platform's fit: R at 0 and 0.01% at 0, left out
-  skip_on_cran()
-  expect_identical(zero, oob$rule == "R" & oob$tau <= 1e-4)
+  # the clamped candidates (on macOS arm64 R at 0 and 0.01%; none in the Linux forest) are left out of the choice
   expect_true(all(oob$oob_rmse_raw > 0))
-  expect_identical(c(pmin$rule, pmin$tau), c("D", "0"))
-  expect_identical(c(pm$rule, pm$tau), c("D", "0.01"))
+  expect_oob_choice(oob)
 })
 
-test_that("noiseless data: R's corrected OOB errors are 0, and the choice keeps the true component", {
+test_that("noiseless data: corrected OOB errors of 0 are left out, and the choice keeps the true component", {
   # y = x1 exactly: R's uncorrected OOB error is almost all the OOB means' extra variance, and the correction,
-  # estimated from the two halves of the families, exceeds it
+  # estimated from the two halves of the families, can exceed it
   n <- 24
   i <- seq_len(n)
   x <- data.frame(x1 = (i - 0.5) / n, x2 = ((i * 7) %% n) / n)
@@ -261,12 +275,9 @@ test_that("noiseless data: R's corrected OOB errors are 0, and the choice keeps 
   expect_equal(sum(oob$min), 1)
   expect_equal(sum(oob$one_se), 1)
   expect_true(all(zero) || !any(zero[oob$min | oob$one_se]))
-  # this platform's fit: every R candidate at 0, left out; D at 10% with x1 alone
-  skip_on_cran()
-  expect_identical(zero, oob$rule == "R")
+  # the clamped candidates (on macOS arm64 every R candidate; none in the Linux forest) are left out of the choice
   expect_true(all(oob$oob_rmse_raw > 0))
-  expect_identical(oob$min, oob$rule == "D" & oob$tau == 0.1)
-  expect_identical(oob$one_se, oob$min)
-  expect_identical(c(pr$rule, pr$tau), c("D", "0.1"))
+  expect_oob_choice(oob)
+  expect_identical(c(pr$rule, pr$tau), unlist(oob[oob$one_se, c("rule", "tau")], use.names = FALSE))
   expect_identical(names(pr$beta), "x1")
 })
