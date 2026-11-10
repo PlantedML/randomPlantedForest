@@ -7,7 +7,7 @@
 \method{print}{rpf_pruned}(x, n_show = 20, ...)
 }
 \arguments{
-\item{x}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}}.}
+\item{x}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}.}
 
 \item{n_show}{\verb{[integer(1): 20]}: The largest number of kept components to list.}
 

@@ -2,7 +2,9 @@
 #'
 #' Drops the small components of a regression forest's functional decomposition and, optionally, refits one
 #' coefficient per kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
-#' without refits, or by K-fold cross-validation on the training rows.
+#' without refits, or by K-fold cross-validation on the training rows. By default every kept interaction of three or
+#' more predictors is then coarsened so that it can be shown in at most `max_panels` heat maps, and the model is pruned
+#' again.
 #'
 #' The forest is decomposed into its purified components `f_S`, one per set `S` of predictors (see [purify()] and
 #' [predict_components()]), at all orders up to `max_interaction`, and its intercept `f_0`. The size of a component is
@@ -32,9 +34,9 @@
 #' components that add nothing on new data.
 #'
 #' **Out of bag** (`select_by = "oob"`). Every tree family of `object` is grown on a bootstrap sample of the training
-#' rows, and the purification works family by family. So `object` is purified once more (as [purify()] does), and on
-#' the way every family's components are evaluated at the training rows outside its bootstrap sample. A row's
-#' out-of-bag (OOB) component is the mean over its OOB families (about 37% of them), and its OOB intercept likewise.
+#' rows, and the purification works family by family. So every family's components (see **Purification** below) are
+#' also evaluated at the training rows outside its bootstrap sample. A row's out-of-bag (OOB) component is the mean
+#' over its OOB families (about 37% of them), and its OOB intercept likewise.
 #' The purification uses the predictors of all training rows, not the outcome, so no outcome information of a row
 #' enters its OOB components.
 #' - The kept components of every `tau` are those of the final model (the shares of `object` on the training rows).
@@ -49,6 +51,10 @@
 #'   the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
 #'   mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
 #'   look worse than they are. The uncorrected values are reported as `oob_rmse_raw`.
+#' - If the correction exceeds a candidate's uncorrected MSE, its corrected MSE is reported as 0. That is not a perfect
+#'   candidate but an overshooting, unreliable estimate (it happens with very few rows, e.g. `"R"` with about as many
+#'   coefficients as rows, or with almost no noise). Such candidates are not chosen, unless all candidates are at 0
+#'   (then they tie).
 #' - The OOB RMSE is taken over the rows with at least one OOB family, the SE for `"1se"` from the per-fold MSEs.
 #' - With few families the OOB means average only one to a few families, and many rows have none (16% at 4
 #'   families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned `"D"` was
@@ -76,20 +82,61 @@
 #' and for `"R"` the least squares on the OOB components of `data`'s rows (out of bag) or on its components on `data`
 #' (by CV). `data` and `y` must therefore be the rows `object` was trained on, in the order of the fit (checked).
 #'
-#' **Purification.** `object` is purified in place at all orders, as [purify()] does, if it is not purified yet. This
-#' does not change its predictions. A forest purified with a `maxp_interaction` below its order is purified again at
-#' all orders, with a message: the pruning needs every component. The out-of-bag path purifies `object` (again) in
-#' mode 2, which gives the same components (a mode-1 purification's up to rounding).
+#' **The display** (`max_panels`, default 10; `Inf` switches it off). A component of two predictors is one heat map.
+#' A kept component `f_S` of three or more predictors is shown as heat maps over two of its predictors, one per cell of
+#' the others. If its own cut points need more than `max_panels` such heat maps, it is coarsened:
+#' - Two predictors of `S` stay at full resolution. Each other predictor `k` is cut into `q_k` intervals of equal
+#'   numbers of training rows (ties merged), with `prod(q) <= max_panels`; `q_k = 1` averages `k` out. Only the
+#'   maximal `q` vectors (no `q_k` can grow) are considered; they are listed directly, not searched among all
+#'   `max_panels^(|S| - 2)` vectors.
+#' - Within a cell, `f_S` is averaged over the coarse predictors with the product of their training marginals. The
+#'   coarsened component is not purified again: [purify()] identifies the components under the joint distribution of
+#'   the training rows, not under the product of the marginals, and the averaging changes the component's means along
+#'   its two full-resolution predictors and its mean over the training rows. It is used as it is (no part of it is
+#'   moved into the intercept or into components of lower order).
+#' - Of all choices of the two full predictors and the `q` vector, the one keeping the largest share of the variance
+#'   of `f_S` on the training rows is taken (ties: the first in lexicographic order).
+#'
+#' Then the same rule prunes again, on the components the first pruning kept, with the coarsened ones in place of the
+#' originals. Its shares, which `tau` thresholds, are of the variance of that model (the intercept plus these
+#' components) on the training rows, not of the forest's prediction. A pair chosen out of bag is chosen again out of
+#' bag, with the same candidates and folds, scored with each family's coarsened components at its out-of-bag rows (R's
+#' coefficients out of bag); a given rule and `tau`, or a pair chosen by CV, is applied again as it is (R's
+#' coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated, as it would
+#' need the display in every fold's refit). The prediction then uses the coarsened components, so the
+#' pruning judges the model that is shown. In simulations (48 data sets) this second pruning had 0.49% lower test
+#' error than pruning and then coarsening, and 0.57% lower than not coarsening; on California housing (50 families,
+#' order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
+#' the first pruning's.
+#' The display costs about as much again as the out-of-bag pruning: a purification restricted to the components being
+#' coarsened (two at a time) for their candidates, and one for their out-of-bag values; the stored coarsened components
+#' take a few MB each on 16,000 rows at order 3, more at higher orders.
+#'
+#' **Purification.** The pruning needs every component's values at the training rows (and out of bag, its OOB
+#' means), not the purified forest: [purify()] keeps every component of every tree family as pieces, which at high
+#' orders takes far more memory than the forest (see **Cost**). So each family is
+#' purified in turn, as [purify()] does (mode 2, all orders), its components are evaluated at the training rows and
+#' added up, and the family's pieces are freed. The pruned model then stores the pieces of its kept components only,
+#' merged over the families exactly as [purify()] stores them, and [`predict()`][predict.rpf_pruned] and
+#' [predict_components()] evaluate them from there; a coarsened component (the display) is stored in its coarsened
+#' form. The components equal those of the purified forest up to rounding (about `1e-15` relative), and the stored
+#' ones are the purified forest's bit for bit. `object` itself is not purified: an earlier [purify()], at any
+#' `maxp_interaction` or `mode`, is left as it is and does not change the result.
 #'
 #' **Random numbers.** The folds are drawn after `set.seed(seed)`, and the CV's fold fits after it too. Afterwards the
 #' random number stream is restored to its state on entry (after drawing `seed` if it is `NULL`), so the call does not
 #' reset the caller's stream.
 #'
-#' **Cost.** The out-of-bag choice purifies `object` once and evaluates each family's components at its OOB rows; it
-#' needs no fit. The CV fits and purifies the forest K more times. Both evaluate the components on the training rows:
-#' only those the purified forest stores (at most `sum(choose(p, seq_len(max_interaction)))`, usually far fewer: the
-#' subsets of the trees' predictor sets), in one pass over the rows. The memory is about `n` doubles per stored
-#' component, a few times that for the out-of-bag choice. `nthreads` speeds up the fits and the purification.
+#' **Cost.** The out-of-bag choice purifies the families of `object` once (see **Purification**); it needs no fit. The
+#' CV fits and purifies the forest K more times (each fold's forest as [purify()] does). Only the components the
+#' forest has are evaluated (at most `sum(choose(p, seq_len(max_interaction)))`, usually far fewer: the subsets of the
+#' trees' predictor sets). The memory is the forest's plus about `n` doubles per component, three times that for the
+#' out-of-bag choice, plus one family's components at a time per thread; storing the kept components passes over the
+#' families once more. On California housing (16,512 rows, 200 families, `split_try = 3`, `t_try = 0.1`, the fast
+#' draw, 8 threads; measured when this column pass was added) the whole call of `rpf(splits = NULL, prune = TRUE)`
+#' peaked at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at order 3, and at 6.4 GB (9.9 GB RSS) at
+#' order 8 (all predictors), most of it the 31 coarsened components the display keeps; there [purify()] alone needs
+#' more than 12 GB of RSS. `nthreads` speeds up the fits and the purification.
 #'
 #' Only regression forests are supported.
 #'
@@ -100,6 +147,9 @@
 #' @param y `[numeric | NULL: NULL]`: The outcome of the training rows. Required unless `data` contains the outcome
 #'   of a formula or recipe fit.
 #' @param ... Reserved for future expansion. Unknown arguments are an error.
+#' @param max_panels `[numeric(1): 10]`: The display: the most heat maps a kept component of three or more predictors
+#'   may need; such a component is coarsened to at most `max_panels` heat maps, and the model is pruned again (see
+#'   Details). A whole number of at least 1, or `Inf` for no display (the first pruning's model).
 #' @param rule `[character: c("D", "R")]`: The rules to consider: `"D"` drops, `"R"` drops and refits one coefficient
 #'   per kept component.
 #' @param tau `[numeric: c(0, 1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1)]`: The thresholds to consider, as shares of
@@ -122,26 +172,56 @@
 #' @param verbose `[logical(1): FALSE]`: Report the progress of the choice.
 #'
 #' @return An object of class `rpf_pruned`, a list with elements:
-#' - `fit`: `object` (purified).
+#' - `fit`: `object`, as it was (not purified by the pruning).
 #' - `rule`, `tau`: the chosen rule and threshold.
 #' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`).
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
 #'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
-#' - `components`: a `data.frame` of every nonzero component of `object` on the training rows: `component` (its
-#'   name, as in [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
+#' - `components`: a `data.frame` of every nonzero component of `object` on the training rows (after a second pruning
+#'   of the display, only of those the first pruning kept: see below): `component` (its name, as in
+#'   [predict_components()]), `order`, `share`, `kept`, `beta` (`NA` if dropped).
 #' - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a `data.frame` with one row per candidate: `rule`,
-#'   `tau`, `oob_rmse` (corrected; used for the choice), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and
-#'   `se_mse_raw` (uncorrected), `n_kept`, `min` and `one_se` (the two choices). Its attribute `n_rows` is the number
-#'   of rows with an OOB family.
+#'   `tau`, `oob_rmse` (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
+#'   Details), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and `se_mse_raw` (uncorrected), `n_kept`, `min` and
+#'   `one_se` (the two choices). Its attribute `n_rows` is the number of rows with an OOB family.
 #' - `cv`: `NULL` unless the pair was chosen by CV; otherwise a `data.frame` with one row per candidate: `rule`, `tau`,
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
 #' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
 #'   given rule and `tau`, `select_by` is `"oob"` if R's coefficients were fitted out of bag, otherwise `NULL`.
+#' - With the display (finite `max_panels`) and a component coarsened, a second pruning runs, and these describe it:
+#'   its candidates are the components the first pruning kept, with the coarsened ones in place, and `oob` is its
+#'   table. `components` then lists only these components, and their `share` (which the second pruning's `tau`
+#'   thresholds) is of the variance of their model (the intercept plus these components) on the training rows, not of
+#'   the forest's prediction; every nonzero component of `object` with its share of the forest's prediction is in
+#'   `display$first$components`. Without a coarsened component, they are the first pruning's. With the display,
+#'   `components` also has `form` (`"full"` for one or two predictors, `"asis"` if its own cut points need at most
+#'   `max_panels` heat maps, `"coarsened"`; `NA` for a component of three or more predictors the first pruning dropped,
+#'   so only without a second pruning) and `heat_maps`. The element `display` is a list:
+#'   `max_panels`; `first`, the first pruning's model (without `fit`); `coarse`, per coarsened component (named as the
+#'   components): `S` (all the component's predictors), `C` (the coarse predictors, `|S| - 2` of `S`: the panel
+#'   predictors), `q` (the numbers of intervals aimed at; merged ties can leave fewer, `lengths(cuts) + 1`), `cuts`
+#'   (per coarse predictor), `cells` (the number of heat maps, `prod(lengths(cuts) + 1)`), `var_kept` (the share of
+#'   the component's variance kept), `forest_panels`, `kept` (in the final model), `candidates` (every candidate's
+#'   coarse set, `q`, cells and variance kept), `stored` (what prediction needs; no training data) and `seconds` (the
+#'   time to choose and build its form); `asis`, per component kept as it is (form `"asis"`), its panels with the
+#'   same names and meaning: `S` (all the component's predictors), `C` (the panel predictors: the `|S| - 2` of `S`
+#'   with the fewest own cut points; of ties, the first in `S`), `cuts` (per predictor of `C`, its own cut points: the
+#'   leaf bounds of the trees containing `S` inside the range of the training values), `forest_panels`
+#'   (`prod(lengths(cuts) + 1)`) and `kept`; `forms`, per component of three or more predictors the first pruning
+#'   kept, its form, heat maps and variance kept; `second` (whether a second pruning ran); `seconds` (the time of each
+#'   step); `cache`, an environment holding the coarsened components' search indices, built at their first
+#'   [`predict()`][predict.rpf_pruned] (a cache, not part of the model: rebuilt when missing or invalid, as after
+#'   saving and loading). In `coarse` and `asis` alike, a panel is a cell of `cuts` (a value `x` of predictor `k` of
+#'   `C` lies in cell `findInterval(x, cuts[[k]])`), shown as a heat map over the two predictors `setdiff(S, C)` at
+#'   full resolution.
+#' - `store`: the pieces of the kept components that are not coarsened, from which the model predicts (see
+#'   **Purification**), and `cache`, an environment holding them built for prediction.
 #'
 #' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
 #'
-#' @seealso [predict.rpf_pruned()], [predict_components()], [purify()].
+#' @seealso [predict.rpf_pruned()], [predict_components()], [purify()]; [rpf()] with `prune = TRUE` fits and prunes in one
+#'   call.
 #' @export
 #'
 #' @examples
@@ -168,11 +248,19 @@
 #' prune_components(fit, x, y, rule = "R", tau = 0.01)
 #'
 #' predict(pruned, x[1:5, ])
+#'
+#' # A three-way interaction, shown in at most 4 heat maps
+#' y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
+#' fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+#' shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
+#' shown
+#' shown$display$forms
 prune_components <- function(
   object,
   data,
   y = NULL,
   ...,
+  max_panels = 10,
   rule = c("D", "R"),
   tau = c(0, 1e-4, 3e-4, 1e-3, 3e-3, 0.01, 0.03, 0.1),
   select = c("1se", "min"),
@@ -196,6 +284,10 @@ prune_components <- function(
   if (missing(data) || is.null(data)) {
     cli::cli_abort("{.arg data} is required: the training rows of {.arg object}, as passed to {.fn rpf}.")
   }
+  checkmate::assert_number(max_panels, lower = 1)
+  if (is.finite(max_panels)) {
+    checkmate::assert_int(max_panels, lower = 1, upper = .Machine$integer.max)
+  }
   checkmate::assert_character(rule, min.len = 1, any.missing = FALSE)
   checkmate::assert_subset(rule, c("D", "R"))
   rule <- unique(rule)
@@ -209,10 +301,50 @@ prune_components <- function(
   nthreads <- as.integer(nthreads %||% object$params$nthreads)
   checkmate::assert_flag(verbose)
 
-  tr <- prune_training_data(object, data, y)
+  prune_run(
+    object,
+    prune_training_data(object, data, y),
+    max_panels = max_panels,
+    rule = rule,
+    tau = tau,
+    select = select,
+    select_by = select_by,
+    default_select_by = default_select_by,
+    folds = folds,
+    fold_id = fold_id,
+    seed = seed,
+    nthreads = nthreads,
+    verbose = verbose
+  )
+}
+
+# The pruning of prune_components() on the checked arguments: `tr` holds the training rows (prune_training_data()),
+# `default_select_by` whether `select_by` was left at its default. rpf(prune = TRUE) calls it with the rows it was
+# fitted on. store = FALSE leaves out the stored pieces of the kept components (rpf(tune = )'s search scores the
+# pruned models but does not predict with them). Errors are reported against `call`.
+#
+# The forest's components come from one pass over its families (prune_columns()), not from a purified store, and the
+# result stores the pieces of its kept components only (prune_store()): the forest is left as it is.
+prune_run <- function(
+  object,
+  tr,
+  max_panels,
+  rule,
+  tau,
+  select,
+  select_by,
+  default_select_by,
+  folds,
+  fold_id,
+  seed,
+  nthreads,
+  verbose,
+  store = TRUE,
+  call = rlang::caller_env()
+) {
   n <- length(tr$y)
   # the shares, R's coefficients and the out-of-bag rows are those of the training rows
-  prune_check_training_rows(object, tr)
+  prune_check_training_rows(object, tr, call = call)
   cand <- expand.grid(tau = sort(tau), rule = rule, stringsAsFactors = FALSE)[, c("rule", "tau")]
   # a choice among the candidates, or a given rule and tau
   choose <- nrow(cand) > 1
@@ -223,14 +355,17 @@ prune_components <- function(
   if (!choose && identical(select_by, "cv")) {
     select_by <- NULL
   }
-  # the out-of-bag path purifies the forest itself, on the way to its out-of-bag components
-  prune_check_purified(object, nthreads, purify = !identical(select_by, "oob"))
+  # the predictor names as the components are named
+  fnames <- colnames(preprocess_predictors_predict(object, tr$predictors[1, , drop = FALSE]))
 
   cv <- NULL
   oob <- NULL
   dec <- NULL
   # the out-of-bag components that R's final coefficients are fitted on, if out of bag
   oob_fit <- NULL
+  # the display prunes again out of bag: it needs the forest's OOB sums
+  display <- is.finite(max_panels)
+  sums <- NULL
   if (choose) {
     if (is.null(seed)) {
       seed <- sample.int(.Machine$integer.max, 1L)
@@ -247,17 +382,18 @@ prune_components <- function(
     } else {
       checkmate::assert_atomic_vector(fold_id, any.missing = FALSE, len = n)
       if (length(unique(fold_id)) < 2) {
-        cli::cli_abort("{.arg fold_id} must have at least two distinct folds.")
+        cli::cli_abort("{.arg fold_id} must have at least two distinct folds.", call = call)
       }
     }
     if (select_by == "cv") {
       cv <- prune_cv(object, tr, cand, fold_id, seed, nthreads, verbose)
       table <- cv
     } else {
-      sel <- prune_oob(object, tr, cand, fold_id, nthreads, verbose)
+      sel <- prune_oob(object, tr, fnames, cand, fold_id, nthreads, verbose, keep_sums = display)
       oob <- sel$table
       dec <- sel$dec
       oob_fit <- sel$oob_fit
+      sums <- sel$sums
       rm(sel)
       table <- oob
     }
@@ -271,19 +407,35 @@ prune_components <- function(
     seed <- NULL
     if (identical(select_by, "oob")) {
       # a given R: the out-of-bag components for its coefficients, as the choice fits them (no scores, no folds)
-      sel <- prune_oob(object, tr, NULL, NULL, nthreads, verbose)
+      sel <- prune_oob(object, tr, fnames, NULL, NULL, nthreads, verbose, keep_sums = display)
       dec <- sel$dec
       oob_fit <- sel$oob_fit
+      sums <- sel$sums
       rm(sel)
     }
   }
 
-  # The chosen rule and tau on the forest itself, on all training rows (the out-of-bag path has decomposed it). R's
+  # The chosen rule and tau on the forest itself, on all training rows (the out-of-bag path has its components). R's
   # coefficients: on the out-of-bag components with select_by = "oob", as each candidate was scored; else in sample
-  dec <- dec %||% prune_decompose(object, tr$predictors, rep(TRUE, n), nthreads = nthreads)
-  sets <- dec$sets[dec$nonzero]
+  dec <- dec %||% prune_columns(object, fnames, nthreads, oob = FALSE)$dec
   rf <- prune_fit_rule(rule_sel, tau_sel, dec, tr$y, oob = oob_fit)
+  res <- prune_result(object, rule_sel, tau_sel, dec, rf, cv, oob, select, select_by, fold_id, seed)
+  if (display) {
+    rm(oob_fit)
+    res <- prune_display(res, object, tr, dec, sums, cand, as.integer(max_panels), nthreads)
+  }
+  if (store) {
+    # the pieces of the kept components that are not coarsened (the display stores those in its own form)
+    coarse <- names(res$beta) %in% names(res$display$coarse)
+    res$store <- prune_store(object, res$sets[!coarse], nthreads)
+    res$cache <- new.env(parent = emptyenv())
+  }
+  res
+}
 
+# The rpf_pruned model of rule and tau on the decomposition `dec`, with R's (alpha, beta) `rf` (prune_fit_rule())
+prune_result <- function(object, rule, tau, dec, rf, cv, oob, select, select_by, fold_id, seed) {
+  sets <- dec$sets[dec$nonzero]
   components <- data.frame(
     component = names(dec$share),
     order = lengths(sets),
@@ -292,12 +444,11 @@ prune_components <- function(
     beta = unname(rf$beta[names(dec$share)]),
     stringsAsFactors = FALSE
   )
-
   structure(
     list(
       fit = object,
-      rule = rule_sel,
-      tau = tau_sel,
+      rule = rule,
+      tau = tau,
       intercept = rf$alpha,
       beta = rf$beta,
       sets = sets[components$kept],
@@ -388,22 +539,56 @@ prune_restore_rng <- function(rng) {
   }
 }
 
-# Purify `object` (mode 2, all orders) unless it is purified at all its orders. A purification below the forest's
-# order (purify(maxp_interaction = k)) leaves the higher components zero, which the pruning would silently drop (and
-# the fold fits would not): it is purified again at all orders. predict() does not change. With purify = FALSE (the
-# out-of-bag choice, whose purify_oob() purifies at all orders anyway) only the message.
-prune_check_purified <- function(object, nthreads, purify = TRUE) {
-  capped <- is_purified(object) && object$fit$is_purify_capped()
-  if (capped) {
-    cli::cli_inform(c(
-      "i" = "{.arg object} was purified with a {.arg maxp_interaction} below its order; purifying it at all orders.",
-      " " = "{.fn prune_components} prunes the whole forest. The forest's predictions do not change."
-    ))
+# The forest's components at its training rows from one pass over its families (purify_columns(), C++): each family
+# is purified as purify() purifies it (mode 2, all orders), its components are evaluated at all training rows, and
+# then it is freed, so the purified store of all components is never built and the forest is left as it is (an
+# earlier purification, at any order or mode, stays as it is and is not read). Returns `dec`, the decomposition as
+# prune_decompose() gives it (the components in the order of prune_order_sets(), equal to the purified store's up to
+# rounding, its intercept bitwise), and with `oob` also `o`, the out-of-bag sums as purify_oob() gives them
+# (prune_oob_score()). feature_names: the predictors' names.
+prune_columns <- function(object, feature_names, nthreads, oob = TRUE) {
+  cc <- object$fit$purify_columns(0L, nthreads, oob)
+  sets <- lapply(cc$sets, as.integer)
+  ord <- prune_order_sets(sets)
+  # a forest of order k has no component above k; as prune_stored_sets()
+  ord <- ord[lengths(sets[ord]) <= object$params$max_interaction]
+  M <- cc$own[, ord, drop = FALSE]
+  cc$own <- NULL
+  dec <- prune_dec_matrix(M, sets[ord], cc$intercept[1], nrow(M), feature_names)
+  rm(M)
+  list(dec = dec, o = if (oob) cc[c("sets", "sum0", "sum1", "intercept0", "intercept1", "count")])
+}
+
+# The pieces of the components `sets` (column indices) of `object`, merged exactly as purify() stores them (C++
+# store_components(): one pass over the families restricted to these components), as plain R data: what predict()
+# needs for them, without the forest's other components
+prune_store <- function(object, sets, nthreads) {
+  object$fit$store_components(lapply(sets, as.integer), nthreads)
+}
+
+# The built store of a pruned model (an external pointer: the store's tables and indices, as the purified forest
+# builds them), kept in the model's cache environment; rebuilt if missing or gone (a deserialized model)
+prune_store_built <- function(object) {
+  cache <- object$cache
+  xp <- if (is.environment(cache)) cache[[".store"]] else NULL
+  if (is.null(xp) || !rpf_store_valid(xp)) {
+    xp <- rpf_store_build(object$store, as.integer(object$fit$params$nthreads))
+    if (is.environment(cache)) {
+      assign(".store", xp, envir = cache)
+    }
   }
-  if (purify && (capped || !is_purified(object))) {
-    object$fit$purify_threads(0L, nthreads, 2L)
+  xp
+}
+
+# The order of predictor sets (column indices): by order, then lexicographically (the order of utils::combn() over
+# all sets)
+prune_order_sets <- function(sets) {
+  if (length(sets) == 0) {
+    return(integer(0))
   }
-  invisible()
+  width <- max(lengths(sets))
+  key <- vapply(sets, function(s) c(length(s), s, rep(0L, width - length(s))), integer(width + 1))
+  do.call(order, as.data.frame(t(key)))
 }
 
 # The predictor sets of the components the purified forest stores (as column indices), up to its order, ordered by
@@ -411,12 +596,7 @@ prune_check_purified <- function(object, nthreads, purify = TRUE) {
 prune_stored_sets <- function(fit) {
   sets <- lapply(fit$fit$purified_components(), as.integer)
   sets <- sets[lengths(sets) >= 1 & lengths(sets) <= fit$params$max_interaction]
-  if (length(sets) == 0) {
-    return(list())
-  }
-  width <- max(lengths(sets))
-  key <- vapply(sets, function(s) c(length(s), s, rep(0L, width - length(s))), integer(width + 1))
-  sets[do.call(order, as.data.frame(t(key)))]
+  sets[prune_order_sets(sets)]
 }
 
 # Names of predictor sets, as predict_components() names its columns
@@ -424,20 +604,11 @@ prune_set_names <- function(sets, feature_names) {
   vapply(sets, function(s) paste0(sort(feature_names[s]), collapse = ":"), character(1))
 }
 
-# The components of `fit` (purified first if needed) on the preprocessed predictor matrix X, one column per set, in
-# one pass
-prune_component_matrix <- function(fit, X, sets, nthreads = 0L) {
-  if (!is_purified(fit)) {
-    fit$fit$purify_threads(0L, nthreads, 2L)
-  }
-  out <- fit$fit$predict_components_matrix(X, sets, nthreads)
-  dimnames(out) <- NULL
-  out
-}
-
 # Decomposition of `fit` on its own training rows (logical `own`) and, optionally, other rows (logical `other`): the
 # components, the intercept, the shares of the nonzero components (named) and which sets they are. Only the
-# components the purified forest stores are evaluated (the others are zero), not all 2^p - 1 sets.
+# components the purified forest stores are evaluated (the others are zero), not all 2^p - 1 sets. `fit` is purified
+# first if it is not: the CV's fold fits, which need their components at the held-out rows and are discarded
+# afterwards (the forest being pruned is decomposed by prune_columns() instead).
 prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L) {
   X <- preprocess_predictors_predict(fit, predictors)
   if (!is_purified(fit)) {
@@ -445,17 +616,23 @@ prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L) {
   }
   sets <- prune_stored_sets(fit)
   rows <- c(which(own), if (!is.null(other)) which(other))
-  M <- prune_component_matrix(fit, X[rows, , drop = FALSE], sets, nthreads)
-  n_own <- sum(own)
-  M_own <- M[seq_len(n_own), , drop = FALSE]
+  M <- fit$fit$predict_components_matrix(X[rows, , drop = FALSE], sets, nthreads)
+  dimnames(M) <- NULL
   intercept <- as.numeric(fit$fit$predict_matrix(X[1, 1, drop = FALSE], -1, 0L))[1]
+  prune_dec_matrix(M, sets, intercept, sum(own), colnames(X), !is.null(other))
+}
+
+# The decomposition from the components M (rows: the own rows, then the others; columns: `sets`) and the intercept.
+# The prediction is the intercept plus all columns of M.
+prune_dec_matrix <- function(M, sets, intercept, n_own, feature_names, other = FALSE) {
+  M_own <- M[seq_len(n_own), , drop = FALSE]
   # the purified forest's prediction is its intercept plus all its components, which are all in M
   pred_own <- intercept + rowSums(M_own)
   var_pop <- function(v) mean((v - mean(v))^2)
   v_comp <- vapply(seq_len(ncol(M_own)), function(k) var_pop(M_own[, k]), numeric(1))
   nonzero <- v_comp > 0
   share <- v_comp[nonzero] / var_pop(pred_own)
-  names(share) <- prune_set_names(sets[nonzero], colnames(X))
+  names(share) <- prune_set_names(sets[nonzero], feature_names)
   M <- M[, nonzero, drop = FALSE]
   colnames(M) <- names(share)
   list(
@@ -464,7 +641,7 @@ prune_decompose <- function(fit, predictors, own, other = NULL, nthreads = 0L) {
     share = share,
     intercept = intercept,
     own = M[seq_len(n_own), , drop = FALSE],
-    other = if (!is.null(other)) M[-seq_len(n_own), , drop = FALSE]
+    other = if (other) M[-seq_len(n_own), , drop = FALSE]
   )
 }
 
@@ -588,11 +765,20 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   )
 }
 
-# The two choices among the candidates from their RMSE and the SE of their MSE (logical vectors)
-prune_choose <- function(rmse, se_mse, cand) {
+# The two choices among the candidates from their RMSE and the SE of their MSE (logical vectors). left_out: candidates
+# not chosen unless all are left out (prune_oob_score(): those whose corrected MSE was set to 0, an overshooting
+# correction); they then tie at 0. This is the rule of oob_lowest(), which the adaptive stop and rpf(tune = ) use
+prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
+  if (any(left_out) && !all(left_out)) {
+    use <- !left_out
+    ch <- prune_choose(rmse[use], se_mse[use], cand[use, , drop = FALSE])
+    spread <- function(x) replace(logical(length(rmse)), use, x)
+    return(list(min = spread(ch$min), one_se = spread(ch$one_se)))
+  }
   rule_rank <- match(cand$rule, c("D", "R"))
-  # min: the lowest RMSE; ties (relative 1e-12): the larger tau, then D
-  ties <- which(abs(rmse / min(rmse) - 1) <= 1e-12)
+  # min: the lowest RMSE by oob_lowest() (ties within relative 1e-12): the larger tau, then D. At a lowest RMSE of 0
+  # the candidates at 0 tie (all left out, or a CV RMSE of 0, which is a perfect fit, not an overshooting correction)
+  ties <- if (min(rmse) > 0) oob_lowest(rmse) else which(rmse == 0)
   best <- ties[order(-cand$tau[ties], rule_rank[ties])][1]
   # 1se: the largest tau with MSE within one SE of the minimum; at that tau the lower RMSE, then D
   ok <- which(rmse^2 <= (rmse[best]^2 + se_mse[best]) * (1 + 1e-12))
@@ -643,21 +829,33 @@ prune_select_by <- function(object, select_by, default, given = FALSE) {
   "oob"
 }
 
-# Out-of-bag (OOB) choice among the candidates (rule, tau), from one purification of `object` and no refits.
-# `object` is purified (mode 2, all orders, as purify() does) and, on the way, every family's components are evaluated
-# at the training rows outside its bootstrap sample (purify_oob()). Returns prune_oob_score()'s table, the forest's
-# decomposition on its training rows and the out-of-bag components for R's final fit (`oob_fit`). With cand = NULL
-# (a given rule R), no table: only `dec` and `oob_fit`.
-prune_oob <- function(object, tr, cand, fold_id, nthreads, verbose, call = rlang::caller_env()) {
+# Out-of-bag (OOB) choice among the candidates (rule, tau), from one pass over the families of `object` and no
+# refits: every family is purified (mode 2, all orders, as purify() does) and its components are evaluated at the
+# training rows; those outside its bootstrap sample give the OOB sums (prune_columns()). Returns prune_oob_score()'s
+# table, the forest's decomposition on its training rows and the out-of-bag components for R's final fit (`oob_fit`).
+# With cand = NULL (a given rule R), no table: only `dec` and `oob_fit`. keep_sums: also the OOB sums (`sums`), which
+# the display's second pruning needs. fnames: the predictors' names.
+prune_oob <- function(
+  object,
+  tr,
+  fnames,
+  cand,
+  fold_id,
+  nthreads,
+  verbose,
+  keep_sums = FALSE,
+  call = rlang::caller_env()
+) {
   t0 <- proc.time()[["elapsed"]]
   # `tr` are the training rows (checked by prune_components())
-  X <- preprocess_predictors_predict(object, tr$predictors)
-  o <- object$fit$purify_oob(0L, nthreads)
-  dec <- prune_decompose(object, tr$predictors, rep(TRUE, length(tr$y)), nthreads = nthreads)
+  pc <- prune_columns(object, fnames, nthreads)
+  o <- pc$o
+  dec <- pc$dec
+  rm(pc)
   out <- prune_oob_score(
     o,
     dec,
-    colnames(X),
+    fnames,
     tr$y,
     cand,
     fold_id,
@@ -677,11 +875,14 @@ prune_oob <- function(object, tr, cand, fold_id, nthreads, verbose, call = rlang
     ))
   }
   out$info <- NULL
+  if (keep_sums) {
+    out$sums <- o
+  }
   out
 }
 
-# The OOB table of every candidate from the OOB sums `o` (as purify_oob() returns them) and the forest's decomposition
-# on its training rows `dec` (prune_decompose()). feature_names: the predictors' names; y_all: the training outcome;
+# The OOB table of every candidate from the OOB sums `o` (as prune_columns() returns them: those of purify_oob()) and
+# the forest's decomposition on its training rows `dec` (prune_columns()). feature_names: the predictors' names; y_all: the training outcome;
 # n_trees: the number of families. The kept components of each tau come from the forest's own shares (those of the
 # final model). D is scored with the OOB intercept and components. R's (alpha, beta) are fitted as the final model's,
 # by least squares on the OOB components (not the forest's own, which have fitted the training rows' noise), but on
@@ -806,7 +1007,7 @@ prune_oob_score <- function(
     se_of <- function(x) apply(sweep(x, 2, n_k, "/"), 1, stats::sd) / sqrt(length(fids))
     oob_rmse <- sqrt(pmax(rowSums(sse_corr), 0) / n_use)
     se_mse <- se_of(sse_corr)
-    ch <- prune_choose(oob_rmse, se_mse, cand)
+    ch <- prune_choose(oob_rmse, se_mse, cand, left_out = oob_rmse == 0)
     table <- data.frame(
       rule = cand$rule,
       tau = cand$tau,
@@ -839,7 +1040,18 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
   processed <- hardhat::forge(new_data, fit$blueprint)
   check_no_missing(processed$predictors, "{.arg new_data}", call = call)
   X <- preprocess_predictors_predict(fit, processed$predictors)
-  M <- prune_component_matrix(fit, X, object$sets, nthreads)
+  if (nthreads < 1) {
+    nthreads <- as.integer(fit$params$nthreads)
+  }
+  # the display's coarsened components from their stored form, the others from the model's store
+  coarse <- names(object$beta) %in% names(object$display$coarse)
+  M <- matrix(0, nrow(X), length(object$beta))
+  if (!all(coarse)) {
+    M[, !coarse] <- rpf_store_eval(prune_store_built(object), X, lapply(object$sets[!coarse], as.integer), nthreads)
+  }
+  for (k in which(coarse)) {
+    M[, k] <- rpf_coarse_eval(prune_display_built(object, names(object$beta)[k]), X)
+  }
   M <- sweep(M, 2, object$beta, "*")
   colnames(M) <- names(object$beta)
   M
@@ -850,7 +1062,7 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
 #' The prediction of a pruned forest is `alpha + sum(beta_S * f_S(x))` over the kept components `f_S` of the forest,
 #' with the intercept `alpha` and the coefficients `beta_S` (see [prune_components()]).
 #'
-#' @param object `[rpf_pruned]`: A pruned forest from [prune_components()].
+#' @param object `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param new_data `[data.frame | matrix]`: New observations to predict.
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the forest was fitted
 #'   with.
@@ -917,7 +1129,7 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
 #'
 #' Shows the rule and threshold, how they were chosen, what was kept and dropped, and the coefficients.
 #'
-#' @param x `[rpf_pruned]`: A pruned forest from [prune_components()].
+#' @param x `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param n_show `[integer(1): 20]`: The largest number of kept components to list.
 #' @param ... Further arguments passed to or from other methods.
 #'
@@ -992,6 +1204,24 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
       )
     )
   }
+  if (!is.null(x$tune)) {
+    st <- x$tune$settings
+    lines <- c(
+      sprintf(
+        "Tuned out of bag (rpf(tune = )): %d forests; chosen split_try = %d, t_try = %s, min_leaf_rows = %d, splits = %d.",
+        nrow(x$tune$search),
+        st$split_try,
+        format(st$t_try),
+        st$min_leaf_rows,
+        st$splits
+      ),
+      "",
+      lines
+    )
+  }
+  if (!is.null(x$display)) {
+    lines <- c(lines, "", format_display(x, n_show))
+  }
   lines <- c(lines, "", sprintf("Intercept: %s", format(x$intercept, digits = 6)))
   if (nrow(kept) > 0 && n_show > 0) {
     kept <- kept[order(-kept$share), ]
@@ -1001,9 +1231,14 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
       share = vapply(show$share, format_share, ""),
       beta = format(show$beta, digits = 4)
     )
+    what <- "share on the training rows and coefficient"
+    if (!is.null(x$display)) {
+      tab$heat_maps <- show$heat_maps
+      what <- "share on the training rows, coefficient and heat maps"
+    }
     lines <- c(
       lines,
-      "Kept components (largest first), share on the training rows and coefficient:",
+      sprintf("Kept components (largest first), %s:", what),
       utils::capture.output(print(tab, row.names = FALSE, right = FALSE))
     )
     if (nrow(kept) > n_show) {
@@ -1013,6 +1248,50 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
 
   # format into lines so print() writes to stdout, not cli's message stream
   c(cli::cli_format_method(cli::cli_rule(left = "Pruned Random Planted Forest")), lines)
+}
+
+# The display's lines of format.rpf_pruned(): the first pruning, the coarsened components, the heat maps
+format_display <- function(x, n_show) {
+  d <- x$display
+  f <- d$first
+  how <- if (d$second) "coarsened, then pruned again" else "nothing to coarsen, so not pruned again"
+  lines <- c(
+    sprintf("Display: every kept component in at most %d heat maps (%s).", d$max_panels, how),
+    sprintf("First pruning: rule %s, tau = %s, %d components kept.", f$rule, format_share(f$tau), length(f$beta))
+  )
+  co <- d$coarse
+  if (length(co) > 0) {
+    kept_co <- vapply(co, function(z) isTRUE(z$kept), logical(1))
+    vk <- round(range(vapply(co, function(z) z$var_kept, numeric(1))), 2)
+    lines <- c(
+      lines,
+      sprintf(
+        "Coarsened: %d component%s (%d kept by the second pruning); variance kept %s.",
+        length(co),
+        if (length(co) == 1) "" else "s",
+        sum(kept_co),
+        if (vk[1] == vk[2]) format(vk[1]) else paste(vk, collapse = "-")
+      )
+    )
+    if (any(kept_co) && n_show > 0) {
+      z <- utils::head(co[kept_co], n_show)
+      tab <- data.frame(
+        component = names(z),
+        coarse = vapply(z, function(v) paste0(v$C, "(", lengths(v$cuts) + 1, ")", collapse = " x "), ""),
+        heat_maps = vapply(z, function(v) v$cells, numeric(1)),
+        var_kept = vapply(z, function(v) format(v$var_kept, digits = 3), "")
+      )
+      lines <- c(
+        lines,
+        "Kept coarsened components: coarse features (intervals), heat maps, variance kept:",
+        utils::capture.output(print(tab, row.names = FALSE, right = FALSE))
+      )
+      if (sum(kept_co) > n_show) {
+        lines <- c(lines, sprintf("... and %d more", sum(kept_co) - n_show))
+      }
+    }
+  }
+  c(lines, sprintf("Heat maps of the model: %g", sum(x$components$heat_maps[x$components$kept])))
 }
 
 format_share <- function(s) {

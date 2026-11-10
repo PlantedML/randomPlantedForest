@@ -85,14 +85,33 @@
 #'   updates and acts as regularization: smaller values permit larger jumps on
 #'   the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 #'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
+#' @param prune `[logical(1): FALSE]`: Whether to return the pruned model
+#'   instead of the forest (regression only, not with `deterministic = TRUE`):
+#'   the forest is pruned by [prune_components()] with its defaults on the
+#'   training rows, and the result is its `rpf_pruned` model. See "Pruning" in
+#'   Details.
+#' @param max_panels `[numeric(1): 10]`: Used only with `prune = TRUE`: the
+#'   most heat maps a kept component of three or more predictors may need; such
+#'   a component is coarsened to at most `max_panels` heat maps and the model is
+#'   pruned again (the `max_panels` of [prune_components()]). A whole number of
+#'   at least 1, or `Inf` for no coarsening.
+#' @param tune `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether
+#'   to tune the greediness (`split_try`, `t_try`) and `min_leaf_rows` out of
+#'   bag (regression only, not with `deterministic = TRUE`, at least 10 tree
+#'   families). `TRUE` runs the full search ([tune_control()]), `"quick"` the
+#'   two-forest preset, and a [tune_control()] object your own. Every forest of
+#'   the search has `splits` chosen out of bag and is pruned, so `tune` implies
+#'   `splits = NULL` and `prune = TRUE`, and giving `split_try`, `t_try` or
+#'   `min_leaf_rows` with it is an error. See "Tuning out of bag" in Details.
 #' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
 #'   [predict_components()] requires, with the defaults of [purify()]. For other
-#'   settings, call [purify()] after fitting instead.
+#'   settings, call [purify()] after fitting instead. Not used with
+#'   `prune = TRUE`: the pruned model stores the components it keeps.
 #' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
 #' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in
-#'   the returned object as `$forest`. If `FALSE`, `$forest` is `NULL`, which
-#'   saves memory.
+#'   the returned object as `$forest` (with `prune = TRUE`, in the forest:
+#'   `$fit$forest`). If `FALSE`, it is `NULL`, which saves memory.
 #' @param deterministic `[logical(1): FALSE]`: Whether to fit without randomness: no
 #'   bootstrap, the first `max_candidates` possible splits as candidates
 #'   (`t_try` and `split_decay_rate` are ignored) and evenly spaced thresholds. The result does not
@@ -122,6 +141,24 @@
 #'   the checkpoints grown, and `$splits_oob` a list with the chosen `splits`,
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
 #'   (whether it stopped at the cap while the error was still falling).
+#'   With `prune = TRUE`, an object of class `rpf_pruned` (see
+#'   [prune_components()]), whose element `fit` is the forest (not purified), with
+#'   the elements above: the pruned model's OOB path is `$fit$oob_path`, and
+#'   with `splits = NULL` the chosen number of splits `$fit$params$splits` and
+#'   the stop `$fit$splits_oob`.
+#'   With `tune`, the `rpf_pruned` model of the chosen forest, with an element
+#'   `tune`: `search`, the search table (one row per forest grown, in the order
+#'   grown: `step`, `split_try`, `t_try`, `min_leaf_rows`, the chosen `splits`,
+#'   `stopped_at`, `capped`, the forest's corrected OOB RMSE `oob_rmse_forest`
+#'   (as the pruning scores it: its rule `"D"` at `tau = 0`, which keeps every
+#'   nonzero component; the OOB path's `oob_rmse` at the chosen `splits` leaves
+#'   the rows without OOB families of both halves uncorrected and is higher),
+#'   its pruned model's `rule`, `tau`, `n_kept` and corrected OOB RMSE
+#'   `oob_rmse` (the score), `seconds`, whether each step chose it
+#'   (`chosen_step1`, `chosen_step2`, `chosen_step3`; `NA` if not a candidate of
+#'   the step) and `final`); `steps`, each step's candidates and choice;
+#'   `settings`, the chosen `split_try`, `t_try`, `min_leaf_rows` and `splits`;
+#'   `control`, the [tune_control()] used; and `seconds`.
 #' @export
 #' @importFrom methods new
 #' @importFrom hardhat mold
@@ -308,6 +345,55 @@
 #' fit alone, measured when it was added: `split_try = 3`, `t_try = 0.1`, the
 #' exact draw, 8 threads).
 #'
+#' ## Pruning
+#'
+#' With `prune = TRUE`, `rpf()` fits the forest, then prunes its components
+#' with [prune_components()] at that function's defaults, on the
+#' training rows: the rule and the threshold are chosen out of bag (by
+#' cross-validation below 10 tree families, with a message), the sparse choice
+#' `select = "1se"`, and every kept component of three or more predictors is
+#' shown in at most `max_panels` heat maps before the model is pruned again. The
+#' result is the pruned model, of class `rpf_pruned`, with methods for
+#' [`predict()`][predict.rpf_pruned], [predict_components()] and `print()`. It
+#' is the same, bit for bit, as
+#' `prune_components(rpf(..., prune = FALSE), data)` from the same random
+#' number state, for every interface. For other settings of the pruning (`rule`,
+#' `tau`, `select`, `select_by`, folds or seed), fit with `prune = FALSE` and call
+#' [prune_components()]. Together with `splits = NULL`, one call chooses the
+#' number of splits out of bag, prunes and returns the model to show. Pruning
+#' needs out-of-bag rows and a numeric outcome, so `prune = TRUE` is an error for
+#' classification and with `deterministic = TRUE`.
+#'
+#' ## Tuning out of bag
+#'
+#' With `tune`, `rpf()` searches the greediness of the split search
+#' (`split_try` and `t_try`, on the ladder of [greediness_ladder()]) and the
+#' minimum leaf size `min_leaf_rows`, without cross-validation. Every forest of
+#' the search is grown with `splits` chosen out of bag and pruned by
+#' [prune_components()] with its defaults (without the display), and forests are
+#' compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+#' wins. A pruned model at 0 (every candidate's correction overshot, see
+#' [prune_components()]) is not chosen unless all are. The search is
+#' coordinate-wise ([tune_control()]): with `tune = TRUE`
+#' the ladder from 10 / 0.4 to 1 / 0.0125 at `min_leaf_rows = 1`, then
+#' `min_leaf_rows` 1, 5, 20 and 100 at the chosen point, then the point's two
+#' ladder neighbours, about 10 forests in all. `tune = "quick"` grows two
+#' forests, 3 / 0.1 and 1 / 0.025 at `min_leaf_rows = 1`. The chosen forest's
+#' pruned model is returned, with the display at `max_panels`, and the search in
+#' its element `tune`. Every forest is grown from the same random number state,
+#' so the result is the model that `rpf(splits = NULL, prune = TRUE)` returns
+#' at the chosen settings from that state.
+#'
+#' On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
+#' search had 10.8% lower test error than `rpf()`'s 10 / 0.4 (no family of data
+#' sets worse than +0.9%), and 2.8% lower than 5-fold cross-validation over the
+#' same settings at 1/24 of its cost; the quick preset had 9.4% lower test
+#' error (worst +0.4%). In those studies a forest was scored with the pruning's
+#' choice of the time (the lowest out-of-bag error, R's coefficients fitted in
+#' sample); the sparse default of [prune_components()] used here was not
+#' compared there. A search costs about as many fits as it grows forests, and
+#' their prunings.
+#'
 #' @references
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
 #' directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
@@ -345,6 +431,20 @@
 #' rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
 #' rpfit
 #' rpfit$params$splits
+#'
+#' # The whole pipeline: splits chosen out of bag, pruned
+#' set.seed(1)
+#' pruned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL, prune = TRUE)
+#' pruned
+#'
+#' \donttest{
+#' # Tuning out of bag: the quick preset, two forests
+#' set.seed(1)
+#' x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+#' y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
+#' tuned <- rpf(x, y, ntrees = 10, tune = "quick")
+#' tuned$tune$search
+#' }
 rpf <- function(x, ...) {
   UseMethod("rpf")
 }
@@ -375,6 +475,9 @@ rpf.formula <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -416,6 +519,10 @@ rpf.formula <- function(
     loss = loss,
     delta = delta,
     epsilon = epsilon,
+    prune = prune,
+    max_panels = max_panels,
+    tune = tune,
+    given = tune_given(environment()),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -445,6 +552,9 @@ rpf.data.frame <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -473,6 +583,10 @@ rpf.data.frame <- function(
     loss = loss,
     delta = delta,
     epsilon = epsilon,
+    prune = prune,
+    max_panels = max_panels,
+    tune = tune,
+    given = tune_given(environment()),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -502,6 +616,9 @@ rpf.matrix <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -530,6 +647,10 @@ rpf.matrix <- function(
     loss = loss,
     delta = delta,
     epsilon = epsilon,
+    prune = prune,
+    max_panels = max_panels,
+    tune = tune,
+    given = tune_given(environment()),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -559,6 +680,9 @@ rpf.recipe <- function(
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -590,6 +714,10 @@ rpf.recipe <- function(
     loss = loss,
     delta = delta,
     epsilon = epsilon,
+    prune = prune,
+    max_panels = max_panels,
+    tune = tune,
+    given = tune_given(environment()),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -619,6 +747,10 @@ rpf_bridge <- function(
   loss,
   delta,
   epsilon,
+  prune,
+  max_panels,
+  tune,
+  given,
   purify,
   nthreads,
   export_forest,
@@ -692,10 +824,40 @@ rpf_bridge <- function(
     }
   }
 
+  checkmate::assert_flag(prune)
+  # tune: the search chooses split_try, t_try, min_leaf_rows and splits, and prunes every forest
+  control <- tune_resolve(tune, call = call)
+  if (!is.null(control)) {
+    tune_check_call(control, given, splits, prune, outcomes$mode, deterministic, ntrees, split_structure, call = call)
+    splits <- NULL
+    prune <- TRUE
+  }
+  checkmate::assert_number(max_panels, lower = 1)
+  if (is.finite(max_panels)) {
+    checkmate::assert_int(max_panels, lower = 1, upper = .Machine$integer.max)
+  }
   checkmate::assert_flag(purify)
   checkmate::assert_int(nthreads, lower = 1L)
   checkmate::assert_flag(export_forest)
   checkmate::assert_flag(deterministic)
+  if (prune && outcomes$mode != "regression") {
+    cli::cli_abort(
+      c(
+        "{.code prune = TRUE} supports regression only.",
+        "x" = "The outcome is a factor (classification)."
+      ),
+      call = call
+    )
+  }
+  if (prune && deterministic) {
+    cli::cli_abort(
+      c(
+        "{.code prune = TRUE} is not available with {.code deterministic = TRUE}.",
+        "i" = "Fit with {.code prune = FALSE} and call {.fn prune_components} on the forest."
+      ),
+      call = call
+    )
+  }
   if (deterministic && ntrees > 1) {
     cli::cli_warn(c(
       "With {.code deterministic = TRUE}, all {ntrees} tree families are identical.",
@@ -744,11 +906,25 @@ rpf_bridge <- function(
     epsilon = epsilon,
     deterministic = deterministic,
     nthreads = nthreads,
-    purify = purify,
+    # the pruning leaves the forest unpurified (prune_components()), so that rpf(prune = TRUE) is its pruning
+    purify = purify && !prune,
     exact_draw = rpf_exact_draw(call = call),
     keep_level_order = predictors$keep_level_order
   )
 
+  if (!is.null(control)) {
+    return(tune_run(processed, outcomes, predictors, params, control, max_panels, export_forest, call = call))
+  }
+  res <- rpf_fit(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call = call)
+  if (prune) {
+    res <- rpf_prune(res, processed, max_panels, call = call)
+  }
+  res
+}
+
+# The forest of rpf_bridge()'s checked arguments: `adaptive` whether `splits` is chosen out of bag while growing,
+# `checkpoints` those of rpf(oob_path = ) (fixed splits) or NULL
+rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call) {
   if (adaptive) {
     chosen <- tune_splits_oob(outcomes$outcomes, predictors$predictors_matrix, params, call = call)
     fit <- chosen$fit
@@ -782,9 +958,32 @@ rpf_bridge <- function(
     res$oob_path <- chosen$path
     res$splits_oob <- chosen[c("splits", "stopped_at", "capped")]
   } else if (!is.null(checkpoints)) {
-    res$oob_path <- oob_path_table(fit$oob_path(), outcomes$outcomes[, 1], ntrees, call = call)
+    res$oob_path <- oob_path_table(fit$oob_path(), outcomes$outcomes[, 1], params$ntrees, call = call)
   }
   res
+}
+
+# rpf(prune = TRUE): prune_components() with its defaults on the training rows, the same as prune_components(res, data)
+# after rpf(prune = FALSE), random numbers included. max_panels: the display's (Inf: none); store: prune_run()'s
+rpf_prune <- function(res, processed, max_panels, store = TRUE, call) {
+  defaults <- lapply(formals(prune_components)[c("rule", "tau", "select", "select_by", "folds")], eval)
+  prune_run(
+    res,
+    list(predictors = processed$predictors, y = as.numeric(processed$outcomes[[1]])),
+    max_panels = max_panels,
+    rule = defaults$rule,
+    tau = defaults$tau,
+    select = defaults$select[[1]],
+    select_by = defaults$select_by[[1]],
+    default_select_by = TRUE,
+    folds = defaults$folds,
+    fold_id = NULL,
+    seed = NULL,
+    nthreads = as.integer(res$params$nthreads),
+    verbose = FALSE,
+    store = store,
+    call = call
+  )
 }
 
 # Intermediate to hold model object with blueprint used for prediction

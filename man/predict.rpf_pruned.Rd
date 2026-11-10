@@ -7,7 +7,7 @@
 \method{predict}{rpf_pruned}(object, new_data, nthreads = NULL, ...)
 }
 \arguments{
-\item{object}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}}.}
+\item{object}{\verb{[rpf_pruned]}: A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}.}
 
 \item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
 

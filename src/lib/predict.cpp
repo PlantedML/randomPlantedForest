@@ -670,8 +670,7 @@ std::vector<double> RandomPlantedForest::predict_components(
     return out;
   }
 
-  // Rectangle store: per chunk of rows the cells of all features are computed once, then the components are the
-  // outer loop. The same sums in the same order as predict_matrix.
+  // Rectangle store: the same sums in the same order as predict_matrix
   const rpf_rect::PurifiedForest &pf = *rect_forest_;
   std::vector<const rpf_rect::Component *> comps(K, nullptr);
   for (size_t k = 0; k < K; ++k) {
@@ -680,27 +679,43 @@ std::vector<double> RandomPlantedForest::predict_components(
       comps[k] = &it->second;
   }
   unsigned int threads = nthreads > 0 ? (unsigned int)nthreads : (unsigned int)std::max(1, this->nthreads);
+  rects_components(pf, comps, X, n, (int)vs, n_trees, threads, out.data());
+  return out;
+}
+
+void rects_components(
+    const rpf_rect::PurifiedForest &pf,
+    const std::vector<const rpf_rect::Component *> &comps,
+    const double *X,
+    int n,
+    int vs,
+    int n_trees,
+    unsigned threads,
+    double *out
+)
+{
+  const size_t K = comps.size();
+  const int p = (int)pf.cuts.size();
   threads = std::min(threads, std::max(1u, std::thread::hardware_concurrency()));
-  double *res = out.data();
+  // per chunk of rows the cells of all features are computed once, then the components are the outer loop
   parallel_rows(n, threads, [&](int begin, int end) {
-    const size_t chunk = 2048, stride = (size_t)std::max(1, feature_size);
+    const size_t chunk = 2048, stride = (size_t)std::max(1, p);
     std::vector<int32_t> cells(chunk * stride, 0);
     std::vector<double> acc(chunk * vs);
     for (int r0 = begin; r0 < end; r0 += (int)chunk) {
       const size_t m = (size_t)std::min(end - r0, (int)chunk);
-      for (int f = 0; f < feature_size; ++f)
+      for (int f = 0; f < p; ++f)
         for (size_t i = 0; i < m; ++i)
           cells[i * stride + f] = pf.cell(f, X[(size_t)f * n + r0 + i]);
       for (size_t k = 0; k < K; ++k) {
         if (!comps[k])
           continue;
         std::fill(acc.begin(), acc.end(), 0.0);
-        pf.add_component_rows(*comps[k], cells.data(), stride, m, acc.data(), (int)vs);
-        for (size_t c = 0; c < vs; ++c)
+        pf.add_component_rows(*comps[k], cells.data(), stride, m, acc.data(), vs);
+        for (int c = 0; c < vs; ++c)
           for (size_t i = 0; i < m; ++i)
-            res[(k * vs + c) * (size_t)n + r0 + i] = acc[i * vs + c] / n_trees;
+            out[(k * vs + c) * (size_t)n + r0 + i] = acc[i * vs + c] / n_trees;
       }
     }
   });
-  return out;
 }

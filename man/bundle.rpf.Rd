@@ -23,7 +23,7 @@ or the restored \link{rpf} (\code{rpf_pruned}) object for \code{unbundle()}.
 Method for \code{\link[bundle:bundle]{bundle::bundle()}} wrapping \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}},
 so rpf models work with the standard tidymodels serialization workflow.
 Training data is not included; see \code{\link[=rpf_marshal]{rpf_marshal()}} for the implications.
-Pruned forests from \code{\link[=prune_components]{prune_components()}} are bundled the same way.
+Pruned forests from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}} are bundled the same way.
 }
 \examples{
 \dontshow{if (requireNamespace("bundle", quietly = TRUE)) withAutoprint(\{ # examplesIf}

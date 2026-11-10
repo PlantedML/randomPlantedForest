@@ -9,6 +9,7 @@ prune_components(
   data,
   y = NULL,
   ...,
+  max_panels = 10,
   rule = c("D", "R"),
   tau = c(0, 1e-04, 3e-04, 0.001, 0.003, 0.01, 0.03, 0.1),
   select = c("1se", "min"),
@@ -31,6 +32,10 @@ may contain the outcome.}
 of a formula or recipe fit.}
 
 \item{...}{Reserved for future expansion. Unknown arguments are an error.}
+
+\item{max_panels}{\verb{[numeric(1): 10]}: The display: the most heat maps a kept component of three or more predictors
+may need; such a component is coarsened to at most \code{max_panels} heat maps, and the model is pruned again (see
+Details). A whole number of at least 1, or \code{Inf} for no display (the first pruning's model).}
 
 \item{rule}{\verb{[character: c("D", "R")]}: The rules to consider: \code{"D"} drops, \code{"R"} drops and refits one coefficient
 per kept component.}
@@ -64,22 +69,51 @@ on it.}
 \value{
 An object of class \code{rpf_pruned}, a list with elements:
 \itemize{
-\item \code{fit}: \code{object} (purified).
+\item \code{fit}: \code{object}, as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
 \item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}).
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
 \code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
-\item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows: \code{component} (its
-name, as in \code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
+\item \code{components}: a \code{data.frame} of every nonzero component of \code{object} on the training rows (after a second pruning
+of the display, only of those the first pruning kept: see below): \code{component} (its name, as in
+\code{\link[=predict_components]{predict_components()}}), \code{order}, \code{share}, \code{kept}, \code{beta} (\code{NA} if dropped).
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
-\code{tau}, \code{oob_rmse} (corrected; used for the choice), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and
-\code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and \code{one_se} (the two choices). Its attribute \code{n_rows} is the number
-of rows with an OOB family.
+\code{tau}, \code{oob_rmse} (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
+Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and
+\code{one_se} (the two choices). Its attribute \code{n_rows} is the number of rows with an OOB family.
 \item \code{cv}: \code{NULL} unless the pair was chosen by CV; otherwise a \code{data.frame} with one row per candidate: \code{rule}, \code{tau},
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
 given rule and \code{tau}, \code{select_by} is \code{"oob"} if R's coefficients were fitted out of bag, otherwise \code{NULL}.
+\item With the display (finite \code{max_panels}) and a component coarsened, a second pruning runs, and these describe it:
+its candidates are the components the first pruning kept, with the coarsened ones in place, and \code{oob} is its
+table. \code{components} then lists only these components, and their \code{share} (which the second pruning's \code{tau}
+thresholds) is of the variance of their model (the intercept plus these components) on the training rows, not of
+the forest's prediction; every nonzero component of \code{object} with its share of the forest's prediction is in
+\code{display$first$components}. Without a coarsened component, they are the first pruning's. With the display,
+\code{components} also has \code{form} (\code{"full"} for one or two predictors, \code{"asis"} if its own cut points need at most
+\code{max_panels} heat maps, \code{"coarsened"}; \code{NA} for a component of three or more predictors the first pruning dropped,
+so only without a second pruning) and \code{heat_maps}. The element \code{display} is a list:
+\code{max_panels}; \code{first}, the first pruning's model (without \code{fit}); \code{coarse}, per coarsened component (named as the
+components): \code{S} (all the component's predictors), \code{C} (the coarse predictors, \verb{|S| - 2} of \code{S}: the panel
+predictors), \code{q} (the numbers of intervals aimed at; merged ties can leave fewer, \code{lengths(cuts) + 1}), \code{cuts}
+(per coarse predictor), \code{cells} (the number of heat maps, \code{prod(lengths(cuts) + 1)}), \code{var_kept} (the share of
+the component's variance kept), \code{forest_panels}, \code{kept} (in the final model), \code{candidates} (every candidate's
+coarse set, \code{q}, cells and variance kept), \code{stored} (what prediction needs; no training data) and \code{seconds} (the
+time to choose and build its form); \code{asis}, per component kept as it is (form \code{"asis"}), its panels with the
+same names and meaning: \code{S} (all the component's predictors), \code{C} (the panel predictors: the \verb{|S| - 2} of \code{S}
+with the fewest own cut points; of ties, the first in \code{S}), \code{cuts} (per predictor of \code{C}, its own cut points: the
+leaf bounds of the trees containing \code{S} inside the range of the training values), \code{forest_panels}
+(\code{prod(lengths(cuts) + 1)}) and \code{kept}; \code{forms}, per component of three or more predictors the first pruning
+kept, its form, heat maps and variance kept; \code{second} (whether a second pruning ran); \code{seconds} (the time of each
+step); \code{cache}, an environment holding the coarsened components' search indices, built at their first
+\code{\link[=predict.rpf_pruned]{predict()}} (a cache, not part of the model: rebuilt when missing or invalid, as after
+saving and loading). In \code{coarse} and \code{asis} alike, a panel is a cell of \code{cuts} (a value \code{x} of predictor \code{k} of
+\code{C} lies in cell \code{findInterval(x, cuts[[k]])}), shown as a heat map over the two predictors \code{setdiff(S, C)} at
+full resolution.
+\item \code{store}: the pieces of the kept components that are not coarsened, from which the model predicts (see
+\strong{Purification}), and \code{cache}, an environment holding them built for prediction.
 }
 
 Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
@@ -87,7 +121,9 @@ Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_compon
 \description{
 Drops the small components of a regression forest's functional decomposition and, optionally, refits one
 coefficient per kept component. The rule and the threshold are chosen out of bag by default, from the forest itself
-without refits, or by K-fold cross-validation on the training rows.
+without refits, or by K-fold cross-validation on the training rows. By default every kept interaction of three or
+more predictors is then coarsened so that it can be shown in at most \code{max_panels} heat maps, and the model is pruned
+again.
 }
 \details{
 The forest is decomposed into its purified components \code{f_S}, one per set \code{S} of predictors (see \code{\link[=purify]{purify()}} and
@@ -119,9 +155,9 @@ with \code{"R"} fitted out of bag the out-of-bag error changes little over a ran
 components that add nothing on new data.
 
 \strong{Out of bag} (\code{select_by = "oob"}). Every tree family of \code{object} is grown on a bootstrap sample of the training
-rows, and the purification works family by family. So \code{object} is purified once more (as \code{\link[=purify]{purify()}} does), and on
-the way every family's components are evaluated at the training rows outside its bootstrap sample. A row's
-out-of-bag (OOB) component is the mean over its OOB families (about 37\% of them), and its OOB intercept likewise.
+rows, and the purification works family by family. So every family's components (see \strong{Purification} below) are
+also evaluated at the training rows outside its bootstrap sample. A row's out-of-bag (OOB) component is the mean
+over its OOB families (about 37\% of them), and its OOB intercept likewise.
 The purification uses the predictors of all training rows, not the outcome, so no outcome information of a row
 enters its OOB components.
 \itemize{
@@ -137,6 +173,10 @@ scatters more around its expectation. The OOB MSE is therefore corrected: per ro
 the OOB means over the even and over the odd families (for a row whose OOB families are all even or all odd: the
 mean estimate of the other rows). Without the correction, the noise of the OOB components makes the candidates
 look worse than they are. The uncorrected values are reported as \code{oob_rmse_raw}.
+\item If the correction exceeds a candidate's uncorrected MSE, its corrected MSE is reported as 0. That is not a perfect
+candidate but an overshooting, unreliable estimate (it happens with very few rows, e.g. \code{"R"} with about as many
+coefficients as rows, or with almost no noise). Such candidates are not chosen, unless all candidates are at 0
+(then they tie).
 \item The OOB RMSE is taken over the rows with at least one OOB family, the SE for \code{"1se"} from the per-fold MSEs.
 \item With few families the OOB means average only one to a few families, and many rows have none (16\% at 4
 families). In a simulation (p = 6, n = 800, 60 replicates) the corrected OOB error of the unpruned \code{"D"} was
@@ -165,20 +205,63 @@ The chosen (or given) pair is then applied to \code{object} itself (not refitted
 and for \code{"R"} the least squares on the OOB components of \code{data}'s rows (out of bag) or on its components on \code{data}
 (by CV). \code{data} and \code{y} must therefore be the rows \code{object} was trained on, in the order of the fit (checked).
 
-\strong{Purification.} \code{object} is purified in place at all orders, as \code{\link[=purify]{purify()}} does, if it is not purified yet. This
-does not change its predictions. A forest purified with a \code{maxp_interaction} below its order is purified again at
-all orders, with a message: the pruning needs every component. The out-of-bag path purifies \code{object} (again) in
-mode 2, which gives the same components (a mode-1 purification's up to rounding).
+\strong{The display} (\code{max_panels}, default 10; \code{Inf} switches it off). A component of two predictors is one heat map.
+A kept component \code{f_S} of three or more predictors is shown as heat maps over two of its predictors, one per cell of
+the others. If its own cut points need more than \code{max_panels} such heat maps, it is coarsened:
+\itemize{
+\item Two predictors of \code{S} stay at full resolution. Each other predictor \code{k} is cut into \code{q_k} intervals of equal
+numbers of training rows (ties merged), with \code{prod(q) <= max_panels}; \code{q_k = 1} averages \code{k} out. Only the
+maximal \code{q} vectors (no \code{q_k} can grow) are considered; they are listed directly, not searched among all
+\verb{max_panels^(|S| - 2)} vectors.
+\item Within a cell, \code{f_S} is averaged over the coarse predictors with the product of their training marginals. The
+coarsened component is not purified again: \code{\link[=purify]{purify()}} identifies the components under the joint distribution of
+the training rows, not under the product of the marginals, and the averaging changes the component's means along
+its two full-resolution predictors and its mean over the training rows. It is used as it is (no part of it is
+moved into the intercept or into components of lower order).
+\item Of all choices of the two full predictors and the \code{q} vector, the one keeping the largest share of the variance
+of \code{f_S} on the training rows is taken (ties: the first in lexicographic order).
+}
+
+Then the same rule prunes again, on the components the first pruning kept, with the coarsened ones in place of the
+originals. Its shares, which \code{tau} thresholds, are of the variance of that model (the intercept plus these
+components) on the training rows, not of the forest's prediction. A pair chosen out of bag is chosen again out of
+bag, with the same candidates and folds, scored with each family's coarsened components at its out-of-bag rows (R's
+coefficients out of bag); a given rule and \code{tau}, or a pair chosen by CV, is applied again as it is (R's
+coefficients out of bag if the first pruning fitted them so, else in sample; a CV choice is not repeated, as it would
+need the display in every fold's refit). The prediction then uses the coarsened components, so the
+pruning judges the model that is shown. In simulations (48 data sets) this second pruning had 0.49\% lower test
+error than pruning and then coarsening, and 0.57\% lower than not coarsening; on California housing (50 families,
+order 3) the default keeps 30 components, shown in 75 heat maps. If no kept component needs coarsening, the model is
+the first pruning's.
+The display costs about as much again as the out-of-bag pruning: a purification restricted to the components being
+coarsened (two at a time) for their candidates, and one for their out-of-bag values; the stored coarsened components
+take a few MB each on 16,000 rows at order 3, more at higher orders.
+
+\strong{Purification.} The pruning needs every component's values at the training rows (and out of bag, its OOB
+means), not the purified forest: \code{\link[=purify]{purify()}} keeps every component of every tree family as pieces, which at high
+orders takes far more memory than the forest (see \strong{Cost}). So each family is
+purified in turn, as \code{\link[=purify]{purify()}} does (mode 2, all orders), its components are evaluated at the training rows and
+added up, and the family's pieces are freed. The pruned model then stores the pieces of its kept components only,
+merged over the families exactly as \code{\link[=purify]{purify()}} stores them, and \code{\link[=predict.rpf_pruned]{predict()}} and
+\code{\link[=predict_components]{predict_components()}} evaluate them from there; a coarsened component (the display) is stored in its coarsened
+form. The components equal those of the purified forest up to rounding (about \code{1e-15} relative), and the stored
+ones are the purified forest's bit for bit. \code{object} itself is not purified: an earlier \code{\link[=purify]{purify()}}, at any
+\code{maxp_interaction} or \code{mode}, is left as it is and does not change the result.
 
 \strong{Random numbers.} The folds are drawn after \code{set.seed(seed)}, and the CV's fold fits after it too. Afterwards the
 random number stream is restored to its state on entry (after drawing \code{seed} if it is \code{NULL}), so the call does not
 reset the caller's stream.
 
-\strong{Cost.} The out-of-bag choice purifies \code{object} once and evaluates each family's components at its OOB rows; it
-needs no fit. The CV fits and purifies the forest K more times. Both evaluate the components on the training rows:
-only those the purified forest stores (at most \code{sum(choose(p, seq_len(max_interaction)))}, usually far fewer: the
-subsets of the trees' predictor sets), in one pass over the rows. The memory is about \code{n} doubles per stored
-component, a few times that for the out-of-bag choice. \code{nthreads} speeds up the fits and the purification.
+\strong{Cost.} The out-of-bag choice purifies the families of \code{object} once (see \strong{Purification}); it needs no fit. The
+CV fits and purifies the forest K more times (each fold's forest as \code{\link[=purify]{purify()}} does). Only the components the
+forest has are evaluated (at most \code{sum(choose(p, seq_len(max_interaction)))}, usually far fewer: the subsets of the
+trees' predictor sets). The memory is the forest's plus about \code{n} doubles per component, three times that for the
+out-of-bag choice, plus one family's components at a time per thread; storing the kept components passes over the
+families once more. On California housing (16,512 rows, 200 families, \code{split_try = 3}, \code{t_try = 0.1}, the fast
+draw, 8 threads; measured when this column pass was added) the whole call of \code{rpf(splits = NULL, prune = TRUE)}
+peaked at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at order 3, and at 6.4 GB (9.9 GB RSS) at
+order 8 (all predictors), most of it the 31 coarsened components the display keeps; there \code{\link[=purify]{purify()}} alone needs
+more than 12 GB of RSS. \code{nthreads} speeds up the fits and the purification.
 
 Only regression forests are supported.
 }
@@ -206,7 +289,15 @@ pruned_cv$cv
 prune_components(fit, x, y, rule = "R", tau = 0.01)
 
 predict(pruned, x[1:5, ])
+
+# A three-way interaction, shown in at most 4 heat maps
+y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
+fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
+shown
+shown$display$forms
 }
 \seealso{
-\code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}.
+\code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, \code{\link[=predict_components]{predict_components()}}, \code{\link[=purify]{purify()}}; \code{\link[=rpf]{rpf()}} with \code{prune = TRUE} fits and prunes in one
+call.
 }

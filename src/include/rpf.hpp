@@ -9,10 +9,15 @@
 // - purify(): optional post-processing to orthogonalize components;
 //   purify_oob(): the same, plus every family's components at its
 //   out-of-bag training rows (from the in-bag counts of the fit)
+// - purify_columns(), store_components(): the purified components at the
+//   training rows, and the pieces of chosen components, without the purified
+//   store of all components (the pruning; `lib/prune_columns.cpp`)
 // - set_oob_path() / oob_path(): the out-of-bag error along the splits, from
 //   one fit (`lib/oob_path.cpp`)
 // - set_adaptive(): the next fit() chooses the number of splits out of bag
 //   while growing, one family at a time (`lib/oob_path.cpp`)
+// - coarsen_select(), coarsen_oob(), coarsen_eval(): the panel form of
+//   purified components (coarsen.hpp, lib/coarsen.cpp)
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
 //   for serialization
@@ -29,6 +34,7 @@
 #include "trees.hpp"
 #include "kdtree.hpp"
 #include "rects.hpp"
+#include "coarsen.hpp"
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -92,6 +98,41 @@ struct OobComponents {
   std::vector<int> count;                     /**< n x 2: the number of OOB families of each half */
 };
 
+// The purified components at the training rows (purify_columns()), from one pass over the families without the
+// purified store: each family is purified as purify(mode = 2) purifies it, its components are evaluated at all
+// training rows and added up, and the family's pieces are freed. All matrices are column-major.
+struct ComponentColumns {
+  OobComponents oob;             /**< the sets; with `oob`, also the OOB sums and counts (otherwise empty) */
+  std::vector<double> own;       /**< n x (sets.size() * value_size): the forest's components at the training rows */
+  std::vector<double> intercept; /**< value_size: the forest's purified intercept, summed as purify() sums it */
+};
+
+// The pieces of chosen purified components (store_components()): their rectangles merged over the families exactly as
+// purify(mode = 2) merges and stores them, without the other components. A component's value is the sum over the
+// families: divide by n_trees.
+struct ComponentStore {
+  int p = 0, value_size = 1, n_trees = 1;
+  std::vector<std::vector<double>> cuts; /**< the cells of every feature (0-based), as the purified store's */
+  rpf_rect::Accumulator pieces;          /**< per component (1-based S): its constant and its (j, rectangles) groups */
+};
+
+// A ComponentStore built for queries: the groups' tables and k-d indices, as the purified store builds them
+class BuiltStore {
+public:
+  // Takes the pieces out of `store`; throws std::invalid_argument if the store is inconsistent
+  BuiltStore(ComponentStore &store, unsigned build_threads);
+  // The components `sets` (1-based) at the n rows of column-major X (n x p, all features), as predict_components()
+  // of the purified forest gives them, bitwise: column-major n x (sets.size() * value_size). Throws if a set is not
+  // in the store. nthreads: at least 1.
+  std::vector<double>
+  eval(const double *X, int n, int p, const std::vector<std::vector<int>> &sets, int nthreads) const;
+  int value_size() const { return vs; }
+
+private:
+  rpf_rect::PurifiedForest pf;
+  int vs = 1, n_trees = 1;
+};
+
 // The out-of-bag (OOB) path of a fit with checkpoints (set_oob_path()): every family's prediction at each of its OOB
 // training rows (in-bag count 0) after each checkpoint's number of splits, summed per row over the families of even
 // and of odd index (0-based), in family order. All matrices are column-major.
@@ -124,6 +165,30 @@ struct AdaptiveStats {
 namespace rpf_cnt {
 class SubsetCounter;
 }
+
+// Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index;
+// after_batch(start, batch) runs on the calling thread after each batch. An exception in fn is rethrown on the calling
+// thread. (lib/purify.cpp)
+void run_families(
+    size_t n_families,
+    unsigned threads_to_use,
+    const std::function<void(size_t)> &fn,
+    const std::function<void(size_t, size_t)> &after_batch
+);
+
+// The components comps[k] (nullptr: zero) of the rectangle store pf at the n rows of column-major X (all features of
+// pf), divided by n_trees, into out (column-major n x (comps.size() * vs), zero on entry), on up to `threads` threads:
+// per chunk of rows the cells of all features once, then the components. (lib/predict.cpp)
+void rects_components(
+    const rpf_rect::PurifiedForest &pf,
+    const std::vector<const rpf_rect::Component *> &comps,
+    const double *X,
+    int n,
+    int vs,
+    int n_trees,
+    unsigned threads,
+    double *out
+);
 
 class RandomPlantedForest {
 
@@ -215,6 +280,17 @@ public:
   // purify(maxp_interaction, nthreads, 2), and the out-of-bag components of the training rows (see OobComponents).
   // The purified forest is the same as after purify(). Needs the training data and the in-bag counts.
   OobComponents purify_oob(int maxp_interaction, int nthreads);
+  // The purified components at the training rows without the purified store (see ComponentColumns), for the pruning:
+  // each family is purified as purify_oob() purifies it (the same range counts and weights), its components are
+  // evaluated at all training rows tree by tree (no rectangles) and added to the columns on the calling thread in
+  // family order, so nothing depends on the number of threads. The values equal those of purify_oob() and
+  // predict_components() of the purified forest up to rounding; the intercept is the store's, bitwise. With `oob`, the
+  // OOB sums as purify_oob() gives them (needs the in-bag counts). The forest is not changed (an earlier purification
+  // stays as it is). Needs the training data.
+  ComponentColumns purify_columns(int maxp_interaction, int nthreads, bool oob);
+  // The pieces of the components `sets` (1-based; see ComponentStore), from one pass over the families restricted to
+  // them. The forest is not changed. Needs the training data.
+  ComponentStore store_components(const std::vector<std::vector<int>> &sets, int nthreads) const;
   // Track the OOB path in the next fit() (regression): `checkpoints` are increasing split counts in 1..splits; empty
   // turns it off (the default: a plain fit does none of this). The fit itself is unchanged.
   void set_oob_path(const std::vector<int> &checkpoints);
@@ -232,6 +308,22 @@ public:
       const std::vector<int> &checkpoints, AdaptiveStopper stopper, int patience, double floor, double pause_gb
   );
   AdaptiveStats adaptive_stats() const;
+  // The panel form of purified components (coarsen.hpp, lib/coarsen.cpp). The forest must hold its training data and
+  // have value size 1 (regression); the components' rectangles come from passes over the families restricted to them.
+  // coarsen_select(): for each set S (1-based) of order >= 3, the panels the forest's f_S needs (forest_panels) and,
+  // if more than P, every candidate (coarse features C, maximal q vector, equal-mass cuts) scored by the variance kept
+  // on the training rows; the best one, its training-row values and its stored form. If at most P, its panels: the
+  // |S| - 2 features with the fewest own cut points and these cut points. fvals: column-major n_rows x n_cols, the
+  // forest's f_S at the training rows, one column per set (as purify_columns() gives them).
+  std::vector<rpf_coarse::Selected> coarsen_select(
+      const std::vector<std::vector<int>> &sets, int P, int nthreads, const double *fvals, int n_rows, int n_cols
+  );
+  // coarsen_oob(): each family's coarsened components at its out-of-bag rows, summed as purify_oob() sums (needs the
+  // in-bag counts).
+  rpf_coarse::OobSums coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads);
+  // coarsen_eval(): the forest's f_S coarsened on any C (possibly empty: f_S itself) at the n rows of column-major X
+  // (n x p, all features). The forest must be purified in mode 2.
+  std::vector<double> coarsen_eval(const rpf_coarse::Spec &spec, const double *X, int n, int p);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -249,14 +341,39 @@ protected:
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
   // Internal per-family worker for fast exact purifier (mode 2); adds the family's components to `acc`. The range
-  // counts come from `counter` if given (the same integers), from `kdt` otherwise.
+  // counts come from `counter` if given (the same integers), from `kdt` otherwise. With `only`, only those components
+  // (1-based feature sets) are produced.
   void purify_fast_exact_family(
       const TreeFamily &curr_family,
       int maxp_interaction,
       const rpf_kd::KDTree &kdt,
       const std::vector<std::vector<double>> &cuts,
       rpf_rect::Accumulator &acc,
-      const rpf_cnt::SubsetCounter *counter = nullptr
+      const rpf_cnt::SubsetCounter *counter = nullptr,
+      const std::set<std::vector<int>> *only = nullptr
+  ) const;
+  // The components `only` as the families write them (purify_fast_exact_family() restricted to them, in the cells of
+  // `cuts` = forest_cuts()), merged over the families in index order as purify_mode2() merges them: the store's
+  // rectangles before its index
+  rpf_rect::Accumulator merged_components(
+      const std::set<std::vector<int>> &only, int nthreads, const std::vector<std::vector<double>> &cuts
+  ) const;
+  // The cells of the purified store: per feature (0-based) the sorted distinct interval end points of all leaves
+  std::vector<std::vector<double>> forest_cuts() const;
+  // One family's purified components at n rows (`cells`: n x stride, row-major, the rows' cells in `cuts`) added to
+  // out[S] (n x value_size, row-major; created for every S the family's purification writes), and its intercept to
+  // `intercept` (value_size). The purification of purify_fast_exact_family() (the same range counts from `counter`
+  // and weights), evaluated tree by tree without rectangles (lib/prune_columns.cpp).
+  void family_columns(
+      const TreeFamily &curr_family,
+      int maxp_interaction,
+      const std::vector<std::vector<double>> &cuts,
+      const int32_t *cells,
+      size_t stride,
+      size_t n,
+      const rpf_cnt::SubsetCounter &counter,
+      std::map<std::vector<int>, std::vector<double>> &out,
+      std::vector<double> &intercept
   ) const;
   // Components of the last mode-2 purification as weighted rectangles (null after mode 1 or before purify)
   std::shared_ptr<rpf_rect::PurifiedForest> rect_forest_;

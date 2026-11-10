@@ -121,9 +121,11 @@ oob_select <- function(mse) {
   oob_lowest(mse)[1]
 }
 
-# The lowest of the corrected out-of-bag errors `x` (mean squared errors, RMSEs or mean criteria): the indices of its
-# ties (relative 1e-12), in the order of `x`. A corrected error at or below 0 is a correction that overshot (the tables
-# show it clamped at 0), not a perfect model: such values are left out unless all are, and then they all tie.
+# The lowest of the corrected out-of-bag errors `x` (mean squared errors, RMSEs or mean criteria), as the adaptive stop
+# (oob_select()), prune_components()' out-of-bag choice (prune_choose()) and rpf(tune = ) (tune_oob_choose()) choose:
+# the indices of its ties (relative 1e-12), in the order of `x`. A corrected error at or below 0 is a correction that
+# overshot (the tables show it clamped at 0), not a perfect model: such values are left out unless all are, and then
+# they all tie.
 oob_lowest <- function(x) {
   if (all(x <= 0)) {
     return(seq_along(x))

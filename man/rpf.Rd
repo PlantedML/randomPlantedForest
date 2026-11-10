@@ -27,6 +27,9 @@ rpf(x, ...)
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -53,6 +56,9 @@ rpf(x, ...)
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -79,6 +85,9 @@ rpf(x, ...)
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -105,6 +114,9 @@ rpf(x, ...)
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
+  prune = FALSE,
+  max_panels = 10,
+  tune = FALSE,
   purify = FALSE,
   nthreads = 1,
   export_forest = FALSE,
@@ -213,16 +225,38 @@ updates and acts as regularization: smaller values permit larger jumps on
 the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
 values of pure leaves are infinite, and from 0.5 on every leaf value is 0.}
 
+\item{prune}{\verb{[logical(1): FALSE]}: Whether to return the pruned model
+instead of the forest (regression only, not with \code{deterministic = TRUE}):
+the forest is pruned by \code{\link[=prune_components]{prune_components()}} with its defaults on the
+training rows, and the result is its \code{rpf_pruned} model. See "Pruning" in
+Details.}
+
+\item{max_panels}{\verb{[numeric(1): 10]}: Used only with \code{prune = TRUE}: the
+most heat maps a kept component of three or more predictors may need; such
+a component is coarsened to at most \code{max_panels} heat maps and the model is
+pruned again (the \code{max_panels} of \code{\link[=prune_components]{prune_components()}}). A whole number of
+at least 1, or \code{Inf} for no coarsening.}
+
+\item{tune}{\verb{[logical(1) | character(1) | rpf_tune_control: FALSE]}: Whether
+to tune the greediness (\code{split_try}, \code{t_try}) and \code{min_leaf_rows} out of
+bag (regression only, not with \code{deterministic = TRUE}, at least 10 tree
+families). \code{TRUE} runs the full search (\code{\link[=tune_control]{tune_control()}}), \code{"quick"} the
+two-forest preset, and a \code{\link[=tune_control]{tune_control()}} object your own. Every forest of
+the search has \code{splits} chosen out of bag and is pruned, so \code{tune} implies
+\code{splits = NULL} and \code{prune = TRUE}, and giving \code{split_try}, \code{t_try} or
+\code{min_leaf_rows} with it is an error. See "Tuning out of bag" in Details.}
+
 \item{purify}{\verb{[logical(1): FALSE]}: Whether to purify the forest after fitting, which
 \code{\link[=predict_components]{predict_components()}} requires, with the defaults of \code{\link[=purify]{purify()}}. For other
-settings, call \code{\link[=purify]{purify()}} after fitting instead.}
+settings, call \code{\link[=purify]{purify()}} after fitting instead. Not used with
+\code{prune = TRUE}: the pruned model stores the components it keeps.}
 
 \item{nthreads}{\verb{[integer(1): 1]}: Number of threads for fitting. Also the default for
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
 
 \item{export_forest}{\verb{[logical(1): FALSE]}: Whether to store the flattened forest in
-the returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, which
-saves memory.}
+the returned object as \verb{$forest} (with \code{prune = TRUE}, in the forest:
+\verb{$fit$forest}). If \code{FALSE}, it is \code{NULL}, which saves memory.}
 
 \item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
@@ -256,6 +290,24 @@ number of training rows with an OOB tree family. With \code{splits = NULL},
 the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{splits},
 \code{stopped_at} (the number of splits where growing stopped) and \code{capped}
 (whether it stopped at the cap while the error was still falling).
+With \code{prune = TRUE}, an object of class \code{rpf_pruned} (see
+\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest (not purified), with
+the elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
+with \code{splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
+the stop \verb{$fit$splits_oob}.
+With \code{tune}, the \code{rpf_pruned} model of the chosen forest, with an element
+\code{tune}: \code{search}, the search table (one row per forest grown, in the order
+grown: \code{step}, \code{split_try}, \code{t_try}, \code{min_leaf_rows}, the chosen \code{splits},
+\code{stopped_at}, \code{capped}, the forest's corrected OOB RMSE \code{oob_rmse_forest}
+(as the pruning scores it: its rule \code{"D"} at \code{tau = 0}, which keeps every
+nonzero component; the OOB path's \code{oob_rmse} at the chosen \code{splits} leaves
+the rows without OOB families of both halves uncorrected and is higher),
+its pruned model's \code{rule}, \code{tau}, \code{n_kept} and corrected OOB RMSE
+\code{oob_rmse} (the score), \code{seconds}, whether each step chose it
+(\code{chosen_step1}, \code{chosen_step2}, \code{chosen_step3}; \code{NA} if not a candidate of
+the step) and \code{final}); \code{steps}, each step's candidates and choice;
+\code{settings}, the chosen \code{split_try}, \code{t_try}, \code{min_leaf_rows} and \code{splits};
+\code{control}, the \code{\link[=tune_control]{tune_control()}} used; and \code{seconds}.
 }
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression
@@ -445,6 +497,57 @@ a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
 fit alone, measured when it was added: \code{split_try = 3}, \code{t_try = 0.1}, the
 exact draw, 8 threads).
 }
+
+\subsection{Pruning}{
+
+With \code{prune = TRUE}, \code{rpf()} fits the forest, then prunes its components
+with \code{\link[=prune_components]{prune_components()}} at that function's defaults, on the
+training rows: the rule and the threshold are chosen out of bag (by
+cross-validation below 10 tree families, with a message), the sparse choice
+\code{select = "1se"}, and every kept component of three or more predictors is
+shown in at most \code{max_panels} heat maps before the model is pruned again. The
+result is the pruned model, of class \code{rpf_pruned}, with methods for
+\code{\link[=predict.rpf_pruned]{predict()}}, \code{\link[=predict_components]{predict_components()}} and \code{print()}. It
+is the same, bit for bit, as
+\code{prune_components(rpf(..., prune = FALSE), data)} from the same random
+number state, for every interface. For other settings of the pruning (\code{rule},
+\code{tau}, \code{select}, \code{select_by}, folds or seed), fit with \code{prune = FALSE} and call
+\code{\link[=prune_components]{prune_components()}}. Together with \code{splits = NULL}, one call chooses the
+number of splits out of bag, prunes and returns the model to show. Pruning
+needs out-of-bag rows and a numeric outcome, so \code{prune = TRUE} is an error for
+classification and with \code{deterministic = TRUE}.
+}
+
+\subsection{Tuning out of bag}{
+
+With \code{tune}, \code{rpf()} searches the greediness of the split search
+(\code{split_try} and \code{t_try}, on the ladder of \code{\link[=greediness_ladder]{greediness_ladder()}}) and the
+minimum leaf size \code{min_leaf_rows}, without cross-validation. Every forest of
+the search is grown with \code{splits} chosen out of bag and pruned by
+\code{\link[=prune_components]{prune_components()}} with its defaults (without the display), and forests are
+compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+wins. A pruned model at 0 (every candidate's correction overshot, see
+\code{\link[=prune_components]{prune_components()}}) is not chosen unless all are. The search is
+coordinate-wise (\code{\link[=tune_control]{tune_control()}}): with \code{tune = TRUE}
+the ladder from 10 / 0.4 to 1 / 0.0125 at \code{min_leaf_rows = 1}, then
+\code{min_leaf_rows} 1, 5, 20 and 100 at the chosen point, then the point's two
+ladder neighbours, about 10 forests in all. \code{tune = "quick"} grows two
+forests, 3 / 0.1 and 1 / 0.025 at \code{min_leaf_rows = 1}. The chosen forest's
+pruned model is returned, with the display at \code{max_panels}, and the search in
+its element \code{tune}. Every forest is grown from the same random number state,
+so the result is the model that \code{rpf(splits = NULL, prune = TRUE)} returns
+at the chosen settings from that state.
+
+On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the full
+search had 10.8\% lower test error than \code{rpf()}'s 10 / 0.4 (no family of data
+sets worse than +0.9\%), and 2.8\% lower than 5-fold cross-validation over the
+same settings at 1/24 of its cost; the quick preset had 9.4\% lower test
+error (worst +0.4\%). In those studies a forest was scored with the pruning's
+choice of the time (the lowest out-of-bag error, R's coefficients fitted in
+sample); the sparse default of \code{\link[=prune_components]{prune_components()}} used here was not
+compared there. A search costs about as many fits as it grows forests, and
+their prunings.
+}
 }
 \examples{
 # Regression with formula
@@ -472,6 +575,20 @@ set.seed(1)
 rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL)
 rpfit
 rpfit$params$splits
+
+# The whole pipeline: splits chosen out of bag, pruned
+set.seed(1)
+pruned <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = NULL, prune = TRUE)
+pruned
+
+\donttest{
+# Tuning out of bag: the quick preset, two forests
+set.seed(1)
+x <- matrix(runif(400 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
+tuned <- rpf(x, y, ntrees = 10, tune = "quick")
+tuned$tune$search
+}
 }
 \references{
 Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a

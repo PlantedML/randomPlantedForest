@@ -16,6 +16,12 @@ reference:
   - predict.rpf
   - oob_path_checkpoints
 
+- title: Tuning
+  desc: Tuning the greediness and the leaf size out of bag
+- contents:
+  - tune_control
+  - greediness_ladder
+
 - title: Functional decomposition
   desc: Enabling and utilizing functional decomposition
 - contents:

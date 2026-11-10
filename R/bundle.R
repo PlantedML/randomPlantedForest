@@ -3,7 +3,7 @@
 #' Method for [bundle::bundle()] wrapping [rpf_marshal()]/[rpf_unmarshal()],
 #' so rpf models work with the standard tidymodels serialization workflow.
 #' Training data is not included; see [rpf_marshal()] for the implications.
-#' Pruned forests from [prune_components()] are bundled the same way.
+#' Pruned forests from [prune_components()] or [rpf()] are bundled the same way.
 #'
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
 #'   [prune_components()].

@@ -31,6 +31,30 @@ rpf_rect::PurifiedForest list_to_rects(const Rcpp::List &x, int value_size);
 Rcpp::List purify_stats_to_list(const PurifyStats &st);
 Rcpp::List oob_path_to_list(const OobPath &o);
 Rcpp::List adaptive_stats_to_list(const AdaptiveStats &st);
+// The pruning's columns (purify_columns()): list(sets, own, intercept), with the OOB sums as purify_oob() gives them
+Rcpp::List columns_to_list(ComponentColumns &cc, int n, int value_size);
+// The pieces of chosen components (store_components()) as an R list, and back: list(p, value_size, n_trees, cuts,
+// comps = list of list(S, constant, groups = list of list(jmask, box (R x 2m), w (R x value_size))))
+Rcpp::List store_to_list(ComponentStore &st);
+ComponentStore list_to_store(const Rcpp::List &x);
+// A store built for queries (an external pointer, NULL after serialization), the values of its components `sets` at the
+// rows of X (all features; n x (length(sets) * value_size), as predict_components_matrix() of the purified forest)
+SEXP rpf_store_build(const Rcpp::List store, int nthreads);
+Rcpp::NumericMatrix rpf_store_eval(SEXP store, const Rcpp::NumericMatrix &X, const Rcpp::List sets, int nthreads);
+bool rpf_store_valid(SEXP store);
+
+// The panel form of purified components (coarsen.hpp): specs list(S, C, cuts) in, results as R lists out
+rpf_coarse::Spec list_to_spec(const Rcpp::List &sp);
+std::vector<rpf_coarse::Spec> list_to_specs(const Rcpp::List &specs);
+Rcpp::List selected_to_list(const rpf_coarse::Selected &R);
+Rcpp::List form_to_list(const rpf_coarse::Form &f);
+rpf_coarse::Form list_to_form(const Rcpp::List &x);
+// A coarsened component's values at the rows of X (all features) from its stored form: built once (an external
+// pointer, NULL after serialization) and evaluated many times, or in one step
+SEXP rpf_coarse_build(const Rcpp::List stored);
+Rcpp::NumericVector rpf_coarse_eval(SEXP model, const Rcpp::NumericMatrix &X);
+bool rpf_coarse_valid(SEXP model);
+Rcpp::NumericVector rpf_coarse_predict(const Rcpp::List stored, const Rcpp::NumericMatrix &X);
 
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
@@ -309,6 +333,37 @@ public:
         Rcpp::Named("count") = count
     );
   }
+  // The purified components at the training rows without the purified store (see ComponentColumns); with oob also the
+  // OOB sums as purify_oob() gives them. The forest is not changed.
+  Rcpp::List purify_columns(int maxp_interaction, int nthreads, bool oob)
+  {
+    if (core.get_X().empty())
+      Rcpp::stop(
+          "Cannot purify: no training data available. If this forest was "
+          "restored with rpf_unmarshal(), marshal it with include_data = TRUE."
+      );
+    if (oob && core.get_inbag().empty())
+      Rcpp::stop(
+          "The forest has no in-bag counts. If it was restored with rpf_unmarshal(), marshal it with "
+          "include_data = TRUE."
+      );
+    ComponentColumns cc = core.purify_columns(maxp_interaction, nthreads, oob);
+    return columns_to_list(cc, core.get_sample_size(), core.get_value_size());
+  }
+  // The pieces of the components `sets` (a list of 1-based feature sets), as store_to_list() writes them
+  Rcpp::List store_components(const Rcpp::List sets, int nthreads)
+  {
+    if (core.get_X().empty())
+      Rcpp::stop(
+          "Cannot purify: no training data available. If this forest was "
+          "restored with rpf_unmarshal(), marshal it with include_data = TRUE."
+      );
+    std::vector<std::vector<int>> S;
+    for (R_xlen_t k = 0; k < sets.size(); ++k)
+      S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
+    ComponentStore st = core.store_components(S, nthreads);
+    return store_to_list(st);
+  }
   // The out-of-bag path (regression): set the checkpoints before fit(), read the sums after it (see OobPath)
   void set_oob_path(const Rcpp::IntegerVector &checkpoints)
   {
@@ -338,6 +393,37 @@ public:
     );
   }
   Rcpp::List adaptive_stats() { return adaptive_stats_to_list(core.adaptive_stats()); }
+  // The panel form of purified components (regression; coarsen.hpp). sets: a list of 1-based feature sets; fvals:
+  // their values at the training rows, one column per set (as purify_columns()' `own`)
+  Rcpp::List coarsen_select(const Rcpp::List sets, int P, int nthreads, const Rcpp::NumericMatrix &fvals)
+  {
+    std::vector<std::vector<int>> S;
+    for (R_xlen_t k = 0; k < sets.size(); ++k)
+      S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
+    std::vector<rpf_coarse::Selected> res =
+        core.coarsen_select(S, P, nthreads, fvals.begin(), fvals.nrow(), fvals.ncol());
+    Rcpp::List out(res.size());
+    for (size_t i = 0; i < res.size(); ++i) {
+      out[(R_xlen_t)i] = selected_to_list(res[i]);
+      res[i] = rpf_coarse::Selected();
+    }
+    return out;
+  }
+  // specs: a list of list(S, C, cuts); returns list(sum0, sum1), n x length(specs)
+  Rcpp::List coarsen_oob(const Rcpp::List specs, int nthreads)
+  {
+    rpf_coarse::OobSums o = core.coarsen_oob(list_to_specs(specs), nthreads);
+    const int n = core.get_sample_size(), K = (int)specs.size();
+    Rcpp::NumericMatrix sum0(n, K), sum1(n, K);
+    std::copy(o.sum0.begin(), o.sum0.end(), sum0.begin());
+    std::copy(o.sum1.begin(), o.sum1.end(), sum1.begin());
+    return Rcpp::List::create(Rcpp::Named("sum0") = sum0, Rcpp::Named("sum1") = sum1);
+  }
+  Rcpp::NumericVector coarsen_eval(const Rcpp::List spec, const Rcpp::NumericMatrix &X)
+  {
+    std::vector<double> v = core.coarsen_eval(list_to_spec(spec), REAL(X), X.nrow(), X.ncol());
+    return Rcpp::NumericVector(v.begin(), v.end());
+  }
 
 private:
   Core core;
