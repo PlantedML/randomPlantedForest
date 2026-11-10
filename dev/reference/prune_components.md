@@ -1,12 +1,12 @@
 # Prune the components of a Random Planted Forest
 
-Drops the small components of a regression forest's functional
-decomposition and, optionally, refits one coefficient per kept
-component. The rule and the threshold are chosen out of bag by default,
-from the forest itself without refits, or by K-fold cross-validation on
-the training rows. By default every kept interaction of three or more
-predictors is then coarsened so that it can be shown in at most
-`max_panels` heat maps, and the model is pruned again.
+Drops the small components of a forest's functional decomposition and,
+optionally, refits one coefficient per kept component. The rule and the
+threshold are chosen out of bag by default, from the forest itself
+without refits, or by K-fold cross-validation on the training rows. By
+default every kept interaction of three or more predictors is then
+coarsened so that it can be shown in at most `max_panels` heat maps, and
+the model is pruned again.
 
 ## Usage
 
@@ -33,9 +33,9 @@ prune_components(
 
 - object:
 
-  `[rpf]`: A fitted regression
+  `[rpf]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-  model.
+  model (regression or classification).
 
 - data:
 
@@ -47,8 +47,9 @@ prune_components(
 
 - y:
 
-  `[numeric | NULL: NULL]`: The outcome of the training rows. Required
-  unless `data` contains the outcome of a formula or recipe fit.
+  `[numeric | factor | NULL: NULL]`: The outcome of the training rows
+  (the factor for classification). Required unless `data` contains the
+  outcome of a formula or recipe fit.
 
 - ...:
 
@@ -124,7 +125,8 @@ An object of class `rpf_pruned`, a list with elements:
 
 - `rule`, `tau`: the chosen rule and threshold.
 
-- `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`).
+- `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for
+  classification one per score column.
 
 - `beta`: named vector of the coefficients of the kept components (all 1
   for `"D"`). For `"R"` with `select_by` `"oob"`, `intercept` and `beta`
@@ -155,6 +157,9 @@ An object of class `rpf_pruned`, a list with elements:
   `seed` are `NULL` if no choice was made). For a given rule and `tau`,
   `select_by` is `"oob"` if R's coefficients were fitted out of bag,
   otherwise `NULL`.
+
+- `criterion` (classification only): `"brier"` or `"logloss"`, what the
+  candidates were scored by.
 
 - With the display (finite `max_panels`) and a component coarsened, a
   second pruning runs, and these describe it: its candidates are the
@@ -443,7 +448,46 @@ coarsened components the display keeps; there
 alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and
 the purification.
 
-Only regression forests are supported.
+**Classification.** A classification forest is pruned the same way, with
+its score columns: one for a binary outcome, one per class otherwise
+(`K - 1` for `loss = "logit"`, whose first level is the reference).
+Every component then has a column per score column, and:
+
+- A component's share sums its variance over the score columns, centred
+  across the classes (`"logit"`: with the reference level's score 0
+  joined; `"exponential"`: the part all classes share does not count),
+  over the same sum for the prediction. One kept list serves all
+  classes.
+
+- `"R"` fits one coefficient per kept component, shared by the classes,
+  and one intercept per score column (`"exponential"` with more than two
+  classes: the first is 0), out of bag as for regression.
+
+- The criterion is the forest's loss's own: for `loss = "L1"` or `"L2"`
+  the squared error of the raw scores summed over the columns (the Brier
+  score; least squares for `"R"`), for `"logit"` and `"exponential"` the
+  log-loss of the probabilities that `predict(type = "prob")` makes
+  (maximum likelihood for `"R"`, by Newton's method from rule `"D"`'s
+  model). The OOB correction is its second-order form (see
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+  "Classification"). The tables then have `oob_loss`, `se_loss`,
+  `oob_loss_raw` and `se_loss_raw` (the mean criterion) instead of the
+  RMSE columns, and `cv_loss` and `se_loss` for CV; `select = "1se"`
+  uses the SE of the mean criterion. A binary forest with `"L1"` or
+  `"L2"` has one 0/1 column and is pruned as a regression forest of that
+  response, with the RMSE columns.
+
+- The display coarsens a component with one form (`C`, `q`, cuts) for
+  all score columns, chosen by the variance kept of the centred columns;
+  its stored form is one per score column.
+
+- [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+  takes `type` as
+  [`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+  does, and
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  has one column per component and score column, named as for the
+  forest.
 
 ## See also
 

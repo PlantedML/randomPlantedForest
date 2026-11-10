@@ -4,12 +4,22 @@ The prediction of a pruned forest is `alpha + sum(beta_S * f_S(x))` over
 the kept components `f_S` of the forest, with the intercept `alpha` and
 the coefficients `beta_S` (see
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)).
+For classification these are the scores, one per score column, which
+`type` turns into probabilities or classes as
+[`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+does.
 
 ## Usage
 
 ``` r
 # S3 method for class 'rpf_pruned'
-predict(object, new_data, nthreads = NULL, ...)
+predict(
+  object,
+  new_data,
+  type = ifelse(object$fit$mode == "regression", "numeric", "prob"),
+  nthreads = NULL,
+  ...
+)
 ```
 
 ## Arguments
@@ -25,6 +35,14 @@ predict(object, new_data, nthreads = NULL, ...)
 
   `[data.frame | matrix]`: New observations to predict.
 
+- type:
+
+  `[character(1)]`: As in
+  [`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md):
+  `"numeric"` for regression (the default); for classification `"prob"`
+  (the default), `"class"`, or `"numeric"` / `"link"` (the scores
+  `alpha + sum(beta_S * f_S(x))`).
+
 - nthreads:
 
   `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the
@@ -37,8 +55,11 @@ predict(object, new_data, nthreads = NULL, ...)
 
 ## Value
 
-A [`tbl`](https://tibble.tidyverse.org/reference/tibble.html) with
-column `.pred` with the same number of rows as `new_data`.
+A [`tbl`](https://tibble.tidyverse.org/reference/tibble.html) with the
+same number of rows as `new_data`: for regression column `.pred`; for
+classification the columns of
+[`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+for `type`.
 
 ## See also
 

@@ -187,9 +187,9 @@ rpf(
   main tuning parameter: more splits fit more complex functions. A round
   splits the best of its candidates; near saturation, when every
   candidate's leaf is too small to split, a round can make no split.
-  `NULL` chooses it out of bag while the forest grows (regression, not
-  with `deterministic = TRUE`; otherwise `NULL` means 30). See "Choosing
-  `splits` out of bag" in Details.
+  `NULL` chooses it out of bag while the forest grows (not with
+  `deterministic = TRUE`, where `NULL` means 30). See "Choosing `splits`
+  out of bag" in Details.
 
 - split_structure:
 
@@ -228,8 +228,8 @@ rpf(
   `[integer(1): 1]`: Minimum number of rows of the bootstrap sample on
   each side of every split, so in every leaf. Leaves without a threshold
   that keeps this many rows on each side are not drawn as split
-  candidates. Only for regression with `split_structure = "leaves"`; `1`
-  (no limit) otherwise.
+  candidates. Only for `split_structure = "leaves"` (regression and
+  classification); `1` (no limit) otherwise.
 
 - interaction_constraints:
 
@@ -252,7 +252,8 @@ rpf(
 
   `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
   regression, the only supported loss, and `"exponential"` for
-  classification. Classification also supports `"logit"`, which gives
+  classification (with more than two classes the multiclass exponential
+  loss SAMME). Classification also supports `"logit"`, which gives
   similar results but is slower, and `"L1"` and `"L2"`, which fit class
   indicators directly and do not yield proper probability estimates.
 
@@ -278,8 +279,7 @@ rpf(
 - prune:
 
   `[logical(1): FALSE]`: Whether to return the pruned model instead of
-  the forest (regression only, not with `deterministic = TRUE`): the
-  forest is pruned by
+  the forest (not with `deterministic = TRUE`): the forest is pruned by
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
   with its defaults on the training rows, and the result is its
   `rpf_pruned` model. See "Pruning" in Details.
@@ -297,8 +297,8 @@ rpf(
 
   `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether to
   tune the greediness (`split_try`, `t_try`) and `min_leaf_rows` out of
-  bag (regression only, not with `deterministic = TRUE`, at least 10
-  tree families). `TRUE` runs the full search
+  bag (not with `deterministic = TRUE`, at least 10 tree families).
+  `TRUE` runs the full search
   ([`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)),
   `"quick"` the two-forest preset, and a
   [`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
@@ -352,8 +352,8 @@ rpf(
 - oob_path:
 
   `[logical(1) | integer: FALSE]`: Whether to track the out-of-bag (OOB)
-  error along the splits (regression only, not with
-  `deterministic = TRUE`). `TRUE` evaluates it at the checkpoints of
+  error along the splits (not with `deterministic = TRUE`). `TRUE`
+  evaluates it at the checkpoints of
   [`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)
   for `splits`, four per doubling; an increasing integer vector in
   `1..splits` gives the checkpoints. The fitted forest is the same as
@@ -367,13 +367,17 @@ Object of class `"rpf"` with model object contained in `$fit`. With
 per checkpoint, `splits`, the corrected and the plain OOB root mean
 squared error (`oob_rmse`, `oob_rmse_raw`), and the standard errors of
 the two mean squared errors (`se_mse`, `se_mse_raw`). Its attribute
-`n_rows` is the number of training rows with an OOB tree family. With
-`splits = NULL`, `$params$splits` is the chosen number of splits,
-`$oob_path` the path of the checkpoints grown, and `$splits_oob` a list
-with the chosen `splits`, `stopped_at` (the number of splits where
-growing stopped) and `capped` (whether it stopped at the cap while the
-error was still falling). With `prune = TRUE`, an object of class
-`rpf_pruned` (see
+`n_rows` is the number of training rows with an OOB tree family. For
+classification with `loss = "logit"` or `"exponential"`, or more than
+two classes, the columns are the mean corrected and plain criterion
+(`oob_loss`, `oob_loss_raw`) and their standard errors (`se_loss`,
+`se_loss_raw`), and the attribute `criterion` names it (see
+"Classification" in Details). With `splits = NULL`, `$params$splits` is
+the chosen number of splits, `$oob_path` the path of the checkpoints
+grown, and `$splits_oob` a list with the chosen `splits`, `stopped_at`
+(the number of splits where growing stopped) and `capped` (whether it
+stopped at the cap while the error was still falling). With
+`prune = TRUE`, an object of class `rpf_pruned` (see
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)),
 whose element `fit` is the forest (not purified), with the elements
 above: the pruned model's OOB path is `$fit$oob_path`, and with
@@ -386,11 +390,13 @@ forest's corrected OOB RMSE `oob_rmse_forest` (as the pruning scores it:
 its rule `"D"` at `tau = 0`, which keeps every nonzero component; the
 OOB path's `oob_rmse` at the chosen `splits` leaves the rows without OOB
 families of both halves uncorrected and is higher), its pruned model's
-`rule`, `tau`, `n_kept` and corrected OOB RMSE `oob_rmse` (the score),
-`seconds`, whether each step chose it (`chosen_step1`, `chosen_step2`,
-`chosen_step3`; `NA` if not a candidate of the step) and `final`);
-`steps`, each step's candidates and choice; `settings`, the chosen
-`split_try`, `t_try`, `min_leaf_rows` and `splits`; `control`, the
+`rule`, `tau`, `n_kept` and corrected OOB RMSE `oob_rmse` (the score;
+for classification both are the square root of the mean corrected
+criterion), `seconds`, whether each step chose it (`chosen_step1`,
+`chosen_step2`, `chosen_step3`; `NA` if not a candidate of the step) and
+`final`); `steps`, each step's candidates and choice; `settings`, the
+chosen `split_try`, `t_try`, `min_leaf_rows` and `splits`; `control`,
+the
 [`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
 used; and `seconds`.
 
@@ -417,7 +423,11 @@ for a more thorough search.
 
 For classification, `"exponential"` (the default) and `"logit"` fit on
 the link scale and are transformed to probabilities, `"exponential"`
-being faster. `"L1"` and `"L2"` fit class indicators directly and their
+being faster. With more than two classes `"exponential"` is the
+multiclass exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009):
+with one score per class, summing to 0, a row's weight is `exp(-g)`, `g`
+the score of its class, and the probabilities are the softmax of the
+scores. `"L1"` and `"L2"` fit class indicators directly and their
 probabilities are truncated to `[0, 1]`.
 
 ### Factor predictors
@@ -488,21 +498,21 @@ candidate is and how its thresholds are evaluated.
 
 ### The draw of candidates for `leaves`
 
-For regression with `split_structure = "leaves"`, the global option
-`randomPlantedForest.exact_draw` chooses how the candidates are drawn.
-With `TRUE` (the default), every possible split gets a random number in
-every round. With `FALSE`, the candidates are drawn from a Fenwick tree
-over the weights, kept up to date between rounds, which costs a few
-random numbers per candidate instead. Both draw from the same
-distribution, but with other random numbers, so the same seed gives
-another (equally good) forest. Ties between equally good candidates may
-go to different candidates under the two draws, so with many splits,
-near saturation, their fits differ in distribution, though not in
-accuracy. With `min_leaf_rows`, both leave out the same candidates:
-those whose leaf has no threshold with that many rows on each side. The
-fast draw pays off on large data with many splits. The option is read
-when the forest is fitted and stored in `params$exact_draw`; it does not
-affect classification or the other split structures.
+With `split_structure = "leaves"` (regression and classification), the
+global option `randomPlantedForest.exact_draw` chooses how the
+candidates are drawn. With `TRUE` (the default), every possible split
+gets a random number in every round. With `FALSE`, the candidates are
+drawn from a Fenwick tree over the weights, kept up to date between
+rounds, which costs a few random numbers per candidate instead. Both
+draw from the same distribution, but with other random numbers, so the
+same seed gives another (equally good) forest. Ties between equally good
+candidates may go to different candidates under the two draws, so with
+many splits, near saturation, their fits differ in distribution, though
+not in accuracy. With `min_leaf_rows`, both leave out the same
+candidates: those whose leaf has no threshold with that many rows on
+each side. The fast draw pays off on large data with many splits. The
+option is read when the forest is fitted and stored in
+`params$exact_draw`; it does not affect the other split structures.
 
     options(randomPlantedForest.exact_draw = FALSE)
 
@@ -557,10 +567,9 @@ predictors, most so with many levels.
 
 ### Choosing `splits` out of bag
 
-With `splits = NULL` (regression, not deterministic), the number of
-splits is chosen while the forest grows, by the corrected OOB error of
-the out-of-bag path. The families grow to checkpoints, four per doubling
-of the splits
+With `splits = NULL` (not deterministic), the number of splits is chosen
+while the forest grows, by the corrected OOB error of the out-of-bag
+path. The families grow to checkpoints, four per doubling of the splits
 ([`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)
 up to 25,600), and the forest's corrected error is followed checkpoint
 by checkpoint. Growing stops once the lowest error is one doubling of
@@ -612,8 +621,35 @@ pruning (`rule`, `tau`, `select`, `select_by`, folds or seed), fit with
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
 Together with `splits = NULL`, one call chooses the number of splits out
 of bag, prunes and returns the model to show. Pruning needs out-of-bag
-rows and a numeric outcome, so `prune = TRUE` is an error for
-classification and with `deterministic = TRUE`.
+rows, so `prune = TRUE` is an error with `deterministic = TRUE`.
+
+### Classification
+
+A classification forest goes through the same steps (the OOB path,
+`splits = NULL`, `prune`, `max_panels` and `tune`) with its score
+columns: one for a binary outcome, one per class otherwise (`K - 1` for
+`loss = "logit"`: the first level is the reference). Every out-of-bag
+choice is scored by the loss's own criterion, corrected for the OOB
+family count as above:
+
+- `loss = "L1"` or `"L2"`: the squared error of the raw scores summed
+  over the columns (the Brier score, before the scores are truncated to
+  probabilities). With two classes this is the regression criterion of
+  the 0/1 outcome, and the choices are the regression ones, bit for bit.
+
+- `loss = "logit"` or `"exponential"`: the log-loss of the probabilities
+  that `predict(type = "prob")` returns. The correction is its
+  second-order form,
+  `(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
+  with `d = g_even - g_odd` and `H = diag(p) - p p'` over the free score
+  columns (for the squared error `H = 2 I`, the correction above).
+
+The pruning keeps or drops a component for all classes, sizes it by its
+variance summed over the score columns centred across the classes, and
+fits one coefficient per kept component shared by the classes (see
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)).
+The criterion was checked against the test log-loss on simulated data;
+the defaults were chosen on regression and carried over.
 
 ### Tuning out of bag
 
@@ -625,8 +661,9 @@ Every forest of the search is grown with `splits` chosen out of bag and
 pruned by
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
 with its defaults (without the display), and forests are compared by the
-corrected out-of-bag RMSE of their pruned model; the lowest wins. A
-pruned model at 0 (every candidate's correction overshot, see
+corrected out-of-bag RMSE of their pruned model (for classification by
+the root of its mean corrected criterion); the lowest wins. A pruned
+model at 0 (every candidate's correction overshot, see
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md))
 is not chosen unless all are. The search is coordinate-wise
 ([`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)):
@@ -755,7 +792,7 @@ tuned$tune$search
 #> 1    1         3 0.100             1    141        283  FALSE       0.4089001
 #> 2    1         1 0.025             1    141        283  FALSE       0.4914155
 #>   rule tau n_kept oob_rmse seconds chosen_step1 chosen_step2 chosen_step3 final
-#> 1    R 0.1      2 0.356234  10.693         TRUE           NA           NA  TRUE
-#> 2    R 0.1      2 0.357487   0.423        FALSE           NA           NA FALSE
+#> 1    R 0.1      2 0.356234   9.263         TRUE           NA           NA  TRUE
+#> 2    R 0.1      2 0.357487   0.356        FALSE           NA           NA FALSE
 # }
 ```

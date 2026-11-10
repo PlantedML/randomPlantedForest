@@ -333,12 +333,12 @@ predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000        3.34e-14     2.21e-14
-#> 2        1.000        1.49e-12     1.61e-12
-#> 3        1.000        5.30e-13     9.47e-14
-#> 4        1.000        3.41e-14     2.11e-14
-#> 5        1.000        1.20e-14     1.16e-14
-#> 6        1.000        1.81e-13     7.58e-14
+#> 1        1.000        1.61e-15     1.48e-10
+#> 2        1.000        5.25e-15     1.46e- 9
+#> 3        1.000        2.61e-15     1.67e-10
+#> 4        1.000        1.74e-15     1.43e-10
+#> 5        1.000        1.25e-15     1.34e-10
+#> 6        1.000        2.66e-15     1.79e-10
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class

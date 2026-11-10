@@ -231,7 +231,7 @@ Each family is grown on a bootstrap sample and predictions are averaged.</p></dd
 parameter: more splits fit more complex functions. A round splits the best of its
 candidates; near saturation, when every candidate's leaf is too small to split, a
 round can make no split. <code>NULL</code> chooses it out of bag while the forest grows
-(regression, not with <code>deterministic = TRUE</code>; otherwise <code>NULL</code> means 30). See
+(not with <code>deterministic = TRUE</code>, where <code>NULL</code> means 30). See
 "Choosing <code>splits</code> out of bag" in Details.</p></dd>
 
 
@@ -270,8 +270,8 @@ splitting along an existing dimension.</p></dd>
 <dd><p><code>[integer(1): 1]</code>: Minimum number of rows of the
 bootstrap sample on each side of every split, so in every leaf. Leaves
 without a threshold that keeps this many rows on each side are not drawn
-as split candidates. Only for regression with <code>split_structure = "leaves"</code>; <code>1</code>
-(no limit) otherwise.</p></dd>
+as split candidates. Only for <code>split_structure = "leaves"</code> (regression and
+classification); <code>1</code> (no limit) otherwise.</p></dd>
 
 
 <dt id="arg-interaction-constraints">interaction_constraints<a class="anchor" aria-label="anchor" href="#arg-interaction-constraints"></a></dt>
@@ -292,7 +292,8 @@ components.</p></dd>
 
 <dt id="arg-loss">loss<a class="anchor" aria-label="anchor" href="#arg-loss"></a></dt>
 <dd><p><code>[character(1) | NULL: NULL]</code>: Loss function. <code>NULL</code> uses <code>"L2"</code> for
-regression, the only supported loss, and <code>"exponential"</code> for classification.
+regression, the only supported loss, and <code>"exponential"</code> for classification
+(with more than two classes the multiclass exponential loss SAMME).
 Classification also supports <code>"logit"</code>, which gives similar results but is
 slower, and <code>"L1"</code> and <code>"L2"</code>, which fit class indicators directly and do
 not yield proper probability estimates.</p></dd>
@@ -318,7 +319,7 @@ values of pure leaves are infinite, and from 0.5 on every leaf value is 0.</p></
 
 <dt id="arg-prune">prune<a class="anchor" aria-label="anchor" href="#arg-prune"></a></dt>
 <dd><p><code>[logical(1): FALSE]</code>: Whether to return the pruned model
-instead of the forest (regression only, not with <code>deterministic = TRUE</code>):
+instead of the forest (not with <code>deterministic = TRUE</code>):
 the forest is pruned by <code><a href="prune_components.html">prune_components()</a></code> with its defaults on the
 training rows, and the result is its <code>rpf_pruned</code> model. See "Pruning" in
 Details.</p></dd>
@@ -335,8 +336,7 @@ at least 1, or <code>Inf</code> for no coarsening.</p></dd>
 <dt id="arg-tune">tune<a class="anchor" aria-label="anchor" href="#arg-tune"></a></dt>
 <dd><p><code>[logical(1) | character(1) | rpf_tune_control: FALSE]</code>: Whether
 to tune the greediness (<code>split_try</code>, <code>t_try</code>) and <code>min_leaf_rows</code> out of
-bag (regression only, not with <code>deterministic = TRUE</code>, at least 10 tree
-families). <code>TRUE</code> runs the full search (<code><a href="tune_control.html">tune_control()</a></code>), <code>"quick"</code> the
+bag (not with <code>deterministic = TRUE</code>, at least 10 tree families). <code>TRUE</code> runs the full search (<code><a href="tune_control.html">tune_control()</a></code>), <code>"quick"</code> the
 two-forest preset, and a <code><a href="tune_control.html">tune_control()</a></code> object your own. Every forest of
 the search has <code>splits</code> chosen out of bag and is pruned, so <code>tune</code> implies
 <code>splits = NULL</code> and <code>prune = TRUE</code>, and giving <code>split_try</code>, <code>t_try</code> or
@@ -379,7 +379,7 @@ factor predictors only. See "Factor predictors" below.</p></dd>
 
 <dt id="arg-oob-path">oob_path<a class="anchor" aria-label="anchor" href="#arg-oob-path"></a></dt>
 <dd><p><code>[logical(1) | integer: FALSE]</code>: Whether to track the
-out-of-bag (OOB) error along the splits (regression only, not with
+out-of-bag (OOB) error along the splits (not with
 <code>deterministic = TRUE</code>). <code>TRUE</code> evaluates it at the checkpoints of
 <code><a href="oob_path_checkpoints.html">oob_path_checkpoints()</a></code> for <code>splits</code>, four per doubling; an increasing
 integer vector in <code>1..splits</code> gives the checkpoints. The fitted forest is
@@ -395,7 +395,11 @@ allowed.</p></dd>
 checkpoint, <code>splits</code>, the corrected and the plain OOB root mean squared
 error (<code>oob_rmse</code>, <code>oob_rmse_raw</code>), and the standard errors of the two mean
 squared errors (<code>se_mse</code>, <code>se_mse_raw</code>). Its attribute <code>n_rows</code> is the
-number of training rows with an OOB tree family. With <code>splits = NULL</code>,
+number of training rows with an OOB tree family. For classification with
+<code>loss = "logit"</code> or <code>"exponential"</code>, or more than two classes, the columns
+are the mean corrected and plain criterion (<code>oob_loss</code>, <code>oob_loss_raw</code>) and
+their standard errors (<code>se_loss</code>, <code>se_loss_raw</code>), and the attribute
+<code>criterion</code> names it (see "Classification" in Details). With <code>splits = NULL</code>,
 <code>$params$splits</code> is the chosen number of splits, <code>$oob_path</code> the path of
 the checkpoints grown, and <code>$splits_oob</code> a list with the chosen <code>splits</code>,
 <code>stopped_at</code> (the number of splits where growing stopped) and <code>capped</code>
@@ -413,7 +417,8 @@ grown: <code>step</code>, <code>split_try</code>, <code>t_try</code>, <code>min_
 nonzero component; the OOB path's <code>oob_rmse</code> at the chosen <code>splits</code> leaves
 the rows without OOB families of both halves uncorrected and is higher),
 its pruned model's <code>rule</code>, <code>tau</code>, <code>n_kept</code> and corrected OOB RMSE
-<code>oob_rmse</code> (the score), <code>seconds</code>, whether each step chose it
+<code>oob_rmse</code> (the score; for classification both are the square root of the
+mean corrected criterion), <code>seconds</code>, whether each step chose it
 (<code>chosen_step1</code>, <code>chosen_step2</code>, <code>chosen_step3</code>; <code>NA</code> if not a candidate of
 the step) and <code>final</code>); <code>steps</code>, each step's candidates and choice;
 <code>settings</code>, the chosen <code>split_try</code>, <code>t_try</code>, <code>min_leaf_rows</code> and <code>splits</code>;
@@ -444,6 +449,10 @@ few dozen families. The split search parameters
 <code>split_decay_rate</code>) trade speed for a more thorough search.</p>
 <p>For classification, <code>"exponential"</code> (the default) and <code>"logit"</code> fit on the
 link scale and are transformed to probabilities, <code>"exponential"</code> being faster.
+With more than two classes <code>"exponential"</code> is the multiclass exponential
+loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): with one score per class,
+summing to 0, a row's weight is <code>exp(-g)</code>, <code>g</code> the score of its class, and
+the probabilities are the softmax of the scores.
 <code>"L1"</code> and <code>"L2"</code> fit class indicators directly and their probabilities are
 truncated to <code>[0, 1]</code>.</p>
 </div>
@@ -503,8 +512,9 @@ uniformly sampling one threshold within that pair.</p></li>
 <h3 id="the-draw-of-candidates-for-leaves">The draw of candidates for <code>leaves</code><a class="anchor" aria-label="anchor" href="#the-draw-of-candidates-for-leaves"></a></h3>
 
 
-<p>For regression with <code>split_structure = "leaves"</code>, the global option
-<code>randomPlantedForest.exact_draw</code> chooses how the candidates are drawn.
+<p>With <code>split_structure = "leaves"</code> (regression and classification), the
+global option <code>randomPlantedForest.exact_draw</code> chooses how the candidates
+are drawn.
 With <code>TRUE</code> (the default), every possible split gets a random number in
 every round. With <code>FALSE</code>, the candidates are drawn from a Fenwick tree
 over the weights, kept up to date between rounds, which costs a few random
@@ -516,8 +526,8 @@ in distribution, though not in accuracy. With <code>min_leaf_rows</code>, both l
 out the same candidates: those
 whose leaf has no threshold with that many rows on each side. The fast draw
 pays off on large data with many splits. The option is read when the forest
-is fitted and stored in <code>params$exact_draw</code>; it does not affect
-classification or the other split structures.</p>
+is fitted and stored in <code>params$exact_draw</code>; it does not affect the other
+split structures.</p>
 <p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>randomPlantedForest.exact_draw <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre><p></p></div>
 </div>
 
@@ -573,7 +583,7 @@ with factor predictors, most so with many levels.</p>
 <h3 id="choosing-splits-out-of-bag">Choosing <code>splits</code> out of bag<a class="anchor" aria-label="anchor" href="#choosing-splits-out-of-bag"></a></h3>
 
 
-<p>With <code>splits = NULL</code> (regression, not deterministic), the number of splits
+<p>With <code>splits = NULL</code> (not deterministic), the number of splits
 is chosen while the forest grows, by the corrected OOB error of the
 out-of-bag path. The families grow to checkpoints, four per doubling of the
 splits (<code><a href="oob_path_checkpoints.html">oob_path_checkpoints()</a></code> up to 25,600), and the forest's corrected
@@ -621,8 +631,33 @@ number state, for every interface. For other settings of the pruning (<code>rule
 <code>tau</code>, <code>select</code>, <code>select_by</code>, folds or seed), fit with <code>prune = FALSE</code> and call
 <code><a href="prune_components.html">prune_components()</a></code>. Together with <code>splits = NULL</code>, one call chooses the
 number of splits out of bag, prunes and returns the model to show. Pruning
-needs out-of-bag rows and a numeric outcome, so <code>prune = TRUE</code> is an error for
-classification and with <code>deterministic = TRUE</code>.</p>
+needs out-of-bag rows, so <code>prune = TRUE</code> is an error with
+<code>deterministic = TRUE</code>.</p>
+</div>
+
+<div class="section">
+<h3 id="classification">Classification<a class="anchor" aria-label="anchor" href="#classification"></a></h3>
+
+
+<p>A classification forest goes through the same steps (the OOB path,
+<code>splits = NULL</code>, <code>prune</code>, <code>max_panels</code> and <code>tune</code>) with its score columns:
+one for a binary outcome, one per class otherwise (<code>K - 1</code> for
+<code>loss = "logit"</code>: the first level is the reference). Every out-of-bag choice
+is scored by the loss's own criterion, corrected for the OOB family count as
+above:</p><ul><li><p><code>loss = "L1"</code> or <code>"L2"</code>: the squared error of the raw scores summed over
+the columns (the Brier score, before the scores are truncated to
+probabilities). With two classes this is the regression criterion of the
+0/1 outcome, and the choices are the regression ones, bit for bit.</p></li>
+<li><p><code>loss = "logit"</code> or <code>"exponential"</code>: the log-loss of the probabilities
+that <code>predict(type = "prob")</code> returns. The correction is its second-order
+form, <code>(1 / m_i - 1 / ntrees) * d' H d / (2 * (1 / m_even + 1 / m_odd))</code>
+with <code>d = g_even - g_odd</code> and <code>H = diag(p) - p p'</code> over the free score
+columns (for the squared error <code>H = 2 I</code>, the correction above).</p></li>
+</ul><p>The pruning keeps or drops a component for all classes, sizes it by its
+variance summed over the score columns centred across the classes, and fits
+one coefficient per kept component shared by the classes (see
+<code><a href="prune_components.html">prune_components()</a></code>). The criterion was checked against the test log-loss
+on simulated data; the defaults were chosen on regression and carried over.</p>
 </div>
 
 <div class="section">
@@ -634,7 +669,8 @@ classification and with <code>deterministic = TRUE</code>.</p>
 minimum leaf size <code>min_leaf_rows</code>, without cross-validation. Every forest of
 the search is grown with <code>splits</code> chosen out of bag and pruned by
 <code><a href="prune_components.html">prune_components()</a></code> with its defaults (without the display), and forests are
-compared by the corrected out-of-bag RMSE of their pruned model; the lowest
+compared by the corrected out-of-bag RMSE of their pruned model (for
+classification by the root of its mean corrected criterion); the lowest
 wins. A pruned model at 0 (every candidate's correction overshot, see
 <code><a href="prune_components.html">prune_components()</a></code>) is not chosen unless all are. The search is
 coordinate-wise (<code><a href="tune_control.html">tune_control()</a></code>): with <code>tune = TRUE</code>
@@ -756,8 +792,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1         3 0.100             1    141        283  FALSE       0.4089001</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1         1 0.025             1    141        283  FALSE       0.4914155</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   rule tau n_kept oob_rmse seconds chosen_step1 chosen_step2 chosen_step3 final</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    R 0.1      2 0.356234  10.693         TRUE           NA           NA  TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    R 0.1      2 0.357487   0.423        FALSE           NA           NA FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    R 0.1      2 0.356234   9.263         TRUE           NA           NA  TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    R 0.1      2 0.357487   0.356        FALSE           NA           NA FALSE</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

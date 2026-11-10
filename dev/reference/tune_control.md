@@ -144,9 +144,9 @@ tuned$tune$search
 #> 2    1         3   0.1             1    141        283  FALSE       0.4089001
 #> 3    2         3   0.1            20    119        238  FALSE       0.3782499
 #>   rule tau n_kept  oob_rmse seconds chosen_step1 chosen_step2 chosen_step3
-#> 1    R 0.1      2 0.3871046   0.160        FALSE           NA           NA
-#> 2    R 0.1      2 0.3562340  10.702         TRUE        FALSE           NA
-#> 3    R 0.1      2 0.3293479   3.285           NA         TRUE           NA
+#> 1    R 0.1      2 0.3871046   0.128        FALSE           NA           NA
+#> 2    R 0.1      2 0.3562340   9.204         TRUE        FALSE           NA
+#> 3    R 0.1      2 0.3293479   2.529           NA         TRUE           NA
 #>   final
 #> 1 FALSE
 #> 2 FALSE
