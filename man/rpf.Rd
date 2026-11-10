@@ -193,10 +193,10 @@ choosing it resets its age to zero, and splits are sampled with weight
 splitting along an existing dimension.}
 
 \item{min_leaf_rows}{\verb{[integer(1): 1]}: Minimum number of rows of the
-bootstrap sample on each side of every split, so in every leaf. Leaves
-without a threshold that keeps this many rows on each side are not drawn
-as split candidates. Only for \code{split_structure = "leaf"} (regression and
-classification); \code{1} (no limit) otherwise.}
+bootstrap sample on each side of every split, so in every leaf, for every
+\code{split_structure} (regression and classification). Split points are tried
+only among those that keep this many rows on each side, and leaves without
+one are not drawn (see "\code{split_structure}" in Details). \code{1} means no limit.}
 
 \item{interaction_constraints}{\verb{[list | NULL: NULL]}: Feature sets that restrict which
 interactions the forest may form, e.g. \code{list(c("x1", "x2"), c("x3", "x4"))}.
@@ -441,22 +441,30 @@ and, with \code{min_leaf_rows}, those that leave fewer rows on either side (all 
 there are fewer), and evaluated to choose the best split.
 \item \code{"leaf_binned"} (was \code{"hist"}): As \code{"leaf"}, but split points are drawn
 from boundaries of quantile bins computed once per predictor, which makes
-evaluating them faster on large data.
+evaluating them faster on large data. With \code{min_leaf_rows}, only from the
+boundaries that leave that many rows on each side, and candidates without
+one are not drawn.
 \item \code{"tree_then_leaf"} (was \code{"cur_trees_1"}): Split candidates are
 (current-tree, split-dimension) pairs. For each sampled candidate, perform
 \code{n_try_split_points} evaluations. Each evaluation samples a leaf from the
 set of valid current trees (with probability proportional to its number of
 available split points) and then uniformly samples a single split point
-within that leaf.
+within that leaf. With \code{min_leaf_rows}, a leaf's available split points
+are those that leave that many rows on each side, so a leaf without one is
+not drawn.
 \item \code{"tree_then_all_leaves"} (was \code{"cur_trees_2"}): Split candidates are
 (current-tree, split-dimension) pairs. For each sampled candidate, iterate
 through every valid leaf. Within each leaf, sample \code{n_try_split_points}
-split points uniformly and evaluate them.
+split points uniformly and evaluate them. With \code{min_leaf_rows}, only split
+points that leave that many rows on each side, and leaves without one are
+skipped.
 \item \code{"target_tree_then_leaf"} (was \code{"res_trees"}): Split candidates are
 resulting trees. For each sampled candidate, run \code{n_try_split_points}
 evaluations by sampling a (split-dimension, leaf) pair from all valid pairs
 (with probability proportional to its number of available split points),
-then uniformly sampling one split point within that pair.
+then uniformly sampling one split point within that pair. With
+\code{min_leaf_rows}, the available split points are those that leave that many
+rows on each side, as for \code{"tree_then_leaf"}.
 }
 }
 

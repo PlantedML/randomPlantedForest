@@ -75,8 +75,54 @@ size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k)
   return c;
 }
 
-double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size)
+void rows_range(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size, int min_rows, int &lo, int &hi_excl)
 {
+  auto it = leaf.cache().rows_range_cache.find(k);
+  if (it != leaf.cache().rows_range_cache.end()) {
+    lo = it->second.first;
+    hi_excl = it->second.second;
+    return;
+  }
+  const size_t m = leaf.individuals.size();
+  const size_t mr = (size_t)min_rows;
+  lo = 0;
+  hi_excl = 0;
+  if (mr >= 1 && m >= 2 * mr) {
+    const int32_t *rk = fr.rank[(size_t)k].data();
+    auto &buf = fr.buf;
+    buf.resize(m);
+    for (size_t i = 0; i < m; ++i)
+      buf[i] = rk[leaf.individuals[i]];
+    // a threshold of rank r has the rows of rank < r below it: at least mr iff r > t1, at most m - mr iff r <= t2
+    std::nth_element(buf.begin(), buf.begin() + (mr - 1), buf.end());
+    const int32_t t1 = buf[mr - 1];
+    std::nth_element(buf.begin(), buf.begin() + (m - mr), buf.end());
+    const int32_t t2 = buf[m - mr];
+    uint32_t *st = fr.stamp.data();
+    const uint32_t e = fr.next_epoch();
+    int d = 0, a = 0, b = 0; // distinct ranks: all, up to t1, up to t2
+    for (int ind : leaf.individuals) {
+      const int32_t r = rk[ind];
+      if (st[r] != e) {
+        st[r] = e;
+        ++d;
+        a += (r <= t1) ? 1 : 0;
+        b += (r <= t2) ? 1 : 0;
+      }
+    }
+    lo = std::max(leaf_size, a);
+    hi_excl = std::min(d - leaf_size + 1, b);
+  }
+  leaf.cache().rows_range_cache[k] = std::make_pair(lo, hi_excl);
+}
+
+double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size, int min_rows)
+{
+  if (min_rows > 1) {
+    int lo, hi_excl;
+    rows_range(fr, leaf, k, leaf_size, min_rows, lo, hi_excl);
+    return (hi_excl > lo) ? static_cast<double>(hi_excl - lo) : 0.0;
+  }
   const size_t unique = unique_count(fr, leaf, k);
   const long width_unique = (long)unique - 2L * (long)leaf_size + 1L;
   return (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
@@ -358,6 +404,10 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
     throw std::logic_error("cur_trees_1: the tree family has no null tree.");
   rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(itNull->second->ct1_ranks, X);
   const bool one_column = (this->value_size == 1);
+  // min_leaf_rows: leaves weigh their number of thresholds with min_rows rows on each side, so a leaf without one is
+  // never drawn, and the tries draw only from those thresholds
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
 
   // A drawn (or, if deterministic, listed) threshold sp of a leaf in feature k, for candidate idx, and its sums
   struct Try {
@@ -485,7 +535,7 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         double total = 0.0;
         for (size_t li = 0; li < L; ++li) {
           // Weight = number of unique thresholds that respect min leaf size
-          const double w = rpf_ct1::leaf_weight(fr, tree->leaves[li], kdim, leaf_size);
+          const double w = rpf_ct1::leaf_weight(fr, tree->leaves[li], kdim, leaf_size, min_rows);
           wts[li] = w;
           total += w;
           if (w != 0.0)
@@ -544,8 +594,10 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         // Sample by unique thresholds: build/reuse unique values for this leaf and dim
         const std::vector<double> &uniques = rpf_ct1::unique_values(fr, X, *leaf_ptr, k);
         const size_t unique_count = uniques.size();
-        const int left = leaf_size;
-        const int right_exclusive = (int)unique_count - leaf_size + 1;
+        int left = leaf_size;
+        int right_exclusive = (int)unique_count - leaf_size + 1;
+        if (rows_check) // only thresholds with min_rows rows on each side
+          rpf_ct1::rows_range(fr, *leaf_ptr, k, leaf_size, min_rows, left, right_exclusive);
         if (right_exclusive <= left)
           continue;
         int s_idx = rng_randint(left, right_exclusive);
@@ -571,6 +623,11 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
             continue;
           int left = leaf_size;
           int right = (int)unique_count - leaf_size + 1;
+          if (rows_check) { // only thresholds with min_rows rows on each side
+            rpf_ct1::rows_range(fr, leaf, k, leaf_size, min_rows, left, right);
+            if (right <= left)
+              continue;
+          }
           std::vector<int> samples = compute_even_spread_indices(left, right, (size_t)this->split_try);
           for (int s_idx : samples) {
             Try tr;

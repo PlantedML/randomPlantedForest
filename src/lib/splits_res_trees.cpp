@@ -76,6 +76,8 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       sample_idxs.push_back(i);
   }
 
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
   int best_idx = -1;
   for (size_t idx : sample_idxs) {
     if (idx >= possible_trees.size())
@@ -109,7 +111,14 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       double total = 0.0;
       const int leaf_size_local = this->n_leaves[k];
       for (size_t li = 0; li < L; ++li) {
-        const double w = leaf_threshold_weight(X, tree->leaves[li], k, leaf_size_local);
+        double w;
+        if (rows_check) { // min_leaf_rows: the thresholds with min_rows rows on each side; none: weight 0, not drawn
+          int lo, hi_excl;
+          leaf_threshold_range(X, tree->leaves[li], k, leaf_size_local, min_rows, lo, hi_excl);
+          w = (hi_excl > lo) ? static_cast<double>(hi_excl - lo) : 0.0;
+        } else {
+          w = leaf_threshold_weight(X, tree->leaves[li], k, leaf_size_local);
+        }
         wts[li] = w;
         total += w;
         if (w != 0.0)
@@ -297,6 +306,10 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
         const int leaf_size_here = this->n_leaves[k];
         state.left = leaf_size_here;
         state.right = (int)unique_count - leaf_size_here + 1;
+        if (rows_check) // the same range as the leaf's weight
+          min_rows_range_sorted(
+              state.sorted_vals, *state.unique_ptr, leaf_size_here, min_rows, state.left, state.right
+          );
         if (state.right < state.left) {
           state.left = 0;
           state.right = 0;

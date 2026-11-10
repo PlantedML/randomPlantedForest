@@ -36,9 +36,17 @@ FamilyRanks &family_ranks(std::shared_ptr<FamilyRanks> &slot, const std::vector<
 // The number of distinct values of feature k among the leaf's rows (cached in the leaf's unique_count_cache).
 size_t unique_count(FamilyRanks &fr, Leaf &leaf, int k);
 
-// The leaf's sampling weight in feature k, as rpf_utils::leaf_threshold_weight() gives it, without sorting the leaf:
-// max(0, distinct values - 2 * leaf_size + 1).
-double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size);
+// The leaf's sampling weight in feature k, its number of thresholds the search may draw, without sorting the leaf:
+// with min_rows <= 1, max(0, distinct values - 2 * leaf_size + 1), as rpf_utils::leaf_threshold_weight() gives it;
+// with min_leaf_rows (min_rows > 1), max(0, hi_excl - lo) of rows_range(). A leaf without a threshold weighs 0, so it
+// is never drawn.
+double leaf_weight(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size, int min_rows = 1);
+
+// min_leaf_rows (min_rows > 1): the distinct-value indices [lo, hi_excl) of the leaf in feature k (indices into
+// unique_values()) whose thresholds leave at least leaf_size distinct values and min_rows rows on each side, as
+// rpf_utils::min_rows_range() gives them from the sorted values. From the ranks in O(rows): the min_rows-th smallest
+// and largest rank, then the number of distinct ranks up to each. Cached in the leaf's rows_range_cache.
+void rows_range(FamilyRanks &fr, Leaf &leaf, int k, int leaf_size, int min_rows, int &lo, int &hi_excl);
 
 // The leaf's distinct values of feature k, ascending, as rpf_utils::compute_unique_sorted_values() gives them from the
 // leaf's stably sorted values: a run of equal values is represented by its first row in the leaf's order (this

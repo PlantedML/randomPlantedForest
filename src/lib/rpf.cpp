@@ -103,8 +103,6 @@ RandomPlantedForest::RandomPlantedForest(const RPFParams &params)
   this->split_structure_mode_ = params.split_structure_mode;
   if (params.min_leaf_rows < 1)
     throw std::invalid_argument("min_leaf_rows must be at least 1.");
-  if (params.min_leaf_rows > 1 && params.split_structure_mode != 3)
-    throw std::invalid_argument("min_leaf_rows > 1 needs split_structure \"leaves\".");
   this->min_leaf_rows_ = params.min_leaf_rows;
   this->exact_draw_ = params.exact_draw;
   this->interaction_constraints_ = params.interaction_constraints;
@@ -503,7 +501,7 @@ void RandomPlantedForest::update_leaf_weight(
     auto &wts = tree.leaf_weights_by_dim_v[(size_t)kdim];
     if (bit.empty() || wts.size() != bit.size())
       continue;
-    const double w_new = rpf_ct1::leaf_weight(fr, tree.leaves[idx], kdim, this->n_leaves[kdim]);
+    const double w_new = rpf_ct1::leaf_weight(fr, tree.leaves[idx], kdim, this->n_leaves[kdim], this->min_leaf_rows_);
     if (append) {
       rpf_utils::fenwick_push_back(bit, w_new);
       wts.push_back(w_new);
@@ -797,12 +795,12 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       size_t idx_b = static_cast<size_t>(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
       // Assign by value to avoid aliasing issues if vector reallocates later
       *curr_split.leaf_index = leaf_b;
-      if (min_leaf_rows_ > 1) // the entries of the overwritten leaf refer to leaf_b now
+      if (min_leaf_rows_ > 1 && leaf_pool) // the entries of the overwritten leaf refer to leaf_b now
         for (size_t i = 0; i < possible_splits.size(); ++i) {
           SplitCandidate &c = possible_splits[i];
           if (c.tree.get() == curr_split.tree_index.get() && c.leaf_idx == idx_b) {
             c.rows_ok = -1;
-            if (!exact_draw_ && !deterministic) // the fast draw sets their weights again
+            if (mode == 3 && !exact_draw_ && !deterministic) // the fast draw of leaves sets their weights again
               leaves_scratch.sampler.dirty.push_back(i);
           }
         }

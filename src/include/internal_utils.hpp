@@ -66,6 +66,26 @@ void fenwick_push_back(std::vector<double> &bit, double w);
 // Fenwick rebuild and the incremental update after a split, so that the two agree.
 double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size);
 
+// min_leaf_rows (min_rows > 1): the distinct-value indices [lo, hi_excl) of a leaf whose thresholds leave at least
+// leaf_size distinct values and min_rows rows on each side, from the leaf's sorted values and its distinct values
+// (both ascending). The same range as min_rows_range() gives from the first positions: the first position of
+// unique[u] is at least min_rows iff unique[u] > sorted_vals[min_rows - 1], and at most m - min_rows iff
+// unique[u] <= sorted_vals[m - min_rows]. Empty (lo >= hi_excl) if there is no such threshold.
+void min_rows_range_sorted(
+    const std::vector<double> &sorted_vals,
+    const std::vector<double> &unique,
+    int leaf_size,
+    int min_rows,
+    int &lo,
+    int &hi_excl
+);
+// min_leaf_rows for target_tree_then_leaf (res_trees): the range above for leaf and feature k, from the leaf's cached
+// sorted values and distinct values (computed and cached as the search does when missing). Its width
+// max(0, hi_excl - lo) is the leaf's sampling weight, the number of thresholds the search may draw.
+void leaf_threshold_range(
+    const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size, int min_rows, int &lo, int &hi_excl
+);
+
 // Aging helper must be header (templated)
 template <typename CandidateT>
 inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_idx, std::vector<CandidateT> &pool)

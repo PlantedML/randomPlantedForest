@@ -85,10 +85,11 @@
   `prune = TRUE` is an error with `deterministic = TRUE`, and `purify` is not used with it.
   It is the new default (`prune = NULL`, see Breaking changes); `prune = FALSE` returns the forest as before.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
-  Values above 1 need `split_structure = "leaf"` (for classification see below); the default 1 imposes no limit and is accepted everywhere.
-  Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.
+  Every split structure takes it, in regression and classification; the default 1 imposes no limit.
+  Split points are tried only among those that keep this many rows on each side, and leaves without one are no longer drawn: as split candidates with `"leaf"` and `"leaf_binned"`, by the leaf draw of `"tree_then_leaf"` and `"target_tree_then_leaf"` (a leaf's weight is its number of such split points), and `"tree_then_all_leaves"` skips them.
+  Binary predictors are split whenever both sides keep enough rows.
   The default `min_leaf_rows = 1` fits the same models as before, bit for bit.
-* Classification with `split_structure = "leaf"` (the default) takes `min_leaf_rows` and the fast draw of split candidates (`options(randomPlantedForest.exact_draw = FALSE)`) as regression does.
+* Classification with `split_structure = "leaf"` (the default) takes the fast draw of split candidates (`options(randomPlantedForest.exact_draw = FALSE)`) as regression does, and `min_leaf_rows` with every split structure.
   Both use regression's draw: the same candidates are left out, and a classification fit with `loss = "L2"` on a 0/1 response is the regression fit, bit for bit, with either option.
   With `min_leaf_rows = 1` and the exact draw (the default before this version) classification fits are unchanged, bit for bit.
 * `rpf(tune = TRUE)` tunes out of bag in one call (regression and classification): the greediness of the split search (`n_try_split_points` and `share_candidates`, on the ladder of the new `greediness_ladder()`) and `min_leaf_rows`.

@@ -41,7 +41,7 @@ greediness_ladder <- function() {
 #' @param search `[integer: 3:8]`: The rows of `ladder` searched in step 1 (on the default ladder from 10 / 0.4 to
 #'   1 / 0.0125).
 #' @param min_leaf_rows `[integer: c(1, 5, 20, 100)]`: The values of [rpf()]'s `min_leaf_rows` searched in step 2;
-#'   the first one is that of step 1. Values above 1 need `split_structure = "leaf"`.
+#'   the first one is that of step 1.
 #' @param neighbours `[logical(1): TRUE]`: Whether to run step 3.
 #'
 #' @return An object of class `rpf_tune_control`, a list with the four settings, for `rpf(tune = )`.
@@ -175,7 +175,7 @@ tune_given <- function(env, old = character()) {
 
 # The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none
 # of the settings the search chooses given
-tune_check_call <- function(control, given, n_splits, prune, deterministic, n_families, split_structure, call) {
+tune_check_call <- function(control, given, n_splits, prune, deterministic, n_families, call) {
   if (deterministic) {
     cli::cli_abort(
       "{.arg tune} needs out-of-bag rows: it is not available with {.code deterministic = TRUE}.",
@@ -218,15 +218,6 @@ tune_check_call <- function(control, given, n_splits, prune, deterministic, n_fa
       c(
         "{.arg tune} needs at least {prune_oob_min_ntrees} tree families, not {n_families}.",
         "i" = "Every forest is pruned out of bag, which needs out-of-bag rows of several families."
-      ),
-      call = call
-    )
-  }
-  if (split_structure != "leaf" && any(control$min_leaf_rows > 1)) {
-    cli::cli_abort(
-      c(
-        "{.arg tune} searches {.arg min_leaf_rows} above 1, which needs {.code split_structure = \"leaf\"}.",
-        "i" = "Use {.code tune = tune_control(min_leaf_rows = 1)} with {.code split_structure = \"{split_structure}\"}."
       ),
       call = call
     )
