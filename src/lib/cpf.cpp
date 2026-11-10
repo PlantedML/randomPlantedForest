@@ -133,8 +133,9 @@ ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, co
 // sampling of candidates, leaves and thresholds (and therefore the same RNG draws), and the same
 // aging. Only the loss differs: every evaluated split is scored with calcLoss, which needs the
 // individuals on both sides (I_s / I_b) and the weights W. The sums sum_s / sum_b are computed in
-// the same order as in regression, so that with loss "L2" a classification fit reproduces the
-// regression fit on the same 0/1 response.
+// the same order as in regression, and L2_loss (rpf.cpp) scores them with regression's expression,
+// so that with loss "L2" a classification fit is the regression fit on the same 0/1 response, bit
+// for bit, ties in loss included.
 
 // Draw this round's split candidates from a pool with the given ages, with weights
 // exp(-split_decay_rate * age), as the regression split modes do.

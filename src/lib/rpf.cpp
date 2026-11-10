@@ -81,17 +81,23 @@ void RandomPlantedForest::set_purify_cap(int cap)
   purify_cap = cap;
 }
 
+// The L2 loss of a split, as classification scores it. The same expression, in the same order, as regression's split
+// searches (splits_*.cpp) score a candidate: -S_s^2 / n_s - S_b^2 / n_b, accumulated over the columns. Not the equal
+// -2 M S + n M^2: the two round differently, and where two candidates tie (or nearly), the fits would part. One
+// multiplication, one division and one subtraction per term leave a compiler nothing to fuse, so the two modes score
+// bitwise alike on every platform.
 void RandomPlantedForest::L2_loss(Split &split)
 {
   split.M_s = split.sum_s / split.I_s.size();
   split.M_b = split.sum_b / split.I_b.size();
-  split.min_sum = 0;
+  const double n_s = static_cast<double>(split.I_s.size());
+  const double n_b = static_cast<double>(split.I_b.size());
+  double loss = 0.0;
   for (size_t p = 0; p < value_size; ++p) {
-    const double Ms = split.M_s[p];
-    const double Mb = split.M_b[p];
-    split.min_sum += -2 * Ms * split.sum_s[p] + split.I_s.size() * (Ms * Ms);
-    split.min_sum += -2 * Mb * split.sum_b[p] + split.I_b.size() * (Mb * Mb);
+    loss -= (split.sum_s[p] * split.sum_s[p]) / n_s;
+    loss -= (split.sum_b[p] * split.sum_b[p]) / n_b;
   }
+  split.min_sum = loss;
 }
 
 RandomPlantedForest::RandomPlantedForest(const RPFParams &params)

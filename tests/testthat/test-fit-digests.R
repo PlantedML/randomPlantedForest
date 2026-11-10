@@ -4,8 +4,9 @@
 # `deterministic = TRUE`; #78), the purified fits (`purify(mode = 2)` on a leaf's lower bound, #76; `predict()`
 # after a capped purification, #77), every classification fit (#84), the purified components of `purify(mode = 2)`
 # as weighted rectangles, which add the same terms in another order (rounding level), and the three-class
-# exponential fits (`loss3_exponential`, `pur_cls3_*`: SAMME, the multiclass exponential loss). A change meant to
-# leave every fit as it was keeps them all, and a change that moves fits re-pins exactly those.
+# exponential fits (`loss3_exponential`, `pur_cls3_*`: SAMME, the multiclass exponential loss), and the three-class
+# L2 fit (`loss3_L2`: L2 classification scores a split with regression's arithmetic, which breaks a tie otherwise). A
+# change meant to leave every fit as it was keeps them all, and a change that moves fits re-pins exactly those.
 #
 # The digests depend on the platform's floating point and random integers (libm's exp and log draw the candidates),
 # so they are checked only where they were computed: macOS on arm64.
@@ -42,7 +43,7 @@ test_that("small fits are bitwise as pinned", {
     loss2_logit = "fff9199d1334d380b87491678104fa2a",
     loss2_exponential = "de10362d03c0d12ab8a5fd66e2d62d86",
     loss3_L1 = "843dbb7d5d6bafd8eeea3bf3c67487d2",
-    loss3_L2 = "05d608d4ff10164f09ff56353c399223",
+    loss3_L2 = "c536e887470b870fe87d9304f9f55493",
     loss3_logit = "305b7853bd96e566572be447023b34d1",
     loss3_exponential = "20aaee6ce07ccef144fb77fd850c1ae1",
     pur_reg_components = "8bf9507e8cb6ea716ec1315c58a5de81",

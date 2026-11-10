@@ -32,8 +32,6 @@ cp_recon <- function(m, x) {
 test_that("L2 classification on 0/1 is the regression pipeline bitwise (OOB path, splits = NULL, pruning, display, tuner)", {
   skip_on_cran()
   d <- cp_data(500, seed = 11)
-  # (two splits that separate the same rows can tie exactly in loss, and the fits of the two modes round the tie apart:
-  # with these data that happens at seed 4 of 3:5 already at 10 splits; the seeds here have no tie)
   pipe <- function(y, ...) {
     set.seed(3)
     m <- suppressWarnings(rpf(
@@ -61,13 +59,12 @@ test_that("L2 classification on 0/1 is the regression pipeline bitwise (OOB path
       pred = as.numeric(as.matrix(predict(m, d$x, type = "numeric")))
     )
   }
-  # The seeds were checked for ties on macOS arm64. Other platforms draw other forests, and on Linux the two fits of
-  # this one part (their OOB paths differ from the 13th split on); the comparisons below agree there too
+  a <- pipe(d$yb, loss = "L2")
+  b <- pipe(d$y01)
+  expect_identical(a, b)
+  # the display coarsened (4 of the first pruning's 13 components) and pruned again: what this example fit does, on the
+  # platform it was chosen on (other platforms draw other forests)
   if (on_macos_arm64()) {
-    a <- pipe(d$yb, loss = "L2")
-    b <- pipe(d$y01)
-    expect_identical(a, b)
-    # the display coarsened (4 of the first pruning's 13 components) and pruned again
     expect_gt(length(a$coarse), 0)
     expect_identical(a$rule, "R")
   }
@@ -98,6 +95,40 @@ test_that("L2 classification on 0/1 is the regression pipeline bitwise (OOB path
     list(tab = m$tune$search[, cols], pred = as.numeric(as.matrix(predict(m, d$x, type = "numeric"))))
   }
   expect_identical(tun(d$yb, loss = "L2"), tun(d$y01))
+})
+
+test_that("L2 classification on 0/1 is the regression fit bitwise where candidate splits tie in loss", {
+  skip_on_cran()
+  # Splits of 0/1 data often tie in loss: in a leaf whose rows all have the same residual every threshold scores the
+  # same, and others tie to an ulp. Both modes score a split with the same arithmetic, so they break such a tie alike.
+  # Before they did not (classification computed the equal -2 M S + n M^2): with these data the OOB paths of the
+  # default structure parted for 189 of the seeds 1:300 on macOS arm64, and for other seeds on other platforms. Each
+  # case below parted there before (structure, seed, min_leaf_rows, draw).
+  d <- cp_data(300, seed = 11)
+  path <- function(y, seed, ...) {
+    set.seed(seed)
+    suppressWarnings(rpf(d$x, y, max_interaction = 3, ntrees = 8, splits = 80, oob_path = TRUE, ...))$oob_path
+  }
+  cases <- list(
+    list("leaves", 6, 1, TRUE),
+    list("leaves", 38, 1, TRUE),
+    list("leaves", 4, 5, TRUE),
+    list("hist", 33, 1, TRUE),
+    list("cur_trees_1", 70, 1, TRUE),
+    list("cur_trees_2", 44, 1, TRUE),
+    list("res_trees", 55, 1, TRUE),
+    list("leaves", 6, 1, FALSE),
+    list("leaves", 38, 5, FALSE)
+  )
+  old <- options(randomPlantedForest.exact_draw = TRUE)
+  on.exit(options(old))
+  for (cs in cases) {
+    options(randomPlantedForest.exact_draw = cs[[4]])
+    mlr <- if (cs[[3]] > 1) list(min_leaf_rows = cs[[3]]) else list()
+    a <- do.call(path, c(list(d$yb, cs[[2]], loss = "L2", split_structure = cs[[1]]), mlr))
+    b <- do.call(path, c(list(d$y01, cs[[2]], split_structure = cs[[1]]), mlr))
+    expect_identical(a, b, info = paste(unlist(cs), collapse = " "))
+  }
 })
 
 test_that("components + intercept = predict per class; probabilities valid; class = argmax (all losses)", {
