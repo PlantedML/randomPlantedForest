@@ -31,7 +31,10 @@ oob_path_checkpoints <- function(splits) {
 # sum0 / sum1 = each row's OOB predictions summed over the families of even / odd index, one column per checkpoint,
 # count = the number of OOB families of each half). One row per checkpoint: splits, oob_rmse (corrected), oob_rmse_raw,
 # and the standard errors of the two mean squared errors, se_mse and se_mse_raw. Attribute n_rows: the number of rows
-# with an OOB family. The correction is the one of prune_components()' OOB choice (see rpf()'s details).
+# with an OOB family. The correction is the one of prune_components()' OOB choice (see rpf()'s details), except for the
+# rows whose OOB families are all even or all odd: they are left uncorrected here, where prune_oob_score() gives them
+# the mean variance estimate of the rows with both halves. So the path's corrected error of a forest is higher than the
+# one the pruning gives its unpruned model (rule D at tau = 0) by those rows' correction, by more with fewer families.
 oob_path_table <- function(path, y, ntrees, call = rlang::caller_env()) {
   y <- as.numeric(y)
   m0 <- path$count[, 1]

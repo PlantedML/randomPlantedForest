@@ -258,10 +258,14 @@
 #' are all even or all odd is not corrected here (`prune_components()` gives
 #' it the mean estimate of the other rows): about 2% of the rows at 20
 #' families, 18% at 10 and over half at 4 (none at 50), so with few families
-#' the corrected error is biased upwards. Factor levels are ordered by the mean
-#' outcome of all training rows, so a row's own outcome enters the ordering its
-#' OOB families split on, and the OOB error is somewhat optimistic with factor
-#' predictors, most so with many levels.
+#' the corrected error is biased upwards, and above the corrected error
+#' `prune_components()` gives the same forest (rule `"D"` at `tau = 0`).
+#' Factor levels are ordered by the outcome of all training rows: by the mean
+#' outcome (regression), by the share of the second class (binary
+#' classification) or by the first principal component of the class
+#' proportions (three or more classes). So a row's own outcome enters the
+#' ordering its OOB families split on, and the OOB error is somewhat optimistic
+#' with factor predictors, most so with many levels.
 #'
 #' @references
 #' Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
