@@ -185,6 +185,7 @@ void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Mat
 void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
 {
   tree_families = std::vector<TreeFamily>(model.size());
+  inbag_.clear(); // restored with set_inbag(), if at all
   for (size_t i = 0; i < model.size(); ++i) {
     for (const TreeExport &tree : model[i]) {
       if (tree.values.size() != tree.intervals.size())
@@ -507,6 +508,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
     // Bootstrap samples
     int sample_index;
+    init_inbag(n);
     std::vector<std::vector<double>> samples_X, samples_Y;
     if (deterministic) {
       samples_X = X;
@@ -517,6 +519,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       samples_Y = std::vector<std::vector<double>>(sample_size);
       for (size_t i = 0; i < (size_t)sample_size; ++i) {
         sample_index = rng_randint(0, (int)sample_size);
+        add_inbag(n, sample_index);
         samples_Y[i] = Y[sample_index];
         samples_X[i] = X[sample_index];
       }
@@ -680,6 +683,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
     // bootstrap
     int sample_index;
+    init_inbag(n);
     std::vector<std::vector<double>> samples_X, samples_Y;
     std::vector<int> boot_idx(sample_size);
     if (deterministic) {
@@ -693,6 +697,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       samples_Y = std::vector<std::vector<double>>(sample_size);
       for (size_t i = 0; i < (size_t)sample_size; ++i) {
         sample_index = rng_randint(0, (int)sample_size);
+        add_inbag(n, sample_index);
         boot_idx[i] = sample_index;
         samples_Y[i] = Y[sample_index];
         samples_X[i] = X[sample_index];
@@ -866,6 +871,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
 
   // bootstrap
   int sample_index;
+  init_inbag(n);
   std::vector<std::vector<double>> samples_X, samples_Y;
   if (deterministic) {
     samples_X = X;
@@ -876,6 +882,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     samples_Y = std::vector<std::vector<double>>(sample_size);
     for (size_t i = 0; i < (size_t)sample_size; ++i) {
       sample_index = rng_randint(0, (int)sample_size);
+      add_inbag(n, sample_index);
       samples_Y[i] = Y[sample_index];
       samples_X[i] = X[sample_index];
     }

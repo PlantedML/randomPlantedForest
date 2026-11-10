@@ -3,11 +3,13 @@
 #' Method for [bundle::bundle()] wrapping [rpf_marshal()]/[rpf_unmarshal()],
 #' so rpf models work with the standard tidymodels serialization workflow.
 #' Training data is not included; see [rpf_marshal()] for the implications.
+#' Pruned forests from [prune_components()] are bundled the same way.
 #'
-#' @param x `[rpf]`: A fitted [`rpf`] model.
+#' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
+#'   [prune_components()].
 #' @param ... Unused.
-#' @return An object of class `bundled_rpf` for `bundle()`, or the restored
-#'   [rpf] object for `unbundle()`.
+#' @return An object of class `bundled_rpf` (`bundled_rpf_pruned`) for `bundle()`,
+#'   or the restored [rpf] (`rpf_pruned`) object for `unbundle()`.
 #' @examplesIf requireNamespace("bundle", quietly = TRUE)
 #' fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
 #' b <- bundle::bundle(fit)
@@ -21,5 +23,15 @@ bundle.rpf <- function(x, ...) {
     object = rpf_marshal(x),
     situate = bundle::situate_constr(function(object) randomPlantedForest::rpf_unmarshal(object)),
     desc_class = "rpf"
+  )
+}
+
+#' @rdname bundle.rpf
+#' @exportS3Method bundle::bundle
+bundle.rpf_pruned <- function(x, ...) {
+  bundle::bundle_constr(
+    object = rpf_marshal(x),
+    situate = bundle::situate_constr(function(object) randomPlantedForest::rpf_unmarshal(object)),
+    desc_class = "rpf_pruned"
   )
 }

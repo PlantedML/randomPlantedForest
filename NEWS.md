@@ -12,6 +12,18 @@
   `rpf_boxes()` returns the leaves as a data frame.
   Requires `ggplot2`, and `patchwork` for `type = "boxes"`.
   The "Getting started" vignette uses it to show how a tree family is built and what purification does.
+* `prune_components()` prunes the purified components of a regression forest.
+  A component is kept if its share of the variance of the prediction on the training rows is at least `tau`.
+  Rule `"D"` drops the others; rule `"R"` also refits the intercept and one coefficient per kept component by least squares, which changes their scale but not their shape.
+  The rule and `tau` are chosen out of bag by default (`select_by = "oob"`), without refitting: one purification evaluates every tree family's components at the training rows outside its bootstrap sample, and each candidate is scored by its out-of-bag RMSE, corrected for the extra variance of averaging fewer families.
+  On 52 data sets (44 synthetic, 8 splits of California housing) the out-of-bag choice picked the cross-validated model on 43, its test error was 0.09% higher on average, and it took a twelfth of the time.
+  `select_by = "cv"` chooses by K-fold cross-validation instead, refitting the forest on each fold; by default it is used below 10 tree families and for deterministic forests.
+  By default the largest `tau` whose error is within one standard error of the lowest is chosen (`select = "1se"`; `select = "min"` takes the lowest).
+  With `select_by = "oob"`, the coefficients of rule `"R"` are fitted on the out-of-bag components, to score each candidate, for the final model and for a given rule and `tau`, because the forest's own components have also fitted the training rows' noise; with `select_by = "cv"` they are fitted in sample.
+  On the same 52 data sets this sparse default had 1.3% lower test error than the lowest out-of-bag error with in-sample coefficients, with half the components (29 instead of 83 on California housing) and no false component on the synthetic sets; it can drop a small true component (a four-way interaction in one synthetic design, +2.5% test error there).
+  Every fit records how often each training row is in each family's bootstrap sample (fits are unchanged), and `rpf_marshal(include_data = TRUE)` stores these in-bag counts.
+  On 44 synthetic data sets with known sparse structure, the pruned models kept no false component (except five tiny main effects on one additive set) and 111 of the 113 true interactions, and their test error was 15% lower than that of the unpruned forest tuned by CV, lower on 42 of the 44 sets.
+  The result, of class `rpf_pruned`, has methods for `predict()`, `predict_components()` (now an S3 generic) and `print()`, and works with `rpf_marshal()`, `rpf_unmarshal()` and `bundle()`.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.
   Leaves that cannot be split with this many rows on each side are no longer drawn as split candidates, and binary predictors are split whenever both sides keep enough rows.

@@ -8,13 +8,22 @@
 #' Training data is only included with `include_data = TRUE`; without it, a
 #' restored forest can predict (including purified prediction if the forest
 #' was purified before marshaling) but can never be purified afterwards.
+#' With it, the in-bag counts of the bootstrap samples are stored too, so that
+#' [prune_components()] can choose out of bag after restoring.
 #'
-#' @param x `[rpf]`: A fitted [`rpf`] model.
+#' A pruned forest from [prune_components()] (class `rpf_pruned`) is marshaled
+#' the same way: its forest as above, and the pruning (rule, coefficients,
+#' components, the table of the choice) as it is. The restored model predicts as before;
+#' its forest is purified, so it needs no training data for that.
+#'
+#' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
+#'   [prune_components()].
 #' @param include_data `[logical(1): FALSE]`: Store training data in the blob, enabling
 #'   [purify()] after restoring.
-#' @param blob `[rpf_marshaled]`: Object created by `rpf_marshal()`.
-#' @return `rpf_marshal()` returns a list of class `rpf_marshaled`;
-#'   `rpf_unmarshal()` returns an object of class [rpf].
+#' @param blob `[rpf_marshaled | rpf_pruned_marshaled]`: Object created by `rpf_marshal()`.
+#' @return `rpf_marshal()` returns a list of class `rpf_marshaled`
+#'   (`rpf_pruned_marshaled` for a pruned forest);
+#'   `rpf_unmarshal()` returns an object of class [rpf] (`rpf_pruned`).
 #' @export
 #' @examples
 #' fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
@@ -24,6 +33,12 @@
 #' restored <- rpf_unmarshal(readRDS(tmp))
 #' all.equal(predict(fit, mtcars), predict(restored, mtcars))
 rpf_marshal <- function(x, include_data = FALSE) {
+  if (inherits(x, "rpf_pruned")) {
+    # the forest as for an rpf; the pruning is plain R data
+    out <- unclass(x)
+    out$fit <- rpf_marshal(x$fit, include_data = include_data)
+    return(structure(out, class = "rpf_pruned_marshaled"))
+  }
   checkmate::assert_class(x, "rpf")
   checkmate::assert_flag(include_data)
   check_rpf_alive(x)
@@ -45,6 +60,9 @@ rpf_marshal <- function(x, include_data = FALSE) {
     grid = if (purified && length(rects) == 0) x$fit$get_grid_leaves(),
     rects = if (length(rects) > 0) rects,
     data = if (include_data) x$fit$get_data(),
+    # the in-bag counts (n x ntrees, 0..255) for prune_components(select_by = "oob"); none in a forest restored
+    # from a blob without them
+    inbag = if (include_data) tryCatch(as.raw(x$fit$inbag()), error = function(e) NULL),
     # $forest (export_forest = TRUE) duplicates $model; rebuilt on unmarshal
     had_forest = !is.null(x$forest)
   )
@@ -59,6 +77,11 @@ rpf_marshal <- function(x, include_data = FALSE) {
 #' @rdname rpf_marshal
 #' @export
 rpf_unmarshal <- function(blob) {
+  if (inherits(blob, "rpf_pruned_marshaled")) {
+    out <- unclass(blob)
+    out$fit <- rpf_unmarshal(blob$fit)
+    return(structure(out, class = "rpf_pruned"))
+  }
   checkmate::assert_class(blob, "rpf_marshaled")
   state <- blob$fit_state
   if (!identical(state$version, 1L)) {
@@ -89,6 +112,14 @@ rpf_unmarshal <- function(blob) {
     fit$set_training_data(as.matrix(state$data$Y), as.matrix(state$data$X))
   }
   fit$set_model(state$model)
+  # NULL without include_data, and in blobs from versions before the field existed
+  if (!is.null(state$inbag)) {
+    n <- state$dims$sample_size
+    if (!is.raw(state$inbag) || length(state$inbag) != n * length(state$model)) {
+      cli::cli_abort("Corrupt {.cls rpf_marshaled} blob: the in-bag counts do not match the forest.")
+    }
+    fit$set_inbag(matrix(as.integer(state$inbag), nrow = n))
+  }
   if (state$purified) {
     if (length(state$rects) > 0) {
       fit$set_purified_rects(state$rects)
@@ -120,15 +151,19 @@ rpf_unmarshal <- function(blob) {
 #'
 #' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
 #' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable.
-#' @param x `[rpf]`: A fitted [`rpf`] model, possibly restored from disk.
+#' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
+#'   [prune_components()], possibly restored from disk.
 #' @return `TRUE` if the underlying model can be used, `FALSE` otherwise.
 #' @export
 rpf_is_valid <- function(x) {
+  if (inherits(x, "rpf_pruned")) {
+    x <- x$fit
+  }
   checkmate::assert_class(x, "rpf")
   !inherits(try(x$fit$is_purified(), silent = TRUE), "try-error")
 }
 
-check_rpf_alive <- function(x) {
+check_rpf_alive <- function(x, call = rlang::caller_env()) {
   if (!rpf_is_valid(x)) {
     cli::cli_abort(
       c(
@@ -136,7 +171,7 @@ check_rpf_alive <- function(x) {
         "i" = "Most likely it was saved with {.fn saveRDS} and restored with {.fn readRDS}.",
         "i" = "Use {.code blob <- rpf_marshal(x)} before saving and {.code rpf_unmarshal(blob)} after loading, see {.help rpf_marshal}."
       ),
-      call = rlang::caller_env()
+      call = call
     )
   }
   invisible(x)

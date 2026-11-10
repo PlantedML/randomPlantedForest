@@ -6,7 +6,9 @@
 // - ctor(params): configure; set_data(Y, X) loads data; fit() trains
 // - predict_matrix/predict_vector(): batch/single predictions;
 //   predict_components(): many components in one pass
-// - purify(): optional post-processing to orthogonalize components
+// - purify(): optional post-processing to orthogonalize components;
+//   purify_oob(): the same, plus every family's components at its
+//   out-of-bag training rows (from the in-bag counts of the fit)
 // - get_model()/set_model(), get_grid_leaves()/set_grid_leaves(),
 //   get_purified_rects()/set_purified_rects(): export and restore the forest
 //   for serialization
@@ -75,6 +77,20 @@ struct PurifyStats {
   double n_components = 0, n_rects = 0, n_groups = 0, n_index_nodes = 0, n_table_cells = 0;
   double bytes = 0; /**< bytes allocated for the rectangles, tables and indices */
 };
+
+// The out-of-bag (OOB) components of purify_oob(): before the families are merged, every family's components are
+// evaluated at its OOB training rows (in-bag count 0) and summed per row and component, separately over the families
+// of even and odd index (0-based), in family order. All matrices are column-major.
+struct OobComponents {
+  std::vector<std::vector<int>> sets;         /**< the components (1-based features, ascending) */
+  std::vector<double> sum0, sum1;             /**< n x (sets.size() * value_size): the two sums */
+  std::vector<double> intercept0, intercept1; /**< n x value_size: the sums of the families' intercepts */
+  std::vector<int> count;                     /**< n x 2: the number of OOB families of each half */
+};
+
+namespace rpf_cnt {
+class SubsetCounter;
+}
 
 class RandomPlantedForest {
 
@@ -159,6 +175,13 @@ public:
   int get_purify_cap() const;
   // Restore it after set_grid_leaves() (serialization path); 0 is a purification of all orders.
   void set_purify_cap(int cap);
+  // In-bag counts: inbag[f][i] = how often training row i is in the bootstrap sample of family f (saturating at 255;
+  // all 1 for a deterministic forest). Empty before a fit, or after set_model() until set_inbag() (serialization).
+  const std::vector<std::vector<uint8_t>> &get_inbag() const { return inbag_; }
+  void set_inbag(std::vector<std::vector<uint8_t>> inbag);
+  // purify(maxp_interaction, nthreads, 2), and the out-of-bag components of the training rows (see OobComponents).
+  // The purified forest is the same as after purify(). Needs the training data and the in-bag counts.
+  OobComponents purify_oob(int maxp_interaction, int nthreads);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -172,16 +195,36 @@ protected:
   void warn(const std::string &msg);
   // Internal per-family worker (grid-based mode 1)
   void purify_3_family(TreeFamily &curr_family, int maxp_interaction);
-  // Internal per-family worker for fast exact purifier (mode 2); adds the family's components to `acc`
+  // Internal per-family worker for fast exact purifier (mode 2); adds the family's components to `acc`. The range
+  // counts come from `counter` if given (the same integers), from `kdt` otherwise.
   void purify_fast_exact_family(
       const TreeFamily &curr_family,
       int maxp_interaction,
       const rpf_kd::KDTree &kdt,
       const std::vector<std::vector<double>> &cuts,
-      rpf_rect::Accumulator &acc
+      rpf_rect::Accumulator &acc,
+      const rpf_cnt::SubsetCounter *counter = nullptr
   ) const;
   // Components of the last mode-2 purification as weighted rectangles (null after mode 1 or before purify)
   std::shared_ptr<rpf_rect::PurifiedForest> rect_forest_;
+  // Threads for purify(): nthreads_param if > 0, otherwise min(the forest's nthreads, the hardware concurrency)
+  unsigned purify_threads(int nthreads_param);
+  // The OOB sums of purify_oob(), filled family by family (see there)
+  struct OobSums;
+  // Mode 2 for all families on threads_to_use threads. With oob, also the OOB sums, and the range counts from
+  // per-subset k-d trees (subset_count.hpp: the same counts, so the same purification).
+  void purify_mode2(int maxp_interaction, unsigned threads_to_use, OobSums *oob);
+  // inbag_[f][i]: how often training row i is in the bootstrap sample of family f (saturating at 255); filled by
+  // create_tree_family
+  std::vector<std::vector<uint8_t>> inbag_;
+  // Start family n's in-bag counts (deterministic: every row once), and count one draw of row i
+  void init_inbag(size_t n) { inbag_[n].assign((size_t)sample_size, deterministic ? 1 : 0); }
+  void add_inbag(size_t n, int i)
+  {
+    uint8_t &c = inbag_[n][(size_t)i];
+    if (c < 255)
+      ++c;
+  }
   GridFamilyExport family_grid_from_rects(size_t f) const;
   std::vector<std::vector<double>> X; /**< Nested vector feature samples of size (sample_size x feature_size) */
   std::vector<std::vector<double>> Y; /**< Corresponding values for the feature samples */

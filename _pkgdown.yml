@@ -21,6 +21,12 @@ reference:
     - purify
     - predict_components
 
+- title: Pruning
+  desc: Dropping small components, chosen by cross-validation or out of bag
+- contents:
+  - prune_components
+  - predict.rpf_pruned
+
 - title: Visualization
   desc: Inspecting the trees of a forest
 - contents:

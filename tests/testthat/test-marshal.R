@@ -110,6 +110,32 @@ test_that("include_data = TRUE allows purify after restore", {
   expect_identical(predict(restored, mtcars), predict(fit, mtcars))
 })
 
+test_that("include_data = TRUE stores the in-bag counts", {
+  set.seed(3)
+  fit <- rpf(mpg ~ wt + cyl + hp, data = mtcars, ntrees = 6, max_interaction = 2)
+  ib <- fit$fit$inbag()
+  blob <- rpf_marshal(fit, include_data = TRUE)
+  expect_type(blob$fit_state$inbag, "raw")
+  restored <- rpf_unmarshal(blob)
+  expect_identical(restored$fit$inbag(), ib)
+  # the out-of-bag components after restoring are those of the original forest
+  expect_identical(restored$fit$purify_oob(0L, 1L), fit$fit$purify_oob(0L, 1L))
+
+  # without the data, no counts: a restored forest cannot be purified anyway
+  plain <- rpf_marshal(fit)
+  expect_null(plain$fit_state$inbag)
+  expect_error(rpf_unmarshal(plain)$fit$inbag(), "include_data = TRUE")
+  # a blob with data from a version without the field restores without counts
+  old <- blob
+  old$fit_state$inbag <- NULL
+  expect_error(rpf_unmarshal(old)$fit$inbag(), "no in-bag counts")
+  expect_error(rpf_unmarshal(old)$fit$purify_oob(0L, 1L), "no in-bag counts")
+  # corrupt counts are rejected
+  bad <- blob
+  bad$fit_state$inbag <- bad$fit_state$inbag[-1]
+  expect_error(rpf_unmarshal(bad), "in-bag counts do not match")
+})
+
 test_that("purify on a data-free restored forest errors informatively", {
   fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 5)
   restored <- rpf_unmarshal(rpf_marshal(fit))
@@ -298,4 +324,78 @@ test_that("a capped purification keeps its store and its cap through the round t
     expect_identical(again$fit$get_purify_cap(), 0L)
     expect_identical(predict_components(again, mtcars), predict_components(fit, mtcars))
   }
+})
+
+prune_marshal_fit <- function(n = 300) {
+  set.seed(11)
+  x <- matrix(runif(n * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+  y <- 1 + 2 * x[, 1] + 4 * x[, 2] * x[, 3] + rnorm(n, sd = 0.3)
+  set.seed(5)
+  fit <- rpf(x, y, max_interaction = 3, ntrees = 10, splits = 40)
+  list(x = x, y = y, fit = fit)
+}
+
+test_that("a pruned forest survives the round trip and predicts the same", {
+  d <- prune_marshal_fit()
+  for (rule in c("D", "R")) {
+    pr <- prune_components(d$fit, d$x, d$y, rule = rule, tau = c(0, 0.01), folds = 3, seed = 1)
+    blob <- rpf_marshal(pr)
+    expect_s3_class(blob, "rpf_pruned_marshaled")
+    expect_s3_class(blob$fit, "rpf_marshaled")
+    expect_null(blob$fit$fit_state$data)
+    tmp <- tempfile(fileext = ".rds")
+    saveRDS(blob, tmp)
+    restored <- rpf_unmarshal(readRDS(tmp))
+    expect_s3_class(restored, "rpf_pruned")
+    expect_s3_class(restored$fit, "rpf")
+    expect_true(rpf_is_valid(restored))
+    expect_identical(predict(restored, d$x), predict(pr, d$x))
+    expect_identical(predict(restored, d$x, nthreads = 2), predict(pr, d$x))
+    expect_identical(predict_components(restored, d$x), predict_components(pr, d$x))
+    expect_identical(
+      predict_components(restored, d$x, max_interaction = 1),
+      predict_components(pr, d$x, max_interaction = 1)
+    )
+    expect_identical(format(restored), format(pr))
+    # everything but the forest is kept as it is
+    keep <- setdiff(names(pr), "fit")
+    expect_identical(unclass(restored)[keep], unclass(pr)[keep])
+    expect_identical(predict(restored$fit, d$x), predict(d$fit, d$x))
+  }
+})
+
+test_that("a pruned forest marshaled with its data can be pruned again", {
+  d <- prune_marshal_fit()
+  pr <- prune_components(d$fit, d$x, d$y, rule = "R", tau = 0.01)
+  blob <- rpf_marshal(pr, include_data = TRUE)
+  expect_false(is.null(blob$fit$fit_state$data))
+  restored <- rpf_unmarshal(blob)
+  again <- prune_components(restored$fit, d$x, d$y, rule = "R", tau = 0.01)
+  expect_identical(again$beta, pr$beta)
+  expect_identical(again$components, pr$components)
+  # the in-bag counts come along: the out-of-bag choice and R's out-of-bag coefficients are the same
+  oob_again <- prune_components(restored$fit, d$x, d$y, rule = "R", tau = c(0, 0.01), seed = 1)
+  oob_ref <- prune_components(d$fit, d$x, d$y, rule = "R", tau = c(0, 0.01), seed = 1)
+  expect_identical(oob_again$select_by, "oob")
+  expect_identical(oob_again$oob, oob_ref$oob)
+  expect_identical(oob_again$beta, oob_ref$beta)
+  expect_identical(oob_again$intercept, oob_ref$intercept)
+  # without its data, the restored forest still predicts, but cannot be pruned again
+  plain <- rpf_unmarshal(rpf_marshal(pr))
+  expect_identical(predict(plain, d$x), predict(pr, d$x))
+  expect_error(prune_components(plain$fit, d$x, d$y, rule = "R", tau = 0.01), "no training data")
+})
+
+test_that("a pruned forest restored without marshal gives an actionable error", {
+  d <- prune_marshal_fit(n = 100)
+  pr <- prune_components(d$fit, d$x, d$y, rule = "D", tau = 0.01)
+  tmp <- tempfile(fileext = ".rds")
+  saveRDS(pr, tmp)
+  zombie <- readRDS(tmp)
+  expect_false(rpf_is_valid(zombie))
+  expect_error(predict(zombie, d$x), "rpf_marshal")
+  expect_error(predict_components(zombie, d$x), "rpf_marshal")
+  expect_error(rpf_marshal(zombie), "readRDS")
+  expect_true(rpf_is_valid(pr))
+  expect_error(rpf_marshal(pr, include_data = NA))
 })

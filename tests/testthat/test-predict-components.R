@@ -122,6 +122,12 @@ test_that("predict_components errors appropriately", {
 
   # predictors is wrong type
   expect_error(predict_components(rp, mtcars, predictors = list("cyl")))
+
+  # unknown arguments
+  expect_error(predict_components(rp, mtcars, max_interactions = 2), class = "rlib_error_dots_nonempty")
+
+  # not a forest
+  expect_error(predict_components(list(), mtcars))
 })
 
 test_that(".predict_single_component is consistent with predictor order", {
