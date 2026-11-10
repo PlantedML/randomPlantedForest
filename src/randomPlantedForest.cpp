@@ -30,7 +30,9 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
       .method("purify_stats", &T::purify_stats)
       .method("is_purified", &T::is_purified)
       .method("is_purify_capped", &T::is_purify_capped)
-      .method("set_purify_capped", &T::set_purify_capped);
+      .method("set_purify_capped", &T::set_purify_capped)
+      .method("get_purify_cap", &T::get_purify_cap)
+      .method("set_purify_cap", &T::set_purify_cap);
 }
 
 RCPP_MODULE(mod_rpf)

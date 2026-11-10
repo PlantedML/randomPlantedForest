@@ -43,7 +43,10 @@ use.
 \details{
 The forest is modified in place: \code{x} and every copy of it are purified,
 whether or not the result is assigned.
-\code{purify()} is idempotent, meaning if the forest is already purified it just returns it unmodified.
+If the forest is already purified with all the orders asked for, \code{purify()} returns it unmodified, whatever
+\code{mode} and \code{nthreads} are. A forest purified with a \code{maxp_interaction} below the order asked for (all orders
+with the default \code{NULL}) is purified again, which needs its training data: a forest restored by
+\code{\link[=rpf_unmarshal]{rpf_unmarshal()}} without it can only be purified up to its earlier cap.
 }
 \examples{
 rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)

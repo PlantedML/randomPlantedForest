@@ -232,6 +232,8 @@ public:
   bool is_purified() { return core.is_purified(); }
   bool is_purify_capped() { return core.is_purify_capped(); }
   void set_purify_capped(bool capped) { core.set_purify_capped(capped); }
+  int get_purify_cap() { return core.get_purify_cap(); }
+  void set_purify_cap(int cap) { core.set_purify_cap(cap); }
 
 private:
   Core core;
