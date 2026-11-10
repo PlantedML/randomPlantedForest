@@ -28,7 +28,7 @@ test_that("Multiclass: Detection works", {
 
   # y 3-level character
   expect_error(rpf(ychar ~ x1 + x2, xdat), regexp = "must be numeric \\(regression\\) or a factor")
-  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "Ordering of factor columns only implemented")
+  expect_error(rpf(ychar ~ x3 + x4, xdat), regexp = "must be numeric \\(regression\\) or a factor")
 })
 
 # Multiclass logit learns signal (#40) -------------------------------------

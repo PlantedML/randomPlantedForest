@@ -53,6 +53,11 @@
 * `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.
   It returns the raw predictions, as `type = "numeric"` does (the link is the identity).
   Previously it stopped with an error about the size of `pred`.
+* `rpf()` stops with a clear error on inputs that gave wrong fits without a warning or failed later: an infinite outcome, `epsilon` outside `(0, 0.5)`, `delta` of 0.5 or more (or 0 with `loss = "logit"`), `t_try = 0`, predictor names that are missing, duplicated or contain `:`, and interaction terms in the formula.
+  `rpf()` finds interactions itself, so write `y ~ x1 + x2` instead of `y ~ x1 * x2`; to fit a product as a predictor of its own, write `I(x1 * x2)` or add it to the data as a column.
+  A character or logical outcome and a factor outcome with a single class get the package's own message instead of one from `hardhat` or `model.matrix()`.
+  Unused levels of a factor outcome are dropped with a warning; previously a binary outcome with an unused level was fitted, but `predict()` failed.
+  `predict()` on zero rows returns zero rows instead of an error.
 * The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.

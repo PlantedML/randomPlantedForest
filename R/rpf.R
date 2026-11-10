@@ -8,13 +8,21 @@
 #' @param x,y `[data.frame | matrix | recipe]`, `[numeric | factor]`:
 #'   Predictors and outcome for the x/y interface.
 #'   `x` holds the predictors, or is a [`recipe`][recipes::recipe] (then supply
-#'   `data` instead of `y`).
+#'   `data` instead of `y`). The predictors need unique names that do not
+#'   contain `:`, which joins predictor names in component names such as `x1:x2`.
 #'   `y` is the outcome vector: __numeric__ for regression, __factor__ for
-#'   classification.
+#'   classification. A numeric outcome must be finite. A factor outcome needs at
+#'   least two classes; levels that do not occur are dropped with a warning.
 #' @param ... Not currently used, but required for extensibility. Unknown
 #'   (e.g. misspelled) arguments are an error.
 #' @param formula `[formula]`: A formula with the outcome on the left-hand side and the
-#'   predictors on the right-hand side, e.g. `y ~ x1 + x2`.
+#'   predictors on the right-hand side, e.g. `y ~ x1 + x2`. Interaction terms
+#'   such as `x1:x2` or `x1 * x2` are an error: they would add a predictor named
+#'   `x1:x2`, and `:` is how components are named. The forest finds interactions
+#'   itself, up to `max_interaction`, so list the predictors as `y ~ x1 + x2`.
+#'   To fit a product as a predictor of its own, write `I(x1 * x2)`, or add it to
+#'   `data` as a column with its own name. Transformed terms of one predictor,
+#'   such as `log(x1)`, are allowed.
 #' @param data `[data.frame]`: Data containing the predictors and the outcome,
 #'   used with `formula` or a recipe `x`.
 #' @param max_interaction `[integer(1): 2]`: Maximum number of predictors a single tree may
@@ -63,14 +71,16 @@
 #'   not yield proper probability estimates.
 #' @param delta `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Class proportions are truncated to `[delta, 1 - delta]` when computing the
-#'   loss of a split. Should be positive for `"logit"`: with `delta = 0`, nodes
-#'   containing a single class have infinite loss and their splits are always
-#'   rejected.
+#'   loss of a split. Must be less than 0.5, from where every proportion is
+#'   truncated to the same value, and positive for `"logit"`: with `delta = 0`,
+#'   nodes containing a single class have infinite loss and their splits are
+#'   always rejected.
 #' @param epsilon `[numeric(1): 0.1]`: Only used if `loss` is `"logit"` or `"exponential"`.
 #'   Class proportions are truncated to `[epsilon, 1 - epsilon]` when computing
 #'   the fit in a leaf. Unlike `delta`, this caps the size of individual leaf
 #'   updates and acts as regularization: smaller values permit larger jumps on
-#'   the link scale.
+#'   the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
+#'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
 #' @param purify `[logical(1): FALSE]`: Whether to purify the forest after fitting, which
 #'   [predict_components()] requires, with the defaults of [purify()]. For other
 #'   settings, call [purify()] after fitting instead.
@@ -260,6 +270,7 @@ rpf.formula <- function(
   ...
 ) {
   rlang::check_dots_empty()
+  check_no_interaction_terms(formula, data)
   # model.matrix() would expand logical predictors into two dummy columns; use them
   # as 0/1 like the x/y interface. The outcome stays as is so it is still validated.
   outcome <- all.vars(rlang::f_lhs(formula))
@@ -327,6 +338,7 @@ rpf.data.frame <- function(
   ...
 ) {
   rlang::check_dots_empty()
+  check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
@@ -381,6 +393,7 @@ rpf.matrix <- function(
   ...
 ) {
   rlang::check_dots_empty()
+  check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
   rpf_bridge(
@@ -496,6 +509,8 @@ rpf_bridge <- function(
   hardhat::validate_outcomes_are_univariate(processed$outcomes)
   check_no_missing(processed$predictors, "The predictors", call = call)
   check_no_missing(processed$outcomes, "The outcome", call = call)
+  check_predictor_names(names(processed$predictors), call = call)
+  processed <- check_outcome(processed, call = call)
   predictors <- preprocess_predictors_fit(processed, keep_level_order = keep_level_order, call = call)
   checkmate::assert_string(loss, null.ok = TRUE)
   outcomes <- preprocess_outcome(processed, loss, call = call)
@@ -519,6 +534,9 @@ rpf_bridge <- function(
   checkmate::assert_choice(split_structure, choices = c("leaves", "hist", "cur_trees_1", "cur_trees_2", "res_trees"))
   checkmate::assert_int(split_try, lower = 1)
   checkmate::assert_number(t_try, lower = 0, upper = 1)
+  if (t_try <= 0) {
+    cli::cli_abort("{.arg t_try} must be greater than 0, not {t_try}.", call = call)
+  }
   checkmate::assert_int(max_candidates, lower = 1)
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
@@ -535,6 +553,22 @@ rpf_bridge <- function(
   checkmate::assert_choice(loss, choices = loss_functions)
   checkmate::assert_number(delta, lower = 0, upper = 1)
   checkmate::assert_number(epsilon, lower = 0, upper = 1)
+  if (loss %in% c("logit", "exponential")) {
+    # Both truncate class proportions to [value, 1 - value], which is empty from 0.5 on
+    if (delta >= 0.5 || (loss == "logit" && delta <= 0)) {
+      range <- if (loss == "logit") "greater than 0" else "at least 0"
+      cli::cli_abort(
+        "With {.code loss = \"{loss}\"}, {.arg delta} must be {range} and less than 0.5, not {delta}.",
+        call = call
+      )
+    }
+    if (epsilon <= 0 || epsilon >= 0.5) {
+      cli::cli_abort(
+        "With {.code loss = \"{loss}\"}, {.arg epsilon} must be greater than 0 and less than 0.5, not {epsilon}.",
+        call = call
+      )
+    }
+  }
 
   checkmate::assert_flag(purify)
   checkmate::assert_int(nthreads, lower = 1L)

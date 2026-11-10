@@ -15,6 +15,132 @@ check_no_missing <- function(data, what, call = rlang::caller_env()) {
   invisible(data)
 }
 
+abort_outcome_type <- function(y, call = rlang::caller_env()) {
+  cli::cli_abort(
+    c(
+      "The outcome must be numeric (regression) or a factor (classification).",
+      "x" = "It is of class {.cls {class(y)}}.",
+      "i" = if (is.character(y) || is.logical(y)) "For classification, convert it with {.fn factor}."
+    ),
+    call = call
+  )
+}
+
+# The x/y interface: hardhat::mold() cannot standardize an outcome vector that is
+# neither numeric nor a factor and would fail with its own message first.
+check_outcome_type <- function(y, call = rlang::caller_env()) {
+  if (is.atomic(y) && is.null(dim(y)) && !is.numeric(y) && !is.factor(y)) {
+    abort_outcome_type(y, call = call)
+  }
+  invisible(y)
+}
+
+# Checks the molded outcome before it is encoded: numeric outcomes must be finite
+# (NA is reported by check_no_missing()), factor outcomes need two classes. Levels
+# that do not occur are dropped with a warning, in the outcome and in the
+# blueprint's ptype, so that predict() returns one column per class of the fit.
+check_outcome <- function(processed, call = rlang::caller_env()) {
+  y <- processed$outcomes[[1]]
+  if (is.factor(y)) {
+    used <- levels(y)[levels(y) %in% y]
+    if (length(used) < 2) {
+      cli::cli_abort(
+        c(
+          "A factor outcome needs at least two classes.",
+          "x" = "Only {.val {used}} occurs."
+        ),
+        call = call
+      )
+    }
+    unused <- setdiff(levels(y), used)
+    if (length(unused) > 0) {
+      cli::cli_warn(
+        c(
+          "Dropped {length(unused)} unused level{?s} of the outcome: {.val {unused}}.",
+          "i" = "The forest predicts the {length(used)} classes that occur."
+        ),
+        call = call
+      )
+      processed$outcomes[[1]] <- factor(y, levels = used)
+      ptypes <- processed$blueprint$ptypes
+      ptypes$outcomes[[1]] <- factor(ptypes$outcomes[[1]], levels = used)
+      processed$blueprint <- hardhat::update_blueprint(processed$blueprint, ptypes = ptypes)
+    }
+  } else if (checkmate::test_numeric(y)) {
+    if (any(is.infinite(y))) {
+      cli::cli_abort(
+        c(
+          "The outcome must be finite.",
+          "x" = "It has {sum(is.infinite(y))} infinite value{?s}."
+        ),
+        call = call
+      )
+    }
+  } else {
+    abort_outcome_type(y, call = call)
+  }
+  processed
+}
+
+# Predictors are identified by name: forge() matches new data by name, and
+# component names join predictor names with ":".
+check_predictor_names <- function(names, call = rlang::caller_env()) {
+  missing <- which(is.na(names) | names == "")
+  if (length(missing) > 0) {
+    cli::cli_abort(
+      c(
+        "Every predictor must have a name.",
+        "x" = "Column{?s} {as.character(missing)} {?has/have} no name.",
+        "i" = "Set column names, e.g. with {.fn colnames}."
+      ),
+      call = call
+    )
+  }
+  duplicated_names <- unique(names[duplicated(names)])
+  if (length(duplicated_names) > 0) {
+    cli::cli_abort(
+      c(
+        "Predictor names must be unique.",
+        "x" = "Duplicated: {.val {duplicated_names}}."
+      ),
+      call = call
+    )
+  }
+  with_colon <- names[grepl(":", names, fixed = TRUE)]
+  if (length(with_colon) > 0) {
+    cli::cli_abort(
+      c(
+        "Predictor names must not contain {.code :}.",
+        "x" = "Found {.val {with_colon}}.",
+        "i" = "Component names join predictor names with {.code :}, as in {.code x1:x2}. Rename {cli::qty(length(with_colon))}the column{?s}."
+      ),
+      call = call
+    )
+  }
+  invisible(names)
+}
+
+# Interaction terms in a formula (x1:x2, x1 * x2, (...)^2) would add product
+# columns as predictors, which the components would then mix with the forest's own
+# interactions.
+check_no_interaction_terms <- function(formula, data, call = rlang::caller_env()) {
+  terms <- stats::terms(formula, data = data)
+  interactions <- attr(terms, "term.labels")[attr(terms, "order") > 1]
+  if (length(interactions) > 0) {
+    cli::cli_abort(
+      c(
+        "The formula must not contain interaction terms.",
+        "x" = "Found {.code {interactions}}.",
+        "i" = "Such a term becomes a predictor named {.code x1:x2}, and {.code :} is how {.fn rpf} names components.",
+        "i" = "{.fn rpf} finds interactions itself, up to {.arg max_interaction}: write {.code y ~ x1 + x2}.",
+        "i" = "To fit a product as a predictor of its own, write {.code I(x1 * x2)}, or add it to the data as a column with its own name."
+      ),
+      call = call
+    )
+  }
+  invisible(formula)
+}
+
 #' Order factor levels by response
 #'
 #' Regression: Order by mean(y)
@@ -285,8 +411,8 @@ preprocess_outcome <- function(processed, loss, call = rlang::caller_env()) {
     # rpf_impl expects Y to be a matrix
     outcomes <- as.matrix(outcomes, ncol = 1)
   } else {
-    # mode <- "unsupported"
-    cli::cli_abort("The outcome must be numeric (regression) or a factor (classification).", call = call)
+    # mode <- "unsupported"; check_outcome() has rejected these already
+    abort_outcome_type(outcomes, call = call)
   }
 
   list(
