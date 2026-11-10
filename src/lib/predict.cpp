@@ -1,6 +1,7 @@
 // Prediction entry points split out from rpf.cpp for readability and reuse.
 #include "rpf.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <iterator>
 #include <limits>
@@ -173,6 +174,146 @@ struct FlatTree {
   std::vector<double> lo, hi; // n_leaves x cols.size(), row-major; open bounds stored as -/+inf
   std::vector<double> values; // n_leaves x value_size
   size_t n_leaves = 0;
+  // The leaf index, if built (LeafIndexer): a k-d tree. An inner node sends x to node a if x[dim] < split, else
+  // (also for NaN) to node b. A bucket (dim < 0) holds the leaves items[a, b), in ascending order.
+  struct Node {
+    double split;
+    uint32_t a, b;
+    int dim;
+  };
+  std::vector<Node> nodes;
+  std::vector<uint32_t> items;
+};
+
+// The leaf rule of predict_single(): an interval edge at the training bound is open (stored as -/+inf), so new data
+// outside the training range still lands in a leaf. The explicit inf checks keep NaN/inf inputs matching it.
+inline bool in_leaf(const double *lo, const double *hi, const double *x, size_t nd)
+{
+  const double inf = std::numeric_limits<double>::infinity();
+  for (size_t j = 0; j < nd; ++j)
+    if (!((lo[j] <= x[j] || lo[j] == -inf) && (x[j] < hi[j] || hi[j] == inf)))
+      return false;
+  return true;
+}
+
+// From kIndexRows rows on, the trees of more than kIndexLeaves leaves are indexed before the rows are predicted. With
+// fewer rows building the index costs more than it saves, and in smaller trees the scan is as fast (CA0, 100
+// families). A bucket holds kIndexBucket leaves or fewer unless no cut separates them.
+constexpr int kIndexRows = 512;
+constexpr size_t kIndexLeaves = 64;
+constexpr size_t kIndexBucket = 8;
+constexpr size_t kIndexCopies = 4;  // at most this many index entries per leaf
+constexpr size_t kIndexSample = 16; // a node's cut is taken from the bounds of at most this many of its leaves
+constexpr int kIndexDepth = 48;
+
+// The leaf index of a tree: a k-d tree that cuts the space, not the set of leaves. A node's cut on dimension j at s
+// sends the leaves with lo < s to the left node and those with hi > s to the right one (lo == -inf and hi == inf
+// count as such), so a leaf across the cut goes to both. A row x goes left if x[j] < s, else right. Every leaf
+// that in_leaf() accepts for x is then in the bucket that x reaches: lo <= x < s gives lo < s; x >= s with x < hi
+// gives hi > s, and x = NaN or +inf needs hi == inf. The leaves stay in ascending order in every node, so a bucket's
+// matching leaves are added in the scan's order.
+// The cut on each dimension is the median of the leaf bounds inside the node's cell (of a sample of its leaves); the
+// dimension whose cut leaves the fewest leaves on the larger side is taken. A node becomes a bucket if no cut makes
+// both sides smaller, or if the leaves across the cut would exceed the node's share of the copies (kIndexCopies per
+// leaf in all, shared between two nodes in proportion to their leaves). Built per call, freed with the FlatTree.
+class LeafIndexer {
+public:
+  // Index the tree (if it has more than kIndexLeaves leaves). One indexer per thread: its scratch is reused.
+  void index(FlatTree &tree)
+  {
+    const size_t L = tree.n_leaves;
+    nd = tree.cols.size();
+    if (L <= kIndexLeaves || nd == 0 || L > std::numeric_limits<uint32_t>::max() / kIndexCopies)
+      return;
+    ft = &tree;
+    const double inf = std::numeric_limits<double>::infinity();
+    cell_lo.assign(nd, -inf);
+    cell_hi.assign(nd, inf);
+    scratch.resize(2 * kIndexDepth + 1);
+    std::vector<uint32_t> &all = scratch[2 * kIndexDepth];
+    all.resize(L);
+    for (size_t l = 0; l < L; ++l)
+      all[l] = (uint32_t)l;
+    build(all, (kIndexCopies - 1) * L, 0);
+    tree.nodes.shrink_to_fit();
+    tree.items.shrink_to_fit();
+  }
+
+private:
+  FlatTree *ft = nullptr;
+  size_t nd = 0;
+  std::vector<double> cell_lo, cell_hi, bounds;
+  std::vector<std::vector<uint32_t>> scratch; // the leaves of the two children of the node at each depth
+
+  uint32_t build(const std::vector<uint32_t> &leaves, size_t spare, int depth)
+  {
+    const uint32_t id = (uint32_t)ft->nodes.size();
+    ft->nodes.push_back(FlatTree::Node{0.0, 0, 0, -1});
+    const size_t m = leaves.size();
+    const double *lo = ft->lo.data(), *hi = ft->hi.data();
+    size_t best_j = nd, best_large = m, best_sum = 0;
+    double best_s = 0.0;
+    for (size_t j = 0; m > kIndexBucket && depth < kIndexDepth && j < nd; ++j) {
+      bounds.clear();
+      const size_t n_sample = std::min(m, kIndexSample);
+      for (size_t i = 0; i < n_sample; ++i) {
+        const size_t l = leaves[i * m / n_sample];
+        const double a = lo[l * nd + j], b = hi[l * nd + j];
+        if (a > cell_lo[j] && a < cell_hi[j])
+          bounds.push_back(a);
+        if (b > cell_lo[j] && b < cell_hi[j])
+          bounds.push_back(b);
+      }
+      if (bounds.empty())
+        continue;
+      const auto mid = bounds.begin() + (std::ptrdiff_t)(bounds.size() / 2);
+      std::nth_element(bounds.begin(), mid, bounds.end());
+      const double s = *mid;
+      size_t n_left = 0, n_right = 0;
+      for (uint32_t l : leaves) {
+        n_left += lo[l * nd + j] < s;
+        n_right += hi[l * nd + j] > s;
+      }
+      const size_t large = std::max(n_left, n_right), sum = n_left + n_right;
+      if (large < best_large || (large == best_large && best_j < nd && sum < best_sum)) {
+        best_j = j;
+        best_s = s;
+        best_large = large;
+        best_sum = sum;
+      }
+    }
+    const size_t copies = best_sum > m ? best_sum - m : 0; // the leaves across the cut
+    if (best_j == nd || copies > spare) {
+      ft->nodes[id].a = (uint32_t)ft->items.size();
+      ft->items.insert(ft->items.end(), leaves.begin(), leaves.end());
+      ft->nodes[id].b = (uint32_t)ft->items.size();
+      return id;
+    }
+    spare -= copies;
+
+    std::vector<uint32_t> &left = scratch[2 * (size_t)depth], &right = scratch[2 * (size_t)depth + 1];
+    left.clear();
+    right.clear();
+    for (uint32_t l : leaves) {
+      if (lo[l * nd + best_j] < best_s)
+        left.push_back(l);
+      if (hi[l * nd + best_j] > best_s)
+        right.push_back(l);
+    }
+    ft->nodes[id].dim = (int)best_j;
+    ft->nodes[id].split = best_s;
+    const size_t spare_left = (size_t)((double)spare * (double)left.size() / (double)best_sum);
+    const double upper = cell_hi[best_j], lower = cell_lo[best_j];
+    cell_hi[best_j] = best_s;
+    const uint32_t a = build(left, spare_left, depth + 1);
+    cell_hi[best_j] = upper;
+    cell_lo[best_j] = best_s;
+    const uint32_t b = build(right, spare - spare_left, depth + 1);
+    cell_lo[best_j] = lower;
+    ft->nodes[id].a = a;
+    ft->nodes[id].b = b;
+    return id;
+  }
 };
 
 // Runs f(begin, end) on contiguous row ranges, one per thread.
@@ -318,6 +459,16 @@ RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::se
     }
   }
 
+  // From kIndexRows rows on, the leaves of each tree of more than kIndexLeaves leaves are indexed (trees spread over
+  // the threads). A row's matching leaves are then added in leaf order, as the scan adds them, so the predictions are
+  // bitwise the same.
+  if (n >= kIndexRows)
+    parallel_rows((int)trees.size(), threads, [&](int begin, int end) {
+      LeafIndexer indexer;
+      for (int t = begin; t < end; ++t)
+        indexer.index(trees[(size_t)t]);
+    });
+
   const double *x = X; // column-major: x[c * n + row]
   parallel_rows(n, threads, [&](int begin, int end) {
     // Tree-outer loop keeps one tree's leaves hot in cache across all rows of the chunk.
@@ -328,20 +479,23 @@ RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::se
       for (int r = begin; r < end; ++r) {
         for (size_t j = 0; j < nd; ++j)
           xr[j] = x[(size_t)ft.cols[j] * n + r];
-        for (size_t l = 0; l < ft.n_leaves; ++l) {
-          const double *lo = &ft.lo[l * nd], *hi = &ft.hi[l * nd];
-          bool valid = true;
-          for (size_t j = 0; j < nd; ++j) {
-            // explicit inf checks keep NaN/inf inputs matching predict_single
-            if (!((lo[j] <= xr[j] || lo[j] == -inf) && (xr[j] < hi[j] || hi[j] == inf))) {
-              valid = false;
-              break;
-            }
+        if (!ft.nodes.empty()) {
+          // the bucket that holds every leaf of this row, then the scan's test on its leaves, in leaf order
+          const FlatTree::Node *node = &ft.nodes[0];
+          while (node->dim >= 0)
+            node = &ft.nodes[xr[(size_t)node->dim] < node->split ? node->a : node->b];
+          for (uint32_t q = node->a; q < node->b; ++q) {
+            const size_t l = ft.items[q];
+            if (in_leaf(&ft.lo[l * nd], &ft.hi[l * nd], xr.data(), nd))
+              for (size_t k = 0; k < vs; ++k)
+                res[k * n + r] += ft.values[l * vs + k];
           }
-          if (valid)
+          continue;
+        }
+        for (size_t l = 0; l < ft.n_leaves; ++l)
+          if (in_leaf(&ft.lo[l * nd], &ft.hi[l * nd], xr.data(), nd))
             for (size_t k = 0; k < vs; ++k)
               res[k * n + r] += ft.values[l * vs + k];
-        }
       }
     }
     for (size_t k = 0; k < vs; ++k)
