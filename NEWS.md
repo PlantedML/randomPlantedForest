@@ -75,6 +75,7 @@
   Previously the intercept and `m` then did not sum to the prediction.
 * `predict_components()` takes the components' predictors from the forest's own columns, in their order.
   A formula with terms such as `log(x1)`, `I(x1^2)` or `. - x3` no longer makes it fail, and with factor predictors the components come in the order of the fit's columns, which has the factors last.
+* `predict_components()` on a `new_data` with zero rows returns zero rows with the right columns, instead of failing with "Feature vector is empty.".
 
 ## Performance
 
