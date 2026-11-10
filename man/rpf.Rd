@@ -242,8 +242,8 @@ settings, call \code{\link[=purify]{purify()}} after fitting instead. Not used w
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
 
 \item{export_forest}{\verb{[logical(1): FALSE]}: Whether to store the flattened forest in
-the returned object as \verb{$forest}. If \code{FALSE}, \verb{$forest} is \code{NULL}, which
-saves memory.}
+the returned object as \verb{$forest} (with \code{prune = TRUE}, in the forest:
+\verb{$fit$forest}). If \code{FALSE}, it is \code{NULL}, which saves memory.}
 
 \item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
@@ -278,7 +278,10 @@ the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{split
 \code{stopped_at} (the number of splits where growing stopped) and \code{capped}
 (whether it stopped at the cap while the error was still falling).
 With \code{prune = TRUE}, an object of class \code{rpf_pruned} (see
-\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest, purified.
+\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest, purified, with
+the elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
+with \code{splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
+the stop \verb{$fit$splits_oob}.
 }
 \description{
 Fits a random planted forest (Hiabu, Mammen and Meyer, 2020) for regression

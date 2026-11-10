@@ -102,8 +102,8 @@
 #' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
 #' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in
-#'   the returned object as `$forest`. If `FALSE`, `$forest` is `NULL`, which
-#'   saves memory.
+#'   the returned object as `$forest` (with `prune = TRUE`, in the forest:
+#'   `$fit$forest`). If `FALSE`, it is `NULL`, which saves memory.
 #' @param deterministic `[logical(1): FALSE]`: Whether to fit without randomness: no
 #'   bootstrap, the first `max_candidates` possible splits as candidates
 #'   (`t_try` and `split_decay_rate` are ignored) and evenly spaced thresholds. The result does not
@@ -134,7 +134,10 @@
 #'   `stopped_at` (the number of splits where growing stopped) and `capped`
 #'   (whether it stopped at the cap while the error was still falling).
 #'   With `prune = TRUE`, an object of class `rpf_pruned` (see
-#'   [prune_components()]), whose element `fit` is the forest, purified.
+#'   [prune_components()]), whose element `fit` is the forest, purified, with
+#'   the elements above: the pruned model's OOB path is `$fit$oob_path`, and
+#'   with `splits = NULL` the chosen number of splits `$fit$params$splits` and
+#'   the stop `$fit$splits_oob`.
 #' @export
 #' @importFrom methods new
 #' @importFrom hardhat mold
