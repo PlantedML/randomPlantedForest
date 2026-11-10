@@ -121,6 +121,10 @@ public:
   void get_parameters(std::ostream &out);
   virtual void set_parameters(const std::vector<std::string> &keys, const std::vector<double> &values);
   bool is_purified();
+  // Whether the last purify() computed the components only up to an order below max_interaction.
+  bool is_purify_capped() const;
+  // Restore that state after set_grid_leaves() (serialization path).
+  void set_purify_capped(bool capped);
 
   // Destination for warnings; nullptr silences them. The core never writes to
   // std::cout itself, as R forbids that in packages.
@@ -158,6 +162,9 @@ protected:
   std::vector<TreeFamily> tree_families; /**<  random planted forest containing result */
   // Per-tree seeds drawn from seed_source on the main thread, one per tree family
   std::vector<unsigned long long> tree_seeds_;
+  // purify() computed the components only up to an order below max_interaction, so the grids sum to a truncated
+  // prediction: predict() of the whole forest then scans the leaves, which purification leaves unchanged
+  bool purify_capped = false;
   std::vector<double> predict_single(const std::vector<double> &X, std::set<int> component_index);
   void L2_loss(Split &split);
   virtual void create_tree_family(std::vector<Leaf> initial_leaves, size_t n);

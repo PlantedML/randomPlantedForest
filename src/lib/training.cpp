@@ -102,5 +102,6 @@ void RandomPlantedForest::fit()
     this->purify(0, 0, 2);
   } else {
     purified = false;
+    purify_capped = false;
   }
 }

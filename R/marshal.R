@@ -36,6 +36,8 @@ rpf_marshal <- function(x, include_data = FALSE) {
     bounds = x$fit$get_bounds(),
     dims = x$fit$get_shape(),
     purified = purified,
+    # purify(maxp_interaction = k) below the fit's order: predict() keeps using the leaves
+    purify_capped = x$fit$is_purify_capped(),
     grid = if (purified) x$fit$get_grid_leaves(),
     data = if (include_data) x$fit$get_data(),
     # $forest (export_forest = TRUE) duplicates $model; rebuilt on unmarshal
@@ -84,6 +86,10 @@ rpf_unmarshal <- function(blob) {
   fit$set_model(state$model)
   if (state$purified) {
     fit$set_grid_leaves(state$grid)
+    # NULL in blobs from versions before the field existed
+    if (isTRUE(state$purify_capped)) {
+      fit$set_purify_capped(TRUE)
+    }
   }
 
   forest <- NULL

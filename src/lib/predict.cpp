@@ -11,7 +11,9 @@ std::vector<double> RandomPlantedForest::predict_single(const std::vector<double
 {
   std::vector<double> total_res = std::vector<double>(value_size, 0);
 
-  if (!purified) {
+  // After a capped purify() the grids hold only the low orders: the whole forest is predicted from the leaves,
+  // which purification leaves unchanged
+  if (!purified || (purify_capped && component_index == std::set<int>{0})) {
     // consider all components
     if (component_index == std::set<int>{0}) {
       for (auto &tree_family : this->tree_families) {
@@ -225,7 +227,9 @@ RandomPlantedForest::predict_matrix(const double *X, int n, int p, const std::se
   const bool all_components = component_index == std::set<int>{0};
   const bool intercept_only = component_index == std::set<int>{-1};
 
-  if (purified) {
+  // After a capped purify() the grids hold only the low orders: the whole forest is predicted from the leaves below,
+  // which purification leaves unchanged
+  if (purified && !(purify_capped && all_components)) {
     // Purified trees are grids: per tree dimension, binary-search the cell
     // boundaries. Matching trees are resolved once here, not per row.
     struct GridTree {

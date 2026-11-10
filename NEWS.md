@@ -18,6 +18,9 @@
 * The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
+* `predict()` after `purify(maxp_interaction = k)` with `k` below the fit's `max_interaction` returns the forest's prediction.
+  Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
+  `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
 * `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
 
 # randomPlantedForest 0.5.0

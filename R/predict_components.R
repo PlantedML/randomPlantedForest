@@ -37,6 +37,11 @@
 #' by `predictors`.
 #' - `target_levels` (`character`): For multiclass classification only: Vector of target levels
 #' which can be used to disassemble `m`, as names include both term and target level.
+#' - `remainder` (`numeric`): Only if `m` leaves out components of the forest: if `max_interaction`
+#' (lowered to the number of `predictors`) is below that of the [`rpf`] object, or if the forest was purified
+#' with a `maxp_interaction` below it (see [purify()]). The prediction minus `intercept` and `m`'s row sums,
+#' so that the three sum to the prediction.
+#' For multiclass classification, one column per target level.
 #'
 #' @export
 #' @importFrom hardhat forge
@@ -142,8 +147,10 @@ predict_components <- function(object, new_data, max_interaction = NULL, predict
 
   # If max_interaction here is smaller than that of model fit, we calculate a remainder term
   # to make m's sum up to SHAPs etc, see https://github.com/PlantedML/glex/issues/11
+  # The same after purify(maxp_interaction = k) below the fit's order: the components above k
+  # are zero columns, and the remainder holds their sum.
 
-  if (max_interaction < object$params$max_interaction) {
+  if (max_interaction < object$params$max_interaction || object$fit$is_purify_capped()) {
     pred <- predict.rpf(object, new_data = new_data, type = "numeric")
 
     # handling differs if multiclass

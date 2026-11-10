@@ -153,6 +153,8 @@ public:
     core.set_parameters(Rcpp::as<std::vector<std::string>>(keys), Rcpp::as<std::vector<double>>(values));
   }
   bool is_purified() { return core.is_purified(); }
+  bool is_purify_capped() { return core.is_purify_capped(); }
+  void set_purify_capped(bool capped) { core.set_purify_capped(capped); }
 
 private:
   Core core;

@@ -50,6 +50,18 @@ bool RandomPlantedForest::is_purified()
   return purified;
 }
 
+bool RandomPlantedForest::is_purify_capped() const
+{
+  return purified && purify_capped;
+}
+
+void RandomPlantedForest::set_purify_capped(bool capped)
+{
+  if (capped && !purified)
+    throw std::invalid_argument("Only a purified forest can have a capped purification.");
+  purify_capped = capped;
+}
+
 void RandomPlantedForest::L2_loss(Split &split)
 {
   split.M_s = split.sum_s / split.I_s.size();
@@ -149,6 +161,7 @@ void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
     }
   }
   purified = false;
+  purify_capped = false;
 }
 
 std::vector<FamilyExport> RandomPlantedForest::get_model() const
@@ -225,6 +238,8 @@ void RandomPlantedForest::set_grid_leaves(const std::vector<GridFamilyExport> &g
     }
   }
   purified = true;
+  // a full purification unless set_purify_capped() says otherwise
+  purify_capped = false;
 }
 
 // --------------- calcOptimalSplit per mode ---------------

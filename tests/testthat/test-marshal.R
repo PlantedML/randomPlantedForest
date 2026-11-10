@@ -179,3 +179,14 @@ test_that("blob records package version and warns when saved with a newer one", 
   expect_warning(restored <- rpf_unmarshal(blob), "999.0.0")
   expect_identical(predict(restored, mtcars), predict(fit, mtcars))
 })
+
+test_that("a purification capped by maxp_interaction survives the round trip", {
+  set.seed(2)
+  fit <- rpf(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  p0 <- predict(fit, mtcars)
+  purify(fit, maxp_interaction = 1)
+  restored <- expect_roundtrip(fit, mtcars)
+  expect_identical(predict(restored, mtcars), p0)
+  expect_true(restored$fit$is_purify_capped())
+  expect_identical(predict_components(restored, mtcars), predict_components(fit, mtcars))
+})
