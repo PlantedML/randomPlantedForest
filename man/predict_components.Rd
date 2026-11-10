@@ -25,7 +25,7 @@ predict_components(object, new_data, ...)
 )
 }
 \arguments{
-\item{object}{\verb{[rpf | rpf_pruned]}: A fitted \code{\link{rpf}} model, or a pruned one from \code{\link[=prune_components]{prune_components()}}.}
+\item{object}{\verb{[rpf | rpf_pruned]}: A fitted \code{\link{rpf}} model, or a pruned one from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}.}
 
 \item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
 
@@ -89,8 +89,8 @@ increase drastically to \code{sum(choose(ncol(new_data), seq_len(max_interaction
 }
 \section{Pruned forests}{
 
-For an \code{rpf_pruned} object from \code{\link[=prune_components]{prune_components()}}, \code{m} holds only the kept components, each scaled by its
-coefficient \code{beta_S}, and \code{intercept} is the pruned model's intercept \code{alpha}, so that they sum to
+For an \code{rpf_pruned} object from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}}, \code{m} holds only the kept components, each scaled
+by its coefficient \code{beta_S}, and \code{intercept} is the pruned model's intercept \code{alpha}, so that they sum to
 \code{\link[=predict.rpf_pruned]{predict()}} of the pruned model. Components that are not kept are absent, not zero columns.
 If \code{predictors} or \code{max_interaction} leave out kept components, their sum is returned as \code{remainder}.
 }

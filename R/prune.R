@@ -994,7 +994,7 @@ prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::cal
 #' The prediction of a pruned forest is `alpha + sum(beta_S * f_S(x))` over the kept components `f_S` of the forest,
 #' with the intercept `alpha` and the coefficients `beta_S` (see [prune_components()]).
 #'
-#' @param object `[rpf_pruned]`: A pruned forest from [prune_components()].
+#' @param object `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param new_data `[data.frame | matrix]`: New observations to predict.
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the forest was fitted
 #'   with.
@@ -1061,7 +1061,7 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
 #'
 #' Shows the rule and threshold, how they were chosen, what was kept and dropped, and the coefficients.
 #'
-#' @param x `[rpf_pruned]`: A pruned forest from [prune_components()].
+#' @param x `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param n_show `[integer(1): 20]`: The largest number of kept components to list.
 #' @param ... Further arguments passed to or from other methods.
 #'
