@@ -156,11 +156,21 @@ tune_resolve <- function(tune, call) {
   )
 }
 
-# Which of the settings that `tune` takes over the user gave in the call of an rpf() method (its environment)
-tune_given <- function(env) {
+# Which of the settings that `tune` takes over the user gave in the call of an rpf() method (its environment), and
+# (attribute "typed") the name each was given by: the old name for its new one if the user typed that (`old`, the old
+# names rpf_renamed() moved), so that the errors name what the user typed
+tune_given <- function(env, old = character()) {
   args <- c("n_splits", "n_try_split_points", "share_candidates", "min_leaf_rows", "prune")
   # an argument given as NULL counts as not given (NULL is the default of each)
-  vapply(args, function(a) !eval(call("missing", as.name(a)), env) && !is.null(get(a, envir = env)), logical(1))
+  given <- vapply(
+    args,
+    function(a) !eval(call("missing", as.name(a)), env) && !is.null(get(a, envir = env)),
+    logical(1)
+  )
+  typed <- stats::setNames(args, args)
+  typed[unname(renamed_args[old])] <- old
+  attr(given, "typed") <- typed
+  given
 }
 
 # The checks of rpf(tune = ): a random forest with at least 10 families (the pruning's out-of-bag choice), and none
@@ -172,8 +182,10 @@ tune_check_call <- function(control, given, n_splits, prune, deterministic, n_fa
       call = call
     )
   }
+  typed <- attr(given, "typed") %||% stats::setNames(names(given), names(given))
   set <- intersect(c("n_try_split_points", "share_candidates", "min_leaf_rows"), names(given)[given])
   if (length(set) > 0) {
+    set <- unname(typed[set])
     cli::cli_abort(
       c(
         paste(
@@ -189,8 +201,9 @@ tune_check_call <- function(control, given, n_splits, prune, deterministic, n_fa
     )
   }
   if (given[["n_splits"]] && !is.null(n_splits)) {
+    name <- typed[["n_splits"]]
     cli::cli_abort(
-      "{.arg tune} chooses {.arg n_splits} out of bag ({.code n_splits = NULL}): don't give a number.",
+      "{.arg tune} chooses {.arg {name}} out of bag ({.code {name} = NULL}): don't give a number.",
       call = call
     )
   }

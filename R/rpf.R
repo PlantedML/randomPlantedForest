@@ -632,7 +632,7 @@ rpf.formula <- function(
   oob_path = FALSE,
   ...
 ) {
-  rpf_renamed(..., .env = environment())
+  old <- rpf_renamed(..., .env = environment())
   check_no_interaction_terms(formula, data)
   # model.matrix() would expand logical predictors into two dummy columns; use them
   # as 0/1 like the x/y interface. The outcome stays as is so it is still validated.
@@ -668,7 +668,7 @@ rpf.formula <- function(
     prune = prune,
     max_panels = max_panels,
     tune = tune,
-    given = tune_given(environment()),
+    given = tune_given(environment(), old),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -709,7 +709,7 @@ rpf.data.frame <- function(
   oob_path = FALSE,
   ...
 ) {
-  rpf_renamed(..., .env = environment())
+  old <- rpf_renamed(..., .env = environment())
   check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
@@ -732,7 +732,7 @@ rpf.data.frame <- function(
     prune = prune,
     max_panels = max_panels,
     tune = tune,
-    given = tune_given(environment()),
+    given = tune_given(environment(), old),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -773,7 +773,7 @@ rpf.matrix <- function(
   oob_path = FALSE,
   ...
 ) {
-  rpf_renamed(..., .env = environment())
+  old <- rpf_renamed(..., .env = environment())
   check_outcome_type(y)
   blueprint <- hardhat::default_xy_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, y, blueprint = blueprint)
@@ -796,7 +796,7 @@ rpf.matrix <- function(
     prune = prune,
     max_panels = max_panels,
     tune = tune,
-    given = tune_given(environment()),
+    given = tune_given(environment(), old),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,
@@ -837,7 +837,7 @@ rpf.recipe <- function(
   oob_path = FALSE,
   ...
 ) {
-  rpf_renamed(..., .env = environment())
+  old <- rpf_renamed(..., .env = environment())
   blueprint <- hardhat::default_recipe_blueprint(intercept = FALSE)
   processed <- hardhat::mold(x, data, blueprint = blueprint)
   # the recipe's steps decide the predictor columns: indices have no user-given order to refer to
@@ -863,7 +863,7 @@ rpf.recipe <- function(
     prune = prune,
     max_panels = max_panels,
     tune = tune,
-    given = tune_given(environment()),
+    given = tune_given(environment(), old),
     purify = purify,
     nthreads = nthreads,
     export_forest = export_forest,

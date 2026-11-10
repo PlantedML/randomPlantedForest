@@ -138,10 +138,20 @@ test_that("the old names work in every rpf() method, and other unknown arguments
   expect_error(rpf(x, mtcars$mpg, ntrees = 2, foo = 1), class = "rlib_error_dots_nonempty")
 })
 
-test_that("tune: an old name counts as given", {
+test_that("tune: an old name counts as given, and its errors name it as it was typed", {
+  x <- mtcars[, c("cyl", "wt", "hp")]
+  msg <- function(...) {
+    m <- tryCatch(suppressWarnings(rpf(x, mtcars$mpg, n_families = 10, tune = TRUE, ...)), error = conditionMessage)
+    gsub("\\s+", " ", cli::ansi_strip(m))
+  }
+  expect_match(msg(split_try = 3), "don't give `split_try`", fixed = TRUE)
+  expect_match(msg(t_try = 0.1, min_leaf_rows = 1), "don't give `t_try` and `min_leaf_rows`, even at", fixed = TRUE)
+  expect_match(msg(n_try_split_points = 3), "don't give `n_try_split_points`", fixed = TRUE)
+  expect_match(msg(splits = 30), "`tune` chooses `splits` out of bag (`splits = NULL`)", fixed = TRUE)
+  expect_match(msg(n_splits = 30), "`tune` chooses `n_splits` out of bag (`n_splits = NULL`)", fixed = TRUE)
   expect_error(
     suppressWarnings(rpf(mpg ~ ., data = mtcars, n_families = 10, tune = TRUE, split_try = 3)),
-    "n_try_split_points"
+    "split_try"
   )
 })
 
