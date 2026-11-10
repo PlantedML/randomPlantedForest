@@ -34,6 +34,7 @@
   On 52 data sets this chose the same `splits` as the lowest error along a fixed budget of 3,200 splits on 50, and a later, lower minimum on the other two, while growing 0.72 of the splits.
   The tree families grow one at a time, `nthreads` together, and keep only their out-of-bag predictions and a 40-byte record per split, from which the chosen forest is rebuilt without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1 GB) bounds the memory of families waiting for the stop.
   `print()` shows the chosen `splits` and where growing stopped.
+  A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
   The default stays `splits = 30`.
 * `rpf()` gains `min_leaf_rows`, the minimum number of rows on each side of every split, so in every leaf.
   Values above 1 need regression with `split_structure = "leaves"`; the default 1 imposes no limit and is accepted everywhere.

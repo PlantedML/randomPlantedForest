@@ -115,8 +115,19 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, floor = 0) {
   st
 }
 
-# The chosen checkpoint among 1..length(mse) (the corrected OOB mean squared errors grown): the lowest; ties (relative
-# 1e-12) go to fewer splits
+# The chosen checkpoint among 1..length(mse) (the corrected OOB mean squared errors grown): the lowest by
+# oob_lowest(); ties go to fewer splits
 oob_select <- function(mse) {
-  which(mse <= min(mse) * (1 + 1e-12) | mse == min(mse))[1]
+  oob_lowest(mse)[1]
+}
+
+# The lowest of the corrected out-of-bag errors `x` (mean squared errors, RMSEs or mean criteria): the indices of its
+# ties (relative 1e-12), in the order of `x`. A corrected error at or below 0 is a correction that overshot (the tables
+# show it clamped at 0), not a perfect model: such values are left out unless all are, and then they all tie.
+oob_lowest <- function(x) {
+  if (all(x <= 0)) {
+    return(seq_along(x))
+  }
+  ok <- which(x > 0)
+  ok[x[ok] <= min(x[ok]) * (1 + 1e-12)]
 }

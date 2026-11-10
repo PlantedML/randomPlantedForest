@@ -78,6 +78,11 @@ test_that("the stopper: patience, floor, the cap and ties", {
   expect_identical(sel(c(5, 3, 2 * (1 + 1e-13), 2, 2.1)), 3L)
   expect_identical(sel(c(5, 3, 2.01, 2, 2.1)), 4L)
   expect_identical(sel(c(1, 2, 3)), 1L)
+  # a corrected error at or below 0 (its correction overshot) is left out unless all are; then the first
+  expect_identical(sel(c(0.5, -0.01, 0.3, 0.31)), 3L)
+  expect_identical(sel(c(0.5, 0, 0.2, -0.3, 0.1)), 5L)
+  expect_identical(sel(c(0, -1e-3, -0.3)), 1L)
+  expect_identical(randomPlantedForest:::oob_lowest(c(0.2, 0, 0.1, 0.1 * (1 + 1e-13), -1)), c(3L, 4L))
 })
 
 test_that("growing stops at the cap with a warning while the error still falls", {

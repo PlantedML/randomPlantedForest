@@ -423,8 +423,9 @@ error is followed checkpoint by checkpoint. Growing stops once the lowest
 error is one doubling of the splits back (for example, no new minimum from
 100 to 200 splits), or at 25,600 splits, with a warning if the error was
 still falling there. The result is the forest at the lowest error (ties go
-to fewer splits): the forest that \code{rpf()} with that many \code{splits} and the
-same seed returns. On 52 data sets (44 synthetic, 8 splits of California
+to fewer splits; a corrected error at or below 0, a correction that
+overshot, is not chosen unless all are): the forest that \code{rpf()} with that
+many \code{splits} and the same seed returns. On 52 data sets (44 synthetic, 8 splits of California
 housing) this chose the same \code{splits} as the lowest error along a fixed
 budget of 3,200 splits on 50 of them, and a later, lower minimum on the
 other two, while growing 0.72 of the splits.
@@ -440,7 +441,9 @@ memory for time; the fit depends neither on it nor on \code{nthreads}. Growing
 all families together would hold every family's growing state until the
 stop: about 18 GB of resident memory (RSS) on California housing (16,512
 rows) at 200 families and \code{max_interaction = 3}, where the fit one family at
-a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint).
+a time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
+fit alone, measured when it was added: \code{split_try = 3}, \code{t_try = 0.1}, the
+exact draw, 8 threads).
 }
 }
 \examples{
