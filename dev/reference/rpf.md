@@ -25,6 +25,7 @@ rpf(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -49,6 +50,7 @@ rpf(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -73,6 +75,7 @@ rpf(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -97,6 +100,7 @@ rpf(
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
   min_leaf_rows = 1,
+  interaction_constraints = NULL,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -190,6 +194,23 @@ rpf(
   that keeps this many rows on each side are not drawn as split
   candidates. Only for regression with `split_structure = "leaves"`; `1`
   (no limit) otherwise.
+
+- interaction_constraints:
+
+  `[list | NULL: NULL]`: Feature sets that restrict which interactions
+  the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`. Each
+  set is given by predictor names or by column indices: with `x`, the
+  columns of `x`; with a formula, the predictors in the order the
+  formula names them (`y ~ .`: the order of the columns of `data`); with
+  a recipe, names only (its steps decide the columns). A tree on the
+  predictors `T` is grown only if `T` is a subset of one of the sets, as
+  with xgboost's interaction constraints. The subsets of a set stay
+  allowed, so the forest keeps the main effects it grows a pair from. A
+  predictor in no set is not used. Applies together with
+  `max_interaction`: set `max_interaction = 0` to let the sets alone
+  decide. `NULL` means no constraint. One use is to refit the forest on
+  the effects a first fit found, e.g. after dropping its small
+  components.
 
 - loss:
 

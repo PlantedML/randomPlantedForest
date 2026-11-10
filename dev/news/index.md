@@ -34,6 +34,16 @@
   candidates under `min_leaf_rows`, but with other random numbers, so
   the same seed gives another forest. The default `TRUE` fits the same
   models as before, bit for bit.
+- [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  gains `interaction_constraints`, a list of feature sets that restricts
+  which interactions the forest may form, as in xgboost: a tree on the
+  predictors `T` is grown only if `T` is a subset of one of the sets.
+  The sets are given by predictor names or column indices (with a
+  formula, indices follow the formula’s predictors; with a recipe, names
+  only). They apply together with `max_interaction`, for every
+  `split_structure`, in regression and classification, and
+  [`print()`](https://rdrr.io/r/base/print.html) shows them. The default
+  `NULL` leaves fits unchanged.
 
 ### Bug fixes
 

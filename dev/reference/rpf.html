@@ -71,6 +71,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -95,6 +96,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -119,6 +121,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -143,6 +146,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -236,6 +240,22 @@ bootstrap sample on each side of every split, so in every leaf. Leaves
 without a threshold that keeps this many rows on each side are not drawn
 as split candidates. Only for regression with <code>split_structure = "leaves"</code>; <code>1</code>
 (no limit) otherwise.</p></dd>
+
+
+<dt id="arg-interaction-constraints">interaction_constraints<a class="anchor" aria-label="anchor" href="#arg-interaction-constraints"></a></dt>
+<dd><p><code>[list | NULL: NULL]</code>: Feature sets that restrict which
+interactions the forest may form, e.g. <code>list(c("x1", "x2"), c("x3", "x4"))</code>.
+Each set is given by predictor names or by column indices: with <code>x</code>, the
+columns of <code>x</code>; with a formula, the predictors in the order the formula
+names them (<code>y ~ .</code>: the order of the columns of <code>data</code>); with a recipe,
+names only (its steps decide the columns). A tree on the predictors <code>T</code> is
+grown only if <code>T</code> is a subset of one of the sets, as with xgboost's
+interaction constraints. The subsets of a set stay allowed, so the forest
+keeps the main effects it grows a pair from. A predictor in no set is not
+used. Applies together with <code>max_interaction</code>: set <code>max_interaction = 0</code> to
+let the sets alone decide. <code>NULL</code> means no constraint. One use is to refit
+the forest on the effects a first fit found, e.g. after dropping its small
+components.</p></dd>
 
 
 <dt id="arg-loss">loss<a class="anchor" aria-label="anchor" href="#arg-loss"></a></dt>
