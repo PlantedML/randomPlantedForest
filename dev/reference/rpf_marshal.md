@@ -67,7 +67,7 @@ so it needs no training data for that.
 ## Examples
 
 ``` r
-fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, prune = FALSE)
 blob <- rpf_marshal(fit)
 tmp <- tempfile(fileext = ".rds")
 saveRDS(blob, tmp)

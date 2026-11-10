@@ -173,18 +173,19 @@ point, the larger <code>min_leaf_rows</code>). Step 3 chooses among every forest
 <span class="r-in"><span><span class="va">tuned</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">x</span>,</span></span>
 <span class="r-in"><span>  <span class="va">y</span>,</span></span>
+<span class="r-in"><span>  max_interaction <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>  ntrees <span class="op">=</span> <span class="fl">10</span>,</span></span>
 <span class="r-in"><span>  tune <span class="op">=</span> <span class="fu">tune_control</span><span class="op">(</span>search <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span>, min_leaf_rows <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">20</span><span class="op">)</span>, neighbours <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">tuned</span><span class="op">$</span><span class="va">tune</span><span class="op">$</span><span class="va">search</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   step split_try t_try min_leaf_rows splits stopped_at capped oob_rmse_forest</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    1        10   0.4             1     50        100  FALSE       0.4767295</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    1         3   0.1             1    141        283  FALSE       0.4089001</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3    2         3   0.1            20    119        238  FALSE       0.3782499</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    1        10   0.4             1     84        100  FALSE       0.4844060</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    1         3   0.1             1     59         71  FALSE       0.4459042</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    2        10   0.4            20    168        200  FALSE       0.3832057</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   rule tau n_kept  oob_rmse seconds chosen_step1 chosen_step2 chosen_step3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    R 0.1      2 0.3871046   0.128        FALSE           NA           NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    R 0.1      2 0.3562340   9.204         TRUE        FALSE           NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3    R 0.1      2 0.3293479   2.529           NA         TRUE           NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    R 0.1      2 0.3666121   0.082         TRUE        FALSE           NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    R 0.1      2 0.3752002   0.059        FALSE           NA           NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    R 0.1      2 0.3539268   0.199           NA         TRUE           NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1 FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2 FALSE</span>

@@ -73,16 +73,18 @@
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">drat</span>, data <span class="op">=</span> <span class="va">mtcars</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">drat</span>, data <span class="op">=</span> <span class="va">mtcars</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ── Regression Random Planted Forest ────────────────────────────────────────────</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">Formula</span>: `mpg ~ cyl + wt + drat`</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">10</span> tree families with <span style="color: #0000BB;">30</span> splits each on <span style="color: #0000BB;">3</span> predictors, <span style="font-style: italic;">interactions to degree </span><span style="color: #0000BB; font-style: italic;">2</span>.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">10</span> tree families with <span style="color: #0000BB;">6</span> splits each on <span style="color: #0000BB;">3</span> predictors, <span style="font-style: italic;">interactions to degree </span><span style="color: #0000BB; font-style: italic;">2</span>.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> `splits` chosen out of bag (lowest corrected OOB RMSE 2.723); growing stopped at</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">12</span> splits.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Forest is not purified.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ── Tree growing </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    split_structure: leaves</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          split_try: 10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              t_try: 0.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          split_try: 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              t_try: 0.1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     max_candidates: 50</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   split_decay_rate: 0.1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>      delete_leaves: TRUE</span>

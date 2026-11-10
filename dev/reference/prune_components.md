@@ -138,7 +138,16 @@ An object of class `rpf_pruned`, a list with elements:
   the training rows (after a second pruning of the display, only of
   those the first pruning kept: see below): `component` (its name, as in
   [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)),
-  `order`, `share`, `kept`, `beta` (`NA` if dropped).
+  `order`, `share`, `kept`, `beta` (`NA` if dropped), and `model_share`:
+  the share of the final model's component,
+  `Var(beta_S f_S) / Var(prediction of the model)` on the training rows
+  (with the display, of `f_S` in its heat-map form; for classification,
+  as `share`, over the centred score columns; `NA` if dropped). `share`
+  is what `tau` thresholds; `model_share` is the component's importance
+  in the model, which
+  [print()](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md)
+  shows. As the components need not be uncorrelated, the shares need not
+  sum to 1.
 
 - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a
   `data.frame` with one row per candidate: `rule`, `tau`, `oob_rmse`
@@ -504,151 +513,149 @@ with `prune = TRUE` fits and prunes in one call.
 set.seed(1)
 x <- matrix(runif(600 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50)
+fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50, prune = FALSE)
 
 # Rule and threshold chosen out of bag (no refits): the largest tau within one SE
 # of the lowest error
 pruned <- prune_components(fit, x, y, seed = 1)
 pruned
-#> ── Pruned Random Planted Forest ────────────────────────────────────────────────
-#> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 10% of Var(prediction)
-#> Chosen by out-of-bag error (1-SE rule; R refitted in 5 folds, seed 1) among 16 candidates.
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 2 components.
+#> Intercept: -0.00482281
 #> 
-#> Nonzero components: 9
-#> Kept:    2 (by order 1: 1, 2: 1)
-#> Dropped: 7 (by order 1: 3, 2: 4)
-#> Largest dropped: x1:x3 (share 1.8%); dropped shares sum to 4.4%
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  x2:x3     58%       
+#>  x1        44%       
 #> 
-#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
-#> First pruning: rule R, tau = 10%, 2 components kept.
-#> Heat maps of the model: 2
-#> 
-#> Intercept: -0.0162521
-#> Kept components (largest first), share on the training rows, coefficient and heat maps:
-#>  component share beta  heat_maps
-#>  x1        61%   0.977 1        
-#>  x2:x3     19%   1.863 1        
+#> How it was chosen:
+#>   The forest: 20 tree families of 50 splits.
+#>   From the forest's 10 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 1) among 16 candidates.
+#>   Left out: 8 components, shares together 2.1% (largest x2, 0.65%).
 pruned$oob
-#>    rule   tau  oob_rmse     se_mse oob_rmse_raw se_mse_raw n_kept   min one_se
-#> 1     D 0e+00 0.5361833 0.01395762    0.5638097 0.01187499      9 FALSE  FALSE
-#> 2     D 1e-04 0.5361833 0.01395762    0.5638097 0.01187499      9 FALSE  FALSE
-#> 3     D 3e-04 0.5361833 0.01395762    0.5638097 0.01187499      9 FALSE  FALSE
-#> 4     D 1e-03 0.5333645 0.01401006    0.5607863 0.01162696      7 FALSE  FALSE
-#> 5     D 3e-03 0.5204500 0.01389558    0.5467446 0.01264863      5 FALSE  FALSE
-#> 6     D 1e-02 0.5201940 0.01503833    0.5452333 0.01395539      4 FALSE  FALSE
-#> 7     D 3e-02 0.5044697 0.02196168    0.5187196 0.02147003      2 FALSE  FALSE
-#> 8     D 1e-01 0.5044697 0.02196168    0.5187196 0.02147003      2 FALSE  FALSE
-#> 9     R 0e+00 0.3836019 0.02250883    0.4397841 0.02277146      9 FALSE  FALSE
-#> 10    R 1e-04 0.3836019 0.02250883    0.4397841 0.02277146      9 FALSE  FALSE
-#> 11    R 3e-04 0.3836019 0.02250883    0.4397841 0.02277146      9 FALSE  FALSE
-#> 12    R 1e-03 0.3857449 0.02245586    0.4404874 0.02275764      7 FALSE  FALSE
-#> 13    R 3e-03 0.3858999 0.02053559    0.4374335 0.01928150      5 FALSE  FALSE
-#> 14    R 1e-02 0.3841273 0.01885531    0.4359182 0.01767504      4 FALSE  FALSE
-#> 15    R 3e-02 0.3800078 0.01757644    0.4315554 0.01610271      2 FALSE  FALSE
-#> 16    R 1e-01 0.3800078 0.01757644    0.4315554 0.01610271      2  TRUE   TRUE
+#>    rule   tau  oob_rmse      se_mse oob_rmse_raw  se_mse_raw n_kept   min
+#> 1     D 0e+00 0.4326435 0.017132961    0.4577946 0.016471299     10 FALSE
+#> 2     D 1e-04 0.4326435 0.017132961    0.4577946 0.016471299     10 FALSE
+#> 3     D 3e-04 0.4326435 0.017132961    0.4577946 0.016471299     10 FALSE
+#> 4     D 1e-03 0.4307297 0.016162161    0.4535609 0.015358376      7 FALSE
+#> 5     D 3e-03 0.4274866 0.014897697    0.4476957 0.014815801      5 FALSE
+#> 6     D 1e-02 0.4207083 0.015924505    0.4363396 0.016059946      2 FALSE
+#> 7     D 3e-02 0.4207083 0.015924505    0.4363396 0.016059946      2 FALSE
+#> 8     D 1e-01 0.4207083 0.015924505    0.4363396 0.016059946      2 FALSE
+#> 9     R 0e+00 0.3346053 0.008475738    0.3756329 0.009224183     10 FALSE
+#> 10    R 1e-04 0.3346053 0.008475738    0.3756329 0.009224183     10 FALSE
+#> 11    R 3e-04 0.3346053 0.008475738    0.3756329 0.009224183     10 FALSE
+#> 12    R 1e-03 0.3329692 0.009513342    0.3740199 0.010275340      7 FALSE
+#> 13    R 3e-03 0.3347209 0.009565213    0.3737766 0.009465612      5 FALSE
+#> 14    R 1e-02 0.3328582 0.009525521    0.3726909 0.009540695      2 FALSE
+#> 15    R 3e-02 0.3328582 0.009525521    0.3726909 0.009540695      2 FALSE
+#> 16    R 1e-01 0.3328582 0.009525521    0.3726909 0.009540695      2  TRUE
+#>    one_se
+#> 1   FALSE
+#> 2   FALSE
+#> 3   FALSE
+#> 4   FALSE
+#> 5   FALSE
+#> 6   FALSE
+#> 7   FALSE
+#> 8   FALSE
+#> 9   FALSE
+#> 10  FALSE
+#> 11  FALSE
+#> 12  FALSE
+#> 13  FALSE
+#> 14  FALSE
+#> 15  FALSE
+#> 16   TRUE
 
 # ... or the lowest error
 prune_components(fit, x, y, select = "min", seed = 1)
-#> ── Pruned Random Planted Forest ────────────────────────────────────────────────
-#> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 10% of Var(prediction)
-#> Chosen by out-of-bag error (lowest OOB RMSE; R refitted in 5 folds, seed 1) among 16 candidates.
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 2 components.
+#> Intercept: -0.00482281
 #> 
-#> Nonzero components: 9
-#> Kept:    2 (by order 1: 1, 2: 1)
-#> Dropped: 7 (by order 1: 3, 2: 4)
-#> Largest dropped: x1:x3 (share 1.8%); dropped shares sum to 4.4%
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  x2:x3     58%       
+#>  x1        44%       
 #> 
-#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
-#> First pruning: rule R, tau = 10%, 2 components kept.
-#> Heat maps of the model: 2
-#> 
-#> Intercept: -0.0162521
-#> Kept components (largest first), share on the training rows, coefficient and heat maps:
-#>  component share beta  heat_maps
-#>  x1        61%   0.977 1        
-#>  x2:x3     19%   1.863 1        
+#> How it was chosen:
+#>   The forest: 20 tree families of 50 splits.
+#>   From the forest's 10 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold chosen by out-of-bag error (lowest OOB RMSE; 5 folds, seed 1) among 16 candidates.
+#>   Left out: 8 components, shares together 2.1% (largest x2, 0.65%).
 
 # ... or by 5-fold CV
 pruned_cv <- prune_components(fit, x, y, select_by = "cv", seed = 1)
 pruned_cv$cv
 #>    rule   tau   cv_rmse      se_mse n_kept   min one_se
-#> 1     D 0e+00 0.4673140 0.026285812   10.0 FALSE  FALSE
-#> 2     D 1e-04 0.4673225 0.026283390    9.8 FALSE  FALSE
-#> 3     D 3e-04 0.4674804 0.026401513    9.0 FALSE  FALSE
-#> 4     D 1e-03 0.4674112 0.025471341    7.6 FALSE  FALSE
-#> 5     D 3e-03 0.4638035 0.024529257    5.8 FALSE  FALSE
-#> 6     D 1e-02 0.4630849 0.024904421    3.0 FALSE  FALSE
-#> 7     D 3e-02 0.4462390 0.018379566    2.0 FALSE  FALSE
-#> 8     D 1e-01 0.4462390 0.018379566    2.0 FALSE  FALSE
-#> 9     R 0e+00 0.3851965 0.012296486   10.0 FALSE  FALSE
-#> 10    R 1e-04 0.3851968 0.012296395    9.8 FALSE  FALSE
-#> 11    R 3e-04 0.3849120 0.012053138    9.0 FALSE  FALSE
-#> 12    R 1e-03 0.3824749 0.010638693    7.6 FALSE  FALSE
-#> 13    R 3e-03 0.3686001 0.009522577    5.8 FALSE  FALSE
-#> 14    R 1e-02 0.3506606 0.007501968    3.0 FALSE  FALSE
-#> 15    R 3e-02 0.3375723 0.005728376    2.0 FALSE  FALSE
-#> 16    R 1e-01 0.3375723 0.005728376    2.0  TRUE   TRUE
+#> 1     D 0e+00 0.3675334 0.012220573   10.0 FALSE  FALSE
+#> 2     D 1e-04 0.3675334 0.012220573   10.0 FALSE  FALSE
+#> 3     D 3e-04 0.3675998 0.012257470    9.8 FALSE  FALSE
+#> 4     D 1e-03 0.3666870 0.012325882    7.0 FALSE  FALSE
+#> 5     D 3e-03 0.3620997 0.012530279    3.8 FALSE  FALSE
+#> 6     D 1e-02 0.3578317 0.010789540    2.0 FALSE  FALSE
+#> 7     D 3e-02 0.3578317 0.010789540    2.0 FALSE  FALSE
+#> 8     D 1e-01 0.3578317 0.010789540    2.0 FALSE  FALSE
+#> 9     R 0e+00 0.3563900 0.009680989   10.0 FALSE  FALSE
+#> 10    R 1e-04 0.3563900 0.009680989   10.0 FALSE  FALSE
+#> 11    R 3e-04 0.3562247 0.009595002    9.8 FALSE  FALSE
+#> 12    R 1e-03 0.3516531 0.009322421    7.0 FALSE  FALSE
+#> 13    R 3e-03 0.3354631 0.008332358    3.8 FALSE  FALSE
+#> 14    R 1e-02 0.3286997 0.006150586    2.0 FALSE  FALSE
+#> 15    R 3e-02 0.3286997 0.006150586    2.0 FALSE  FALSE
+#> 16    R 1e-01 0.3286997 0.006150586    2.0  TRUE   TRUE
 
 # A given rule and threshold: no choice; R's coefficients are still fitted out of bag
 prune_components(fit, x, y, rule = "R", tau = 0.01)
-#> ── Pruned Random Planted Forest ────────────────────────────────────────────────
-#> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 1% of Var(prediction)
-#> Given, not chosen.
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 2 components.
+#> Intercept: -0.00482281
 #> 
-#> Nonzero components: 9
-#> Kept:    4 (by order 1: 1, 2: 3)
-#> Dropped: 5 (by order 1: 3, 2: 2)
-#> Largest dropped: x2 (share 0.72%); dropped shares sum to 1.3%
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  x2:x3     58%       
+#>  x1        44%       
 #> 
-#> Display: every kept component in at most 10 heat maps (nothing to coarsen, so not pruned again).
-#> First pruning: rule R, tau = 1%, 4 components kept.
-#> Heat maps of the model: 4
-#> 
-#> Intercept: -0.0169604
-#> Kept components (largest first), share on the training rows, coefficient and heat maps:
-#>  component share beta     heat_maps
-#>  x1        61%    0.97670 1        
-#>  x2:x3     19%    1.86236 1        
-#>  x1:x3     1.8%  -0.04332 1        
-#>  x1:x2     1.3%   0.06363 1        
+#> How it was chosen:
+#>   The forest: 20 tree families of 50 splits.
+#>   From the forest's 10 nonzero components (purified): those with a share of at least 1% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold given.
+#>   Left out: 8 components, shares together 2.1% (largest x2, 0.65%).
 
 predict(pruned, x[1:5, ])
 #> # A tibble: 5 × 1
 #>    .pred
 #>    <dbl>
-#> 1 -0.747
-#> 2  0.544
-#> 3 -1.08 
-#> 4  1.04 
-#> 5  0.620
+#> 1 -0.768
+#> 2  0.563
+#> 3 -1.18 
+#> 4  1.07 
+#> 5  0.101
 
 # A three-way interaction, shown in at most 4 heat maps
 y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
-fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100)
+fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100, prune = FALSE)
 shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 shown
-#> ── Pruned Random Planted Forest ────────────────────────────────────────────────
-#> Rule R (drop + refit one coefficient per component, fitted out of bag), tau = 3% of Var(prediction)
-#> Chosen by out-of-bag error (1-SE rule; R refitted in 5 folds, seed 1) among 16 candidates.
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 2 components.
+#> Intercept: 0.0509343
 #> 
-#> Nonzero components: 2
-#> Kept:    2 (by order 1: 1, 3: 1)
-#> Dropped: 0
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  x2:x3:x4  64%       
+#>  x1        38%       
 #> 
-#> Display: every kept component in at most 4 heat maps (coarsened, then pruned again).
-#> First pruning: rule R, tau = 3%, 2 components kept.
-#> Coarsened: 1 component (1 kept by the second pruning); variance kept 0.96.
-#> Kept coarsened components: coarse features (intervals), heat maps, variance kept:
-#>  component coarse heat_maps var_kept
-#>  x2:x3:x4  x4(4)  4         0.963   
-#> Heat maps of the model: 5
-#> 
-#> Intercept: 0.0384576
-#> Kept components (largest first), share on the training rows, coefficient and heat maps:
-#>  component share beta   heat_maps
-#>  x1        95%   0.9841 1        
-#>  x2:x3:x4  5.1%  4.6241 4        
+#> How it was chosen:
+#>   The forest: 20 tree families of 100 splits.
+#>   From the forest's 14 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 1) among 16 candidates.
+#>   Left out: 12 components, shares together 11% (largest x2, 2%).
+#>   Components of three or more predictors in at most 4 heat maps each, then rule and threshold chosen again on these (R, tau = 10%; none left out).
+#>   Heat-map forms: x2:x3:x4: x4 in 4 intervals (95% of its variance)
 shown$display$forms
-#>   component order      form forest_panels heat_maps  var_kept
-#> 1  x2:x3:x4     3 coarsened            87         4 0.9633811
+#>   component order      form forest_panels heat_maps var_kept
+#> 1  x2:x3:x4     3 coarsened           145         4 0.948961
 ```

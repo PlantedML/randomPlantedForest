@@ -42,7 +42,9 @@ row per box and columns
 - `box`: The index of the box within its tree.
 
 - `value`: The value of the box. For multiclass classification, one
-  column `value_<class>` per outcome level instead.
+  column `value_<class>` per outcome level instead (for
+  `loss = "logit"`, per level but the first, the reference, whose score
+  is 0).
 
 - `<variable>_lower`, `<variable>_upper` for every predictor: The bounds
   of the box, `NA` for variables the tree does not use.
@@ -73,13 +75,13 @@ to plot the boxes.
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
 head(rpf_boxes(rpfit))
-#>          tree order box    value wt_lower wt_upper hp_lower hp_upper
-#> 1 (Intercept)     0   1  0.00000       NA       NA       NA       NA
-#> 2          wt     1   1 23.52000    1.513    3.170       NA       NA
-#> 3          wt     1   2 11.11667    5.250    5.444       NA       NA
-#> 4          wt     1   3 17.51307    3.730    5.250       NA       NA
-#> 5          wt     1   4 15.83807    3.570    3.730       NA       NA
-#> 6          wt     1   5 16.71716    3.170    3.570       NA       NA
+#>          tree order box     value wt_lower wt_upper hp_lower hp_upper
+#> 1 (Intercept)     0   1  0.000000       NA       NA       NA       NA
+#> 2          wt     1   1 22.700000    1.513    3.435       NA       NA
+#> 3          wt     1   2 10.567368    5.424    5.444       NA       NA
+#> 4          wt     1   3 15.137273    3.520    5.424       NA       NA
+#> 5          wt     1   4 16.531344    3.435    3.520       NA       NA
+#> 6       hp:wt     2   1  5.633333    1.513    3.435       52       93
 ```

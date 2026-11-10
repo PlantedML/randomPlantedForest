@@ -64,6 +64,7 @@
 <p>Like a random forest, it averages many tree-based models grown on bootstrap samples. Unlike a random forest, each of these models is a sum of trees that each split on a fixed set of predictors, and <code>max_interaction</code> bounds how many predictors that can be. With <code>max_interaction = 1</code> the forest is an additive model; with <code>2</code> it adds pairwise interactions, and so on. As a result, the fitted model decomposes exactly into an intercept, main effects and interactions up to that order:</p>
 <p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover><mi>m</mi><mo accent="true">̂</mo></mover><mo stretchy="false" form="prefix">(</mo><mi>x</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mn>0</mn></msub><mo>+</mo><munder><mo>∑</mo><mi>k</mi></munder><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mi>k</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mi>k</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>&lt;</mo><mi>l</mi></mrow></munder><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mrow><mi>k</mi><mi>l</mi></mrow></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mi>k</mi></msub><mo>,</mo><msub><mi>x</mi><mi>l</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><mi>…</mi></mrow><annotation encoding="application/x-tex">\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k &lt; l} \hat m_{kl}(x_k, x_l) + \dots</annotation></semantics></math></p>
 <p>Each component can be inspected and plotted on its own, and together they sum to the prediction.</p>
+<p>By default <code><a href="reference/rpf.html">rpf()</a></code> fits up to three-way interactions, chooses the number of splits out of bag while the forest grows, and leaves out the components that are too small to matter, so it returns a sparse final model (<code>prune = FALSE</code> returns the whole forest).</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -83,54 +84,55 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span><span class="op">)</span></span>
-<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">25</span>, max_interaction <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
-<span><span class="co">#&gt; ── Regression Random Planted Forest ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</span></span>
-<span><span class="co">#&gt; Formula: `mpg ~ cyl + wt + hp`</span></span>
-<span><span class="co">#&gt; 25 tree families with 30 splits each on 3 predictors, interactions to degree 2.</span></span>
-<span><span class="co">#&gt; ℹ Forest is not purified.</span></span>
+<span><span class="co">#&gt; ── Random Planted Forest model ─────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; Regression. Prediction = intercept + the sum of 3 components.</span></span>
+<span><span class="co">#&gt; Intercept: 20.1901</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; ── Tree growing </span></span>
-<span><span class="co">#&gt;    split_structure: leaves</span></span>
-<span><span class="co">#&gt;          split_try: 10</span></span>
-<span><span class="co">#&gt;              t_try: 0.4</span></span>
-<span><span class="co">#&gt;     max_candidates: 50</span></span>
-<span><span class="co">#&gt;   split_decay_rate: 0.1</span></span>
-<span><span class="co">#&gt;      delete_leaves: TRUE</span></span>
+<span><span class="co">#&gt; Components (largest first), importance = share of the variance of the prediction on the training rows:</span></span>
+<span><span class="co">#&gt;  component importance</span></span>
+<span><span class="co">#&gt;  cyl       14%       </span></span>
+<span><span class="co">#&gt;  wt        13%       </span></span>
+<span><span class="co">#&gt;  hp        11%       </span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.</span></span>
+<span><span class="co">#&gt; How it was chosen:</span></span>
+<span><span class="co">#&gt;   The forest: 200 tree families of 7 splits (chosen out of bag; growing stopped at 12).</span></span>
+<span><span class="co">#&gt;   From the forest's 7 nonzero components (purified): those with a share of at least 3% of the forest's Var(prediction), as they are (rule D).</span></span>
+<span><span class="co">#&gt;   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.</span></span>
+<span><span class="co">#&gt;   Left out: 4 components, shares together 0.41% (largest cyl:wt, 0.21%).</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; # A tibble: 6 × 1</span></span>
 <span><span class="co">#&gt;   .pred</span></span>
 <span><span class="co">#&gt;   &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1  21.4</span></span>
-<span><span class="co">#&gt; 2  21.0</span></span>
-<span><span class="co">#&gt; 3  24.4</span></span>
-<span><span class="co">#&gt; 4  20.9</span></span>
-<span><span class="co">#&gt; 5  17.7</span></span>
-<span><span class="co">#&gt; 6  19.1</span></span></code></pre></div>
-<p><code><a href="reference/predict_components.html">predict_components()</a></code> returns the decomposition: one column per main effect and interaction, plus the intercept.</p>
+<span><span class="co">#&gt; 1  20.7</span></span>
+<span><span class="co">#&gt; 2  20.2</span></span>
+<span><span class="co">#&gt; 3  25.6</span></span>
+<span><span class="co">#&gt; 4  19.6</span></span>
+<span><span class="co">#&gt; 5  16.7</span></span>
+<span><span class="co">#&gt; 6  19.3</span></span></code></pre></div>
+<p>On these 32 cars the final model has the three main effects; the interactions, which explain less than 1% of the variance of the prediction, are left out.</p>
+<p><code><a href="reference/predict_components.html">predict_components()</a></code> returns the decomposition: one column per component of the model, plus the intercept.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
-<span><span class="co">#&gt;          cyl         wt         hp     cyl:wt      cyl:hp        hp:wt</span></span>
-<span><span class="co">#&gt;        &lt;num&gt;      &lt;num&gt;      &lt;num&gt;      &lt;num&gt;       &lt;num&gt;        &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1: 2.8275105  0.2569457  0.2970626  0.3448129  0.06873138  0.006002504</span></span>
-<span><span class="co">#&gt; 2: 2.8275105 -0.2438784  0.2970626  0.3929089  0.06873138  0.076817727</span></span>
-<span><span class="co">#&gt; 3: 4.8022694  1.7754646  1.3572422 -0.4610986 -0.41379471 -0.231709254</span></span>
-<span><span class="co">#&gt; 4: 2.8275105 -0.4727413  0.2970626  0.3538112  0.06873138  0.256989969</span></span>
-<span><span class="co">#&gt; 5: 0.7661282 -1.0143147 -0.3952336  0.4528133  0.02336632  0.241715900</span></span>
-<span><span class="co">#&gt; 6: 2.8275105 -1.1525180  0.5397470 -0.4590129 -0.03247695 -0.199217461</span></span></code></pre></div>
+<span><span class="co">#&gt;             wt         hp        cyl</span></span>
+<span><span class="co">#&gt;          &lt;num&gt;      &lt;num&gt;      &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:  0.50125240  0.3024038 -0.3017086</span></span>
+<span><span class="co">#&gt; 2:  0.02433186  0.3024038 -0.3017086</span></span>
+<span><span class="co">#&gt; 3:  1.31127379  1.5655240  2.5146038</span></span>
+<span><span class="co">#&gt; 4: -0.57728154  0.3024038 -0.3017086</span></span>
+<span><span class="co">#&gt; 5: -0.97647808 -0.6675734 -1.8815153</span></span>
+<span><span class="co">#&gt; 6: -1.14911679  0.5190305 -0.3017086</span></span></code></pre></div>
 <p>The <a href="https://plantedml.com/glex/" class="external-link">glex</a> package plots these components:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">glex</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"wt"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"hp"</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span>
-<span>  <span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"cyl"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"wt"</span>, <span class="st">"hp"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-effects-1.png" alt="" width="100%"></p>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"wt"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"hp"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"cyl"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-effects-1.png" width="100%"></p>
 <p>The <a href="https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html">Get started</a> guide covers classification, recipes, saving models and more on interpreting components, and the <a href="https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html" class="external-link">Bikesharing decomposition</a> article works through a larger example.</p>
 </div>
 </div>

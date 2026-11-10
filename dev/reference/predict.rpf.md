@@ -74,20 +74,20 @@ and has no column, so `K - 1` columns are returned for `K` levels.
 
 ``` r
 # Regression with L2 loss
-rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")])
+rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")], prune = FALSE)
 predict(rpfit, mtcars[, c("cyl", "wt")])
 #> # A tibble: 32 × 1
 #>    .pred
 #>    <dbl>
-#>  1  20.8
-#>  2  20.8
-#>  3  25.4
-#>  4  20.8
-#>  5  17.9
-#>  6  18.5
-#>  7  14.9
-#>  8  23.7
-#>  9  22.3
-#> 10  18.7
+#>  1  20.6
+#>  2  20.2
+#>  3  25.2
+#>  4  20.1
+#>  5  16.4
+#>  6  18.6
+#>  7  15.5
+#>  8  23.3
+#>  9  23.0
+#> 10  19.1
 #> # ℹ 22 more rows
 ```

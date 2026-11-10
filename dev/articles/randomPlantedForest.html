@@ -77,7 +77,7 @@ decomposition, with no post-hoc approximation needed.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
-<h2 id="fitting-a-regression-forest">Fitting a regression forest<a class="anchor" aria-label="anchor" href="#fitting-a-regression-forest"></a>
+<h2 id="fitting-a-regression-model">Fitting a regression model<a class="anchor" aria-label="anchor" href="#fitting-a-regression-model"></a>
 </h2>
 <p>To see what the model recovers, we simulate data where the true
 components are known. The outcome depends on <code>x1</code>,
@@ -110,40 +110,90 @@ the terms are exactly the components the model is meant to estimate.</p>
 <span>  <span class="fl">2</span> <span class="op">*</span> <span class="va">sim</span><span class="op">$</span><span class="va">x1</span> <span class="op">*</span> <span class="va">sim</span><span class="op">$</span><span class="va">x2</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, nthreads <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">model</span></span>
+<span><span class="co">#&gt; ── Random Planted Forest model ─────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; Regression. Prediction = intercept + the sum of 4 components.</span></span>
+<span><span class="co">#&gt; Intercept: 0.998346</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Components (largest first), importance = share of the variance of the prediction on the training rows:</span></span>
+<span><span class="co">#&gt;  component importance</span></span>
+<span><span class="co">#&gt;  x1:x2     34%       </span></span>
+<span><span class="co">#&gt;  x1        34%       </span></span>
+<span><span class="co">#&gt;  x2        26%       </span></span>
+<span><span class="co">#&gt;  x3        5.4%      </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; How it was chosen:</span></span>
+<span><span class="co">#&gt;   The forest: 200 tree families of 84 splits (chosen out of bag; growing stopped at 168).</span></span>
+<span><span class="co">#&gt;   From the forest's 14 nonzero components (purified): those with a share of at least 3% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).</span></span>
+<span><span class="co">#&gt;   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 1954012425) among 16 candidates.</span></span>
+<span><span class="co">#&gt;   Left out: 10 components, shares together 0.19% (largest x1:x3, 0.054%).</span></span></code></pre></div>
+<p>With its defaults, <code><a href="../reference/rpf.html">rpf()</a></code> does three things in one
+call:</p>
+<ol style="list-style-type: decimal">
+<li>It grows a forest of 200 tree families, each a sum of trees on up to
+three predictors (<code>max_interaction = 3</code>), and chooses the
+number of splits while the families grow: by the error on the training
+rows that a family’s bootstrap sample left out (out of bag), stopping
+once more splits no longer help (<code>splits = NULL</code>).</li>
+<li>It prunes the forest’s components with
+<code><a href="../reference/prune_components.html">prune_components()</a></code>: a component is kept if its share of the
+variance of the prediction is large enough, either as it is or with one
+refitted coefficient per kept component; the rule and the threshold are
+again chosen out of bag (<code>prune = NULL</code>, that is
+<code>TRUE</code>).</li>
+<li>It shows every kept component of three predictors in at most 10 heat
+maps (<code>max_panels = 10</code>), coarsening it if needed, and prunes
+again.</li>
+</ol>
+<p>The result is the pruned model. Here it keeps the three main effects
+and the <code>x1:x2</code> interaction, and drops <code>x4</code> and
+the other interactions, which the data do not have.
+<code><a href="../reference/predict_components.html">predict_components()</a></code> gives every kept component as it
+enters the prediction (see “Decomposing predictions” below):</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="../reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">model</span>, new_data <span class="op">=</span> <span class="va">sim</span><span class="op">)</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "x1"    "x2"    "x3"    "x1:x2"</span></span></code></pre></div>
+<p>Prediction works as usual:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span>, new_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
+<span><span class="co">#&gt;     .pred</span></span>
+<span><span class="co">#&gt;     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> -<span style="color: #BB0000;">0.326</span> </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>  0.013<span style="text-decoration: underline;">1</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>  1.17  </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>  4.00  </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>  1.17  </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>  0.831</span></span></code></pre></div>
+<p><code>prune = FALSE</code> returns the forest itself, with all its
+components, as earlier versions did. <code>max_interaction</code> is the
+central choice of the method: lower values give a more constrained
+model, <code>max_interaction = 0</code> allows interactions of any
+order. <code>ntrees</code> sets the number of tree families, and
+<code>splits = &lt;number&gt;</code> fixes the number of splits instead
+of choosing it. The forest below is restricted to main effects and
+two-way interactions:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">50</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
 <span><span class="co">#&gt; ── Regression Random Planted Forest ────────────────────────────────────────────</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">Formula</span>: `y ~ .`</span></span>
-<span><span class="co">#&gt; <span style="color: #0000BB;">50</span> tree families with <span style="color: #0000BB;">30</span> splits each on <span style="color: #0000BB;">4</span> predictors, <span style="font-style: italic;">interactions to degree </span><span style="color: #0000BB; font-style: italic;">2</span>.</span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">50</span> tree families with <span style="color: #0000BB;">141</span> splits each on <span style="color: #0000BB;">4</span> predictors, <span style="font-style: italic;">interactions to degree</span></span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB; font-style: italic;">2</span>.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> `splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at</span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">141</span> splits.</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Forest is not purified.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; ── Tree growing </span></span>
 <span><span class="co">#&gt;    split_structure: leaves</span></span>
-<span><span class="co">#&gt;          split_try: 10</span></span>
-<span><span class="co">#&gt;              t_try: 0.4</span></span>
+<span><span class="co">#&gt;          split_try: 3</span></span>
+<span><span class="co">#&gt;              t_try: 0.1</span></span>
 <span><span class="co">#&gt;     max_candidates: 50</span></span>
 <span><span class="co">#&gt;   split_decay_rate: 0.1</span></span>
 <span><span class="co">#&gt;      delete_leaves: TRUE</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Fit using <span style="color: #0000BB;">1</span> thread, also the default for `predict()` and `purify()`.</span></span></code></pre></div>
-<p><code>max_interaction = 2</code> restricts the forest to main effects
-and two-way interactions. This is the central tuning choice of the
-method: lower values give a more interpretable, more constrained model,
-while <code>max_interaction = 0</code> allows interactions of any order.
-<code>ntrees</code> sets the number of tree families in the
-ensemble.</p>
-<p>Prediction works as usual:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
-<span><span class="co">#&gt;     .pred</span></span>
-<span><span class="co">#&gt;     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> -<span style="color: #BB0000;">0.217</span> </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>  0.056<span style="text-decoration: underline;">2</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>  1.27  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>  3.83  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>  1.17  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>  0.955</span></span></code></pre></div>
 <p>Note that <code><a href="../reference/rpf.html">rpf()</a></code> does not handle missing values: rows
 containing <code>NA</code> must be imputed or removed beforehand (see
 the <code>recipes</code> section below for one way to do this as part of
@@ -161,15 +211,15 @@ splitting on an additional variable, and
 variables.</p>
 <p>To look at one family, we fit a forest with a single, small family to
 the same data:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">small</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">1</span>, splits <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">small</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">1</span>, splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">small</span><span class="op">)</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/fit-small-1.png" class="r-plt" alt="" width="100%"></p>
 <p>The trees are arranged in rows by the number of variables they split
 on, with the leaves coloured by their value.
 <code>plot(type = "boxes")</code> draws the same leaves in variable
 space instead, one panel per tree:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">small</span>, type <span class="op">=</span> <span class="st">"boxes"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/boxes-small-1.png" class="r-plt" alt="" width="100%"></p>
 <p>These trees are not yet the components of the decomposition. The
@@ -179,7 +229,7 @@ can just as well be carried by trees on <code>x2</code> together with
 another variable as by a tree on <code>x2</code> alone. Purification
 moves each effect to the lowest-order tree it belongs to, without
 changing the family’s predictions:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/purify.html">purify</a></span><span class="op">(</span><span class="va">small</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">small</span>, type <span class="op">=</span> <span class="st">"boxes"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/boxes-purified-1.png" class="r-plt" alt="" width="100%"></p>
@@ -189,7 +239,9 @@ root value is the intercept, close to the true value of 1. Averaging
 these components over all tree families gives the decomposition of the
 whole forest, which <code><a href="../reference/predict_components.html">predict_components()</a></code> computes. With a
 single family and few splits the estimates are coarse, which is why the
-next section uses the forest of 50 families fitted above.</p>
+next section uses the forest of 50 families fitted above. The pruned
+model’s components are the same averages over its families, but only the
+kept ones, each multiplied by its coefficient.</p>
 </div>
 <div class="section level2">
 <h2 id="decomposing-predictions">Decomposing predictions<a class="anchor" aria-label="anchor" href="#decomposing-predictions"></a>
@@ -201,17 +253,19 @@ a sum of low-dimensional components:</p>
 an intercept and one column per main effect and interaction term,
 evaluated on the supplied data. The forest is <em>purified</em>
 internally to make the decomposition unique, which is why the print
-method above reports the purification state.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+method above reports the purification state. For the pruned model,
+<code>predict_components(model, new_data = sim)</code> returns the kept
+components in the same form.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">sim</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">components</span><span class="op">$</span><span class="va">intercept</span></span>
-<span><span class="co">#&gt; [1] 0.9862793</span></span>
+<span><span class="co">#&gt; [1] 0.9868946</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  [1] "x1"    "x2"    "x3"    "x4"    "x1:x2" "x1:x3" "x1:x4" "x2:x3" "x2:x4"</span></span>
 <span><span class="co">#&gt; [10] "x3:x4"</span></span></code></pre></div>
 <p>The components sum exactly to the model prediction:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred_sum</span> <span class="op">&lt;-</span> <span class="va">components</span><span class="op">$</span><span class="va">intercept</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
 <span><span class="va">pred_direct</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">sim</span><span class="op">)</span><span class="op">$</span><span class="va">.pred</span></span>
 <span></span>
@@ -223,14 +277,14 @@ outcome. Their standard deviations give a simple importance measure: the
 three main effects and the <code>x1:x2</code> interaction dominate,
 while <code>x4</code> and the other interactions are close to zero, as
 they should be.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span>, <span class="va">sd</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="co">#&gt; x1:x2    x1    x2    x3 x2:x3 x1:x3    x4 x1:x4 x2:x4 x3:x4 </span></span>
-<span><span class="co">#&gt; 0.656 0.655 0.573 0.258 0.026 0.007 0.000 0.000 0.000 0.000</span></span></code></pre></div>
+<span><span class="co">#&gt;    x1 x1:x2    x2    x3 x1:x3 x2:x3 x2:x4 x1:x4 x3:x4    x4 </span></span>
+<span><span class="co">#&gt; 0.677 0.640 0.592 0.276 0.026 0.025 0.022 0.020 0.014 0.011</span></span></code></pre></div>
 <p>The estimated main effects follow the true functions (blue lines). As
 with any tree-based model, they flatten out towards the edges of the
 data, where few observations are available to determine them.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">op</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">3</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">4</span>, <span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">v</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">true_effects</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">ylim</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">[[</span><span class="va">v</span><span class="op">]</span><span class="op">]</span>, <span class="va">true_effects</span><span class="op">[[</span><span class="va">v</span><span class="op">]</span><span class="op">]</span><span class="op">(</span><span class="va">sim</span><span class="op">[[</span><span class="va">v</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
@@ -246,13 +300,13 @@ data, where few observations are available to determine them.</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/graphics/curve.html" class="external-link">curve</a></span><span class="op">(</span><span class="va">true_effects</span><span class="op">[[</span><span class="va">v</span><span class="op">]</span><span class="op">]</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, add <span class="op">=</span> <span class="cn">TRUE</span>, lwd <span class="op">=</span> <span class="fl">2</span>, col <span class="op">=</span> <span class="st">"blue"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/main-effects-1.png" class="r-plt" alt="" width="672"></p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="va">op</span><span class="op">)</span></span></code></pre></div>
 <p>The interaction is a function of two variables, so it is shown as a
 heatmap. We evaluate the estimated <code>x1:x2</code> component on a
 grid. Note <code>x3</code> and <code>x4</code> must be present in the
 new data but do not affect this component.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">grid_points</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">1</span>, length.out <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
 <span><span class="va">grid</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="va">grid_points</span>, x2 <span class="op">=</span> <span class="va">grid_points</span>, x3 <span class="op">=</span> <span class="fl">0</span>, x4 <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
 <span><span class="va">estimated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">grid</span>, predictors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"x1"</span>, <span class="st">"x2"</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">m</span><span class="op">[[</span><span class="st">"x1:x2"</span><span class="op">]</span><span class="op">]</span></span>
@@ -277,7 +331,7 @@ new data but do not affect this component.</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/interaction-1.png" class="r-plt" alt="" width="672"></p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="va">op</span><span class="op">)</span></span></code></pre></div>
 <p>The plots above are drawn manually from
 <code><a href="../reference/predict_components.html">predict_components()</a></code> for illustration. The <a href="https://plantedml.com/glex/" class="external-link"><code>glex</code></a> package
@@ -295,21 +349,21 @@ from <code>palmerpenguins</code>, removing missing values first.</p>
 <div class="section level3">
 <h3 id="binary">Binary<a class="anchor" aria-label="anchor" href="#binary"></a>
 </h3>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">penguins</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html" class="external-link">na.omit</a></span><span class="op">(</span><span class="fu">palmerpenguins</span><span class="fu">::</span><span class="va"><a href="https://allisonhorst.github.io/palmerpenguins/reference/penguins.html" class="external-link">penguins</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">rpfit_sex</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">sex</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span>, ntrees <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="va">rpfit_sex</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">sex</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span>, nthreads <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_sex</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"prob"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 2</span></span></span>
 <span><span class="co">#&gt;   .pred_female .pred_male</span></span>
 <span><span class="co">#&gt;          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>       0.030<span style="text-decoration: underline;">1</span>    0.970  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>       0.817     0.183  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>       0.998     0.002<span style="text-decoration: underline;">19</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>       0.997     0.003<span style="text-decoration: underline;">22</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>       0.028<span style="text-decoration: underline;">4</span>    0.972  </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>       0.996     0.003<span style="text-decoration: underline;">86</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        0.327     0.673 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        0.775     0.225 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        0.940     0.060<span style="text-decoration: underline;">2</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        0.807     0.193 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        0.181     0.819 </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        0.916     0.083<span style="text-decoration: underline;">6</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_sex</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"class"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
 <span><span class="co">#&gt;   .pred_class</span></span>
@@ -320,28 +374,31 @@ from <code>palmerpenguins</code>, removing missing values first.</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> female     </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> male       </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> female</span></span></code></pre></div>
-<p>With the default <code>loss = "exponential"</code> (or
-<code>"logit"</code>), <code>type = "link"</code> additionally gives raw
-predictions on the log-odds scale.</p>
+<p>A classification model goes through the same steps as a regression
+model: the number of splits is chosen out of bag and the components are
+pruned, both by the log-loss of the predicted probabilities. With the
+default <code>loss = "exponential"</code> (or <code>"logit"</code>),
+<code>type = "link"</code> additionally gives raw predictions on the
+log-odds scale.</p>
 </div>
 <div class="section level3">
 <h3 id="multiclass">Multiclass<a class="anchor" aria-label="anchor" href="#multiclass"></a>
 </h3>
 <p>Multiclass classification works the same way: probability predictions
 contain one column per class:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">rpfit_species</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">species</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span>, ntrees <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rpfit_species</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">species</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span>, nthreads <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_species</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"prob"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 3</span></span></span>
 <span><span class="co">#&gt;   .pred_Adelie .pred_Chinstrap .pred_Gentoo</span></span>
 <span><span class="co">#&gt;          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        1.000        1.61<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.48<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        1.000        5.25<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.46<span style="color: #949494;">e</span><span style="color: #BB0000;">- 9</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        1.000        2.61<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.67<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        1.000        1.74<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.43<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        1.000        1.25<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.34<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        1.000        2.66<span style="color: #949494;">e</span><span style="color: #BB0000;">-15</span>     1.79<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        1.000        1.80<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.60<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        1.000        3.98<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     9.66<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        1.000        2.74<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     4.47<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        1.000        1.89<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.04<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        1.000        2.25<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.18<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        1.000        2.76<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     6.91<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_species</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"class"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
 <span><span class="co">#&gt;   .pred_class</span></span>
@@ -353,8 +410,9 @@ contain one column per class:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> Adelie     </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> Adelie</span></span></code></pre></div>
 <p>The default loss for classification is <code>"exponential"</code>,
-which gives proper probability estimates. <code>"logit"</code> gives
-similar results but is slower, while <code>"L1"</code> and
+which gives proper probability estimates (with more than two classes it
+is the multiclass exponential loss SAMME). <code>"logit"</code> gives
+similar results after pruning but is slower, while <code>"L1"</code> and
 <code>"L2"</code> fit class indicators directly and do not yield proper
 probabilities. Note that with <code>loss = "logit"</code>, multiclass
 models are fit on a reference-class (log-odds) scale, so link
@@ -370,7 +428,7 @@ in place of a formula, so preprocessing can be bundled with the model
 specification. This makes it easy to add preprocessing steps, such as
 imputing missing values, which <code><a href="../reference/rpf.html">rpf()</a></code> itself does not
 accept:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/tidymodels/recipes" class="external-link">recipes</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># rows with a missing outcome still need to be dropped by hand</span></span>
@@ -380,18 +438,18 @@ accept:</p>
 <span>  <span class="fu"><a href="https://recipes.tidymodels.org/reference/step_impute_median.html" class="external-link">step_impute_median</a></span><span class="op">(</span><span class="fu"><a href="https://recipes.tidymodels.org/reference/has_role.html" class="external-link">all_numeric_predictors</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://recipes.tidymodels.org/reference/step_impute_mode.html" class="external-link">step_impute_mode</a></span><span class="op">(</span><span class="fu"><a href="https://recipes.tidymodels.org/reference/has_role.html" class="external-link">all_nominal_predictors</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">rpfit_rec</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">rec</span>, data <span class="op">=</span> <span class="va">peng_raw</span>, ntrees <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="va">rpfit_rec</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">rec</span>, data <span class="op">=</span> <span class="va">peng_raw</span>, nthreads <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_rec</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">peng_raw</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
 <span><span class="co">#&gt;   .pred</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> <span style="text-decoration: underline;">3</span>744.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> <span style="text-decoration: underline;">3</span>470.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> <span style="text-decoration: underline;">3</span>598.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> <span style="text-decoration: underline;">3</span>503.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> <span style="text-decoration: underline;">3</span>984.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> <span style="text-decoration: underline;">3</span>364.</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> <span style="text-decoration: underline;">3</span>728.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> <span style="text-decoration: underline;">3</span>381.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> <span style="text-decoration: underline;">3</span>542.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> <span style="text-decoration: underline;">3</span>414.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> <span style="text-decoration: underline;">3</span>937.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> <span style="text-decoration: underline;">3</span>300.</span></span></code></pre></div>
 <p>The preprocessing steps are stored with the model and applied
 automatically in <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>.</p>
 </div>
@@ -401,7 +459,7 @@ automatically in <code><a href="https://rdrr.io/r/stats/predict.html" class="ext
 <p>An <code>rpf</code> object holds its forest in an external pointer to
 a C++ object, which <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> cannot preserve, meaning that
 a naively saved and restored model is not usable:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".rds"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="va">tmp</span><span class="op">)</span></span>
 <span><span class="va">broken</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span></span>
@@ -416,7 +474,7 @@ a naively saved and restored model is not usable:</p>
 <span><span class="co">#&gt;   loading, see `?rpf_marshal()`.</span></span></code></pre></div>
 <p>Use <code><a href="../reference/rpf_marshal.html">rpf_marshal()</a></code> to convert the model into a plain R
 list before saving, and <code><a href="../reference/rpf_marshal.html">rpf_unmarshal()</a></code> after loading:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="fu"><a href="../reference/rpf_marshal.html">rpf_marshal</a></span><span class="op">(</span><span class="va">rpfit</span><span class="op">)</span>, <span class="va">tmp</span><span class="op">)</span></span>
 <span><span class="va">restored</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf_marshal.html">rpf_unmarshal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -425,7 +483,8 @@ list before saving, and <code><a href="../reference/rpf_marshal.html">rpf_unmars
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
-<p>Alternatively, a <a href="https://rstudio.github.io/bundle/" class="external-link"><code>bundle</code></a> method
+<p>Pruned models are saved the same way:
+<code>rpf_marshal(model)</code>. Alternatively, a <a href="https://rstudio.github.io/bundle/" class="external-link"><code>bundle</code></a> method
 wrapping the same mechanism is available via
 <code><a href="https://rstudio.github.io/bundle/reference/bundle.html" class="external-link">bundle::bundle()</a></code> and <code><a href="https://rstudio.github.io/bundle/reference/bundle.html" class="external-link">bundle::unbundle()</a></code>.</p>
 </div>

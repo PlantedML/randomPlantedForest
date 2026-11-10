@@ -72,15 +72,15 @@ for `type`.
 set.seed(1)
 x <- matrix(runif(300 * 3, -1, 1), ncol = 3, dimnames = list(NULL, paste0("x", 1:3)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(300, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30)
+fit <- rpf(x, y, max_interaction = 2, ntrees = 10, splits = 30, prune = FALSE)
 pruned <- prune_components(fit, x, y, rule = "R", tau = 0.01)
 predict(pruned, x[1:5, ])
 #> # A tibble: 5 × 1
-#>    .pred
-#>    <dbl>
-#> 1 -0.121
-#> 2 -1.46 
-#> 3  0.156
-#> 4  0.528
-#> 5 -1.18 
+#>     .pred
+#>     <dbl>
+#> 1 -0.192 
+#> 2 -1.73  
+#> 3 -0.0109
+#> 4  0.610 
+#> 5 -1.45  
 ```

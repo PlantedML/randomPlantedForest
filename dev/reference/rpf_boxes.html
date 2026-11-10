@@ -81,7 +81,8 @@ e.g. <code>"x1:x2"</code>, or <code>"(Intercept)"</code>.</p></li>
 <li><p><code>order</code>: The number of variables of the tree, <code>0</code> for the intercept.</p></li>
 <li><p><code>box</code>: The index of the box within its tree.</p></li>
 <li><p><code>value</code>: The value of the box. For multiclass classification, one
-column <code>value_&lt;class&gt;</code> per outcome level instead.</p></li>
+column <code>value_&lt;class&gt;</code> per outcome level instead (for <code>loss = "logit"</code>,
+per level but the first, the reference, whose score is 0).</p></li>
 <li><p><code>&lt;variable&gt;_lower</code>, <code>&lt;variable&gt;_upper</code> for every predictor: The bounds of
 the box, <code>NA</code> for variables the tree does not use.</p></li>
 </ul></div>
@@ -107,15 +108,15 @@ marshaled with <code>include_data = TRUE</code>.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">5</span>, splits <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">5</span>, splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">rpf_boxes</span><span class="op">(</span><span class="va">rpfit</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          tree order box    value wt_lower wt_upper hp_lower hp_upper</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (Intercept)     0   1  0.00000       NA       NA       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2          wt     1   1 23.52000    1.513    3.170       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3          wt     1   2 11.11667    5.250    5.444       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4          wt     1   3 17.51307    3.730    5.250       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5          wt     1   4 15.83807    3.570    3.730       NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6          wt     1   5 16.71716    3.170    3.570       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          tree order box     value wt_lower wt_upper hp_lower hp_upper</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 (Intercept)     0   1  0.000000       NA       NA       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2          wt     1   1 22.700000    1.513    3.435       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3          wt     1   2 10.567368    5.424    5.444       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4          wt     1   3 15.137273    3.520    5.424       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5          wt     1   4 16.531344    3.435    3.520       NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6       hp:wt     2   1  5.633333    1.513    3.435       52       93</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

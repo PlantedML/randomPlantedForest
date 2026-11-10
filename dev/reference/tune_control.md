@@ -135,18 +135,19 @@ y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(400, sd = 0.3)
 tuned <- rpf(
   x,
   y,
+  max_interaction = 2,
   ntrees = 10,
   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 )
 tuned$tune$search
 #>   step split_try t_try min_leaf_rows splits stopped_at capped oob_rmse_forest
-#> 1    1        10   0.4             1     50        100  FALSE       0.4767295
-#> 2    1         3   0.1             1    141        283  FALSE       0.4089001
-#> 3    2         3   0.1            20    119        238  FALSE       0.3782499
+#> 1    1        10   0.4             1     84        100  FALSE       0.4844060
+#> 2    1         3   0.1             1     59         71  FALSE       0.4459042
+#> 3    2        10   0.4            20    168        200  FALSE       0.3832057
 #>   rule tau n_kept  oob_rmse seconds chosen_step1 chosen_step2 chosen_step3
-#> 1    R 0.1      2 0.3871046   0.128        FALSE           NA           NA
-#> 2    R 0.1      2 0.3562340   9.204         TRUE        FALSE           NA
-#> 3    R 0.1      2 0.3293479   2.529           NA         TRUE           NA
+#> 1    R 0.1      2 0.3666121   0.082         TRUE        FALSE           NA
+#> 2    R 0.1      2 0.3752002   0.059        FALSE           NA           NA
+#> 3    R 0.1      2 0.3539268   0.199           NA         TRUE           NA
 #>   final
 #> 1 FALSE
 #> 2 FALSE

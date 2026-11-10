@@ -100,7 +100,7 @@ directly interpretable tree ensemble.
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10)
+rpfit <- rpf(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
 is_purified(rpfit)
 #> [1] FALSE
 purify(rpfit)

@@ -32,16 +32,18 @@ Invisibly: `x`.
 ## Examples
 
 ``` r
-rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10)
+rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, ntrees = 10, prune = FALSE)
 #> ── Regression Random Planted Forest ────────────────────────────────────────────
 #> Formula: `mpg ~ cyl + wt + drat`
-#> 10 tree families with 30 splits each on 3 predictors, interactions to degree 2.
+#> 10 tree families with 6 splits each on 3 predictors, interactions to degree 2.
+#> ℹ `splits` chosen out of bag (lowest corrected OOB RMSE 2.723); growing stopped at
+#> 12 splits.
 #> ℹ Forest is not purified.
 #> 
 #> ── Tree growing 
 #>    split_structure: leaves
-#>          split_try: 10
-#>              t_try: 0.4
+#>          split_try: 3
+#>              t_try: 0.1
 #>     max_candidates: 50
 #>   split_decay_rate: 0.1
 #>      delete_leaves: TRUE

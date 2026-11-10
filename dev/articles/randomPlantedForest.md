@@ -13,7 +13,7 @@ approximation needed.
 library(randomPlantedForest)
 ```
 
-## Fitting a regression forest
+## Fitting a regression model
 
 To see what the model recovers, we simulate data where the true
 components are known. The outcome depends on `x1`, `x2` and `x3` through
@@ -53,44 +53,102 @@ sim$y <- 1 +
 
 ``` r
 
-rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50)
-rpfit
-#> ── Regression Random Planted Forest ────────────────────────────────────────────
-#> Formula: `y ~ .`
-#> 50 tree families with 30 splits each on 4 predictors, interactions to degree 2.
-#> ℹ Forest is not purified.
+model <- rpf(y ~ ., data = sim, nthreads = 2)
+model
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 4 components.
+#> Intercept: 0.998346
 #> 
-#> ── Tree growing 
-#>    split_structure: leaves
-#>          split_try: 10
-#>              t_try: 0.4
-#>     max_candidates: 50
-#>   split_decay_rate: 0.1
-#>      delete_leaves: TRUE
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  x1:x2     34%       
+#>  x1        34%       
+#>  x2        26%       
+#>  x3        5.4%      
 #> 
-#> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
+#> How it was chosen:
+#>   The forest: 200 tree families of 84 splits (chosen out of bag; growing stopped at 168).
+#>   From the forest's 14 nonzero components (purified): those with a share of at least 3% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 1954012425) among 16 candidates.
+#>   Left out: 10 components, shares together 0.19% (largest x1:x3, 0.054%).
 ```
 
-`max_interaction = 2` restricts the forest to main effects and two-way
-interactions. This is the central tuning choice of the method: lower
-values give a more interpretable, more constrained model, while
-`max_interaction = 0` allows interactions of any order. `ntrees` sets
-the number of tree families in the ensemble.
+With its defaults,
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+does three things in one call:
+
+1.  It grows a forest of 200 tree families, each a sum of trees on up to
+    three predictors (`max_interaction = 3`), and chooses the number of
+    splits while the families grow: by the error on the training rows
+    that a family’s bootstrap sample left out (out of bag), stopping
+    once more splits no longer help (`splits = NULL`).
+2.  It prunes the forest’s components with
+    [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md):
+    a component is kept if its share of the variance of the prediction
+    is large enough, either as it is or with one refitted coefficient
+    per kept component; the rule and the threshold are again chosen out
+    of bag (`prune = NULL`, that is `TRUE`).
+3.  It shows every kept component of three predictors in at most 10 heat
+    maps (`max_panels = 10`), coarsening it if needed, and prunes again.
+
+The result is the pruned model. Here it keeps the three main effects and
+the `x1:x2` interaction, and drops `x4` and the other interactions,
+which the data do not have.
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+gives every kept component as it enters the prediction (see “Decomposing
+predictions” below):
+
+``` r
+
+names(predict_components(model, new_data = sim)$m)
+#> [1] "x1"    "x2"    "x3"    "x1:x2"
+```
 
 Prediction works as usual:
 
 ``` r
 
-predict(rpfit, new_data = head(sim))
+predict(model, new_data = head(sim))
 #> # A tibble: 6 × 1
 #>     .pred
 #>     <dbl>
-#> 1 -0.217 
-#> 2  0.0562
-#> 3  1.27  
-#> 4  3.83  
+#> 1 -0.326 
+#> 2  0.0131
+#> 3  1.17  
+#> 4  4.00  
 #> 5  1.17  
-#> 6  0.955
+#> 6  0.831
+```
+
+`prune = FALSE` returns the forest itself, with all its components, as
+earlier versions did. `max_interaction` is the central choice of the
+method: lower values give a more constrained model,
+`max_interaction = 0` allows interactions of any order. `ntrees` sets
+the number of tree families, and `splits = <number>` fixes the number of
+splits instead of choosing it. The forest below is restricted to main
+effects and two-way interactions:
+
+``` r
+
+rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50, prune = FALSE)
+rpfit
+#> ── Regression Random Planted Forest ────────────────────────────────────────────
+#> Formula: `y ~ .`
+#> 50 tree families with 141 splits each on 4 predictors, interactions to degree
+#> 2.
+#> ℹ `splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at
+#> 141 splits.
+#> ℹ Forest is not purified.
+#> 
+#> ── Tree growing 
+#>    split_structure: leaves
+#>          split_try: 3
+#>              t_try: 0.1
+#>     max_candidates: 50
+#>   split_decay_rate: 0.1
+#>      delete_leaves: TRUE
+#> 
+#> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
 ```
 
 Note that
@@ -113,7 +171,7 @@ the same data:
 
 ``` r
 
-small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10)
+small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10, prune = FALSE)
 plot(small)
 ```
 
@@ -153,7 +211,8 @@ forest, which
 [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
 computes. With a single family and few splits the estimates are coarse,
 which is why the next section uses the forest of 50 families fitted
-above.
+above. The pruned model’s components are the same averages over its
+families, but only the kept ones, each multiplied by its coefficient.
 
 ## Decomposing predictions
 
@@ -168,14 +227,16 @@ sum of low-dimensional components:
 returns exactly this decomposition: an intercept and one column per main
 effect and interaction term, evaluated on the supplied data. The forest
 is *purified* internally to make the decomposition unique, which is why
-the print method above reports the purification state.
+the print method above reports the purification state. For the pruned
+model, `predict_components(model, new_data = sim)` returns the kept
+components in the same form.
 
 ``` r
 
 components <- predict_components(rpfit, new_data = sim)
 
 components$intercept
-#> [1] 0.9862793
+#> [1] 0.9868946
 names(components$m)
 #>  [1] "x1"    "x2"    "x3"    "x4"    "x1:x2" "x1:x3" "x1:x4" "x2:x3" "x2:x4"
 #> [10] "x3:x4"
@@ -201,8 +262,8 @@ other interactions are close to zero, as they should be.
 ``` r
 
 round(sort(sapply(components$m, sd), decreasing = TRUE), 3)
-#> x1:x2    x1    x2    x3 x2:x3 x1:x3    x4 x1:x4 x2:x4 x3:x4 
-#> 0.656 0.655 0.573 0.258 0.026 0.007 0.000 0.000 0.000 0.000
+#>    x1 x1:x2    x2    x3 x1:x3 x2:x3 x2:x4 x1:x4 x3:x4    x4 
+#> 0.677 0.640 0.592 0.276 0.026 0.025 0.022 0.020 0.014 0.011
 ```
 
 The estimated main effects follow the true functions (blue lines). As
@@ -293,18 +354,18 @@ automatically fits a classification forest. We illustrate with the
 
 penguins <- na.omit(palmerpenguins::penguins)
 
-rpfit_sex <- rpf(sex ~ ., data = penguins, ntrees = 50)
+rpfit_sex <- rpf(sex ~ ., data = penguins, nthreads = 2)
 
 predict(rpfit_sex, head(penguins), type = "prob")
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1       0.0301    0.970  
-#> 2       0.817     0.183  
-#> 3       0.998     0.00219
-#> 4       0.997     0.00322
-#> 5       0.0284    0.972  
-#> 6       0.996     0.00386
+#> 1        0.327     0.673 
+#> 2        0.775     0.225 
+#> 3        0.940     0.0602
+#> 4        0.807     0.193 
+#> 5        0.181     0.819 
+#> 6        0.916     0.0836
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -317,7 +378,10 @@ predict(rpfit_sex, head(penguins), type = "class")
 #> 6 female
 ```
 
-With the default `loss = "exponential"` (or `"logit"`), `type = "link"`
+A classification model goes through the same steps as a regression
+model: the number of splits is chosen out of bag and the components are
+pruned, both by the log-loss of the predicted probabilities. With the
+default `loss = "exponential"` (or `"logit"`), `type = "link"`
 additionally gives raw predictions on the log-odds scale.
 
 ### Multiclass
@@ -327,18 +391,18 @@ contain one column per class:
 
 ``` r
 
-rpfit_species <- rpf(species ~ ., data = penguins, ntrees = 50)
+rpfit_species <- rpf(species ~ ., data = penguins, nthreads = 2)
 
 predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000        1.61e-15     1.48e-10
-#> 2        1.000        5.25e-15     1.46e- 9
-#> 3        1.000        2.61e-15     1.67e-10
-#> 4        1.000        1.74e-15     1.43e-10
-#> 5        1.000        1.25e-15     1.34e-10
-#> 6        1.000        2.66e-15     1.79e-10
+#> 1        1.000        1.80e-13     1.60e-11
+#> 2        1.000        3.98e-13     9.66e-10
+#> 3        1.000        2.74e-13     4.47e-11
+#> 4        1.000        1.89e-13     1.04e-11
+#> 5        1.000        2.25e-13     1.18e-11
+#> 6        1.000        2.76e-13     6.91e-11
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -352,12 +416,13 @@ predict(rpfit_species, head(penguins), type = "class")
 ```
 
 The default loss for classification is `"exponential"`, which gives
-proper probability estimates. `"logit"` gives similar results but is
-slower, while `"L1"` and `"L2"` fit class indicators directly and do not
-yield proper probabilities. Note that with `loss = "logit"`, multiclass
-models are fit on a reference-class (log-odds) scale, so link
-predictions and components have one column less than there are classes:
-see
+proper probability estimates (with more than two classes it is the
+multiclass exponential loss SAMME). `"logit"` gives similar results
+after pruning but is slower, while `"L1"` and `"L2"` fit class
+indicators directly and do not yield proper probabilities. Note that
+with `loss = "logit"`, multiclass models are fit on a reference-class
+(log-odds) scale, so link predictions and components have one column
+less than there are classes: see
 [`?predict.rpf`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
 for details.
 
@@ -382,18 +447,18 @@ rec <- recipe(body_mass_g ~ ., data = peng_raw) |>
   step_impute_median(all_numeric_predictors()) |>
   step_impute_mode(all_nominal_predictors())
 
-rpfit_rec <- rpf(rec, data = peng_raw, ntrees = 50)
+rpfit_rec <- rpf(rec, data = peng_raw, nthreads = 2)
 
 predict(rpfit_rec, head(peng_raw))
 #> # A tibble: 6 × 1
 #>   .pred
 #>   <dbl>
-#> 1 3744.
-#> 2 3470.
-#> 3 3598.
-#> 4 3503.
-#> 5 3984.
-#> 6 3364.
+#> 1 3728.
+#> 2 3381.
+#> 3 3542.
+#> 4 3414.
+#> 5 3937.
+#> 6 3300.
 ```
 
 The preprocessing steps are stored with the model and applied
@@ -439,6 +504,7 @@ all.equal(
 #> [1] TRUE
 ```
 
+Pruned models are saved the same way: `rpf_marshal(model)`.
 Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method
 wrapping the same mechanism is available via
 [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)

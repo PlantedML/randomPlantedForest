@@ -5,9 +5,10 @@ The points of greediness that `rpf(tune = )` searches: pairs of
 (share of the possible splits drawn as candidates in each round),
 greediest first. Each step down the ladder halves `t_try` and
 `split_try` (rounded up, at least 1), from 40 / 1 to 1 / 0.003125,
-except the first, which takes `t_try` from 1 to 0.8. Row 3 is
+except the first, which takes `t_try` from 1 to 0.8. Row 3 is the other
+split structures' default, 10 / 0.4; row 5 is
 [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)'s
-default, 10 / 0.4.
+default for `split_structure = "leaves"`, 3 / 0.1.
 
 ## Usage
 
