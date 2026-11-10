@@ -313,12 +313,18 @@
 #' threshold with that many rows on each side. The fast draw is about 2.5 times
 #' as fast on large data with many splits. The option is read when the forest
 #' is fitted and stored in `params$exact_draw`; it does not affect the other
-#' split structures. To reproduce a fit of version 0.5.0, set it and give
-#' 0.5.0's defaults (see the last example):
+#' split structures. To reproduce a regression fit of version 0.5.0, set it and
+#' give 0.5.0's defaults, as the example "A regression forest of version 0.5.0"
+#' does:
 #'
 #' ```r
 #' options(randomPlantedForest.exact_draw = TRUE)
 #' ```
+#'
+#' Classification fits of 0.5.0 cannot be reproduced: they changed for every
+#' split structure and loss (see NEWS: classification uses regression's split
+#' structures, the largest value of a predictor can be split off, and three or
+#' more classes with the exponential loss use SAMME).
 #'
 #' ## Reproducibility
 #'
@@ -517,7 +523,7 @@
 #' rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 #'
 #' \donttest{
-#' # The forest of earlier versions (0.5.0): their defaults and the exact draw
+#' # A regression forest of version 0.5.0: its defaults and the exact draw
 #' old <- options(randomPlantedForest.exact_draw = TRUE)
 #' set.seed(1)
 #' rpfit <- rpf(
@@ -874,7 +880,7 @@ rpf_bridge <- function(
   if (max_interaction == 0) {
     max_interaction <- p
   }
-  # same applies to values > p, silently, as the default of 2 exceeds p for a single predictor
+  # same applies to values > p, silently, as the default of 3 exceeds p for one or two predictors
   if (max_interaction > p) {
     max_interaction <- p
   }

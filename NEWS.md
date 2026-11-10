@@ -12,12 +12,13 @@
   - `ntrees = 200` (was 50): more families had lower test error at every order (2% per doubling) and sparser pruned models.
   The loss is unchanged: `"L2"` for regression and `"exponential"` for classification (with more than two classes the multiclass exponential loss SAMME, see Bug fixes).
   So every default fit changes, regression and classification, and `rpf()` returns an `rpf_pruned` object instead of an `rpf` unless `prune = FALSE`.
-  To fit as before, give master's settings and the exact draw:
+  To fit a regression forest as before, give master's settings and the exact draw:
   ```r
   options(randomPlantedForest.exact_draw = TRUE)
   rpf(..., max_interaction = 2, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4, prune = FALSE)
   ```
-  The default call does more work than before: 0.2 s on `mtcars`, 0.4 s on `iris`, and about 2 minutes with a peak of 5 GB of resident memory (RSS; 2.4 GB of physical footprint) on California housing (16,512 rows) at 8 threads.
+  Classification fits of earlier versions cannot be reproduced this way: they change for every split structure and loss (see Bug fixes: classification uses regression's split structures, the largest value of a predictor can be split off, and three or more classes with the exponential loss use SAMME).
+  The default call does more work than before: 0.2 s on `mtcars`, 0.4 s on `iris`, and about 2.3 minutes with a peak of 4.6 GB of resident memory (RSS; 2.7 GB of physical footprint, which varies by a few tenths of a GB from run to run) on California housing (16,512 rows) at 8 threads, measured with all changes of this version.
 
 ## New features
 
@@ -59,7 +60,7 @@
   `print()` shows the chosen `splits` and where growing stopped.
   It is the new default (see Breaking changes).
   A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
-  A family waiting for the stop pauses at most one doubling past the first families' estimate and grows on if the stop comes later, so a flat out-of-bag curve no longer makes every family grow far past the stop: a three-class fit with the defaults on 100 rows takes 12 s instead of 35 s, with the same forest.
+  A family waiting for the stop pauses at most one doubling past the first families' estimate and grows on if the stop comes later, so a flat out-of-bag curve no longer makes every family grow far past the stop: a three-class fit with `loss = "logit"` and otherwise the defaults on 100 rows took 12 s instead of 35 s, with the same forest (measured when the pause was added, before the plateau stop below).
 * `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression and classification): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
   The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
   With `splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.

@@ -465,11 +465,17 @@ saturation, their fits differ in distribution, though not in accuracy. With
 threshold with that many rows on each side. The fast draw is about 2.5 times
 as fast on large data with many splits. The option is read when the forest
 is fitted and stored in \code{params$exact_draw}; it does not affect the other
-split structures. To reproduce a fit of version 0.5.0, set it and give
-0.5.0's defaults (see the last example):
+split structures. To reproduce a regression fit of version 0.5.0, set it and
+give 0.5.0's defaults, as the example "A regression forest of version 0.5.0"
+does:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{options(randomPlantedForest.exact_draw = TRUE)
 }\if{html}{\out{</div>}}
+
+Classification fits of 0.5.0 cannot be reproduced: they changed for every
+split structure and loss (see NEWS: classification uses regression's split
+structures, the largest value of a predictor can be split off, and three or
+more classes with the exponential loss use SAMME).
 }
 
 \subsection{Reproducibility}{
@@ -665,7 +671,7 @@ rpfit <- rpf(mpg ~ ., data = mtcars, ntrees = 20, splits = 100, oob_path = TRUE,
 rpfit$oob_path[which.min(rpfit$oob_path$oob_rmse), ]
 
 \donttest{
-# The forest of earlier versions (0.5.0): their defaults and the exact draw
+# A regression forest of version 0.5.0: its defaults and the exact draw
 old <- options(randomPlantedForest.exact_draw = TRUE)
 set.seed(1)
 rpfit <- rpf(
