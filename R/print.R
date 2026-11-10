@@ -54,6 +54,17 @@ format.rpf <- function(x, ...) {
     } else {
       cli::cli_alert_info("Forest is not purified.")
     }
+    # NULL for fits from versions before keep_level_order
+    kept <- params$keep_level_order
+    if (length(kept) > 0) {
+      sorted <- setdiff(names(x$factor_levels), kept)
+      # one quantity per cli string, so the two parts are formatted separately
+      msg <- cli::format_inline("Factor{?s} {.var {kept}} {?keeps its/keep their} level order")
+      if (length(sorted) > 0) {
+        msg <- paste0(msg, "; ", cli::format_inline("{.var {sorted}} {?is/are} ordered by the outcome"))
+      }
+      cli::cli_alert_info("{msg}.")
+    }
     if (params$deterministic) {
       cli::cli_alert_warning("Fit deterministically.")
     }

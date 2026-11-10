@@ -31,6 +31,7 @@ rpf(x, ...)
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 )
 
@@ -55,6 +56,7 @@ rpf(x, ...)
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 )
 
@@ -79,6 +81,7 @@ rpf(x, ...)
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 )
 
@@ -103,6 +106,7 @@ rpf(x, ...)
   nthreads = 1,
   export_forest = FALSE,
   deterministic = FALSE,
+  keep_level_order = FALSE,
   ...
 )
 }
@@ -207,6 +211,12 @@ bootstrap, the first \code{max_candidates} possible splits as candidates
 (\code{t_try} is ignored) and evenly spaced thresholds. The result does not
 depend on the seed, and all tree families are identical, so use
 \code{ntrees = 1}. Mainly useful for testing and debugging.}
+
+\item{keep_level_order}{\verb{[logical(1) | character: FALSE]}: Which factor
+predictors keep the order of their levels instead of being ordered by the
+outcome. \code{FALSE} orders every factor by the outcome, \code{TRUE} keeps the level
+order of every factor, and a character vector keeps it for the named
+factor predictors only. See "Factor predictors" below.}
 }
 \value{
 Object of class \code{"rpf"} with model object contained in \verb{$fit}.
@@ -242,6 +252,32 @@ For classification, \code{"exponential"} (the default) and \code{"logit"} fit on
 link scale and are transformed to probabilities, \code{"exponential"} being faster.
 \code{"L1"} and \code{"L2"} fit class indicators directly and their probabilities are
 truncated to \verb{[0, 1]}.
+}
+
+\subsection{Factor predictors}{
+
+Factor predictors, and character predictors, which are converted to
+factors, are coded as integers \verb{1, 2, ...} in an order of their levels, and
+splits are thresholds on these codes. A split therefore separates the levels
+below a cut from those above it in that order.
+
+By default, the levels are ordered by the outcome, so that the levels
+most alike in the outcome are neighbours (Wright and König, 2019):
+\itemize{
+\item regression: by the mean outcome of each level;
+\item binary classification: by the share of the second outcome level;
+\item more than two classes: by the first principal component of the class
+proportions of each level (Coppersmith et al., 1999).
+}
+
+This applies to ordered factors too. With \code{keep_level_order}, the chosen
+factors are instead coded in the order of \code{levels()}, as given, ordered or
+not, so that every split separates neighbouring levels in that order.
+
+The coding is stored in the fit as \verb{$factor_levels}, the levels of each
+factor in the order of their codes. \link[=predict.rpf]{predict()},
+\code{\link[=predict_components]{predict_components()}} and \code{\link[=purify]{purify()}} code new data by these levels, by
+name, so the order of the levels in \code{new_data} does not matter.
 }
 
 \subsection{\code{split_structure}}{
@@ -300,8 +336,21 @@ rpfit <- rpf(x = mtcars[, c("cyl", "wt", "hp")], y = mtcars$mpg, max_interaction
 
 # Classification
 rpfit <- rpf(Species ~ ., data = iris, loss = "exponential")
+
+# A factor that keeps its level order: splits separate neighbouring levels
+cars <- mtcars
+cars$gear <- factor(cars$gear, levels = c(3, 4, 5))
+rpfit <- rpf(mpg ~ gear + wt, data = cars, keep_level_order = "gear")
+rpfit$factor_levels
 }
 \references{
 Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
 directly interpretable tree ensemble. \doi{10.48550/arXiv.2012.14563}
+
+Wright, M. N. & König, I. R. (2019). Splitting on categorical predictors in
+random forests. PeerJ 7:e6339. \doi{10.7717/peerj.6339}
+
+Coppersmith, D., Hong, S. J. & Hosking, J. R. (1999). Partitioning nominal
+attributes in decision trees. Data Mining and Knowledge Discovery 3:197--217.
+\doi{10.1023/A:1009869804967}
 }

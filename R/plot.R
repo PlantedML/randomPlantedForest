@@ -191,8 +191,9 @@ grid_boxes <- function(family) {
 #' @param class `[character(1) | NULL: NULL]`: For multiclass classification,
 #'   the outcome level whose values to plot. `NULL` uses the first level.
 #' @param factor_levels `[logical(1): TRUE]`: Label factors with their
-#'   levels instead of integer codes. Levels are ordered by their association
-#'   with the outcome, as used in the fit.
+#'   levels instead of integer codes. Levels are in the order used in the fit:
+#'   ordered by the outcome, or in their own order with `keep_level_order` (see
+#'   [rpf()]).
 #'
 #' @return A `ggplot` for `type = "tree"`, a `patchwork` for `type = "boxes"`.
 #' @references Hiabu, M., Mammen, E., Meyer, J. T. (2023). Random Planted
