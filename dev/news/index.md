@@ -8,20 +8,20 @@
   has new defaults: a plain `rpf(y ~ ., data)` now returns the pruned
   model (class `rpf_pruned`), for regression and classification. The new
   defaults, each switched by its argument:
-  - `splits = NULL`: the number of splits is chosen out of bag while the
-    forest grows (was 30).
+  - `n_splits = NULL`: the number of splits is chosen out of bag while
+    the forest grows (was 30).
   - `prune = NULL`: the forest is pruned by
     [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
     with its defaults, and every kept component of three or more
     predictors is shown in at most `max_panels = 10` heat maps (was no
     pruning). With `deterministic = TRUE` it means `prune = FALSE` and
-    `splits = NULL` means 30, as there are no out-of-bag rows.
-  - `split_try = NULL, t_try = NULL`: 3 thresholds per candidate and 10%
-    of the possible splits per round for `split_structure = "leaves"`
-    (was 10 / 0.4, still the default of the other split structures). On
-    48 simulated and benchmark data sets this greediness had 5.7% to
-    6.8% lower test error than 10 / 0.4.
-  - The split candidates of `"leaves"` are drawn by the fast draw
+    `n_splits = NULL` means 30, as there are no out-of-bag rows.
+  - `n_try_split_points = NULL, share_candidates = NULL`: 3 thresholds
+    per candidate and 10% of the possible splits per round for
+    `split_structure = "leaf"` (was 10 / 0.4, still the default of the
+    other split structures). On 48 simulated and benchmark data sets
+    this greediness had 5.7% to 6.8% lower test error than 10 / 0.4.
+  - The split candidates of `"leaf"` are drawn by the fast draw
     (`options(randomPlantedForest.exact_draw = FALSE)`, now the
     default): the same distribution as the exact draw, with other random
     numbers, so the same seed gives another forest. It is about 2.5
@@ -29,8 +29,8 @@
   - `max_interaction = 3` (was 2). Order 3 had 15% lower test error than
     order 2 on simulated data and 1.5% on California housing; no limit
     (order p) was worse on California housing and 11 to 41 times slower.
-  - `ntrees = 200` (was 50): more families had lower test error at every
-    order (2% per doubling) and sparser pruned models. The loss is
+  - `n_families = 200` (was 50): more families had lower test error at
+    every order (2% per doubling) and sparser pruned models. The loss is
     unchanged: `"L2"` for regression and `"exponential"` for
     classification (with more than two classes the multiclass
     exponential loss SAMME, see Bug fixes). So every default fit
@@ -43,7 +43,7 @@
   ``` r
 
   options(randomPlantedForest.exact_draw = TRUE)
-  rpf(..., max_interaction = 2, ntrees = 50, splits = 30, split_try = 10, t_try = 0.4, prune = FALSE)
+  rpf(..., max_interaction = 2, n_families = 50, n_splits = 30, n_try_split_points = 10, share_candidates = 0.4, prune = FALSE)
   ```
 
   Classification fits of earlier versions cannot be reproduced this way:
@@ -56,6 +56,41 @@
   footprint, which varies by a few tenths of a GB from run to run) on
   California housing (16,512 rows) at 8 threads, measured with all
   changes of this version.
+
+### Renamed arguments
+
+- Four arguments of
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  and the split structures have clearer names; the prefix gives the unit
+  (`n_` a count, `share_` a share in (0, 1\], `max_` a cap):
+  - `ntrees` → `n_families` (the number of tree families),
+  - `splits` → `n_splits` (splits per tree family),
+  - `split_try` → `n_try_split_points` (split points tried per
+    candidate),
+  - `t_try` → `share_candidates` (share of the possible splits drawn as
+    candidates each round);
+  - `split_structure`: `"leaves"` → `"leaf"`, `"hist"` →
+    `"leaf_binned"`, `"cur_trees_1"` → `"tree_then_leaf"`,
+    `"cur_trees_2"` → `"tree_then_all_leaves"`, `"res_trees"` →
+    `"target_tree_then_leaf"` (the candidate, then how the leaf to split
+    is found).
+- The old names still work and give the same fit, with a deprecation
+  warning once per session for each old name (class
+  `lifecycle_warning_deprecated`;
+  `options(lifecycle_verbosity = "warning")` warns every time, `"quiet"`
+  never); giving an argument under both names is an error. The same
+  holds for `oob_path_checkpoints(splits = )` and for a
+  [`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
+  ladder with the columns `split_try` and `t_try`.
+- The new names are used in
+  [`print()`](https://rdrr.io/r/base/print.html), in the tables of the
+  new features (the `n_splits` column of `$oob_path`, the tuning’s
+  `$tune$search` and `$tune$settings`,
+  [`greediness_ladder()`](https://plantedml.com/randomPlantedForest/dev/reference/greediness_ladder.md)),
+  and in errors and documentation. A fitted model’s `$params` keeps the
+  old names (`ntrees`, `splits`, `split_try`, `t_try` and the old
+  `split_structure` values), so code that reads them, and models saved
+  by 0.5.0, keep working.
 
 ### New features
 
@@ -155,28 +190,29 @@
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md))
   at four checkpoints per doubling of the splits
   ([`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/dev/reference/oob_path_checkpoints.md)),
-  or at given ones. On 52 data sets, choosing `splits` by the lowest
+  or at given ones. On 52 data sets, choosing `n_splits` by the lowest
   corrected error among the values of a cross-validation grid did as
   well as 5-fold cross-validation over that grid (test error 0.06% lower
   on average), at 0.9 of its cost. The fitted forest is the same as
   without `oob_path`, which is off by default.
-- `rpf(splits = NULL)` chooses the number of splits out of bag while the
-  forest grows (regression and classification). The forest’s corrected
-  out-of-bag error is followed at four checkpoints per doubling of the
-  splits, growing stops once its lowest value is one doubling back (at
-  most 25,600 splits), and the forest at the lowest error is returned:
-  the forest that
+- `rpf(n_splits = NULL)` chooses the number of splits out of bag while
+  the forest grows (regression and classification). The forest’s
+  corrected out-of-bag error is followed at four checkpoints per
+  doubling of the splits, growing stops once its lowest value is one
+  doubling back (at most 25,600 splits), and the forest at the lowest
+  error is returned: the forest that
   [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
-  with that many `splits` and the same seed gives. On 52 data sets this
-  chose the same `splits` as the lowest error along a fixed budget of
-  3,200 splits on 50, and a later, lower minimum on the other two, while
-  growing 0.72 of the splits. The tree families grow one at a time,
-  `nthreads` together, and keep only their out-of-bag predictions and a
-  40-byte record per split, from which the chosen forest is rebuilt
-  without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1
-  GB) bounds the memory of families waiting for the stop.
+  with that many `n_splits` and the same seed gives. On 52 data sets
+  this chose the same `n_splits` as the lowest error along a fixed
+  budget of 3,200 splits on 50, and a later, lower minimum on the other
+  two, while growing 0.72 of the splits. The tree families grow one at a
+  time, `nthreads` together, and keep only their out-of-bag predictions
+  and a 40-byte record per split, from which the chosen forest is
+  rebuilt without a refit;
+  `options(randomPlantedForest.adaptive_pause_gb)` (1 GB) bounds the
+  memory of families waiting for the stop.
   [`print()`](https://rdrr.io/r/base/print.html) shows the chosen
-  `splits` and where growing stopped. It is the new default (see
+  `n_splits` and where growing stopped. It is the new default (see
   Breaking changes). A corrected out-of-bag error at or below 0 at a
   checkpoint (a correction that overshot; never observed) is not chosen
   unless all are. A family waiting for the stop pauses at most one
@@ -192,7 +228,7 @@
   the stop on a new minimum alone). The choice is still the lowest error
   among the splits grown, so the plateau stop changes the forest only
   where the lowest error would have come later. On recorded paths it
-  chose the same `splits` as the stop on a new minimum alone on all 44
+  chose the same `n_splits` as the stop on a new minimum alone on all 44
   synthetic regression sets, 4 splits of California housing and 24
   classification fits (logit and exponential loss, binary and three
   classes), and grew 10% (regression) to 29% (classification) fewer
@@ -216,7 +252,7 @@
   10 by default, `Inf` for no coarsening). The result equals
   `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the
   same random number state, for the formula, x/y and recipe interfaces.
-  With `splits = NULL`, one call chooses the number of splits out of
+  With `n_splits = NULL`, one call chooses the number of splits out of
   bag, prunes and returns the model to show. `prune = TRUE` is an error
   with `deterministic = TRUE`, and `purify` is not used with it. It is
   the new default (`prune = NULL`, see Breaking changes);
@@ -224,13 +260,13 @@
 - [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   gains `min_leaf_rows`, the minimum number of rows on each side of
   every split, so in every leaf. Values above 1 need
-  `split_structure = "leaves"` (for classification see below); the
-  default 1 imposes no limit and is accepted everywhere. Leaves that
-  cannot be split with this many rows on each side are no longer drawn
-  as split candidates, and binary predictors are split whenever both
-  sides keep enough rows. The default `min_leaf_rows = 1` fits the same
-  models as before, bit for bit.
-- Classification with `split_structure = "leaves"` (the default) takes
+  `split_structure = "leaf"` (for classification see below); the default
+  1 imposes no limit and is accepted everywhere. Leaves that cannot be
+  split with this many rows on each side are no longer drawn as split
+  candidates, and binary predictors are split whenever both sides keep
+  enough rows. The default `min_leaf_rows = 1` fits the same models as
+  before, bit for bit.
+- Classification with `split_structure = "leaf"` (the default) takes
   `min_leaf_rows` and the fast draw of split candidates
   (`options(randomPlantedForest.exact_draw = FALSE)`) as regression
   does. Both use regression’s draw: the same candidates are left out,
@@ -239,10 +275,10 @@
   `min_leaf_rows = 1` and the exact draw (the default before this
   version) classification fits are unchanged, bit for bit.
 - `rpf(tune = TRUE)` tunes out of bag in one call (regression and
-  classification): the greediness of the split search (`split_try` and
-  `t_try`, on the ladder of the new
+  classification): the greediness of the split search
+  (`n_try_split_points` and `share_candidates`, on the ladder of the new
   [`greediness_ladder()`](https://plantedml.com/randomPlantedForest/dev/reference/greediness_ladder.md))
-  and `min_leaf_rows`. Every forest of the search has `splits` chosen
+  and `min_leaf_rows`. Every forest of the search has `n_splits` chosen
   out of bag and is pruned by
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
   with its defaults, and the forest whose pruned model has the lowest
@@ -262,7 +298,7 @@
   sample), not with the sparse default used here. The default stays
   `tune = FALSE`.
 - Classification forests go through the same pipeline as regression
-  forests: `rpf(oob_path = )`, `rpf(splits = NULL)`,
+  forests: `rpf(oob_path = )`, `rpf(n_splits = NULL)`,
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
   with its display (`max_panels`), `rpf(prune = TRUE)` and
   `rpf(tune = )`. Every out-of-bag choice is scored by the loss’s own
@@ -289,7 +325,7 @@
   0/1 response, bit for bit. With the new defaults (see Breaking
   changes) a classification fit takes all these steps.
 - `options(randomPlantedForest.exact_draw = FALSE)` draws the split
-  candidates of regression with `split_structure = "leaves"` from a tree
+  candidates of regression with `split_structure = "leaf"` from a tree
   of weights kept up to date between rounds, instead of one random
   number per possible split in every round
   ([`?rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
@@ -325,46 +361,49 @@
 
 ### Bug fixes
 
-- `split_structure = "cur_trees_1"` samples leaves in proportion to
+- `split_structure = "tree_then_leaf"` samples leaves in proportion to
   their available thresholds, as documented. After a split, the sampling
   weights of new leaves counted rows instead of distinct values, and the
   cached prefix sums were built incorrectly. Leaves with tied values
   were then drawn too often, and draws were wasted on leaves that cannot
-  be split. With `deterministic = TRUE`, `"cur_trees_1"` evaluated only
-  the first split candidate in every round; it now evaluates the first
-  `max_candidates`, as the other split structures do. Fitted models
-  change for regression with `split_structure = "cur_trees_1"`, random
-  and deterministic.
-- `split_structure = "res_trees"` with `deterministic = TRUE` evaluates
-  thresholds evenly spread over all (predictor, leaf, threshold) triples
-  of a candidate. Previously it tried only the lowest thresholds of each
-  leaf and left most of the variance unexplained. Fitted models change
-  for regression with `split_structure = "res_trees"` and
-  `deterministic = TRUE` only.
-- `split_structure = "cur_trees_2"` with `deterministic = TRUE`
-  evaluates `split_try` thresholds evenly spread over each leaf, as
-  `"cur_trees_1"` does. Previously it tried the 1st to 9th smallest
-  values of each leaf. Fitted models change for regression with
-  `split_structure = "cur_trees_2"` and `deterministic = TRUE` only.
+  be split. With `deterministic = TRUE`, `"tree_then_leaf"` evaluated
+  only the first split candidate in every round; it now evaluates the
+  first `max_candidates`, as the other split structures do. Fitted
+  models change for regression with
+  `split_structure = "tree_then_leaf"`, random and deterministic.
+- `split_structure = "target_tree_then_leaf"` with
+  `deterministic = TRUE` evaluates thresholds evenly spread over all
+  (predictor, leaf, threshold) triples of a candidate. Previously it
+  tried only the lowest thresholds of each leaf and left most of the
+  variance unexplained. Fitted models change for regression with
+  `split_structure = "target_tree_then_leaf"` and `deterministic = TRUE`
+  only.
+- `split_structure = "tree_then_all_leaves"` with `deterministic = TRUE`
+  evaluates `n_try_split_points` thresholds evenly spread over each
+  leaf, as `"tree_then_leaf"` does. Previously it tried the 1st to 9th
+  smallest values of each leaf. Fitted models change for regression with
+  `split_structure = "tree_then_all_leaves"` and `deterministic = TRUE`
+  only.
 - Classification’s split structures were never completed to match
   regression’s. They now use the same candidate pool, the same sampling
   of candidates, leaves and thresholds, and the same aging; only the
   loss differs. With `loss = "L2"` a classification fit on a 0/1
   response now equals the regression fit (same seed). Previously
-  `"cur_trees_1"` was `"cur_trees_2"`; `"res_trees"` used another
-  candidate pool and ignored `split_decay_rate`; `"hist"` only ever
-  split the root, so it fitted an additive model of stumps whatever
-  `max_interaction` was; and `"cur_trees_2"` never split the candidate
-  tree’s own leaves. The fixes above for `"cur_trees_1"` sampling and
-  for `deterministic = TRUE` apply to classification too. Classification
+  `"tree_then_leaf"` was `"tree_then_all_leaves"`;
+  `"target_tree_then_leaf"` used another candidate pool and ignored
+  `split_decay_rate`; `"leaf_binned"` only ever split the root, so it
+  fitted an additive model of stumps whatever `max_interaction` was; and
+  `"tree_then_all_leaves"` never split the candidate tree’s own leaves.
+  The fixes above for `"tree_then_leaf"` sampling and for
+  `deterministic = TRUE` apply to classification too. Classification
   fits change for every `split_structure` and every loss.
 - The internal loss `"exponential_2"` no longer crashes.
 - Splits can separate the largest value of a predictor within a leaf.
-  Previously every split structure except `"leaves"` for regression
+  Previously every split structure except `"leaf"` for regression
   excluded that split, so binary predictors were never split on, and
   classification could not learn from them at all. Fitted models change
   for classification and for regression with `split_structure` other
-  than `"leaves"`.
+  than `"leaf"`.
 - A tree family that makes no split predicts the mean outcome of its
   bootstrap sample, and for classification its class shares (truncated
   to `[epsilon, 1 - epsilon]` with `loss = "logit"` or `"exponential"`).
@@ -436,15 +475,15 @@
   rose by a common `log(1 / epsilon)` that the softmax ignores but the
   weights did not. The weights then no longer matched the probabilities
   [`predict()`](https://rdrr.io/r/stats/predict.html) gives (by factors
-  up to 10^10 in small tests). With `splits` chosen out of bag
-  (`splits = NULL`) and the forest pruned (`prune = TRUE`; order 3, 200
-  families, `split_try = 3`, `t_try = 0.1`, the fast draw) on two
-  simulated three-class data sets, the pruned model’s test log-loss was
-  0.022 and 0.036 above logit’s; it is now 0.061 below and 0.003 above,
-  with 15 and 25 splits chosen instead of 21–25 and 238–400, and on the
-  larger set (4,000 rows) the fit is four times as fast. Fitted models
-  change for `loss = "exponential"` with more than two classes only;
-  binary fits are unchanged.
+  up to 10^10 in small tests). With `n_splits` chosen out of bag
+  (`n_splits = NULL`) and the forest pruned (`prune = TRUE`; order 3,
+  200 families, `n_try_split_points = 3`, `share_candidates = 0.1`, the
+  fast draw) on two simulated three-class data sets, the pruned model’s
+  test log-loss was 0.022 and 0.036 above logit’s; it is now 0.061 below
+  and 0.003 above, with 15 and 25 splits chosen instead of 21–25 and
+  238–400, and on the larger set (4,000 rows) the fit is four times as
+  fast. Fitted models change for `loss = "exponential"` with more than
+  two classes only; binary fits are unchanged.
 - [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
   with `mode = 2` no longer drops training rows that lie on a leaf’s
   lower bound. Purified components and the intercept now equal those of
@@ -507,7 +546,7 @@
   splits (4 tree families, 1 thread), a binary fit takes 0.37 s instead
   of 1.9 s and a three-class fit 0.88 s instead of 2.9 s; with 1,000
   rows and 500 splits, a binary fit takes 2.3 s instead of 26 s.
-- Fitting regression forests with `split_structure = "leaves"` (the
+- Fitting regression forests with `split_structure = "leaf"` (the
   default) is about 1.4 times as fast on larger data, for example 310 s
   → 216 s at 1 thread and 50 s → 34 s at 8 threads on California housing
   (16,512 rows, `max_interaction = 3`, 10,000 splits). Fitted models are
@@ -521,9 +560,9 @@
   rows) prediction takes 1.9 s instead of 5.7 s at 1 thread and 0.45 s
   instead of 1.26 s at 8 threads; with `delete_leaves = FALSE`, 2.9 s
   instead of 10.7 s and 0.71 s instead of 2.07 s.
-- Fitting regression forests with `split_structure = "cur_trees_1"` is
-  about 6 times as fast and needs less memory, for example 1,299 s → 216
-  s at 1 thread and 238 s → 38 s at 8 threads on California housing
+- Fitting regression forests with `split_structure = "tree_then_leaf"`
+  is about 6 times as fast and needs less memory, for example 1,299 s →
+  216 s at 1 thread and 238 s → 38 s at 8 threads on California housing
   (16,512 rows, `max_interaction = 3`, 10,000 splits), with the peak
   memory at 8 threads down from 2.5 GB to 0.9 GB. Fitted models are
   bitwise unchanged.
@@ -556,10 +595,10 @@
   [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
   keeps every piece of every component, which grows steeply with the
   order: on California housing (16,512 rows, 200 tree families,
-  `split_try = 3`, `t_try = 0.1`, the fast draw, 8 threads; both builds
-  measured when this change was made) the whole call
-  `rpf(splits = NULL, prune = TRUE)` at `max_interaction = 8` (all
-  predictors) was stopped at 12 GB of resident memory (RSS) while
+  `n_try_split_points = 3`, `share_candidates = 0.1`, the fast draw, 8
+  threads; both builds measured when this change was made) the whole
+  call `rpf(n_splits = NULL, prune = TRUE)` at `max_interaction = 8`
+  (all predictors) was stopped at 12 GB of resident memory (RSS) while
   purifying, and now finishes with a peak physical footprint of 6.4 GB
   (9.9 GB RSS), most of it the coarsened components of the display; at
   order 3 the footprint peaks at 2.3 GB instead of 3.2 GB (RSS 4.1 GB

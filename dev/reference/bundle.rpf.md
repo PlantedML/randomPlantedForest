@@ -46,7 +46,7 @@ or the restored
 ## Examples
 
 ``` r
-fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10, prune = FALSE)
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
 b <- bundle::bundle(fit)
 tmp <- tempfile(fileext = ".rds")
 saveRDS(b, tmp)

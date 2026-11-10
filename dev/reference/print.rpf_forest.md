@@ -36,7 +36,7 @@ str(object, ...)
 
 ``` r
 
-rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, ntrees = 10, export_forest = TRUE, prune = FALSE)
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, n_families = 10, export_forest = TRUE, prune = FALSE)
 print(rpfit$forest)
 #> <rpf_forest> of 10 trees
 str(rpfit$forest)

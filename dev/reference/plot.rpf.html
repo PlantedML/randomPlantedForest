@@ -80,7 +80,7 @@ tree families.</p>
 
 
 <dt id="arg-family">family<a class="anchor" aria-label="anchor" href="#arg-family"></a></dt>
-<dd><p><code>[integer(1): 1]</code>: Which tree family to extract, between 1 and <code>ntrees</code>.</p></dd>
+<dd><p><code>[integer(1): 1]</code>: Which tree family to extract, between 1 and <code>n_families</code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -132,8 +132,8 @@ the order of splits or which leaf a tree grew from, so the splits within
 a tree are reconstructed: the diagram shows a split structure consistent
 with the leaves, and dashed lines link trees to the trees they could
 have grown from. Leaves that overlap other leaves of the same tree hang
-from dotted lines. Readable for small fits, e.g. <code>ntrees = 1</code> and
-<code>splits = 10</code>.</p></li>
+from dotted lines. Readable for small fits, e.g. <code>n_families = 1</code> and
+<code>n_splits = 10</code>.</p></li>
 <li><p><code>type = "boxes"</code> draws one panel per tree in variable space: leaves of
 trees on one variable as bars from zero to their value, leaves of trees
 on two variables as rectangles filled by their value. Overlapping leaves
@@ -154,7 +154,7 @@ Forest: a directly interpretable tree ensemble. arXiv:2012.14563.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, ntrees <span class="op">=</span> <span class="fl">1</span>, splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span>, n_families <span class="op">=</span> <span class="fl">1</span>, n_splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rpfit</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="plot.rpf-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="purify.html">purify</a></span><span class="op">(</span><span class="va">rpfit</span><span class="op">)</span></span></span>

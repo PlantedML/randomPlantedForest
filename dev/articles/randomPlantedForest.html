@@ -135,7 +135,7 @@ call:</p>
 three predictors (<code>max_interaction = 3</code>), and chooses the
 number of splits while the families grow: by the error on the training
 rows that a family’s bootstrap sample left out (out of bag), stopping
-once more splits no longer help (<code>splits = NULL</code>).</li>
+once more splits no longer help (<code>n_splits = NULL</code>).</li>
 <li>It prunes the forest’s components with
 <code><a href="../reference/prune_components.html">prune_components()</a></code>: a component is kept if its share of the
 variance of the prediction is large enough, either as it is or with one
@@ -170,28 +170,28 @@ enters the prediction (see “Decomposing predictions” below):</p>
 components, as earlier versions did. <code>max_interaction</code> is the
 central choice of the method: lower values give a more constrained
 model, <code>max_interaction = 0</code> allows interactions of any
-order. <code>ntrees</code> sets the number of tree families, and
-<code>splits = &lt;number&gt;</code> fixes the number of splits instead
-of choosing it. The forest below is restricted to main effects and
-two-way interactions:</p>
+order. <code>n_families</code> sets the number of tree families, and
+<code>n_splits = &lt;number&gt;</code> fixes the number of splits
+instead of choosing it. The forest below is restricted to main effects
+and two-way interactions:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">50</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, n_families <span class="op">=</span> <span class="fl">50</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
 <span><span class="co">#&gt; ── Regression Random Planted Forest ────────────────────────────────────────────</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">Formula</span>: `y ~ .`</span></span>
 <span><span class="co">#&gt; <span style="color: #0000BB;">50</span> tree families with <span style="color: #0000BB;">141</span> splits each on <span style="color: #0000BB;">4</span> predictors, <span style="font-style: italic;">interactions to degree</span></span></span>
 <span><span class="co">#&gt; <span style="color: #0000BB; font-style: italic;">2</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> `splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> `n_splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at</span></span>
 <span><span class="co">#&gt; <span style="color: #0000BB;">141</span> splits.</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Forest is not purified.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; ── Tree growing </span></span>
-<span><span class="co">#&gt;    split_structure: leaves</span></span>
-<span><span class="co">#&gt;          split_try: 3</span></span>
-<span><span class="co">#&gt;              t_try: 0.1</span></span>
-<span><span class="co">#&gt;     max_candidates: 50</span></span>
-<span><span class="co">#&gt;   split_decay_rate: 0.1</span></span>
-<span><span class="co">#&gt;      delete_leaves: TRUE</span></span>
+<span><span class="co">#&gt;      split_structure: leaf</span></span>
+<span><span class="co">#&gt;   n_try_split_points: 3</span></span>
+<span><span class="co">#&gt;     share_candidates: 0.1</span></span>
+<span><span class="co">#&gt;       max_candidates: 50</span></span>
+<span><span class="co">#&gt;     split_decay_rate: 0.1</span></span>
+<span><span class="co">#&gt;        delete_leaves: TRUE</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Fit using <span style="color: #0000BB;">1</span> thread, also the default for `predict()` and `purify()`.</span></span></code></pre></div>
 <p>Note that <code><a href="../reference/rpf.html">rpf()</a></code> does not handle missing values: rows
@@ -202,7 +202,7 @@ the model specification).</p>
 <div class="section level2">
 <h2 id="inside-a-tree-family">Inside a tree family<a class="anchor" aria-label="anchor" href="#inside-a-tree-family"></a>
 </h2>
-<p>The forest averages <code>ntrees</code> tree families. Unlike a
+<p>The forest averages <code>n_families</code> tree families. Unlike a
 single CART tree, a family consists of several trees, each splitting on
 its own set of variables, and it predicts a point by adding up the
 values of all leaves containing it. New trees grow from existing ones by
@@ -212,7 +212,7 @@ variables.</p>
 <p>To look at one family, we fit a forest with a single, small family to
 the same data:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">small</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, ntrees <span class="op">=</span> <span class="fl">1</span>, splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">small</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, n_families <span class="op">=</span> <span class="fl">1</span>, n_splits <span class="op">=</span> <span class="fl">10</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">small</span><span class="op">)</span></span></code></pre></div>
 <p><img src="randomPlantedForest_files/figure-html/fit-small-1.png" class="r-plt" alt="" width="100%"></p>
 <p>The trees are arranged in rows by the number of variables they split

@@ -293,15 +293,15 @@ components.
   fitted on it. The final model's are fitted on all rows with at least
   one OOB family.
 
-- An OOB mean averages `m_i` families (about 37% of `B = ntrees`), the
-  final model all `B`, so the OOB prediction scatters more around its
-  expectation. The OOB MSE is therefore corrected: per row it subtracts
-  `(1 / m_i - 1 / B) * v_i`, with `v_i` the across-family variance of
-  the candidate's prediction, estimated from the OOB means over the even
-  and over the odd families (for a row whose OOB families are all even
-  or all odd: the mean estimate of the other rows). Without the
-  correction, the noise of the OOB components makes the candidates look
-  worse than they are. The uncorrected values are reported as
+- An OOB mean averages `m_i` families (about 37% of `B = n_families`),
+  the final model all `B`, so the OOB prediction scatters more around
+  its expectation. The OOB MSE is therefore corrected: per row it
+  subtracts `(1 / m_i - 1 / B) * v_i`, with `v_i` the across-family
+  variance of the candidate's prediction, estimated from the OOB means
+  over the even and over the odd families (for a row whose OOB families
+  are all even or all odd: the mean estimate of the other rows). Without
+  the correction, the noise of the OOB components makes the candidates
+  look worse than they are. The uncorrected values are reported as
   `oob_rmse_raw`.
 
 - If the correction exceeds a candidate's uncorrected MSE, its corrected
@@ -321,9 +321,9 @@ components.
   of `"R"` within 4.4% except once (+11.5% at 10 families with a 3-way
   interaction), and the OOB choice was as good as the CV's or better
   from 10 families on (within 0.4% in test error, or better by 7-10%
-  where the CV's fold fits choose poorly). Below 10 families (`ntrees`),
-  the default `select_by` scores by CV instead (with a message); an
-  explicit `select_by = "oob"` warns.
+  where the CV's fold fits choose poorly). Below 10 families
+  (`n_families`), the default `select_by` scores by CV instead (with a
+  message); an explicit `select_by = "oob"` warns.
 
 - A deterministic forest has no out-of-bag rows, and a forest restored
   by
@@ -447,12 +447,13 @@ subsets of the trees' predictor sets). The memory is the forest's plus
 about `n` doubles per component, three times that for the out-of-bag
 choice, plus one family's components at a time per thread; storing the
 kept components passes over the families once more. On California
-housing (16,512 rows, 200 families, `split_try = 3`, `t_try = 0.1`, the
-fast draw, 8 threads; measured when this column pass was added) the
-whole call of `rpf(splits = NULL, prune = TRUE)` peaked at 2.3 GB of
-physical footprint (4.1 GB of resident memory, RSS) at order 3, and at
-6.4 GB (9.9 GB RSS) at order 8 (all predictors), most of it the 31
-coarsened components the display keeps; there
+housing (16,512 rows, 200 families, `n_try_split_points = 3`,
+`share_candidates = 0.1`, the fast draw, 8 threads; measured when this
+column pass was added) the whole call of
+`rpf(n_splits = NULL, prune = TRUE)` peaked at 2.3 GB of physical
+footprint (4.1 GB of resident memory, RSS) at order 3, and at 6.4 GB
+(9.9 GB RSS) at order 8 (all predictors), most of it the 31 coarsened
+components the display keeps; there
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
 alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and
 the purification.
@@ -513,7 +514,7 @@ with `prune = TRUE` fits and prunes in one call.
 set.seed(1)
 x <- matrix(runif(600 * 4, -1, 1), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
 y <- x[, 1] + 2 * x[, 2] * x[, 3] + rnorm(600, sd = 0.3)
-fit <- rpf(x, y, max_interaction = 2, ntrees = 20, splits = 50, prune = FALSE)
+fit <- rpf(x, y, max_interaction = 2, n_families = 20, n_splits = 50, prune = FALSE)
 
 # Rule and threshold chosen out of bag (no refits): the largest tau within one SE
 # of the lowest error
@@ -636,7 +637,7 @@ predict(pruned, x[1:5, ])
 
 # A three-way interaction, shown in at most 4 heat maps
 y3 <- x[, 1] + 4 * x[, 2] * x[, 3] * x[, 4] + rnorm(600, sd = 0.3)
-fit3 <- rpf(x, y3, max_interaction = 3, ntrees = 20, splits = 100, prune = FALSE)
+fit3 <- rpf(x, y3, max_interaction = 3, n_families = 20, n_splits = 100, prune = FALSE)
 shown <- prune_components(fit3, x, y3, max_panels = 4, seed = 1)
 shown
 #> ── Random Planted Forest model ─────────────────────────────────────────────────

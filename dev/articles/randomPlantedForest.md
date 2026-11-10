@@ -81,7 +81,7 @@ does three things in one call:
     three predictors (`max_interaction = 3`), and chooses the number of
     splits while the families grow: by the error on the training rows
     that a family’s bootstrap sample left out (out of bag), stopping
-    once more splits no longer help (`splits = NULL`).
+    once more splits no longer help (`n_splits = NULL`).
 2.  It prunes the forest’s components with
     [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md):
     a component is kept if its share of the variance of the prediction
@@ -123,30 +123,30 @@ predict(model, new_data = head(sim))
 `prune = FALSE` returns the forest itself, with all its components, as
 earlier versions did. `max_interaction` is the central choice of the
 method: lower values give a more constrained model,
-`max_interaction = 0` allows interactions of any order. `ntrees` sets
-the number of tree families, and `splits = <number>` fixes the number of
-splits instead of choosing it. The forest below is restricted to main
-effects and two-way interactions:
+`max_interaction = 0` allows interactions of any order. `n_families`
+sets the number of tree families, and `n_splits = <number>` fixes the
+number of splits instead of choosing it. The forest below is restricted
+to main effects and two-way interactions:
 
 ``` r
 
-rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 50, prune = FALSE)
+rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 50, prune = FALSE)
 rpfit
 #> ── Regression Random Planted Forest ────────────────────────────────────────────
 #> Formula: `y ~ .`
 #> 50 tree families with 141 splits each on 4 predictors, interactions to degree
 #> 2.
-#> ℹ `splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at
+#> ℹ `n_splits` chosen out of bag (lowest corrected OOB RMSE 0.3359); growing stopped at
 #> 141 splits.
 #> ℹ Forest is not purified.
 #> 
 #> ── Tree growing 
-#>    split_structure: leaves
-#>          split_try: 3
-#>              t_try: 0.1
-#>     max_candidates: 50
-#>   split_decay_rate: 0.1
-#>      delete_leaves: TRUE
+#>      split_structure: leaf
+#>   n_try_split_points: 3
+#>     share_candidates: 0.1
+#>       max_candidates: 50
+#>     split_decay_rate: 0.1
+#>        delete_leaves: TRUE
 #> 
 #> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
 ```
@@ -159,11 +159,11 @@ this as part of the model specification).
 
 ## Inside a tree family
 
-The forest averages `ntrees` tree families. Unlike a single CART tree, a
-family consists of several trees, each splitting on its own set of
-variables, and it predicts a point by adding up the values of all leaves
-containing it. New trees grow from existing ones by splitting on an
-additional variable, and `max_interaction = 2` limits each tree to at
+The forest averages `n_families` tree families. Unlike a single CART
+tree, a family consists of several trees, each splitting on its own set
+of variables, and it predicts a point by adding up the values of all
+leaves containing it. New trees grow from existing ones by splitting on
+an additional variable, and `max_interaction = 2` limits each tree to at
 most two variables.
 
 To look at one family, we fit a forest with a single, small family to
@@ -171,7 +171,7 @@ the same data:
 
 ``` r
 
-small <- rpf(y ~ ., data = sim, max_interaction = 2, ntrees = 1, splits = 10, prune = FALSE)
+small <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 1, n_splits = 10, prune = FALSE)
 plot(small)
 ```
 

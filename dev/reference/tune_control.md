@@ -27,8 +27,10 @@ tune_control(
 - ladder:
 
   `[data.frame: greediness_ladder()]`: The points of greediness,
-  greediest first: columns `split_try` (whole numbers, at least 1) and
-  `t_try` (in `(0, 1]`).
+  greediest first: columns `n_try_split_points` (whole numbers, at
+  least 1) and `share_candidates` (in `(0, 1]`). The column names of
+  0.5.0, `split_try` and `t_try`, still work, with a deprecation
+  warning.
 
 - search:
 
@@ -40,7 +42,7 @@ tune_control(
   `[integer: c(1, 5, 20, 100)]`: The values of
   [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)'s
   `min_leaf_rows` searched in step 2; the first one is that of step 1.
-  Values above 1 need `split_structure = "leaves"`.
+  Values above 1 need `split_structure = "leaf"`.
 
 - neighbours:
 
@@ -54,7 +56,7 @@ for `rpf(tune = )`.
 ## Details
 
 Every forest has its number of splits chosen out of bag while it grows
-(as `rpf(splits = NULL)`) and is pruned by
+(as `rpf(n_splits = NULL)`) and is pruned by
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
 with its defaults, without the display. A step chooses, among all
 forests grown at the coordinate it varies, the one whose pruned model
@@ -78,17 +80,17 @@ two forests, 3 / 0.1 and 1 / 0.025.
 # The full search and the quick preset
 tune_control()
 #> $ladder
-#>    split_try    t_try
-#> 1         40 1.000000
-#> 2         20 0.800000
-#> 3         10 0.400000
-#> 4          5 0.200000
-#> 5          3 0.100000
-#> 6          2 0.050000
-#> 7          1 0.025000
-#> 8          1 0.012500
-#> 9          1 0.006250
-#> 10         1 0.003125
+#>    n_try_split_points share_candidates
+#> 1                  40         1.000000
+#> 2                  20         0.800000
+#> 3                  10         0.400000
+#> 4                   5         0.200000
+#> 5                   3         0.100000
+#> 6                   2         0.050000
+#> 7                   1         0.025000
+#> 8                   1         0.012500
+#> 9                   1         0.006250
+#> 10                  1         0.003125
 #> 
 #> $search
 #> [1] 3 4 5 6 7 8
@@ -103,17 +105,17 @@ tune_control()
 #> [1] "rpf_tune_control"
 tune_control(search = c(5, 7), min_leaf_rows = 1, neighbours = FALSE)
 #> $ladder
-#>    split_try    t_try
-#> 1         40 1.000000
-#> 2         20 0.800000
-#> 3         10 0.400000
-#> 4          5 0.200000
-#> 5          3 0.100000
-#> 6          2 0.050000
-#> 7          1 0.025000
-#> 8          1 0.012500
-#> 9          1 0.006250
-#> 10         1 0.003125
+#>    n_try_split_points share_candidates
+#> 1                  40         1.000000
+#> 2                  20         0.800000
+#> 3                  10         0.400000
+#> 4                   5         0.200000
+#> 5                   3         0.100000
+#> 6                   2         0.050000
+#> 7                   1         0.025000
+#> 8                   1         0.012500
+#> 9                   1         0.006250
+#> 10                  1         0.003125
 #> 
 #> $search
 #> [1] 5 7
@@ -136,21 +138,21 @@ tuned <- rpf(
   x,
   y,
   max_interaction = 2,
-  ntrees = 10,
+  n_families = 10,
   tune = tune_control(search = c(3, 5), min_leaf_rows = c(1, 20), neighbours = FALSE)
 )
 tuned$tune$search
-#>   step split_try t_try min_leaf_rows splits stopped_at capped oob_rmse_forest
-#> 1    1        10   0.4             1     84        100  FALSE       0.4844060
-#> 2    1         3   0.1             1     59         71  FALSE       0.4459042
-#> 3    2        10   0.4            20    168        200  FALSE       0.3832057
-#>   rule tau n_kept  oob_rmse seconds chosen_step1 chosen_step2 chosen_step3
-#> 1    R 0.1      2 0.3666121   0.082         TRUE        FALSE           NA
-#> 2    R 0.1      2 0.3752002   0.059        FALSE           NA           NA
-#> 3    R 0.1      2 0.3539268   0.199           NA         TRUE           NA
-#>   final
-#> 1 FALSE
-#> 2 FALSE
-#> 3  TRUE
+#>   step n_try_split_points share_candidates min_leaf_rows n_splits stopped_at
+#> 1    1                 10              0.4             1       84        100
+#> 2    1                  3              0.1             1       59         71
+#> 3    2                 10              0.4            20      168        200
+#>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
+#> 1  FALSE       0.4844060    R 0.1      2 0.3666121   0.075         TRUE
+#> 2  FALSE       0.4459042    R 0.1      2 0.3752002   0.046        FALSE
+#> 3  FALSE       0.3832057    R 0.1      2 0.3539268   0.168           NA
+#>   chosen_step2 chosen_step3 final
+#> 1        FALSE           NA FALSE
+#> 2           NA           NA FALSE
+#> 3         TRUE           NA  TRUE
 # }
 ```

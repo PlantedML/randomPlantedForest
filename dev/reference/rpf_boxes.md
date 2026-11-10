@@ -22,7 +22,7 @@ rpf_boxes(x, family = 1L, ...)
 - family:
 
   `[integer(1): 1]`: Which tree family to extract, between 1 and
-  `ntrees`.
+  `n_families`.
 
 - ...:
 
@@ -75,7 +75,7 @@ to plot the boxes.
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 5, splits = 10, prune = FALSE)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 5, n_splits = 10, prune = FALSE)
 head(rpf_boxes(rpfit))
 #>          tree order box     value wt_lower wt_upper hp_lower hp_upper
 #> 1 (Intercept)     0   1  0.000000       NA       NA       NA       NA

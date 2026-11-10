@@ -33,7 +33,7 @@ plot(
 - family:
 
   `[integer(1): 1]`: Which tree family to extract, between 1 and
-  `ntrees`.
+  `n_families`.
 
 - ...:
 
@@ -85,7 +85,7 @@ A `ggplot` for `type = "tree"`, a `patchwork` for `type = "boxes"`.
   structure consistent with the leaves, and dashed lines link trees to
   the trees they could have grown from. Leaves that overlap other leaves
   of the same tree hang from dotted lines. Readable for small fits, e.g.
-  `ntrees = 1` and `splits = 10`.
+  `n_families = 1` and `n_splits = 10`.
 
 - `type = "boxes"` draws one panel per tree in variable space: leaves of
   trees on one variable as bars from zero to their value, leaves of
@@ -113,7 +113,7 @@ directly interpretable tree ensemble. arXiv:2012.14563.
 ## Examples
 
 ``` r
-rpfit <- rpf(mpg ~ wt + hp, data = mtcars, ntrees = 1, splits = 10, prune = FALSE)
+rpfit <- rpf(mpg ~ wt + hp, data = mtcars, n_families = 1, n_splits = 10, prune = FALSE)
 plot(rpfit)
 
 purify(rpfit)
