@@ -722,7 +722,7 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
 
 # The two choices among the candidates from their RMSE and the SE of their MSE (logical vectors). left_out: candidates
 # not chosen unless all are left out (prune_oob_score(): those whose corrected MSE was set to 0, an overshooting
-# correction); they then tie at 0
+# correction); they then tie at 0. This is the rule of oob_lowest(), which the adaptive stop and rpf(tune = ) use
 prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
   if (any(left_out) && !all(left_out)) {
     use <- !left_out
@@ -731,8 +731,9 @@ prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
     return(list(min = spread(ch$min), one_se = spread(ch$one_se)))
   }
   rule_rank <- match(cand$rule, c("D", "R"))
-  # min: the lowest RMSE; ties (relative 1e-12): the larger tau, then D. At a lowest RMSE of 0 the candidates at 0 tie
-  ties <- if (min(rmse) > 0) which(abs(rmse / min(rmse) - 1) <= 1e-12) else which(rmse == 0)
+  # min: the lowest RMSE by oob_lowest() (ties within relative 1e-12): the larger tau, then D. At a lowest RMSE of 0
+  # the candidates at 0 tie (all left out, or a CV RMSE of 0, which is a perfect fit, not an overshooting correction)
+  ties <- if (min(rmse) > 0) oob_lowest(rmse) else which(rmse == 0)
   best <- ties[order(-cand$tau[ties], rule_rank[ties])][1]
   # 1se: the largest tau with MSE within one SE of the minimum; at that tau the lower RMSE, then D
   ok <- which(rmse^2 <= (rmse[best]^2 + se_mse[best]) * (1 + 1e-12))

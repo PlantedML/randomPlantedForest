@@ -208,6 +208,19 @@ test_that("candidates whose corrected OOB MSE was set to 0 are not chosen, unles
   expect_identical(which(ch$one_se), 3L)
 })
 
+test_that("the adaptive stop, the pruning and the tuner choose the lowest corrected error by one rule", {
+  ns <- asNamespace("randomPlantedForest")
+  # a corrected MSE below 0 (the path's, unclamped) or clamped at 0 (the pruning's and the tuner's tables): left out
+  mse <- c(0.5, -0.01, 0.3, 0.31)
+  expect_identical(ns$oob_select(mse), 3L)
+  expect_identical(ns$tune_oob_choose(pmax(mse, 0), simpler = 1:4), 3L)
+  rmse <- sqrt(pmax(mse, 0))
+  cand <- data.frame(rule = rep("D", 4), tau = c(0.03, 0.02, 0.01, 0))
+  expect_identical(which(ns$prune_choose(rmse, rep(0, 4), cand, left_out = rmse == 0)$min), 3L)
+  # all at or below 0: all tie
+  expect_identical(ns$oob_lowest(c(0, -1, 0)), 1:3)
+})
+
 test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   # 32 rows, 10 families: R at a small tau has about as many coefficients as a fold has rows, its predictions differ
   # wildly between the two halves of the families, and the correction exceeds the uncorrected OOB MSE
