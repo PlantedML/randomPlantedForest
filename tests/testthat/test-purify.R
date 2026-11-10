@@ -114,9 +114,9 @@ test_that("purify() above an earlier cap purifies again, as a fresh purification
   y <- X$x1 * X$x2 + X$x2 * X$x3 + X$x1 + rnorm(n, sd = 0.2)
   for (mode in 1:2) {
     set.seed(1)
-    fit <- rpf_050(x = X, y = y, max_interaction = 3, ntrees = 5, splits = 40)
+    fit <- rpf_050(x = X, y = y, max_interaction = 3, n_families = 5, n_splits = 40)
     set.seed(1)
-    fresh <- rpf_050(x = X, y = y, max_interaction = 3, ntrees = 5, splits = 40)
+    fresh <- rpf_050(x = X, y = y, max_interaction = 3, n_families = 5, n_splits = 40)
     purify(fresh, mode = mode)
 
     purify(fit, maxp_interaction = 1, mode = mode)
@@ -146,9 +146,9 @@ test_that("purify() above an earlier cap purifies again, as a fresh purification
 
 test_that("purify() above an earlier cap purifies again for multiclass classification", {
   set.seed(5)
-  fit <- rpf_050(Species ~ ., data = iris, max_interaction = 2, ntrees = 5, loss = "L2")
+  fit <- rpf_050(Species ~ ., data = iris, max_interaction = 2, n_families = 5, loss = "L2")
   set.seed(5)
-  fresh <- rpf_050(Species ~ ., data = iris, max_interaction = 2, ntrees = 5, loss = "L2")
+  fresh <- rpf_050(Species ~ ., data = iris, max_interaction = 2, n_families = 5, loss = "L2")
   purify(fit, maxp_interaction = 1)
   purify(fit)
   purify(fresh)
@@ -157,7 +157,7 @@ test_that("purify() above an earlier cap purifies again for multiclass classific
 })
 
 test_that("purify() checks its arguments on a purified forest too", {
-  fit <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, ntrees = 5)
+  fit <- rpf_050(mpg ~ ., data = mtcars, max_interaction = 2, n_families = 5)
   purify(fit)
   expect_error(purify(fit, mode = 99), "mode")
   expect_error(purify(fit, maxp_interaction = 0), "maxp_interaction")

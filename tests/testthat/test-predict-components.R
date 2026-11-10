@@ -226,7 +226,7 @@ test_that("a subset of predictors returns the other components as remainder", {
 
   for (dd in list(d_reg, d_bin, d_3)) {
     set.seed(1)
-    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 30)
+    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, n_families = 5, n_splits = 30)
     for (purified in c(FALSE, TRUE)) {
       # unpurified: predict_components() purifies in place; then on a forest purified with mode = 1
       if (purified) {
@@ -261,7 +261,7 @@ test_that("predict_components() works with formula terms that are not raw column
   )
   for (case in cases) {
     set.seed(1)
-    fit <- rpf_050(case$formula, data = d, max_interaction = 2, ntrees = 5, splits = 20)
+    fit <- rpf_050(case$formula, data = d, max_interaction = 2, n_families = 5, n_splits = 20)
     pc <- predict_components(fit, d[1:30, ], max_interaction = 1)
     expect_named(pc$m, case$names)
     expect_named(pc$x, case$names)
@@ -273,7 +273,7 @@ test_that("predict_components() works with formula terms that are not raw column
   }
   # x holds the term's values, as the forest sees them
   set.seed(1)
-  fit <- rpf_050(y ~ log(x1) + x2, data = d, ntrees = 5, splits = 20)
+  fit <- rpf_050(y ~ log(x1) + x2, data = d, n_families = 5, n_splits = 20)
   expect_equal(predict_components(fit, d[1:30, ])$x[["log(x1)"]], log(d$x1[1:30]))
 })
 
@@ -283,7 +283,7 @@ test_that("components follow the fit's column order when factors come first", {
   d <- data.frame(f = factor(sample(c("u", "v", "w"), n, TRUE)), x1 = runif(n), x2 = runif(n))
   d$y <- as.integer(d$f) * d$x1 + d$x2 + rnorm(n, sd = 0.2)
   set.seed(1)
-  fit <- rpf_050(y ~ ., data = d, max_interaction = 2, ntrees = 5, splits = 30)
+  fit <- rpf_050(y ~ ., data = d, max_interaction = 2, n_families = 5, n_splits = 30)
 
   # hardhat::mold() puts the factor last
   pc <- predict_components(fit, d[1:40, ])
@@ -310,7 +310,7 @@ test_that("zero rows of new_data give zero rows with the right columns", {
 
   for (dd in list(d_reg, d_bin, d_3)) {
     set.seed(1)
-    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, ntrees = 5, splits = 20)
+    fit <- rpf_050(y ~ ., data = dd, max_interaction = 2, n_families = 5, n_splits = 20)
     full <- predict_components(fit, dd[1:5, ])
     zero <- predict_components(fit, dd[0, ])
     expect_identical(nrow(zero$m), 0L)

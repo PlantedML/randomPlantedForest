@@ -221,13 +221,20 @@ test_that("a fold fit keeps the level order of the factors the forest keeps it f
   df <- data.frame(d$x, g = factor(sample(letters[1:4], 300, replace = TRUE), levels = c("d", "b", "a", "c")))
   df$y <- d$y + c(a = 0, b = 1, c = -1, d = 2)[as.character(df$g)]
   set.seed(5)
-  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, ntrees = 10, splits = 30, keep_level_order = "g")
+  fit <- rpf_050(y ~ ., data = df, max_interaction = 2, n_families = 10, n_splits = 30, keep_level_order = "g")
   ns <- asNamespace("randomPlantedForest")
   rows <- rep_len(1:3, 300) != 1
   tr <- ns$prune_training_data(fit, df, NULL)
   refit <- ns$prune_refit(fit, tr$predictors, tr$y, rows, seed = 7, nthreads = 1L)
   set.seed(7)
-  direct <- rpf_050(y ~ ., data = df[rows, ], max_interaction = 2, ntrees = 10, splits = 30, keep_level_order = "g")
+  direct <- rpf_050(
+    y ~ .,
+    data = df[rows, ],
+    max_interaction = 2,
+    n_families = 10,
+    n_splits = 30,
+    keep_level_order = "g"
+  )
   expect_identical(refit$factor_levels, direct$factor_levels)
   expect_identical(refit$factor_levels$g, c("d", "b", "a", "c"))
   expect_identical(predict(refit, df), predict(direct, df))
@@ -365,7 +372,7 @@ test_that("a constant outcome gives the intercept alone, and it prints", {
   x <- data.frame(x1 = runif(100), x2 = runif(100))
   y <- rep(2, 100)
   set.seed(1)
-  f <- rpf_050(x, y, ntrees = 10, splits = 10)
+  f <- rpf_050(x, y, n_families = 10, n_splits = 10)
   p <- prune_components(f, x, y, seed = 1)
   expect_identical(nrow(p$components), 0L)
   expect_length(p$beta, 0)
@@ -373,7 +380,7 @@ test_that("a constant outcome gives the intercept alone, and it prints", {
   expect_true("  The forest: 10 tree families of 10 splits." %in% capture.output(print(p)))
   # the same through rpf(prune = TRUE), with the splits chosen out of bag
   set.seed(1)
-  q <- rpf(x, y, ntrees = 10, splits = NULL, prune = TRUE)
+  q <- rpf(x, y, n_families = 10, n_splits = NULL, prune = TRUE)
   expect_s3_class(q, "rpf_pruned")
   expect_length(q$beta, 0)
   expect_equal(predict(q, x)$.pred, rep(2, 100))

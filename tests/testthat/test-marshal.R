@@ -253,7 +253,7 @@ test_that("purified round-trip keeps mode 1 grids and mode 2 rectangles apart", 
 
 test_that("a restored capped purification keeps its order, and is purified again only with data", {
   set.seed(2)
-  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, n_families = 10, max_interaction = 3)
   purify(fit, maxp_interaction = 2)
 
   restored <- expect_roundtrip(fit, mtcars)
@@ -275,7 +275,7 @@ test_that("a restored capped purification keeps its order, and is purified again
 
 test_that("a blob without the cap's order restores a capped purification", {
   set.seed(2)
-  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+  fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, n_families = 10, max_interaction = 3)
   purify(fit, maxp_interaction = 2)
   blob <- rpf_marshal(fit, include_data = TRUE)
   # as written before the field existed: the order is unknown and counts as 1
@@ -292,7 +292,7 @@ test_that("a blob without the cap's order restores a capped purification", {
 test_that("a capped purification keeps its store and its cap through the round trip, in both modes", {
   for (mode in 1:2) {
     set.seed(6)
-    fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, ntrees = 10, max_interaction = 3)
+    fit <- rpf_050(mpg ~ wt + cyl + hp + disp, data = mtcars, n_families = 10, max_interaction = 3)
     p0 <- predict(fit, mtcars)
     purify(fit, maxp_interaction = 2, mode = mode)
     blob <- rpf_marshal(fit, include_data = TRUE)
