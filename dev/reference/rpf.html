@@ -70,6 +70,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  max_candidates <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -93,6 +94,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  max_candidates <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -116,6 +118,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  max_candidates <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -139,6 +142,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  max_candidates <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  split_decay_rate <span class="op">=</span> <span class="fl">0.1</span>,</span>
 <span>  delete_leaves <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
 <span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
@@ -224,6 +228,14 @@ choosing it resets its age to zero, and splits are sampled with weight
 <dt id="arg-delete-leaves">delete_leaves<a class="anchor" aria-label="anchor" href="#arg-delete-leaves"></a></dt>
 <dd><p><code>[logical(1): TRUE]</code>: Whether to delete a parent leaf when
 splitting along an existing dimension.</p></dd>
+
+
+<dt id="arg-min-leaf-rows">min_leaf_rows<a class="anchor" aria-label="anchor" href="#arg-min-leaf-rows"></a></dt>
+<dd><p><code>[integer(1): 1]</code>: Minimum number of rows of the
+bootstrap sample on each side of every split, so in every leaf. Leaves
+without a threshold that keeps this many rows on each side are not drawn
+as split candidates. Only for regression with <code>split_structure = "leaves"</code>; <code>1</code>
+(no limit) otherwise.</p></dd>
 
 
 <dt id="arg-loss">loss<a class="anchor" aria-label="anchor" href="#arg-loss"></a></dt>
@@ -334,6 +346,25 @@ evaluate them.</p></li>
 pairs (with probability proportional to its number of available thresholds), then
 uniformly sampling one threshold within that pair.</p></li>
 </ul></div>
+
+<div class="section">
+<h3 id="the-draw-of-candidates-for-leaves">The draw of candidates for <code>leaves</code><a class="anchor" aria-label="anchor" href="#the-draw-of-candidates-for-leaves"></a></h3>
+
+
+<p>For regression with <code>split_structure = "leaves"</code>, the global option
+<code>randomPlantedForest.exact_draw</code> chooses how the candidates are drawn.
+With <code>TRUE</code> (the default), every possible split gets a random number in
+every round. With <code>FALSE</code>, the candidates are drawn from a Fenwick tree
+over the weights, kept up to date between rounds, which costs a few random
+numbers per candidate instead. Both draw from the same distribution, but
+with other random numbers, so the same seed gives another (equally good)
+forest. With <code>min_leaf_rows</code>, both leave out the same candidates: those
+whose leaf has no threshold with that many rows on each side. The fast draw
+pays off on large data with many splits. The option is read when the forest
+is fitted and stored in <code>params$exact_draw</code>; it does not affect
+classification or the other split structures.</p>
+<p></p><div class="sourceCode r"><pre><code><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>randomPlantedForest.exact_draw <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre><p></p></div>
+</div>
 
     </div>
     <div class="section level2">

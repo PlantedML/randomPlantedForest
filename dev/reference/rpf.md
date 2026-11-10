@@ -24,6 +24,7 @@ rpf(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -47,6 +48,7 @@ rpf(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -70,6 +72,7 @@ rpf(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -93,6 +96,7 @@ rpf(
   max_candidates = 50,
   split_decay_rate = 0.1,
   delete_leaves = TRUE,
+  min_leaf_rows = 1,
   loss = NULL,
   delta = 0.001,
   epsilon = 0.1,
@@ -178,6 +182,14 @@ rpf(
 
   `[logical(1): TRUE]`: Whether to delete a parent leaf when splitting
   along an existing dimension.
+
+- min_leaf_rows:
+
+  `[integer(1): 1]`: Minimum number of rows of the bootstrap sample on
+  each side of every split, so in every leaf. Leaves without a threshold
+  that keeps this many rows on each side are not drawn as split
+  candidates. Only for regression with `split_structure = "leaves"`; `1`
+  (no limit) otherwise.
 
 - loss:
 
@@ -296,6 +308,24 @@ candidate is and how its thresholds are evaluated.
   leaf) pair from all valid pairs (with probability proportional to its
   number of available thresholds), then uniformly sampling one threshold
   within that pair.
+
+### The draw of candidates for `leaves`
+
+For regression with `split_structure = "leaves"`, the global option
+`randomPlantedForest.exact_draw` chooses how the candidates are drawn.
+With `TRUE` (the default), every possible split gets a random number in
+every round. With `FALSE`, the candidates are drawn from a Fenwick tree
+over the weights, kept up to date between rounds, which costs a few
+random numbers per candidate instead. Both draw from the same
+distribution, but with other random numbers, so the same seed gives
+another (equally good) forest. With `min_leaf_rows`, both leave out the
+same candidates: those whose leaf has no threshold with that many rows
+on each side. The fast draw pays off on large data with many splits. The
+option is read when the forest is fitted and stored in
+`params$exact_draw`; it does not affect classification or the other
+split structures.
+
+    options(randomPlantedForest.exact_draw = FALSE)
 
 ## References
 
