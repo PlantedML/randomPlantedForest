@@ -18,6 +18,7 @@
 * The C++ code compiles without warnings under `-Wall -pedantic`.
 * `predict_components()` returns one intercept per target level for multiclass classification, named by `target_levels` (#70).
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
+* `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
 
 # randomPlantedForest 0.5.0
 

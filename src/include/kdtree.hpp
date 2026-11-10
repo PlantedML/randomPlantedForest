@@ -137,7 +137,7 @@ private:
   box_outside(const std::vector<double> &minv, const std::vector<double> &maxv, const std::vector<RangeConstraint> &C)
   {
     for (const auto &rc : C) {
-      if (maxv[rc.dim] <= rc.left)
+      if (maxv[rc.dim] < rc.left) // left is inclusive
         return true;
       if (minv[rc.dim] >= rc.right)
         return true;
@@ -151,7 +151,7 @@ private:
     for (const auto &rc : C) {
       if (minv[rc.dim] < rc.left)
         return false;
-      if (maxv[rc.dim] > rc.right)
+      if (maxv[rc.dim] >= rc.right) // right is exclusive
         return false;
     }
     return true;
