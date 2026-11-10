@@ -92,5 +92,5 @@ test_that("`min_leaf_rows` is validated, stored and restored", {
   # params saved before `min_leaf_rows` existed mean 1
   params <- b$params
   params$min_leaf_rows <- NULL
-  expect_equal(tail(rpf_param_vector(params, "regression"), 1), 1)
+  expect_equal(rpf_param_vector(params, "regression")[[14]], 1)
 })

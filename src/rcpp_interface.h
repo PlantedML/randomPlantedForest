@@ -25,6 +25,18 @@ std::vector<GridFamilyExport> list_to_grid(const Rcpp::List &grid);
 // Route core output to the R console and seeds to R's RNG.
 void connect_to_r(RandomPlantedForest &core);
 
+// For tests: rpf_utils::leaves_draw_counts() (the exact or the fast draw of
+// `leaves`) with a seed from R's RNG. rows_ok: empty, or 0 / 1 per entry (0: no
+// valid threshold under min_leaf_rows, never drawn).
+Rcpp::NumericVector leaves_draw_counts(
+    const Rcpp::NumericVector &ages,
+    double decay,
+    int n_candidates,
+    int reps,
+    bool exact,
+    const Rcpp::IntegerVector &rows_ok
+);
+
 template <class Core> class RcppForest {
 public:
   // Construct and fit (regression)

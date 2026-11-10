@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <cstddef>
+#include <cstdint>
 #include <algorithm>
 #include <numeric>
 #include <unordered_set>
@@ -78,15 +79,67 @@ inline void age_pool_by_sample(const std::vector<size_t> &sample_idxs, int best_
 // the package DLL is loaded via LoadLibrary.
 extern thread_local std::vector<std::vector<int>> *tls_working_bin_id_ptr;
 
+// The fast draw of `leaves` (exact_draw = false): the same age-weighted draw
+// without replacement as the exact draw, by a Fenwick tree over the pool's
+// weights, kept up to date between the splits of a tree family. Drawing k
+// entries costs O(k log pool) instead of a random number per pool entry.
+// Entries are drawn one at a time, each with probability proportional to its
+// weight among those not yet drawn: the same distribution as the k smallest
+// exponential keys -log(u) / w of the exact draw, but other random numbers.
+// Methods in splits_leaves.cpp.
+struct LeavesSampler {
+  const void *owner = nullptr; // the pool the tree mirrors
+  size_t synced = 0;           // pool entries [0, synced) are in the tree
+  std::vector<double> w;       // the entries' weights
+  std::vector<double> bit;     // their Fenwick tree (1-based nodes in bit[0..])
+  size_t updates = 0;          // set() calls since the last rebuild()
+  std::vector<double> taken;   // draw(): the drawn entries' weights, restored after it
+  // min_leaf_rows: entries below `synced` whose leaf changed since the last
+  // draw (their rows_ok reset), so their weights are set again before the next
+  std::vector<size_t> dirty;
+  // Forget the weights and mirror the pool `o` from its first entry.
+  void reset(const void *o);
+  // Recompute the tree from the weights (bounds the running sums' rounding).
+  void rebuild();
+  // Change entry i's weight.
+  void set(size_t i, double nw);
+  // Append an entry.
+  void push(double nw);
+  // The sum of all weights.
+  double total() const;
+  // Append to `out` k distinct entries with positive weight, drawn one at a
+  // time in proportion to their weights (fewer if fewer have one).
+  void draw(size_t k, std::vector<size_t> &out);
+};
+
 // Scratch buffers of the `leaves` split search (splits_leaves.cpp), reused
 // across the candidates and splits of one tree family instead of allocated per
 // candidate. Owned by create_tree_family's stack; TLS holds only a pointer to
-// it, for the same reason as above.
+// it, for the same reason as above. The fast draw's sampler lives here too, so
+// it lasts exactly one tree family.
 struct LeavesScratch {
   std::vector<double> unique, prefix, total;
   std::vector<size_t> first_pos;
   std::vector<std::pair<double, size_t>> keys;
+  LeavesSampler sampler;
 };
+
+namespace rpf_utils {
+// For tests of the two draws of `leaves`: how often each entry of a pool with
+// the given ages is among the n_candidates drawn, over `reps` draws (exact or
+// fast), with the random numbers of a generator seeded with `seed`. The fast
+// draw's tree is kept across the draws, as in a fit. rows_ok: empty, or 0 / 1
+// per entry, as min_leaf_rows sets it (0: never drawn).
+std::vector<double> leaves_draw_counts(
+    const std::vector<double> &ages,
+    double decay,
+    size_t n_candidates,
+    size_t reps,
+    bool exact,
+    const std::vector<int> &rows_ok,
+    uint64_t seed
+);
+} // namespace rpf_utils
 extern thread_local LeavesScratch *tls_leaves_scratch_ptr;
 
 #endif // INTERNAL_UTILS_HPP

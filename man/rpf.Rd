@@ -253,6 +253,25 @@ pairs (with probability proportional to its number of available thresholds), the
 uniformly sampling one threshold within that pair.
 }
 }
+
+\subsection{The draw of candidates for \code{leaves}}{
+
+For regression with \code{split_structure = "leaves"}, the global option
+\code{randomPlantedForest.exact_draw} chooses how the candidates are drawn.
+With \code{TRUE} (the default), every possible split gets a random number in
+every round. With \code{FALSE}, the candidates are drawn from a Fenwick tree
+over the weights, kept up to date between rounds, which costs a few random
+numbers per candidate instead. Both draw from the same distribution, but
+with other random numbers, so the same seed gives another (equally good)
+forest. With \code{min_leaf_rows}, both leave out the same candidates: those
+whose leaf has no threshold with that many rows on each side. The fast draw
+pays off on large data with many splits. The option is read when the forest
+is fitted and stored in \code{params$exact_draw}; it does not affect
+classification or the other split structures.
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{options(randomPlantedForest.exact_draw = FALSE)
+}\if{html}{\out{</div>}}
+}
 }
 \examples{
 # Regression with formula

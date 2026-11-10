@@ -131,7 +131,200 @@ bool min_rows_feasible(const std::vector<std::vector<double>> &X, const Leaf &le
   min_rows_range(first_pos, m, leaf_size, min_rows, lo, hi_excl);
   return lo < hi_excl;
 }
+
+// A pool entry's weight for the fast draw: exp(-decay * age), cached in the
+// entry until its age changes, as draw_leaf_candidates() does. With
+// rows_check, 0 for an entry whose rows_ok is 0, which the exact draw leaves
+// out.
+template <typename Cand> double leaf_weight(Cand &c, double decay, bool rows_check)
+{
+  if (rows_check && c.rows_ok == 0)
+    return 0.0;
+  if (!(c.w_age == c.age)) {
+    c.w = std::exp(-decay * c.age);
+    c.w_age = c.age;
+  }
+  return c.w;
+}
+
+// The fast draw: brings the sampler's tree up to date with the pool, then
+// draws from it. Brought up to date here: the entries appended since the last
+// draw and, with rows_check, the entries whose leaf changed since (fs.dirty,
+// filled where create_tree_family() resets their rows_ok). An entry whose
+// rows_ok is unknown (-1) gets feasible(entry) first, so that every entry's
+// rows_ok is known at the draw, as before the exact draw. The drawn entries'
+// new ages are set after the split, in calcOptimalSplit_leaves().
+template <typename Cand, typename Feasible>
+std::vector<size_t> draw_leaf_candidates_fast(
+    std::vector<Cand> &pool, size_t n_candidates, double decay, LeavesSampler &fs, bool rows_check, Feasible feasible
+)
+{
+  if (fs.owner != static_cast<const void *>(&pool) || fs.synced > pool.size())
+    fs.reset(&pool);
+  auto weight = [&](Cand &c) {
+    if (rows_check && c.rows_ok < 0)
+      c.rows_ok = feasible(c) ? 1 : 0;
+    return leaf_weight(c, decay, rows_check);
+  };
+  for (size_t i : fs.dirty)
+    if (i < fs.synced)
+      fs.set(i, weight(pool[i]));
+  fs.dirty.clear();
+  for (size_t i = fs.synced; i < pool.size(); ++i)
+    fs.push(weight(pool[i]));
+  fs.synced = pool.size();
+  std::vector<size_t> out;
+  fs.draw(n_candidates, out);
+  if (out.empty()) // no positive weight: uniformly, as the exact draw
+    out = sample_weighted_indices_filtered(std::vector<double>(pool.size(), 0.0), n_candidates);
+  return out;
+}
+
+// The lowest set bit of i: the number of entries a Fenwick node i holds.
+inline size_t lowbit(size_t i)
+{
+  return i & (~i + 1);
+}
 } // namespace
+
+void LeavesSampler::reset(const void *o)
+{
+  owner = o;
+  synced = 0;
+  w.clear();
+  bit.clear();
+  updates = 0;
+  dirty.clear();
+}
+
+void LeavesSampler::rebuild()
+{
+  const size_t n = w.size();
+  bit = w;
+  for (size_t i = 1; i <= n; ++i) {
+    const size_t j = i + lowbit(i);
+    if (j <= n)
+      bit[j - 1] += bit[i - 1];
+  }
+  updates = 0;
+}
+
+void LeavesSampler::set(size_t i, double nw)
+{
+  const double d = nw - w[i];
+  w[i] = nw;
+  if (d != 0.0)
+    fenwick_add(bit, i + 1, d);
+  if (++updates > 4 * w.size() + 1024) // bounds the rounding drift of the running sums
+    rebuild();
+}
+
+void LeavesSampler::push(double nw)
+{
+  // node i (1-based) holds the entries (i - lowbit(i), i]: nw plus the nodes
+  // i - 1, i - 2, i - 4, ... below lowbit(i)
+  w.push_back(nw);
+  const size_t i = bit.size() + 1;
+  const size_t low = lowbit(i);
+  double node = nw;
+  for (size_t step = 1; step < low; step <<= 1)
+    node += bit[i - step - 1];
+  bit.push_back(node);
+}
+
+double LeavesSampler::total() const
+{
+  double s = 0.0;
+  for (size_t i = bit.size(); i > 0; i -= lowbit(i))
+    s += bit[i - 1];
+  return s;
+}
+
+void LeavesSampler::draw(size_t k, std::vector<size_t> &out)
+{
+  taken.clear();
+  const size_t start = out.size();
+  for (size_t j = 0; j < k; ++j) {
+    double tot = total();
+    if (!(tot > 0.0)) {
+      rebuild();
+      tot = total();
+      if (!(tot > 0.0))
+        break;
+    }
+    size_t id = SIZE_MAX;
+    for (int attempt = 0; attempt < 2 && id == SIZE_MAX; ++attempt) {
+      const double r = (1.0 - rng_runif01()) * tot; // in (0, tot]
+      const size_t i1 = fenwick_find_by_prefix(bit, r);
+      if (i1 >= 1 && i1 <= w.size() && w[i1 - 1] > 0.0) {
+        id = i1 - 1;
+      } else { // rounding of the running sums: rebuild and draw again
+        rebuild();
+        tot = total();
+        if (!(tot > 0.0))
+          break;
+      }
+    }
+    if (id == SIZE_MAX) { // rounding again: the last entry with a positive weight
+      for (size_t i = w.size(); i > 0; --i)
+        if (w[i - 1] > 0.0) {
+          id = i - 1;
+          break;
+        }
+      if (id == SIZE_MAX)
+        break;
+    }
+    out.push_back(id);
+    taken.push_back(w[id]);
+    set(id, 0.0); // without replacement
+  }
+  for (size_t j = 0; j < taken.size(); ++j)
+    set(out[start + j], taken[j]);
+}
+
+namespace rpf_utils {
+std::vector<double> leaves_draw_counts(
+    const std::vector<double> &ages,
+    double decay,
+    size_t n_candidates,
+    size_t reps,
+    bool exact,
+    const std::vector<int> &rows_ok,
+    uint64_t seed
+)
+{
+  struct Entry {
+    double age, w = 0.0, w_age = std::numeric_limits<double>::quiet_NaN();
+    signed char rows_ok = -1;
+  };
+  const bool rows_check = !rows_ok.empty();
+  if (rows_check && rows_ok.size() != ages.size())
+    throw std::invalid_argument("leaves_draw_counts: rows_ok must be empty or as long as ages.");
+  std::vector<Entry> pool;
+  for (size_t i = 0; i < ages.size(); ++i) {
+    pool.push_back(Entry{ages[i]});
+    if (rows_check)
+      pool.back().rows_ok = rows_ok[i] != 0 ? 1 : 0;
+  }
+  auto feasible = [](const Entry &) { return true; }; // every rows_ok is known
+  std::mt19937_64 rng(seed);
+  struct RngGuard {
+    std::mt19937_64 *old;
+    ~RngGuard() { swap_tls_rng(old); }
+  } guard{swap_tls_rng(&rng)};
+  LeavesSampler fs;
+  std::vector<std::pair<double, size_t>> keys;
+  std::vector<double> counts(pool.size(), 0.0);
+  for (size_t r = 0; r < reps; ++r) {
+    const std::vector<size_t> drawn =
+        exact ? draw_leaf_candidates(pool, n_candidates, decay, keys, rows_check)
+              : draw_leaf_candidates_fast(pool, n_candidates, decay, fs, rows_check, feasible);
+    for (size_t i : drawn)
+      counts[i] += 1.0;
+  }
+  return counts;
+}
+} // namespace rpf_utils
 
 Split RandomPlantedForest::calcOptimalSplit_leaves(
     const std::vector<std::vector<double>> &Y,
@@ -155,23 +348,28 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
   // min_leaf_rows: pool entries whose leaf has no threshold with min_rows rows
-  // on each side are not drawn (checked once per leaf and feature)
+  // on each side are not drawn (checked once per leaf and feature), by either
+  // draw
   const int min_rows = this->min_leaf_rows_;
   const bool rows_check = min_rows > 1;
+  auto feasible = [&](const SplitCandidate &c) {
+    return c.tree && c.leaf_idx < c.tree->leaves.size() &&
+           min_rows_feasible(X, c.tree->leaves[c.leaf_idx], c.dim - 1, this->n_leaves[c.dim - 1], min_rows);
+  };
   std::vector<size_t> sample_idxs;
   if (this->deterministic) {
     for (size_t i = 0; i < n_candidates && i < possible_splits.size(); ++i)
       sample_idxs.push_back(i);
-  } else {
+  } else if (this->exact_draw_) {
     if (rows_check)
       for (auto &c : possible_splits)
-        if (c.rows_ok < 0) {
-          const bool ok =
-              c.tree && c.leaf_idx < c.tree->leaves.size() &&
-              min_rows_feasible(X, c.tree->leaves[c.leaf_idx], c.dim - 1, this->n_leaves[c.dim - 1], min_rows);
-          c.rows_ok = ok ? 1 : 0;
-        }
+        if (c.rows_ok < 0)
+          c.rows_ok = feasible(c) ? 1 : 0;
     sample_idxs = draw_leaf_candidates(possible_splits, n_candidates, this->split_decay_rate_, sc.keys, rows_check);
+  } else {
+    sample_idxs = draw_leaf_candidates_fast(
+        possible_splits, n_candidates, this->split_decay_rate_, sc.sampler, rows_check, feasible
+    );
   }
 
   int best_idx = -1;
@@ -283,6 +481,9 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   }
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
+  if (!this->deterministic && !this->exact_draw_) // the fast draw's tree: the drawn entries' new ages
+    for (size_t idx : sample_idxs)
+      sc.sampler.set(idx, leaf_weight(possible_splits[idx], this->split_decay_rate_, rows_check));
   finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }

@@ -1,4 +1,5 @@
 #include "rcpp_interface.h"
+#include "internal_utils.hpp"
 
 using namespace Rcpp;
 
@@ -32,8 +33,8 @@ std::set<int> to_int_set(const NumericVector &v)
 
 RPFParams parse_rpf_params(const std::vector<double> &pars)
 {
-  if (pars.size() < 12 || pars.size() > 14)
-    Rcpp::stop("RandomPlantedForest requires 12 to 14 parameters, got %d", (int)pars.size());
+  if (pars.size() < 12 || pars.size() > 15)
+    Rcpp::stop("RandomPlantedForest requires 12 to 15 parameters, got %d", (int)pars.size());
   RPFParams p;
   p.max_interaction = pars[0];
   p.n_trees = pars[1];
@@ -49,8 +50,10 @@ RPFParams parse_rpf_params(const std::vector<double> &pars)
   p.delete_leaves = (pars[11] != 0);
   if (pars.size() >= 13)
     p.split_structure_mode = static_cast<int>(pars[12]);
-  if (pars.size() == 14)
+  if (pars.size() >= 14) // older vectors (marshaled models) lack these two: 1 and the exact draw
     p.min_leaf_rows = static_cast<int>(pars[13]);
+  if (pars.size() >= 15)
+    p.exact_draw = (pars[14] != 0);
   return p;
 }
 
@@ -194,13 +197,39 @@ std::vector<GridFamilyExport> list_to_grid(const List &grid)
   return out;
 }
 
+namespace {
+// Two 32-bit draws from R's RNG composed into one 64-bit seed
+std::uint64_t seed_from_r()
+{
+  std::uint64_t hi = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));
+  std::uint64_t lo = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));
+  return (hi << 32) ^ lo;
+}
+} // namespace
+
 void connect_to_r(RandomPlantedForest &core)
 {
   core.verbose_out = &Rcout;
-  core.seed_source = [] {
-    // Two 32-bit draws from R's RNG composed into one 64-bit seed
-    std::uint64_t hi = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));
-    std::uint64_t lo = static_cast<std::uint64_t>(R::runif(0.0, 4294967296.0));
-    return (hi << 32) ^ lo;
-  };
+  core.seed_source = seed_from_r;
+}
+
+NumericVector leaves_draw_counts(
+    const NumericVector &ages, double decay, int n_candidates, int reps, bool exact, const IntegerVector &rows_ok
+)
+{
+  if (n_candidates < 1 || reps < 0)
+    Rcpp::stop("n_candidates must be positive and reps non-negative");
+  if (rows_ok.size() != 0 && rows_ok.size() != ages.size())
+    Rcpp::stop("rows_ok must be empty or as long as ages");
+  Rcpp::RNGScope scope;
+  const std::vector<double> counts = rpf_utils::leaves_draw_counts(
+      as<std::vector<double>>(ages),
+      decay,
+      (size_t)n_candidates,
+      (size_t)reps,
+      exact,
+      as<std::vector<int>>(rows_ok),
+      seed_from_r()
+  );
+  return NumericVector(counts.begin(), counts.end());
 }
