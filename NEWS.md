@@ -82,6 +82,12 @@
   `purify()` also checks its arguments when the forest is already purified.
   A capped forest restored by `rpf_unmarshal()` without its training data cannot be purified again; asking for more orders is an error that says so.
 
+## Documentation
+
+* `?purify` states how the components are identified (the marginal identification over the training rows, Hiabu, Meyer and Wright, 2023), and that the intercept is the mean prediction on the training rows.
+* `?rpf` says that `deterministic = TRUE` also ignores `split_decay_rate`, how `split_structure = "leaves"` draws its thresholds, and that a seed reproduces a fit on the same platform only.
+* `?print.rpf_forest`'s example prints a forest (`export_forest = TRUE`), and `?plot.rpf` cites the RPF paper as 2020.
+
 ## Performance
 
 * Classification with `loss = "logit"` fits 3x to 11x faster, with bitwise the same fits.
