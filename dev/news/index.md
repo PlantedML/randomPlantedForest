@@ -110,6 +110,24 @@
   `loss = "L1"` or `"L2"`. It returns the raw predictions, as
   `type = "numeric"` does (the link is the identity). Previously it
   stopped with an error about the size of `pred`.
+- [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  stops with a clear error on inputs that gave wrong fits without a
+  warning or failed later: an infinite outcome, `epsilon` outside
+  `(0, 0.5)`, `delta` of 0.5 or more (or 0 with `loss = "logit"`),
+  `t_try = 0`, predictor names that are missing, duplicated or contain
+  `:`, and interaction terms in the formula.
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  finds interactions itself, so write `y ~ x1 + x2` instead of
+  `y ~ x1 * x2`; to fit a product as a predictor of its own, write
+  `I(x1 * x2)` or add it to the data as a column. A character or logical
+  outcome and a factor outcome with a single class get the package’s own
+  message instead of one from `hardhat` or
+  [`model.matrix()`](https://rdrr.io/r/stats/model.matrix.html). Unused
+  levels of a factor outcome are dropped with a warning; previously a
+  binary outcome with an unused level was fitted, but
+  [`predict()`](https://rdrr.io/r/stats/predict.html) failed.
+  [`predict()`](https://rdrr.io/r/stats/predict.html) on zero rows
+  returns zero rows instead of an error.
 - The C++ code compiles without warnings under `-Wall -pedantic`.
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
   returns one intercept per target level for multiclass classification,

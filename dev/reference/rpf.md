@@ -123,8 +123,12 @@ rpf(
   `[data.frame | matrix | recipe]`, `[numeric | factor]`: Predictors and
   outcome for the x/y interface. `x` holds the predictors, or is a
   [`recipe`](https://recipes.tidymodels.org/reference/recipe.html) (then
-  supply `data` instead of `y`). `y` is the outcome vector: **numeric**
-  for regression, **factor** for classification.
+  supply `data` instead of `y`). The predictors need unique names that
+  do not contain `:`, which joins predictor names in component names
+  such as `x1:x2`. `y` is the outcome vector: **numeric** for
+  regression, **factor** for classification. A numeric outcome must be
+  finite. A factor outcome needs at least two classes; levels that do
+  not occur are dropped with a warning.
 
 - ...:
 
@@ -134,7 +138,14 @@ rpf(
 - formula:
 
   `[formula]`: A formula with the outcome on the left-hand side and the
-  predictors on the right-hand side, e.g. `y ~ x1 + x2`.
+  predictors on the right-hand side, e.g. `y ~ x1 + x2`. Interaction
+  terms such as `x1:x2` or `x1 * x2` are an error: they would add a
+  predictor named `x1:x2`, and `:` is how components are named. The
+  forest finds interactions itself, up to `max_interaction`, so list the
+  predictors as `y ~ x1 + x2`. To fit a product as a predictor of its
+  own, write `I(x1 * x2)`, or add it to `data` as a column with its own
+  name. Transformed terms of one predictor, such as `log(x1)`, are
+  allowed.
 
 - data:
 
@@ -228,9 +239,10 @@ rpf(
 
   `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or
   `"exponential"`. Class proportions are truncated to
-  `[delta, 1 - delta]` when computing the loss of a split. Should be
-  positive for `"logit"`: with `delta = 0`, nodes containing a single
-  class have infinite loss and their splits are always rejected.
+  `[delta, 1 - delta]` when computing the loss of a split. Must be less
+  than 0.5, from where every proportion is truncated to the same value,
+  and positive for `"logit"`: with `delta = 0`, nodes containing a
+  single class have infinite loss and their splits are always rejected.
 
 - epsilon:
 
@@ -239,6 +251,8 @@ rpf(
   `[epsilon, 1 - epsilon]` when computing the fit in a leaf. Unlike
   `delta`, this caps the size of individual leaf updates and acts as
   regularization: smaller values permit larger jumps on the link scale.
+  Must be greater than 0 and less than 0.5: at 0 the leaf values of pure
+  leaves are infinite, and from 0.5 on every leaf value is 0.
 
 - purify:
 

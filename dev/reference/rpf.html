@@ -170,9 +170,11 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <dd><p><code>[data.frame | matrix | recipe]</code>, <code>[numeric | factor]</code>:
 Predictors and outcome for the x/y interface.
 <code>x</code> holds the predictors, or is a <code><a href="https://recipes.tidymodels.org/reference/recipe.html" class="external-link">recipe</a></code> (then supply
-<code>data</code> instead of <code>y</code>).
+<code>data</code> instead of <code>y</code>). The predictors need unique names that do not
+contain <code>:</code>, which joins predictor names in component names such as <code>x1:x2</code>.
 <code>y</code> is the outcome vector: <strong>numeric</strong> for regression, <strong>factor</strong> for
-classification.</p></dd>
+classification. A numeric outcome must be finite. A factor outcome needs at
+least two classes; levels that do not occur are dropped with a warning.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -182,7 +184,13 @@ classification.</p></dd>
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p><code>[formula]</code>: A formula with the outcome on the left-hand side and the
-predictors on the right-hand side, e.g. <code>y ~ x1 + x2</code>.</p></dd>
+predictors on the right-hand side, e.g. <code>y ~ x1 + x2</code>. Interaction terms
+such as <code>x1:x2</code> or <code>x1 * x2</code> are an error: they would add a predictor named
+<code>x1:x2</code>, and <code>:</code> is how components are named. The forest finds interactions
+itself, up to <code>max_interaction</code>, so list the predictors as <code>y ~ x1 + x2</code>.
+To fit a product as a predictor of its own, write <code>I(x1 * x2)</code>, or add it to
+<code>data</code> as a column with its own name. Transformed terms of one predictor,
+such as <code>log(x1)</code>, are allowed.</p></dd>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
@@ -273,9 +281,10 @@ not yield proper probability estimates.</p></dd>
 <dt id="arg-delta">delta<a class="anchor" aria-label="anchor" href="#arg-delta"></a></dt>
 <dd><p><code>[numeric(1): 0.001]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
 Class proportions are truncated to <code>[delta, 1 - delta]</code> when computing the
-loss of a split. Should be positive for <code>"logit"</code>: with <code>delta = 0</code>, nodes
-containing a single class have infinite loss and their splits are always
-rejected.</p></dd>
+loss of a split. Must be less than 0.5, from where every proportion is
+truncated to the same value, and positive for <code>"logit"</code>: with <code>delta = 0</code>,
+nodes containing a single class have infinite loss and their splits are
+always rejected.</p></dd>
 
 
 <dt id="arg-epsilon">epsilon<a class="anchor" aria-label="anchor" href="#arg-epsilon"></a></dt>
@@ -283,7 +292,8 @@ rejected.</p></dd>
 Class proportions are truncated to <code>[epsilon, 1 - epsilon]</code> when computing
 the fit in a leaf. Unlike <code>delta</code>, this caps the size of individual leaf
 updates and acts as regularization: smaller values permit larger jumps on
-the link scale.</p></dd>
+the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
+values of pure leaves are infinite, and from 0.5 on every leaf value is 0.</p></dd>
 
 
 <dt id="arg-purify">purify<a class="anchor" aria-label="anchor" href="#arg-purify"></a></dt>
