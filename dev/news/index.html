@@ -62,6 +62,8 @@
 <li>
 <code><a href="../reference/predict_components.html">predict_components()</a></code> returns one intercept per target level for multiclass classification, named by <code>target_levels</code> (<a href="https://github.com/PlantedML/randomPlantedForest/issues/70" class="external-link">#70</a>). Previously only the first level’s intercept was returned, so components plus intercept did not sum to the prediction for other levels.</li>
 <li>
+<code><a href="../reference/predict_components.html">predict_components()</a></code> accepts a matrix as <code>new_data</code>, like <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> does. It no longer turns the caller’s data.frame into a data.table by reference.</li>
+<li>
 <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> after <code>purify(maxp_interaction = k)</code> with <code>k</code> below the fit’s <code>max_interaction</code> returns the forest’s prediction. Previously it returned the intercept plus the components up to order <code>k</code>, leaving out the higher orders. <code><a href="../reference/predict_components.html">predict_components()</a></code> now returns their sum as <code>remainder</code>, so that its result sums to the prediction, and <code><a href="../reference/rpf_marshal.html">rpf_marshal()</a></code> keeps the purification’s cap.</li>
 <li>
 <code><a href="../reference/purify.html">purify()</a></code> with <code>mode = 2</code> no longer drops training rows that lie on a leaf’s lower bound. Purified components and the intercept now equal those of <code>mode = 1</code>.</li>

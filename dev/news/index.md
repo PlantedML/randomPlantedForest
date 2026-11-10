@@ -59,6 +59,10 @@
   Previously only the first level’s intercept was returned, so
   components plus intercept did not sum to the prediction for other
   levels.
+- [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  accepts a matrix as `new_data`, like
+  [`predict()`](https://rdrr.io/r/stats/predict.html) does. It no longer
+  turns the caller’s data.frame into a data.table by reference.
 - [`predict()`](https://rdrr.io/r/stats/predict.html) after
   `purify(maxp_interaction = k)` with `k` below the fit’s
   `max_interaction` returns the forest’s prediction. Previously it
