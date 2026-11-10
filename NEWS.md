@@ -10,6 +10,17 @@
 
 ## Bug fixes
 
+* `split_structure = "cur_trees_1"` samples leaves in proportion to their available thresholds, as documented.
+  After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly.
+  Leaves with tied values were then drawn too often, and draws were wasted on leaves that cannot be split.
+  With `deterministic = TRUE`, `"cur_trees_1"` evaluated only the first split candidate in every round; it now evaluates the first `max_candidates`, as the other split structures do.
+  Fitted models change for regression with `split_structure = "cur_trees_1"`, random and deterministic.
+* `split_structure = "res_trees"` with `deterministic = TRUE` evaluates thresholds evenly spread over all (predictor, leaf, threshold) triples of a candidate.
+  Previously it tried only the lowest thresholds of each leaf and left most of the variance unexplained.
+  Fitted models change for regression with `split_structure = "res_trees"` and `deterministic = TRUE` only.
+* `split_structure = "cur_trees_2"` with `deterministic = TRUE` evaluates `split_try` thresholds evenly spread over each leaf, as `"cur_trees_1"` does.
+  Previously it tried the 1st to 9th smallest values of each leaf.
+  Fitted models change for regression with `split_structure = "cur_trees_2"` and `deterministic = TRUE` only.
 * Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaves"` for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all.
   Fitted models change for classification and for regression with `split_structure` other than `"leaves"`.
@@ -20,6 +31,10 @@
   Previously only the first level's intercept was returned, so components plus intercept did not sum to the prediction for other levels.
 * `predict_components()` accepts a matrix as `new_data`, like `predict()` does.
   It no longer turns the caller's data.frame into a data.table by reference.
+* `predict()` after `purify(maxp_interaction = k)` with `k` below the fit's `max_interaction` returns the forest's prediction.
+  Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
+  `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
+* `purify()` with `mode = 2` no longer drops training rows that lie on a leaf's lower bound. Purified components and the intercept now equal those of `mode = 1`.
 
 # randomPlantedForest 0.5.0
 

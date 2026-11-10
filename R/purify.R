@@ -11,8 +11,10 @@
 #'
 #' @param x `[rpf]`: A fitted [`rpf`] model.
 #' @param maxp_interaction `[integer(1) | NULL: NULL]`: Highest interaction order to purify.
-#'   Higher-order components are set to zero, but still influence lower orders
-#'   during purification, and [predict_components()] then returns zero for them.
+#'   Higher-order components are not computed, but still influence lower orders
+#'   during purification, which are the same as when purifying all orders.
+#'   [predict_components()] then returns zero for the higher orders and their sum as `remainder`.
+#'   [predict()][predict.rpf()] still returns the whole forest's prediction.
 #'   `NULL` purifies all orders.
 #' @param mode `[integer(1): 2]`: Purification algorithm: `2` is the fast exact KD-tree
 #'   based algorithm, `1` the original grid-based one.
