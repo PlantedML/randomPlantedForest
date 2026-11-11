@@ -71,6 +71,33 @@ test_that("the panel form: C = {} is the component, the coarsened values are the
   }
 })
 
+test_that("the panel forms of many components asked for at once are those of each asked for alone", {
+  d <- pd_data(n = 300)
+  fit <- pd_fit(d, 3)
+  purify(fit)
+  sets <- prune_stored_sets(fit)
+  hi <- sets[lengths(sets) >= 3]
+  M <- fit$fit$predict_components_matrix(d$x, hi, 0L)
+  untimed <- function(sel) {
+    lapply(sel, function(s) {
+      s$seconds <- NULL
+      s
+    })
+  }
+  # some kept as they are (no pass over the families), an odd number coarsened (the passes take two at a time)
+  P <- 20L
+  all <- fit$fit$coarsen_select(hi, P, 2L, M)
+  forms <- vapply(all, function(s) s$form, "")
+  expect_true(sum(forms == "asis") > 1)
+  expect_true(sum(forms == "coarsened") > 2)
+  alone <- lapply(seq_along(hi), function(k) fit$fit$coarsen_select(hi[k], P, 1L, M[, k, drop = FALSE])[[1]])
+  expect_identical(untimed(all), untimed(alone))
+  expect_identical(
+    untimed(fit$fit$coarsen_select(rev(hi), P, 1L, M[, rev(seq_along(hi)), drop = FALSE])),
+    rev(untimed(all))
+  )
+})
+
 test_that("the OOB sums: with C = {} those of purify_oob(); threads do not change them", {
   d <- pd_data(n = 300)
   fit <- pd_fit(d, 4)

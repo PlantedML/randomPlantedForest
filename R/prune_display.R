@@ -21,9 +21,9 @@
 #
 # The choice needs the component's values at the training rows (the forest's decomposition, prune_columns()) and its
 # rectangles merged over the families (C++ merged_components(): a purification of the families restricted to the
-# components being chosen), not the purified store. The components are chosen in batches of prune_coarsen_batch: a
-# batch's rectangles and candidates are held only while it is chosen, and the choice of one component does not depend
-# on the others.
+# components being chosen), not the purified store. The components to coarsen are chosen two at a time (C++
+# coarsen_pass_sets; prune_coarsen_batch()): a pair's rectangles and candidates are held only while it is chosen, and
+# the choice of one component does not depend on the others.
 #
 # The second pruning:
 # - chosen out of bag: the same candidates, folds and correction, on each family's coarsened component at its
@@ -57,7 +57,7 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   hi <- which(lengths(kept_sets) >= 3)
   sel <- list()
   if (length(hi) > 0) {
-    batches <- split(hi, (seq_along(hi) - 1L) %/% prune_coarsen_batch)
+    batches <- split(hi, (seq_along(hi) - 1L) %/% prune_coarsen_batch(n, V))
     sel <- unlist(
       lapply(batches, function(b) {
         object$fit$coarsen_select(
@@ -226,10 +226,14 @@ prune_display <- function(first, object, tr, dec, sums, cand, max_panels, nthrea
   res
 }
 
-# The components the display chooses the panel forms of in one restricted pass (prune_display()): fewer passes are
-# faster, but each component chosen at once holds its rectangles and candidates (about 0.5-1 GB per three-way
-# interaction of California housing at order 8, 200 families: all eleven at once peaked 5 GB higher)
-prune_coarsen_batch <- 2L
+# The components whose panel forms the display asks for in one call of coarsen_select() (prune_display()), for n
+# training rows and V score columns: the call gets a copy of their values at the training rows, so as many as make
+# it about 64 MB. The call makes its restricted passes over the families for the components it coarsens only, two at
+# a time (C++ coarsen_pass_sets, which bounds the rectangles and candidates held at once): a model that keeps
+# thousands of three-way components, nearly all shown as they are, does not pass over the forest for each pair.
+prune_coarsen_batch <- function(n, V) {
+  max(2L, as.integer(2^23 %/% (n * V)))
+}
 
 # The built form of coarsened component `nm` (k-d index over its stored rectangles), kept in the display's cache
 # environment; rebuilt if missing or if the pointer is gone (a deserialized object). With V > 1 score columns the stored

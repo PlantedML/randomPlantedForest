@@ -416,10 +416,15 @@ public:
   // on the training rows (of the columns centred by score_centring(), summed); the best one, its training-row values
   // and its stored forms (one per column). If at most P, its panels: the |S| - 2 features with the fewest own cut
   // points and these cut points (one set for all columns). fvals: column-major n_rows x n_cols, the forest's f_S at
-  // the training rows, V columns per set (column k * V + v, as purify_columns() gives them).
+  // the training rows, V columns per set (column k * V + v, as purify_columns() gives them). Any number of sets: the
+  // restricted passes take the sets to coarsen coarsen_pass_sets at a time, the others need none.
   std::vector<rpf_coarse::Selected> coarsen_select(
       const std::vector<std::vector<int>> &sets, int P, int nthreads, const double *fvals, int n_rows, int n_cols
   );
+  // The sets whose rectangles one restricted pass of coarsen_select() holds: fewer passes are faster, but each
+  // component coarsened at once holds its rectangles and candidates (about 0.5-1 GB per three-way interaction of
+  // California housing at order 8, 200 families: all eleven at once peaked 5 GB higher)
+  static constexpr int coarsen_pass_sets = 2;
   // coarsen_oob(): each family's coarsened components at its out-of-bag rows, summed as purify_oob() sums (needs the
   // in-bag counts); V columns per spec.
   rpf_coarse::OobSums coarsen_oob(const std::vector<rpf_coarse::Spec> &specs, int nthreads);

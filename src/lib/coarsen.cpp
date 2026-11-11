@@ -464,23 +464,34 @@ std::vector<Selected> RandomPlantedForest::coarsen_select(
   // over the leaves of all trees >= S, all families. If at most P (f_S kept as it is), R.cpos and R.cuts are its
   // panels: the |S| - 2 features with the fewest interior cut points (the first of ties), in the order of S, and
   // those cut points.
+  // The trees holding each feature, all families: the trees containing S are among those of its rarest feature, so
+  // no component looks at every tree of the forest.
+  std::vector<std::vector<const TreeFamily::value_type *>> trees_of((size_t)feature_size + 1);
+  for (const auto &fam : tree_families)
+    for (const auto &tree : fam)
+      for (int d : tree.first)
+        if (d >= 1 && d <= feature_size)
+          trees_of[(size_t)d].push_back(&tree);
   auto panels_of = [&](Selected &R) -> double {
     const std::vector<int> &S = R.S;
     const int k = (int)S.size();
     std::vector<std::vector<double>> own(k);
-    for (const auto &fam : tree_families)
-      for (const auto &tree : fam) {
-        bool sup = true;
-        for (int d : S)
-          sup = sup && tree.first.count(d);
-        if (!sup)
-          continue;
-        for (const auto &leaf : tree.second->leaves)
-          for (int q = 0; q < k; ++q) {
-            own[q].push_back(leaf.intervals[S[q] - 1].first);
-            own[q].push_back(leaf.intervals[S[q] - 1].second);
-          }
-      }
+    const auto *with = &trees_of[(size_t)S.front()];
+    for (int d : S)
+      if (trees_of[(size_t)d].size() < with->size())
+        with = &trees_of[(size_t)d];
+    for (const auto *tree : *with) {
+      bool sup = true;
+      for (int d : S)
+        sup = sup && tree->first.count(d);
+      if (!sup)
+        continue;
+      for (const auto &leaf : tree->second->leaves)
+        for (int q = 0; q < k; ++q) {
+          own[q].push_back(leaf.intervals[S[q] - 1].first);
+          own[q].push_back(leaf.intervals[S[q] - 1].second);
+        }
+    }
     std::vector<double> qn;
     for (int q = 0; q < k; ++q) {
       auto &v = own[q];
@@ -518,14 +529,26 @@ std::vector<Selected> RandomPlantedForest::coarsen_select(
   };
   std::vector<double> fps(K);
   parallel_for(K, nthreads, [&](size_t i) { fps[i] = panels_of(res[i]); });
-  std::set<std::vector<int>> need;
-  for (size_t i = 0; i < K; ++i)
-    if (fps[i] > (double)P)
-      need.insert(res[i].S);
-  const rpf_rect::Accumulator raw = merged_components(need, nthreads, pf.cuts);
-  parallel_for(K, nthreads, [&](size_t i) {
+  auto select = [&](size_t i, const rpf_rect::Accumulator &raw) {
     select_one(res[i], pf, T, fps[i], raw, n_trees, P, fvals + i * (size_t)V * (size_t)sample_size, V, centre);
-  });
+  };
+  // The components to coarsen need their rectangles, from a pass over the families restricted to them:
+  // coarsen_pass_sets of them at a time, so that only those rectangles and candidates are held at once. A component's
+  // rectangles do not depend on the others of its pass (purify_fast_exact_family() writes each component's terms
+  // tree by tree). The components kept as they are need no pass.
+  std::vector<size_t> coarsened, as_is;
+  for (size_t i = 0; i < K; ++i)
+    (fps[i] > (double)P ? coarsened : as_is).push_back(i);
+  for (size_t b = 0; b < coarsened.size(); b += (size_t)coarsen_pass_sets) {
+    const size_t e = std::min(coarsened.size(), b + (size_t)coarsen_pass_sets);
+    std::set<std::vector<int>> need;
+    for (size_t j = b; j < e; ++j)
+      need.insert(res[coarsened[j]].S);
+    const rpf_rect::Accumulator raw = merged_components(need, nthreads, pf.cuts);
+    parallel_for(e - b, nthreads, [&](size_t j) { select(coarsened[b + j], raw); });
+  }
+  const rpf_rect::Accumulator none;
+  parallel_for(as_is.size(), nthreads, [&](size_t j) { select(as_is[j], none); });
   return res;
 }
 
