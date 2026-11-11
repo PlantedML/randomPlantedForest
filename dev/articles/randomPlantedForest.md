@@ -367,11 +367,11 @@ predict(rpfit_sex, head(penguins), type = "prob")
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
 #> 1        0.181      0.819
-#> 2        0.623      0.377
-#> 3        0.792      0.208
-#> 4        0.669      0.331
-#> 5        0.156      0.844
-#> 6        0.873      0.127
+#> 2        0.625      0.375
+#> 3        0.797      0.203
+#> 4        0.670      0.330
+#> 5        0.155      0.845
+#> 6        0.874      0.126
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class

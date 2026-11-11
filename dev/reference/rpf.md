@@ -505,12 +505,22 @@ probabilities are truncated to `[0, 1]`.
 ### Classification losses
 
 `"exponential"` and `"logit"` fit scores on the link scale: with two
-classes one score, the log-odds of the second class; with more,
-`"logit"` one score per class but the first (whose score is 0) and
-`"exponential"` one score per class, summing to 0 (the multiclass
-exponential loss SAMME of Zhu, Zou, Rosset and Hastie, 2009, whose row
-weight is `exp(-g)`, `g` the score of its class). The probabilities are
-the softmax of the scores.
+classes one score, the log-odds of the second class; with more, one
+score per class, summing to 0 across the classes. The probabilities are
+the softmax of the scores. `"exponential"` with more than two classes is
+the multiclass exponential loss SAMME of Zhu, Zou, Rosset and Hastie
+(2009), whose row weight is `exp(-g)`, `g` the score of its class.
+`"logit"` is the multinomial logit; it fits `K - 1` scores against the
+first level (whose score is 0), which
+[`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+(`type = "link"`),
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md),
+[`rpf_boxes()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.md)
+and the pruned model report with the first level's 0 joined and centred
+across the `K` classes, so both losses report the same layout. In exact
+arithmetic the fit and its pruned model do not depend on which level is
+first; in floating point, candidate splits that tie exactly (as
+duplicated bootstrap rows make) can be broken differently.
 
 Every split moves the scores of the rows of each new leaf by one step,
 which minimises the leaf's penalised loss: the loss of its rows, plus
@@ -804,10 +814,9 @@ With `keep_forest = TRUE` the forest is in `$fit`, so that
 
 A classification forest goes through the same steps (the OOB path,
 `n_splits = NULL`, `prune`, `max_panels` and `tune`) with its score
-columns: one for a binary outcome, one per class otherwise (`K - 1` for
-`loss = "logit"`: the first level is the reference). Every out-of-bag
-choice is scored by the loss's own criterion, corrected for the OOB
-family count as above:
+columns: one for a binary outcome, one per class otherwise. Every
+out-of-bag choice is scored by the loss's own criterion, corrected for
+the OOB family count as above:
 
 - `loss = "L1"` or `"L2"`: the squared error of the raw scores summed
   over the columns (the Brier score, before the scores are truncated to
@@ -818,7 +827,7 @@ family count as above:
   that `predict(type = "prob")` returns. The correction is its
   second-order form,
   `(1 / m_i - 1 / n_families) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
-  with `d = g_even - g_odd` and `H = diag(p) - p p'` over the free score
+  with `d = g_even - g_odd` and `H = diag(p) - p p'` over the score
   columns (for the squared error `H = 2 I`, the correction above).
 
 The pruning keeps or drops a component for all classes, sizes it by its
@@ -1004,8 +1013,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.051         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.038        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.081         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE

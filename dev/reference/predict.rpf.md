@@ -66,9 +66,14 @@ column `.pred_<level>` for each level in `y` containing class
 probabilities if `type = "prob"`. For `type = "class"`, one column
 `.pred_class` with class predictions is returned. For `type = "numeric"`
 or `"link"`, raw predictions are returned: one column `.pred` for binary
-outcomes, and one column `.pred_<level>` per level for multiclass
-outcomes. With `loss = "logit"`, the first level is the reference class
-and has no column, so `K - 1` columns are returned for `K` levels.
+outcomes (the log-odds of the second level with `loss = "logit"` or
+`"exponential"`), and one column `.pred_<level>` per level for
+multiclass outcomes. With `loss = "logit"` or `"exponential"`, these are
+one score per class that sum to 0 across the classes, and the
+probabilities are their softmax. (The multiclass logit loss fits `K - 1`
+scores against the first level; they are reported with the first level's
+score 0 joined and centred across the `K` classes, which leaves the
+probabilities as they are.)
 
 ## Examples
 

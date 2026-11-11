@@ -161,6 +161,41 @@
   ([`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md))
   still load, print and predict, and keep their forest.
 
+- With three or more classes, `loss = "logit"` now reports one score per
+  class, summing to 0 across the classes, as `"exponential"` does:
+  `predict(type = "link")` (and `"numeric"`) has a column
+  `.pred_<level>` for every level,
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  a column `<component>__class:<level>` for every component and level,
+  and one intercept and one remainder column per level (`target_levels`
+  lists all levels), and
+  [`rpf_boxes()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.md)
+  a column `value_<level>` for every level; the same for pruned models,
+  whose [`print()`](https://rdrr.io/r/base/print.html) shows one
+  intercept per level. Before, the first level was the reference class
+  and had no column (`K - 1` columns for `K` levels). The new scores are
+  the old ones with the first level’s score 0 joined and centred across
+  the `K` classes, so a class’s score is now its log-odds against the
+  geometric mean of all classes’ probabilities, not against the first
+  class. The fit, its probabilities and classes, the out-of-bag choices
+  and the pruned model (which components are kept, and their
+  coefficients) do not change, and a model saved before loads and
+  predicts the same probabilities; only what is reported changes.
+  `plot(class = NULL)` now draws the first level, which has values of
+  its own. To get the old scores back, subtract the first level’s column
+  from every column and drop it. Two classes are unchanged: one score,
+  the log-odds of the second level.
+
+- A pruned model of three or more classes with `loss = "exponential"`
+  and rule `"R"` now reports its intercepts centred across the classes,
+  so that its scores sum to 0 as the forest’s do:
+  `predict(type = "link")`, the `intercept` of
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  and [`print()`](https://rdrr.io/r/base/print.html). Rule `"R"` fits
+  them with the first class’s at 0, so its scores did not sum to 0 (by
+  up to 3.7 on a simulated three-class set); the probabilities, classes
+  and the stored `intercept` do not change.
+
 ### Renamed arguments
 
 - Four arguments of

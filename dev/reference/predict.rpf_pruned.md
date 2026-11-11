@@ -41,7 +41,9 @@ predict(
   [`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md):
   `"numeric"` for regression (the default); for classification `"prob"`
   (the default), `"class"`, or `"numeric"` / `"link"` (the scores
-  `alpha + sum(beta_S * f_S(x))`).
+  `alpha + sum(beta_S * f_S(x))`; with `loss = "logit"` or
+  `"exponential"` and more than two classes one per class, summing to 0
+  across the classes).
 
 - nthreads:
 

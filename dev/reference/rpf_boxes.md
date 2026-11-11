@@ -42,9 +42,10 @@ row per box and columns
 - `box`: The index of the box within its tree.
 
 - `value`: The value of the box. For multiclass classification, one
-  column `value_<class>` per outcome level instead (for
-  `loss = "logit"`, per level but the first, the reference, whose score
-  is 0).
+  column `value_<class>` per outcome level instead (for `loss = "logit"`
+  and `"exponential"`, they sum to 0 across the levels, as the scores of
+  [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+  with `type = "link"` do).
 
 - `<variable>_lower`, `<variable>_upper` for every predictor: The bounds
   of the box, `NA` for variables the tree does not use.

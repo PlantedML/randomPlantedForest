@@ -60,9 +60,7 @@ plot(
 - class:
 
   `[character(1) | NULL: NULL]`: For multiclass classification, the
-  outcome level whose values to plot. `NULL` uses the first level (for
-  `loss = "logit"`, the first level after the reference level, which has
-  no values of its own).
+  outcome level whose values to plot. `NULL` uses the first level.
 
 - factor_levels:
 

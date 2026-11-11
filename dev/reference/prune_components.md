@@ -142,7 +142,13 @@ An object of class `rpf_pruned`, a list with elements:
 - `rule`, `tau`: the chosen rule and threshold.
 
 - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for
-  classification one per score column.
+  classification one per score column of the forest (`K - 1` for
+  multiclass `loss = "logit"`, against the first level; with
+  `"exponential"` and rule `"R"` the first is 0).
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+  and
+  [print()](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md)
+  report them as one per class, centred.
 
 - `beta`: named vector of the coefficients of the kept components (all 1
   for `"D"`). For `"R"` with `select_by` `"oob"`, `intercept` and `beta`
@@ -476,19 +482,22 @@ alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and
 the purification.
 
 **Classification.** A classification forest is pruned the same way, with
-its score columns: one for a binary outcome, one per class otherwise
-(`K - 1` for `loss = "logit"`, whose first level is the reference).
-Every component then has a column per score column, and:
+its scores: one for a binary outcome, one per class otherwise. Every
+component then has a column per class, and:
 
-- A component's share sums its variance over the score columns, centred
-  across the classes (`"logit"`: with the reference level's score 0
-  joined; `"exponential"`: the part all classes share does not count),
-  over the same sum for the prediction. One kept list serves all
-  classes.
+- A component's share sums its variance over the classes' scores,
+  centred across the classes (as
+  [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+  reports them with `type = "link"`: the part all classes share does not
+  count), over the same sum for the prediction. One kept list serves all
+  classes. (Internally `loss = "logit"` fits `K - 1` scores against the
+  first level; centred, the shares, the criterion and the model do not
+  depend on which level is first.)
 
 - `"R"` fits one coefficient per kept component, shared by the classes,
-  and one intercept per score column (`"exponential"` with more than two
-  classes: the first is 0), out of bag as for regression.
+  and one intercept per class (up to a constant shared by the classes,
+  which the probabilities ignore; they are reported summing to 0), out
+  of bag as for regression.
 
 - The criterion is the forest's loss's own: for `loss = "L1"` or `"L2"`
   the squared error of the raw scores summed over the columns (the Brier
@@ -513,8 +522,9 @@ Every component then has a column per score column, and:
   [`predict.rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
   does, and
   [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
-  has one column per component and score column, named as for the
-  forest.
+  has one column per component and class, named as for the forest
+  (`<component>__class:<level>`); with `"logit"` or `"exponential"` each
+  component's columns, and the intercepts, sum to 0 across the classes.
 
 ## See also
 

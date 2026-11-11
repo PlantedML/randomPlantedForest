@@ -76,8 +76,12 @@ A `list` with elements:
   functional decomposition of the prediction. All components together
   with the intercept sum up to the prediction. For multiclass
   classification, the number of output columns is multiplied by the
-  number of `target_levels`: the levels of the outcome, or for
-  `loss = "logit"` all levels but the first (the reference level).
+  number of `target_levels`, the levels of the outcome: one column per
+  component and level, named `<component>__class:<level>`. With
+  `loss = "logit"` or `"exponential"` a component's columns sum to 0
+  across the levels, as the scores of
+  [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
+  with `type = "link"` do.
 
 - `intercept` (`numeric`): Expected value of the prediction. For
   multiclass classification, one value per target level, named by
