@@ -80,8 +80,8 @@ and \code{splits_oob}), without the forest (\code{fit$fit} is \code{NULL}), so t
 says so. With \code{keep_forest = TRUE}, \code{object} as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
 \item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}); for classification one per score column of the
-forest (\code{K - 1} for multiclass \code{loss = "logit"}, against the first level; \code{\link[=predict_components]{predict_components()}} and
-\link[=print.rpf_pruned]{print()} report them as one per class, centred).
+forest (\code{K - 1} for multiclass \code{loss = "logit"}, against the first level; with \code{"exponential"} and rule \code{"R"}
+the first is 0). \code{\link[=predict_components]{predict_components()}} and \link[=print.rpf_pruned]{print()} report them as one per class, centred.
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
 \code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
@@ -288,7 +288,8 @@ per class otherwise. Every component then has a column per class, and:
 same sum for the prediction. One kept list serves all classes. (Internally \code{loss = "logit"} fits \code{K - 1} scores
 against the first level; centred, the shares, the criterion and the model do not depend on which level is first.)
 \item \code{"R"} fits one coefficient per kept component, shared by the classes, and one intercept per class (up to a
-constant shared by the classes, which the probabilities ignore), out of bag as for regression.
+constant shared by the classes, which the probabilities ignore; they are reported summing to 0), out of bag as for
+regression.
 \item The criterion is the forest's loss's own: for \code{loss = "L1"} or \code{"L2"} the squared error of the raw scores summed
 over the columns (the Brier score; least squares for \code{"R"}), for \code{"logit"} and \code{"exponential"} the log-loss of the
 probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \code{"R"}, by Newton's method from rule

@@ -150,3 +150,27 @@ test_that("binary logit and multiclass exponential report as before", {
   expect_named(linke, c(".pred_a", ".pred_b", ".pred_c"))
   expect_identical(unname(as.matrix(linke)), unname(sym_raw(fite, d)))
 })
+
+test_that("a multiclass exponential pruned model of rule R reports its intercepts centred", {
+  d <- sym_data()
+  set.seed(6)
+  fit <- rpf(y ~ ., data = d, loss = "exponential", max_interaction = 2, n_families = 10, n_splits = 40, prune = FALSE)
+  pr <- prune_components(fit, d, rule = "R", tau = 0.01, seed = 1)
+  expect_identical(pr$intercept[1], 0) # stored: rule R's, the first class's fixed at 0
+  raw <- pruned_scores(pr, prune_kept_matrix(pr, d))
+  L <- unname(as.matrix(predict(pr, d, type = "link")))
+  expect_lt(max(abs(rowSums(L))), 1e-12)
+  expect_equal(L, unname(raw - mean(pr$intercept)), tolerance = 1e-14)
+  expect_identical(predict(pr, d, type = "prob"), predict_rpf_prob_raw(fit, raw))
+  pc <- predict_components(pr, d)
+  expect_equal(unname(pc$intercept), pr$intercept - mean(pr$intercept), tolerance = 1e-15)
+  M <- as.matrix(pc$m)
+  recon <- sapply(1:3, function(v) pc$intercept[v] + rowSums(M[, seq(v, ncol(M), by = 3), drop = FALSE]))
+  expect_equal(unname(recon), L, tolerance = 1e-10)
+  # rule D: the forest's intercepts, as they are
+  prd <- prune_components(fit, d, rule = "D", tau = 0.01, seed = 1)
+  expect_identical(
+    unname(as.matrix(predict(prd, d, type = "link"))),
+    unname(pruned_scores(prd, prune_kept_matrix(prd, d)))
+  )
+})

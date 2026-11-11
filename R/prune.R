@@ -145,7 +145,8 @@
 #'   same sum for the prediction. One kept list serves all classes. (Internally `loss = "logit"` fits `K - 1` scores
 #'   against the first level; centred, the shares, the criterion and the model do not depend on which level is first.)
 #' - `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per class (up to a
-#'   constant shared by the classes, which the probabilities ignore), out of bag as for regression.
+#'   constant shared by the classes, which the probabilities ignore; they are reported summing to 0), out of bag as for
+#'   regression.
 #' - The criterion is the forest's loss's own: for `loss = "L1"` or `"L2"` the squared error of the raw scores summed
 #'   over the columns (the Brier score; least squares for `"R"`), for `"logit"` and `"exponential"` the log-loss of the
 #'   probabilities that `predict(type = "prob")` makes (maximum likelihood for `"R"`, by Newton's method from rule
@@ -200,8 +201,8 @@
 #'   says so. With `keep_forest = TRUE`, `object` as it was (not purified by the pruning).
 #' - `rule`, `tau`: the chosen rule and threshold.
 #' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for classification one per score column of the
-#'   forest (`K - 1` for multiclass `loss = "logit"`, against the first level; [predict_components()] and
-#'   [print()][print.rpf_pruned()] report them as one per class, centred).
+#'   forest (`K - 1` for multiclass `loss = "logit"`, against the first level; with `"exponential"` and rule `"R"`
+#'   the first is 0). [predict_components()] and [print()][print.rpf_pruned()] report them as one per class, centred.
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
 #'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
@@ -1444,6 +1445,18 @@ pruned_scores <- function(object, M) {
   raw
 }
 
+# The intercepts of a pruned model in its score columns as reported: rule R fits multiclass exponential's with the first
+# class's fixed at 0 (crit_fit_R()), and they are reported centred across the classes, as the forest's sum to 0 (the
+# probabilities do not change). Otherwise object$intercept. (Multiclass logit's K - 1 are reported by
+# reported_scores(), as its other scores.)
+pruned_reported_alpha <- function(object) {
+  a <- object$intercept
+  if (length(a) > 1L && identical(object$fit$params$loss, "exponential") && identical(object$rule, "R")) {
+    a <- a - mean(a)
+  }
+  a
+}
+
 #' Predictions of a pruned Random Planted Forest
 #'
 #' The prediction of a pruned forest is `alpha + sum(beta_S * f_S(x))` over the kept components `f_S` of the forest,
@@ -1453,7 +1466,8 @@ pruned_scores <- function(object, M) {
 #' @param object `[rpf_pruned]`: A pruned forest from [prune_components()] or [rpf()].
 #' @param new_data `[data.frame | matrix]`: New observations to predict.
 #' @param type `[character(1)]`: As in [predict.rpf()]: `"numeric"` for regression (the default); for classification
-#'   `"prob"` (the default), `"class"`, or `"numeric"` / `"link"` (the scores `alpha + sum(beta_S * f_S(x))`).
+#'   `"prob"` (the default), `"class"`, or `"numeric"` / `"link"` (the scores `alpha + sum(beta_S * f_S(x))`; with
+#'   `loss = "logit"` or `"exponential"` and more than two classes one per class, summing to 0 across the classes).
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads` the forest was fitted
 #'   with.
 #' @param ... Not currently used, but required for extensibility. Unknown arguments are an error.
@@ -1490,7 +1504,9 @@ predict.rpf_pruned <- function(
     }
     hardhat::spruce_numeric(object$intercept + rowSums(M))
   } else {
-    predict_rpf_scores(object$fit, pruned_scores(object, M), type)
+    # the scores as reported for "numeric" / "link" (pruned_reported_alpha()), the model's for probabilities
+    alpha <- if (type %in% c("numeric", "link")) pruned_reported_alpha(object) else object$intercept
+    predict_rpf_scores(object$fit, pruned_scores(list(intercept = alpha), M), type)
   }
   hardhat::validate_prediction_size(out, new_data)
   out
@@ -1536,7 +1552,10 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
     m <- reported_scores(object$fit, m, sum(use))
     colnames(m) <- paste0(rep(names(object$beta)[use], each = length(lev)), "__class:", rep(lev, times = sum(use)))
     ret$m <- data.table::as.data.table(m)
-    ret$intercept <- stats::setNames(as.numeric(reported_scores(object$fit, matrix(object$intercept, 1))), lev)
+    ret$intercept <- stats::setNames(
+      as.numeric(reported_scores(object$fit, matrix(pruned_reported_alpha(object), 1))),
+      lev
+    )
     ret$target_levels <- lev
   }
   if (!all(use)) {
@@ -1605,7 +1624,11 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
     if (V > 1L) {
       sprintf(
         "Intercept per class: %s",
-        paste(lev, format(as.numeric(reported_scores(x$fit, matrix(x$intercept, 1))), digits = 6), collapse = ", ")
+        paste(
+          lev,
+          format(as.numeric(reported_scores(x$fit, matrix(pruned_reported_alpha(x), 1))), digits = 6),
+          collapse = ", "
+        )
       )
     } else {
       sprintf("Intercept: %s", format(x$intercept, digits = 6))

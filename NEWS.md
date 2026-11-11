@@ -51,6 +51,9 @@
   To get the old scores back, subtract the first level's column from every column and drop it.
   Two classes are unchanged: one score, the log-odds of the second level.
 
+* A pruned model of three or more classes with `loss = "exponential"` and rule `"R"` now reports its intercepts centred across the classes, so that its scores sum to 0 as the forest's do: `predict(type = "link")`, the `intercept` of `predict_components()` and `print()`.
+  Rule `"R"` fits them with the first class's at 0, so its scores did not sum to 0 (by up to 3.7 on a simulated three-class set); the probabilities, classes and the stored `intercept` do not change.
+
 ## Renamed arguments
 
 * Four arguments of `rpf()` and the split structures have clearer names; the prefix gives the unit (`n_` a count, `share_` a share in (0, 1], `max_` a cap):
