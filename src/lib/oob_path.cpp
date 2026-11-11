@@ -48,11 +48,20 @@ void RandomPlantedForest::path_reset()
     path_sum_[h].assign(len, 0.0);
 }
 
-std::shared_ptr<RandomPlantedForest::PathTracker> RandomPlantedForest::path_start(size_t n, TreeFamily *fam)
+std::shared_ptr<RandomPlantedForest::PathTracker>
+RandomPlantedForest::path_start(size_t n, TreeFamily *fam, const std::vector<std::vector<double>> *Y)
 {
   if (path_checkpoints_.empty())
     return nullptr;
   auto t = std::make_shared<PathTracker>();
+  // the adaptive fit rebuilds the families from their records: one without a split at the chosen checkpoint gets the
+  // fit of its null leaf, as fit_null_leaf() gives it to a family that made no split (from the same rows and Y)
+  if (alone_ && Y && fam) {
+    auto null_tree = fam->find(std::set<int>{0});
+    if (null_tree != fam->end() && !null_tree->second->leaves.empty() &&
+        !null_tree->second->leaves[0].individuals.empty())
+      t->null_value = null_leaf_value(*Y, null_tree->second->leaves[0].individuals);
+  }
   t->family = n;
   t->fam = fam;
   for (int i = 0; i < sample_size; ++i)
@@ -230,6 +239,7 @@ struct RandomPlantedForest::AloneFit {
     std::vector<double> rec_vals;           /**< value_size > 1: per record its 2 * value_size values */
     std::vector<uint32_t> rec_at;           /**< per checkpoint reached: the number of records up to it */
     std::vector<std::set<int>> dims;        /**< the split trees' dims (RpfSplitRecord::dims) */
+    std::vector<double> null_value;         /**< the null leaf's fit, for a family without a split (path_start()) */
     size_t reached = 0;                     /**< the number of checkpoints reached */
     int state = 0;                          /**< 0 waiting, 1 growing, 2 grown, 3 queued to grow again, 4 paused */
     bool pilot = false;                     /**< one of the first `nthreads` families */
@@ -648,6 +658,7 @@ void RandomPlantedForest::alone_finish(size_t n)
   f.rec_vals.shrink_to_fit();
   f.rec_at = std::move(t.rec_at);
   f.dims = std::move(t.dims_list);
+  f.null_value = std::move(t.null_value);
   f.reached = t.next;
   A.stats.splits_grown += f.reached ? (double)path_checkpoints_[f.reached - 1] : 0.0;
   A.count(n, f.rows, f.snaps, f.reached);
@@ -809,6 +820,9 @@ void RandomPlantedForest::alone_rebuild(size_t c)
         r0->leaves.push_back(root);
         fam.insert({std::set<int>{0}, r0});
         const size_t R = F.rec_at[c];
+        // no split up to the checkpoint: the null leaf's fit, as create_tree_family() gives it (fit_null_leaf())
+        if (R == 0 && F.null_value.size() == value_size)
+          r0->leaves[0].value = F.null_value;
         for (size_t i = 0; i < R; ++i) {
           const RpfSplitRecord &r = F.rec[i];
           const std::set<int> &dims = F.dims[(size_t)r.dims];

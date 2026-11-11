@@ -144,6 +144,10 @@
   Previously it predicted 0, a probability of 0.5: constant predictors, a single row or `min_leaf_rows` above half the rows gave an all-zero model, and families that could not split pulled the forest towards 0.
   `purify()` puts that value into the intercept.
   Fitted models change only where a family made no split.
+* The same holds when `n_splits = NULL` (the default) chooses the number of splits out of bag: a family without a split up to the chosen number predicts its rows' fit instead of 0, as a fit with that `n_splits` does.
+  The pruned model already got the level from its intercept; the forest in it (`$fit`) did not.
+  Without `n_splits = NULL`, and for families with a split, fits are unchanged.
+  The pruned model also no longer fails for classification when no component has any variance (for example, constant predictors).
 * Errors while fitting or purifying with `nthreads > 1` are reported as R errors.
   Previously an error in a worker thread terminated the R session.
 * `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.

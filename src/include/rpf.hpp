@@ -435,8 +435,11 @@ protected:
   std::vector<std::shared_ptr<PathTracker>> path_family_;
   // Clear the sums for a new fit (fit()); the checkpoints must lie in 1..n_splits
   void path_reset();
-  // A tracker for family n (growing as `fam`) after its bootstrap (nullptr if the path is off)
-  std::shared_ptr<PathTracker> path_start(size_t n, TreeFamily *fam);
+  // A tracker for family n (growing as `fam`) after its bootstrap (nullptr if the path is off). In an adaptive fit
+  // it also keeps the fit of the family's null leaf on its working outcome Y (null_leaf_value()), for the rebuild of
+  // a family that has no split at the chosen checkpoint.
+  std::shared_ptr<PathTracker>
+  path_start(size_t n, TreeFamily *fam, const std::vector<std::vector<double>> *Y = nullptr);
   // A split found by the search, before the family's leaves change: move the tracked rows of the split leaf to the two
   // new leaves and add M_s / M_b to their predictions (the change of the family's prediction); in an adaptive fit,
   // also record the split. A classification forest passes its leaves' increments inc_s / inc_b instead (for logit and
