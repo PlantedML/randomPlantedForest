@@ -418,7 +418,7 @@ rpf_rect::Accumulator RandomPlantedForest::merged_components(
       [&](size_t f) {
         rpf_rect::Accumulator &acc = batch[f % nt];
         acc = rpf_rect::Accumulator();
-        purify_fast_exact_family(tree_families[f], feature_size, kdt, cuts, acc, &counter, &only);
+        purify_fast_exact_family(tree_families[f], feature_size, kdt, cuts, acc, &counter, &only, purify_counts_of(f));
       },
       [&](size_t, size_t nb) {
         for (size_t i = 0; i < nb; ++i) {
@@ -606,7 +606,9 @@ rpf_coarse::OobSums RandomPlantedForest::coarsen_oob(const std::vector<rpf_coars
       [&](size_t f) {
         const size_t slot = f % nt;
         rpf_rect::Accumulator acc;
-        purify_fast_exact_family(tree_families[f], feature_size, kdt, pf.cuts, acc, &counter, &only);
+        purify_fast_exact_family(
+            tree_families[f], feature_size, kdt, pf.cuts, acc, &counter, &only, purify_counts_of(f)
+        );
         std::vector<int> &rw = rows[slot];
         rw.clear();
         for (size_t i = 0; i < n; ++i)

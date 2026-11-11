@@ -34,7 +34,8 @@ void RandomPlantedForest::purify_fast_exact_family(
     const std::vector<std::vector<double>> &cuts,
     rpf_rect::Accumulator &acc,
     const rpf_cnt::SubsetCounter *counter,
-    const std::set<std::vector<int>> *only
+    const std::set<std::vector<int>> *only,
+    const FamilyCounts *counts
 ) const
 {
   auto range_count = [&](const std::vector<rpf_kd::RangeConstraint> &c) -> size_t {
@@ -109,7 +110,9 @@ void RandomPlantedForest::purify_fast_exact_family(
   kd_cache.reserve(1u << 15);
 
   // 2) Accumulate leaf contributions from ALL trees T (any order), enumerating only S up to maxp
+  size_t tree_no = 0;
   for (const auto &kv : curr_family) {
+    const size_t ti = tree_no++;
     const std::set<int> &T = kv.first;
     if (T == std::set<int>{0})
       continue;
@@ -187,8 +190,14 @@ void RandomPlantedForest::purify_fast_exact_family(
     cons.reserve((size_t)tdim);
     std::vector<int> key;
     key.reserve(3 * (size_t)tdim);
+    // the counts an earlier pass kept for this tree (purify_counts_), if they fit its leaves
+    const int32_t *kept = nullptr;
+    if (counts && ti < counts->size() && (*counts)[ti].size() == leaves.size() * ((size_t)1 << tdim))
+      kept = (*counts)[ti].data();
 
+    size_t leaf_no = 0;
     for (const auto &leaf : leaves) {
+      const size_t li = leaf_no++;
       for (int b = 0; b < tdim; ++b) {
         int d = Tvec[b];
         const auto &lims = lim_list[d - 1];
@@ -237,10 +246,13 @@ void RandomPlantedForest::purify_fast_exact_family(
           key.push_back(rc_hi_idx[b]);
         }
         size_t cnt = 0;
+        const int32_t kept_cnt = kept ? kept[li * ((size_t)1 << tdim) + (size_t)jmask] : -1;
         if (empty_range)
           cnt = 0;
         else if (cons.empty())
           cnt = (size_t)sample_size;
+        else if (kept_cnt >= 0)
+          cnt = (size_t)kept_cnt;
         else {
           auto kIt = kd_cache.find(key);
           if (kIt != kd_cache.end())
@@ -283,6 +295,13 @@ void RandomPlantedForest::purify_fast_exact_family(
 
 // Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index.
 // after_batch(start, batch) runs on the calling thread after each batch.
+const RandomPlantedForest::FamilyCounts *RandomPlantedForest::purify_counts_of(size_t f) const
+{
+  if (f >= purify_counts_.size() || f >= tree_families.size() || purify_counts_[f].size() != tree_families[f].size())
+    return nullptr;
+  return &purify_counts_[f];
+}
+
 void run_families(
     size_t n_families,
     unsigned threads_to_use,

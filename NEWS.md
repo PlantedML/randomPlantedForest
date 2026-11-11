@@ -244,6 +244,9 @@
   A leaf's rows are put in order by each row's integer rank in the predictor (ranked once per tree family) with a radix sort, instead of a comparison sort of the values, and the leaf keeps that order with the first position of each distinct value, so a candidate split no longer passes over the leaf's values; the thresholds are drawn without allocating memory.
   With the default call at 8 threads, growing takes 38 s instead of 78 s on California housing (16,512 rows) and 6.2 s instead of 34.6 s on 20,000 simulated rows with 10 predictors.
   Classification gains less: on 10,000 simulated rows with 10 predictors growing takes 5.0 s instead of 11.2 s with two classes and 9.2 s instead of 15.4 s with three (`loss = "logit"`; the exponential loss alike).
+* Pruning (`prune_components()`, and so the default call) is about 1.7 times as fast on larger data, with bitwise the same models.
+  The numbers of training rows in the leaves' boxes, counted in the pass over the tree families, are kept for the later passes (the display's coarsening, its out-of-bag sums, the store of the kept components) instead of being counted again, for trees of up to 4 predictors; and the index of the components' rectangles finds its cuts without sorting.
+  On California housing (the default call, 8 threads) pruning takes 23 s instead of 39 s; at `max_interaction = 8` (50 tree families) it takes 240 s instead of 270 s, with no more memory.
 
 # randomPlantedForest 0.5.0
 

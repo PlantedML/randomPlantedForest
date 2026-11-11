@@ -170,11 +170,13 @@ void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Mat
   this->Y = samples_Y;
   this->X = samples_X;
   this->sample_size = X.size();
+  drop_purify_counts(); // (counts of the earlier rows)
 }
 
 void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
 {
   tree_families = std::vector<TreeFamily>(model.size());
+  drop_purify_counts();
   inbag_.clear();       // restored with set_inbag(), if at all
   path_sum_[0].clear(); // no OOB path
   path_sum_[1].clear();

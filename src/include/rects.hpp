@@ -187,6 +187,7 @@ struct KdIndex {
     std::vector<double> cst(vs);
     std::vector<int> rest, left, right;
     std::vector<int32_t> bnd, los, his;
+    std::vector<uint64_t> bits;
     while (!heap.empty()) {
       std::pop_heap(heap.begin(), heap.end(), cmp);
       size_t slot = heap.back();
@@ -220,30 +221,81 @@ struct KdIndex {
       if (rest.size() > leaf_size) {
         double best_cost = stop * (double)rest.size();
         for (int d = 0; d < m; ++d) {
-          bnd.clear();
+          // The candidate cuts: up to 15 of the distinct box boundaries inside the node, evenly spread over their
+          // sorted list; for a cut c, L = the boxes that start below c and R = those that end above it. The
+          // boundaries are marked in a bitmap over the node's cells (sorted and made distinct by the walk over it)
+          // unless the node is much wider than it has boxes, and L and R are counted per candidate in one pass over
+          // the boxes: the same candidates and counts as from the sorted lists, without sorting them.
+          const int32_t node_lo = P.rlo[d], node_hi = P.rhi[d];
+          const size_t span = (size_t)(node_hi - node_lo);
           los.clear();
           his.clear();
           for (int r : rest) {
-            int32_t a = rl.lo(r)[d], b = rl.hi(r)[d];
-            los.push_back(a);
-            his.push_back(b);
-            if (a > P.rlo[d] && a < P.rhi[d])
-              bnd.push_back(a);
-            if (b > P.rlo[d] && b < P.rhi[d])
-              bnd.push_back(b);
+            los.push_back(rl.lo(r)[d]);
+            his.push_back(rl.hi(r)[d]);
           }
-          if (bnd.empty())
+          size_t n_bnd = 0;
+          const bool by_bits = span <= 64 * rest.size() + 4096;
+          if (by_bits) {
+            bits.assign(span / 64 + 1, 0);
+            for (size_t i = 0; i < los.size(); ++i) {
+              const int32_t a = los[i], b = his[i];
+              if (a > node_lo && a < node_hi)
+                bits[(size_t)(a - node_lo) >> 6] |= (uint64_t)1 << ((size_t)(a - node_lo) & 63);
+              if (b > node_lo && b < node_hi)
+                bits[(size_t)(b - node_lo) >> 6] |= (uint64_t)1 << ((size_t)(b - node_lo) & 63);
+            }
+            for (uint64_t w : bits)
+              n_bnd += (size_t)__builtin_popcountll(w);
+          } else {
+            bnd.clear();
+            for (size_t i = 0; i < los.size(); ++i) {
+              const int32_t a = los[i], b = his[i];
+              if (a > node_lo && a < node_hi)
+                bnd.push_back(a);
+              if (b > node_lo && b < node_hi)
+                bnd.push_back(b);
+            }
+            std::sort(bnd.begin(), bnd.end());
+            bnd.erase(std::unique(bnd.begin(), bnd.end()), bnd.end());
+            n_bnd = bnd.size();
+          }
+          if (n_bnd == 0)
             continue;
-          std::sort(bnd.begin(), bnd.end());
-          bnd.erase(std::unique(bnd.begin(), bnd.end()), bnd.end());
-          std::sort(los.begin(), los.end());
-          std::sort(his.begin(), his.end());
-          const size_t nq = std::min<size_t>(15, bnd.size());
+          const size_t nq = std::min<size_t>(15, n_bnd);
+          int32_t cand[15];
+          if (by_bits) {
+            // the boundaries of ranks rank(q) (increasing in q), by one walk over the bitmap
+            size_t seen = 0, word = 0;
+            for (size_t q = 0; q < nq; ++q) {
+              const size_t rank = (size_t)(((double)q + 0.5) / (double)nq * (double)n_bnd);
+              while (seen + (size_t)__builtin_popcountll(bits[word]) <= rank) {
+                seen += (size_t)__builtin_popcountll(bits[word]);
+                ++word;
+              }
+              uint64_t w = bits[word];
+              for (size_t skip = rank - seen; skip > 0; --skip)
+                w &= w - 1;
+              cand[q] = node_lo + (int32_t)(word * 64 + (size_t)__builtin_ctzll(w));
+            }
+          } else {
+            for (size_t q = 0; q < nq; ++q)
+              cand[q] = bnd[(size_t)(((double)q + 0.5) / (double)nq * (double)n_bnd)];
+          }
+          // per candidate q: L = #{boxes: lo < cand[q]}, R = #{boxes: hi > cand[q]} (cand is increasing)
+          size_t nl[16] = {0}, nr[16] = {0};
+          for (size_t i = 0; i < los.size(); ++i) {
+            ++nl[std::upper_bound(cand, cand + nq, los[i]) - cand]; // lo < cand[q] from this q on
+            ++nr[std::lower_bound(cand, cand + nq, his[i]) - cand]; // hi > cand[q] for the q before this one
+          }
+          size_t below = 0, above = los.size();
           const double width = (double)(P.rhi[d] - P.rlo[d]);
           for (size_t q = 0; q < nq; ++q) {
-            int32_t c = bnd[(size_t)(((double)q + 0.5) / (double)nq * (double)bnd.size())];
-            double L = (double)(std::lower_bound(los.begin(), los.end(), c) - los.begin());
-            double R = (double)(his.end() - std::upper_bound(his.begin(), his.end(), c));
+            below += nl[q];
+            above -= nr[q];
+            const int32_t c = cand[q];
+            double L = (double)below;
+            double R = (double)above;
             double pl = (double)(c - P.rlo[d]) / width;
             double cost = pl * L + (1.0 - pl) * R;
             if (cost < best_cost) {

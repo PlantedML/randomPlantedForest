@@ -806,6 +806,7 @@ void RandomPlantedForest::alone_rebuild(size_t c)
   for (int i = 0; i < feature_size; ++i)
     root.intervals[(size_t)i] = Interval{lower_bounds[(size_t)i], upper_bounds[(size_t)i]};
   tree_families.assign(B, TreeFamily());
+  drop_purify_counts();
   std::atomic<size_t> next{0};
   std::exception_ptr err;
   std::mutex err_m;

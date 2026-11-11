@@ -437,7 +437,12 @@ public:
   // user interrupt). Empty: never called.
   std::function<void()> check_interrupt;
 
+  // Drop the range counts kept by purify_columns() (see purify_counts_)
+  void drop_purify_counts() { std::vector<FamilyCounts>().swap(purify_counts_); }
+
 protected:
+  // one family's kept range counts: per tree (in map order) its leaves' counts
+  typedef std::vector<std::vector<int32_t>> FamilyCounts;
   // Write a line to verbose_out, if set.
   void warn(const std::string &msg);
   // Internal per-family worker (grid-based mode 1)
@@ -452,7 +457,8 @@ protected:
       const std::vector<std::vector<double>> &cuts,
       rpf_rect::Accumulator &acc,
       const rpf_cnt::SubsetCounter *counter = nullptr,
-      const std::set<std::vector<int>> *only = nullptr
+      const std::set<std::vector<int>> *only = nullptr,
+      const FamilyCounts *counts = nullptr
   ) const;
   // The components `only` as the families write them (purify_fast_exact_family() restricted to them, in the cells of
   // `cuts` = forest_cuts()), merged over the families in index order as purify_mode2() merges them: the store's
@@ -475,8 +481,21 @@ protected:
       size_t n,
       const rpf_cnt::SubsetCounter &counter,
       std::map<std::vector<int>, std::vector<double>> &out,
-      std::vector<double> &intercept
+      std::vector<double> &intercept,
+      FamilyCounts *counts = nullptr
   ) const;
+  // The range counts of the leaves' boxes, kept from one pass over the families for the next ones. purify_columns()
+  // fills them (family_columns()): per family and tree (in the family's map order), per leaf l and j (a mask over the
+  // tree's dims) the number of training rows in the leaf's box on T \ j at [l * 2^|T| + j], or -1 where the pass did
+  // not count; empty for trees of more than purify_counts_max_order dims. The passes restricted to some components
+  // (merged_components(), coarsen_oob()) read them instead of counting again: the same integers. Dropped by
+  // drop_purify_counts() (prune_run() does at its end) and whenever the forest is fitted or set or its training rows
+  // are set.
+  mutable std::vector<FamilyCounts> purify_counts_;
+  // The largest order of a tree whose leaves' counts are kept (16 integers a leaf at most)
+  static constexpr int purify_counts_max_order = 4;
+  // family f's counts if they fit the family (as many trees), else nullptr
+  const FamilyCounts *purify_counts_of(size_t f) const;
   // Components of the last mode-2 purification as weighted rectangles (null after mode 1 or before purify)
   std::shared_ptr<rpf_rect::PurifiedForest> rect_forest_;
   // Threads for purify(): nthreads_param if > 0, otherwise min(the forest's nthreads, the hardware concurrency)
