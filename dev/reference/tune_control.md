@@ -42,7 +42,6 @@ tune_control(
   `[integer: c(1, 5, 20, 100)]`: The values of
   [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)'s
   `min_leaf_rows` searched in step 2; the first one is that of step 1.
-  Values above 1 need `split_structure = "leaf"`.
 
 - neighbours:
 
@@ -147,9 +146,9 @@ tuned$tune$search
 #> 2    1                  3              0.1             1       59         71
 #> 3    2                 10              0.4            20      168        200
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4844060    R 0.1      2 0.3666121   0.081         TRUE
-#> 2  FALSE       0.4459042    R 0.1      2 0.3752002   0.051        FALSE
-#> 3  FALSE       0.3832057    R 0.1      2 0.3539268   0.217           NA
+#> 1  FALSE       0.4844060    R 0.1      2 0.3666121   0.075         TRUE
+#> 2  FALSE       0.4459042    R 0.1      2 0.3752002   0.044        FALSE
+#> 3  FALSE       0.3832057    R 0.1      2 0.3539268   0.162           NA
 #>   chosen_step2 chosen_step3 final
 #> 1        FALSE           NA FALSE
 #> 2           NA           NA FALSE

@@ -275,10 +275,10 @@ splitting along an existing dimension.</p></dd>
 
 <dt id="arg-min-leaf-rows">min_leaf_rows<a class="anchor" aria-label="anchor" href="#arg-min-leaf-rows"></a></dt>
 <dd><p><code>[integer(1): 1]</code>: Minimum number of rows of the
-bootstrap sample on each side of every split, so in every leaf. Leaves
-without a threshold that keeps this many rows on each side are not drawn
-as split candidates. Only for <code>split_structure = "leaf"</code> (regression and
-classification); <code>1</code> (no limit) otherwise.</p></dd>
+bootstrap sample on each side of every split, so in every leaf, for every
+<code>split_structure</code> (regression and classification). Split points are tried
+only among those that keep this many rows on each side, and leaves without
+one are not drawn (see "<code>split_structure</code>" in Details). <code>1</code> means no limit.</p></dd>
 
 
 <dt id="arg-interaction-constraints">interaction_constraints<a class="anchor" aria-label="anchor" href="#arg-interaction-constraints"></a></dt>
@@ -534,22 +534,30 @@ and, with <code>min_leaf_rows</code>, those that leave fewer rows on either side
 there are fewer), and evaluated to choose the best split.</p></li>
 <li><p><code>"leaf_binned"</code> (was <code>"hist"</code>): As <code>"leaf"</code>, but split points are drawn
 from boundaries of quantile bins computed once per predictor, which makes
-evaluating them faster on large data.</p></li>
+evaluating them faster on large data. With <code>min_leaf_rows</code>, only from the
+boundaries that leave that many rows on each side, and candidates without
+one are not drawn.</p></li>
 <li><p><code>"tree_then_leaf"</code> (was <code>"cur_trees_1"</code>): Split candidates are
 (current-tree, split-dimension) pairs. For each sampled candidate, perform
 <code>n_try_split_points</code> evaluations. Each evaluation samples a leaf from the
 set of valid current trees (with probability proportional to its number of
 available split points) and then uniformly samples a single split point
-within that leaf.</p></li>
+within that leaf. With <code>min_leaf_rows</code>, a leaf's available split points
+are those that leave that many rows on each side, so a leaf without one is
+not drawn.</p></li>
 <li><p><code>"tree_then_all_leaves"</code> (was <code>"cur_trees_2"</code>): Split candidates are
 (current-tree, split-dimension) pairs. For each sampled candidate, iterate
 through every valid leaf. Within each leaf, sample <code>n_try_split_points</code>
-split points uniformly and evaluate them.</p></li>
+split points uniformly and evaluate them. With <code>min_leaf_rows</code>, only split
+points that leave that many rows on each side, and leaves without one are
+skipped.</p></li>
 <li><p><code>"target_tree_then_leaf"</code> (was <code>"res_trees"</code>): Split candidates are
 resulting trees. For each sampled candidate, run <code>n_try_split_points</code>
 evaluations by sampling a (split-dimension, leaf) pair from all valid pairs
 (with probability proportional to its number of available split points),
-then uniformly sampling one split point within that pair.</p></li>
+then uniformly sampling one split point within that pair. With
+<code>min_leaf_rows</code>, the available split points are those that leave that many
+rows on each side, as for <code>"tree_then_leaf"</code>.</p></li>
 </ul></div>
 
 <div class="section">
@@ -905,8 +913,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1                  3            0.100             1       84        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1                  1            0.025             1      100        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.090         TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.068        FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.083         TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   chosen_step2 chosen_step3 final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           NA           NA  TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           NA           NA FALSE</span>

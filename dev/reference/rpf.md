@@ -236,10 +236,11 @@ rpf(
 - min_leaf_rows:
 
   `[integer(1): 1]`: Minimum number of rows of the bootstrap sample on
-  each side of every split, so in every leaf. Leaves without a threshold
-  that keeps this many rows on each side are not drawn as split
-  candidates. Only for `split_structure = "leaf"` (regression and
-  classification); `1` (no limit) otherwise.
+  each side of every split, so in every leaf, for every
+  `split_structure` (regression and classification). Split points are
+  tried only among those that keep this many rows on each side, and
+  leaves without one are not drawn (see "`split_structure`" in Details).
+  `1` means no limit.
 
 - interaction_constraints:
 
@@ -543,25 +544,33 @@ candidate, then how the leaf to split is found.
 
 - `"leaf_binned"` (was `"hist"`): As `"leaf"`, but split points are
   drawn from boundaries of quantile bins computed once per predictor,
-  which makes evaluating them faster on large data.
+  which makes evaluating them faster on large data. With
+  `min_leaf_rows`, only from the boundaries that leave that many rows on
+  each side, and candidates without one are not drawn.
 
 - `"tree_then_leaf"` (was `"cur_trees_1"`): Split candidates are
   (current-tree, split-dimension) pairs. For each sampled candidate,
   perform `n_try_split_points` evaluations. Each evaluation samples a
   leaf from the set of valid current trees (with probability
   proportional to its number of available split points) and then
-  uniformly samples a single split point within that leaf.
+  uniformly samples a single split point within that leaf. With
+  `min_leaf_rows`, a leaf's available split points are those that leave
+  that many rows on each side, so a leaf without one is not drawn.
 
 - `"tree_then_all_leaves"` (was `"cur_trees_2"`): Split candidates are
   (current-tree, split-dimension) pairs. For each sampled candidate,
   iterate through every valid leaf. Within each leaf, sample
-  `n_try_split_points` split points uniformly and evaluate them.
+  `n_try_split_points` split points uniformly and evaluate them. With
+  `min_leaf_rows`, only split points that leave that many rows on each
+  side, and leaves without one are skipped.
 
 - `"target_tree_then_leaf"` (was `"res_trees"`): Split candidates are
   resulting trees. For each sampled candidate, run `n_try_split_points`
   evaluations by sampling a (split-dimension, leaf) pair from all valid
   pairs (with probability proportional to its number of available split
   points), then uniformly sampling one split point within that pair.
+  With `min_leaf_rows`, the available split points are those that leave
+  that many rows on each side, as for `"tree_then_leaf"`.
 
 ### Renamed arguments
 
@@ -932,8 +941,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.090         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.068        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.083         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE
