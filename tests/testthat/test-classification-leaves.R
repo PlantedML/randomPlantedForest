@@ -131,7 +131,6 @@ test_that("classification leaves keep min_leaf_rows rows, and no infeasible entr
 
 test_that("classification min_leaf_rows is validated, stored, printed and restored", {
   d <- cl_sim()
-  expect_error(rpf_050(d$x, d$y, n_families = 1, min_leaf_rows = 5, split_structure = "leaf_binned"), "leaf")
   set.seed(2)
   f <- with_exact_draw(FALSE, rpf_050(d$x, d$y, n_families = 2, n_splits = 20, min_leaf_rows = 10))
   expect_identical(f$params$min_leaf_rows, 10L)

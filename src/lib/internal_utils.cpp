@@ -142,6 +142,44 @@ double leaf_threshold_weight(const std::vector<std::vector<double>> &X, Leaf &le
   return (width_unique > 0L) ? static_cast<double>(width_unique) : 0.0;
 }
 
+void min_rows_range_sorted(
+    const std::vector<double> &sorted_vals,
+    const std::vector<double> &unique,
+    int leaf_size,
+    int min_rows,
+    int &lo,
+    int &hi_excl
+)
+{
+  const size_t m = sorted_vals.size();
+  const size_t mr = (size_t)min_rows;
+  if (mr == 0 || m < 2 * mr) {
+    lo = 0;
+    hi_excl = 0;
+    return;
+  }
+  const int a = (int)(std::upper_bound(unique.begin(), unique.end(), sorted_vals[mr - 1]) - unique.begin());
+  const int b = (int)(std::upper_bound(unique.begin(), unique.end(), sorted_vals[m - mr]) - unique.begin());
+  lo = std::max(leaf_size, a);
+  hi_excl = std::min((int)unique.size() - leaf_size + 1, b);
+}
+
+void leaf_threshold_range(
+    const std::vector<std::vector<double>> &X, Leaf &leaf, int k, int leaf_size, int min_rows, int &lo, int &hi_excl
+)
+{
+  std::vector<size_t> order;
+  std::vector<double> sorted_vals;
+  ensure_order_and_sorted_vals_for_leaf(X, leaf, k, order, sorted_vals);
+  auto it = leaf.cache().unique_vals_cache.find(k);
+  if (it == leaf.cache().unique_vals_cache.end()) {
+    auto uniques = compute_unique_sorted_values(sorted_vals);
+    leaf.cache().unique_count_cache[k] = uniques.size();
+    it = leaf.cache().unique_vals_cache.emplace(k, std::move(uniques)).first;
+  }
+  min_rows_range_sorted(sorted_vals, it->second, leaf_size, min_rows, lo, hi_excl);
+}
+
 std::vector<double> compute_unique_sorted_values(const std::vector<double> &sorted_vals)
 {
   std::vector<double> unique;

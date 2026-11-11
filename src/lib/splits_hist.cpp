@@ -5,6 +5,34 @@
 
 using namespace rpf_utils;
 
+namespace {
+// The leaf's row count in each bin of feature k: from the working rows' cached bin ids, else from the cut points
+void hist_bin_counts(
+    const std::vector<std::vector<double>> &X,
+    const Leaf &leaf,
+    int k,
+    const std::vector<double> &cuts_k,
+    std::vector<int> &cnt
+)
+{
+  const size_t Kf = cuts_k.size() + 1;
+  cnt.assign(Kf, 0);
+  if (tls_working_bin_id_ptr != nullptr && (size_t)k < tls_working_bin_id_ptr->size()) {
+    const std::vector<int> &bin_k = (*tls_working_bin_id_ptr)[(size_t)k];
+    for (int ind : leaf.individuals)
+      cnt[(size_t)bin_k[(size_t)ind]] += 1;
+  } else {
+    for (int ind : leaf.individuals) {
+      int b = 0;
+      if (!cuts_k.empty())
+        b = (int)std::distance(cuts_k.begin(), std::upper_bound(cuts_k.begin(), cuts_k.end(), X[ind][k]));
+      b = std::min(std::max(b, 0), (int)Kf - 1);
+      cnt[(size_t)b] += 1;
+    }
+  }
+}
+} // namespace
+
 Split RandomPlantedForest::calcOptimalSplit_hist(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
@@ -22,9 +50,41 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
   unsigned int raw_candidates = static_cast<unsigned int>(std::ceil(this->t_try * possible_splits.size()));
   unsigned int upper = std::min<size_t>(this->max_candidates_, possible_splits.size());
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
+  // min_leaf_rows: a boundary must keep at least `need` rows on each side (leaf_min, the rows the boundaries already
+  // keep, or min_rows if larger); pool entries without such a boundary get weight 0, so they are not drawn. Whether an
+  // entry has one is checked once per leaf and feature (rows_ok, reset when delete_leaves overwrites its leaf).
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
+  std::vector<int> cnt_scratch;
+  auto feasible = [&](const SplitCandidate &c) {
+    if (!c.tree || c.leaf_idx >= c.tree->leaves.size())
+      return false;
+    const int k = c.dim - 1;
+    const Leaf &leaf = c.tree->leaves[c.leaf_idx];
+    const int need = std::max(this->n_leaves[k], min_rows);
+    const int total_n = (int)leaf.individuals.size();
+    if (total_n < 2 * need)
+      return false;
+    const std::vector<double> &cuts_k =
+        (k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
+    if (cuts_k.empty())
+      return false;
+    hist_bin_counts(X, leaf, k, cuts_k, cnt_scratch);
+    int ln = 0;
+    for (size_t b = 0; b + 1 < cnt_scratch.size(); ++b) {
+      ln += cnt_scratch[b];
+      if (ln >= need && total_n - ln >= need)
+        return true;
+    }
+    return false;
+  };
   std::vector<double> weights(possible_splits.size());
-  for (size_t i = 0; i < possible_splits.size(); ++i)
-    weights[i] = std::exp(-this->split_decay_rate_ * possible_splits[i].age);
+  for (size_t i = 0; i < possible_splits.size(); ++i) {
+    SplitCandidate &c = possible_splits[i];
+    if (rows_check && c.rows_ok < 0)
+      c.rows_ok = feasible(c) ? 1 : 0;
+    weights[i] = (rows_check && c.rows_ok == 0) ? 0.0 : std::exp(-this->split_decay_rate_ * c.age);
+  }
   std::vector<size_t> sample_idxs =
       this->deterministic ? std::vector<size_t>() : sample_weighted_indices_filtered(weights, n_candidates);
   if (this->deterministic) {
@@ -42,7 +102,7 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
     const int k_dim = it->dim; // 1-based
     const int k = k_dim - 1;
     Leaf *leafPtr = &it->tree->leaves[it->leaf_idx];
-    const int leaf_min = this->n_leaves[k];
+    const int leaf_min = rows_check ? std::max(this->n_leaves[k], min_rows) : this->n_leaves[k];
     const size_t m = leafPtr->individuals.size();
     if (m == 0)
       continue;

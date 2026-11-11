@@ -93,6 +93,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
       sample_idxs.push_back(i);
   }
 
+  const int min_rows = this->min_leaf_rows_;
+  const bool rows_check = min_rows > 1;
   int best_idx = -1;
   for (size_t idx : sample_idxs) {
     auto it = possible_splits.begin();
@@ -144,16 +146,25 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
           continue;
 
         const size_t m = leaf.individuals.size();
+        // the thresholds drawn from: [leaf_size, distinct - leaf_size], with min_leaf_rows only those with min_rows
+        // rows on each side (a leaf without one is skipped and draws nothing)
+        int left = leaf_size;
+        int right_exclusive = (int)unique_count - leaf_size + 1;
+        if (rows_check) {
+          min_rows_range_sorted(sorted_vals_cf, *unique_ptr, leaf_size, min_rows, left, right_exclusive);
+          if (right_exclusive <= left)
+            continue;
+        }
         std::vector<int> samples;
         if (this->deterministic) {
           // split_try thresholds evenly spread over the same range the random draws use
-          samples = compute_even_spread_indices(leaf_size, (int)unique_count - leaf_size + 1, (size_t)this->split_try);
+          samples = compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try);
           if (samples.empty())
             continue;
         } else {
           samples.resize(this->split_try);
           for (size_t i = 0; i < samples.size(); ++i)
-            samples[i] = rng_randint(leaf_size, (int)unique_count - leaf_size + 1);
+            samples[i] = rng_randint(left, right_exclusive);
           std::sort(samples.begin(), samples.end());
         }
         const bool single_eval = (samples.size() == 1);

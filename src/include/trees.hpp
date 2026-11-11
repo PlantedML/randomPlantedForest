@@ -16,13 +16,17 @@ struct FamilyRanks; // cur_trees_1.hpp
 class DecisionTree;
 // The split search's memos for one leaf, for each feature dimension: a stable order of indices into `individuals`
 // sorted by the feature value (reusable across evaluations), the sorted feature values along it (for lower_bound), the
-// unique sorted values (threshold sampling) and the unique count (to skip leaves with too few thresholds). They are
+// unique sorted values (threshold sampling), the unique count (to skip leaves with too few thresholds) and, with
+// min_leaf_rows, the range of thresholds that keep enough rows on each side. They are
 // functions of the leaf's rows and are needed only while the family grows.
 struct LeafCache {
   std::unordered_map<int, std::vector<size_t>> order_cache;
   std::unordered_map<int, std::vector<double>> sorted_vals_cache;
   std::unordered_map<int, std::vector<double>> unique_vals_cache;
   std::unordered_map<int, size_t> unique_count_cache;
+  // tree_then_leaf (cur_trees_1) with min_leaf_rows: the range [lo, hi_excl) of distinct-value indices whose
+  // thresholds keep min_leaf_rows rows on each side (rpf_ct1::rows_range)
+  std::unordered_map<int, std::pair<int, int>> rows_range_cache;
 };
 
 struct Leaf {

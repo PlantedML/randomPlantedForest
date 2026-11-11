@@ -78,8 +78,6 @@ test_that("`min_leaf_rows` is validated, stored and restored", {
   d <- mlr_sim()
   expect_error(mlr_fit(d, min_leaf_rows = 0), "min_leaf_rows")
   expect_error(mlr_fit(d, min_leaf_rows = 2.5), "min_leaf_rows")
-  expect_error(mlr_fit(d, min_leaf_rows = 5, split_structure = "leaf_binned"), "leaf")
-  # classification: test-classification-leaves.R
 
   b <- mlr_fit(d, min_leaf_rows = 10, n_families = 2)
   expect_identical(b$params$min_leaf_rows, 10L)

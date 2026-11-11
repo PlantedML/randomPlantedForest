@@ -83,7 +83,7 @@ struct RPFParams {
   size_t max_candidates = 50;
   bool delete_leaves = true;
   int split_structure_mode = 3; /**< 0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist */
-  int min_leaf_rows = 1;        /**< rows on each side of every split; > 1 only for leaves (mode 3) */
+  int min_leaf_rows = 1;        /**< rows on each side of every split (1: no limit), every split structure */
   bool exact_draw = true;       /**< leaves: the exact draw of candidates (false: the fast draw, LeavesSampler) */
   /** Allowed feature sets (1-based): a tree on the features T is grown only if T is a subset of one of them.
    *  Empty = unrestricted (only max_interaction applies). */
@@ -629,8 +629,8 @@ protected:
     // expression as before, recomputed only when the age changes, so the draw's weights are bitwise the same.
     double w = 0.0;
     double w_age = std::numeric_limits<double>::quiet_NaN();
-    // leaves with min_leaf_rows_ > 1: whether the leaf has a threshold on dim with min_leaf_rows_ rows on each side
-    // (-1: not yet known). Entries without one are not drawn.
+    // leaves and hist with min_leaf_rows_ > 1: whether the leaf has a threshold on dim with min_leaf_rows_ rows on
+    // each side (-1: not yet known). Entries without one are not drawn.
     signed char rows_ok = -1;
     // legacy ctor without leaf index (defaults to 0) — keep but prefer the 4-arg form from callers
     explicit SplitCandidate(int d, std::shared_ptr<DecisionTree> t, double a = 0.0)
@@ -644,7 +644,10 @@ protected:
   };
   // Which split structure to use (0=res_trees, 1=cur_trees_2, 2=cur_trees_1, 3=leaves, 4=hist)
   int split_structure_mode_ = 3;
-  // leaves: at least this many rows of the bootstrap sample on each side of every split (1: no limit)
+  // At least this many rows of the bootstrap sample on each side of every split (1: no limit), in every split
+  // structure: leaves and hist leave out pool entries without such a threshold (rows_ok); cur_trees_1 and res_trees
+  // weigh a leaf by its number of such thresholds, so a leaf without one is not drawn; cur_trees_2 skips such a leaf.
+  // Each search draws its thresholds only from those that keep the rows.
   int min_leaf_rows_ = 1;
 
   // Histogram mode buffers

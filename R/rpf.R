@@ -71,10 +71,10 @@
 #' @param delete_leaves `[logical(1): TRUE]`: Whether to delete a parent leaf when
 #'   splitting along an existing dimension.
 #' @param min_leaf_rows `[integer(1): 1]`: Minimum number of rows of the
-#'   bootstrap sample on each side of every split, so in every leaf. Leaves
-#'   without a threshold that keeps this many rows on each side are not drawn
-#'   as split candidates. Only for `split_structure = "leaf"` (regression and
-#'   classification); `1` (no limit) otherwise.
+#'   bootstrap sample on each side of every split, so in every leaf, for every
+#'   `split_structure` (regression and classification). Split points are tried
+#'   only among those that keep this many rows on each side, and leaves without
+#'   one are not drawn (see "`split_structure`" in Details). `1` means no limit.
 #' @param interaction_constraints `[list | NULL: NULL]`: Feature sets that restrict which
 #'   interactions the forest may form, e.g. `list(c("x1", "x2"), c("x3", "x4"))`.
 #'   Each set is given by predictor names or by column indices: with `x`, the
@@ -288,25 +288,33 @@
 #'
 #' - `"leaf_binned"` (was `"hist"`): As `"leaf"`, but split points are drawn
 #'   from boundaries of quantile bins computed once per predictor, which makes
-#'   evaluating them faster on large data.
+#'   evaluating them faster on large data. With `min_leaf_rows`, only from the
+#'   boundaries that leave that many rows on each side, and candidates without
+#'   one are not drawn.
 #'
 #' - `"tree_then_leaf"` (was `"cur_trees_1"`): Split candidates are
 #'   (current-tree, split-dimension) pairs. For each sampled candidate, perform
 #'   `n_try_split_points` evaluations. Each evaluation samples a leaf from the
 #'   set of valid current trees (with probability proportional to its number of
 #'   available split points) and then uniformly samples a single split point
-#'   within that leaf.
+#'   within that leaf. With `min_leaf_rows`, a leaf's available split points
+#'   are those that leave that many rows on each side, so a leaf without one is
+#'   not drawn.
 #'
 #' - `"tree_then_all_leaves"` (was `"cur_trees_2"`): Split candidates are
 #'   (current-tree, split-dimension) pairs. For each sampled candidate, iterate
 #'   through every valid leaf. Within each leaf, sample `n_try_split_points`
-#'   split points uniformly and evaluate them.
+#'   split points uniformly and evaluate them. With `min_leaf_rows`, only split
+#'   points that leave that many rows on each side, and leaves without one are
+#'   skipped.
 #'
 #' - `"target_tree_then_leaf"` (was `"res_trees"`): Split candidates are
 #'   resulting trees. For each sampled candidate, run `n_try_split_points`
 #'   evaluations by sampling a (split-dimension, leaf) pair from all valid pairs
 #'   (with probability proportional to its number of available split points),
-#'   then uniformly sampling one split point within that pair.
+#'   then uniformly sampling one split point within that pair. With
+#'   `min_leaf_rows`, the available split points are those that leave that many
+#'   rows on each side, as for `"tree_then_leaf"`.
 #'
 #' ## Renamed arguments
 #'
@@ -944,12 +952,6 @@ rpf_bridge <- function(
   checkmate::assert_number(split_decay_rate, lower = 0)
   checkmate::assert_flag(delete_leaves)
   checkmate::assert_int(min_leaf_rows, lower = 1)
-  if (min_leaf_rows > 1 && split_structure != "leaf") {
-    cli::cli_abort(
-      "{.arg min_leaf_rows} > 1 needs {.code split_structure = \"leaf\"}.",
-      call = call
-    )
-  }
 
   # "median" loss is implemented but discarded
   loss_functions <- switch(outcomes$mode, "regression" = "L2", "classification" = c("L1", "L2", "logit", "exponential"))
@@ -980,7 +982,7 @@ rpf_bridge <- function(
   # tune: the search chooses n_try_split_points, share_candidates, min_leaf_rows and n_splits, and prunes every forest
   control <- tune_resolve(tune, call = call)
   if (!is.null(control)) {
-    tune_check_call(control, given, n_splits, prune, deterministic, n_families, split_structure, call = call)
+    tune_check_call(control, given, n_splits, prune, deterministic, n_families, call = call)
     n_splits <- NULL
     prune <- TRUE
   }
