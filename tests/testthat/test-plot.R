@@ -55,7 +55,7 @@ test_that("tree names follow the model's columns when factors are reordered", {
 
 test_that("multiclass boxes have one value column per class", {
   set.seed(1)
-  fit <- rpf_050(Species ~ ., data = iris, n_families = 1, n_splits = 5)
+  fit <- rpf_050(Species ~ ., data = iris, n_families = 1, n_splits = 5, loss = "exponential")
   boxes <- rpf_boxes(fit)
 
   expect_contains(names(boxes), paste0("value_", levels(iris$Species)))
@@ -103,7 +103,13 @@ test_that("plot() selects the class for multiclass fits only", {
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("patchwork")
   set.seed(1)
-  fit_multi <- rpf_050(Species ~ Sepal.Length + Petal.Length, data = iris, n_families = 1, n_splits = 5)
+  fit_multi <- rpf_050(
+    Species ~ Sepal.Length + Petal.Length,
+    data = iris,
+    n_families = 1,
+    n_splits = 5,
+    loss = "exponential"
+  )
   fit_reg <- rpf_050(mpg ~ wt + hp, data = mtcars, n_families = 1, n_splits = 5)
 
   expect_s3_class(plot(fit_multi, type = "boxes", class = "virginica"), "patchwork")

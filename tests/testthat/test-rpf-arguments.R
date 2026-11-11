@@ -125,6 +125,16 @@ test_that("purify() on a purified forest returns it unchanged", {
 
 test_that("the default loss depends on the outcome", {
   expect_identical(rpf_050(mpg ~ cyl + wt, data = mtcars, n_families = 2)$params$loss, "L2")
-  expect_identical(rpf_050(Species ~ ., data = iris, n_families = 2)$params$loss, "exponential")
+  # classification: logit, with two classes and with more, the same fit as loss = "logit" given
+  iris2 <- droplevels(iris[iris$Species != "setosa", ])
+  for (d in list(iris2, iris)) {
+    set.seed(3)
+    fit <- rpf_050(Species ~ ., data = d, n_families = 2)
+    set.seed(3)
+    fit_logit <- rpf_050(Species ~ ., data = d, n_families = 2, loss = "logit")
+    expect_identical(fit$params$loss, "logit")
+    expect_identical(fit$params$exact_step, TRUE)
+    expect_identical(predict(fit, d, type = "link"), predict(fit_logit, d, type = "link"))
+  }
   expect_error(rpf_050(Species ~ ., data = iris, n_families = 2, loss = c("L1", "L2")))
 })

@@ -1,5 +1,5 @@
 # rpf()'s defaults: a plain call is the explicit call it stands for (splits chosen out of bag, pruned with the display,
-# 3 / 0.1 for "leaf", order 3, 200 families, the fast draw; the loss is master's, exponential for classification),
+# 3 / 0.1 for "leaf", order 3, 200 families, the fast draw; the loss L2 for regression and logit for classification),
 # bit for bit; with deterministic = TRUE the NULL defaults resolve to 30 splits and no pruning.
 
 def_data <- function(n = 120) {
@@ -55,8 +55,8 @@ test_that("the default call is the explicit call it stands for", {
     f <- stats::as.formula(paste(y, "~ x1 + x2 + x3"))
     set.seed(5)
     m <- rpf(f, data = d)
-    expect_identical(m$fit$params$loss, "exponential")
-    expect_identical(def_parts(m, d, "prob"), def_parts(explicit(f, loss = "exponential"), d, "prob"))
+    expect_identical(m$fit$params$loss, "logit")
+    expect_identical(def_parts(m, d, "prob"), def_parts(explicit(f, loss = "logit", exact_step = TRUE), d, "prob"))
   }
 })
 

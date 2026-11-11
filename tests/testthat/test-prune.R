@@ -397,7 +397,7 @@ test_that("model_share of a three-class model is its share of the centred scores
   s <- 2 * x[, 1] + 3 * x[, 2] * x[, 3] + rnorm(300, sd = 0.3)
   y <- cut(s, quantile(s, c(0, 1 / 3, 2 / 3, 1)), include.lowest = TRUE, labels = c("a", "b", "c"))
   set.seed(4)
-  fit <- rpf_050(x, y, max_interaction = 2, n_families = 10, n_splits = 30)
+  fit <- rpf_050(x, y, max_interaction = 2, n_families = 10, n_splits = 30, loss = "exponential")
   pr <- prune_components(fit, x, y, rule = "R", tau = 0.01, max_panels = Inf)
   k <- pr$components$kept
   ms <- pr$components$model_share[k]

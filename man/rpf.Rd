@@ -209,16 +209,18 @@ the forest on the effects a first fit found, e.g. after dropping its small
 components.}
 
 \item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
-regression, the only supported loss, and \code{"exponential"} for classification
-(with more than two classes the multiclass exponential loss SAMME).
-Classification also supports \code{"logit"} (the multinomial log-likelihood),
-and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do not yield
-proper probability estimates. See "Classification losses" in Details.}
+regression, the only supported loss, and \code{"logit"} (the multinomial
+log-likelihood) for classification, with two classes and with more.
+Classification also supports \code{"exponential"} (with more than two classes
+the multiclass exponential loss SAMME), and \code{"L1"} and \code{"L2"}, which fit
+class indicators directly and do not yield proper probability estimates.
+See "Classification losses" in Details.}
 
-\item{exact_step}{\verb{[logical(1): TRUE]}: Only used with \code{loss = "logit"}: whether
-the two leaves of each split get the exact minimisers of the penalised loss
-(Newton's method to convergence on the leaf's rows), or one Newton step from
-the sums the split search scored them by (\code{FALSE}, faster). The split
+\item{exact_step}{\verb{[logical(1): TRUE]}: Only used with \code{loss = "logit"} (the
+classification default): whether the two leaves of each split get the
+exact minimisers of the penalised loss (Newton's method to convergence on
+the leaf's rows), or one Newton step from the sums the split search scored
+them by (\code{FALSE}, faster). The split
 search is the same either way. The exponential loss's step is exact by
 itself, so \code{exact_step} does not change \code{"exponential"} fits. See
 "Classification losses" in Details.}
@@ -376,7 +378,7 @@ round (the default) had 5.7\% to 6.8\% lower test error than 10 and 40\% (the
 default of the other structures, and of \code{"leaf"} before). \code{tune} searches
 this greediness out of bag.
 
-For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
+For classification, \code{"logit"} (the default) and \code{"exponential"} fit on the
 link scale and are transformed to probabilities; see "Classification
 losses". \code{"L1"} and \code{"L2"} fit class indicators directly and their
 probabilities are truncated to \verb{[0, 1]}.
@@ -408,6 +410,14 @@ sorted rows, so that a split point costs the same whatever the leaf's size;
 for \code{"tree_then_leaf"} one pass over the leaf per split point).
 \code{"exponential"}'s step is exact; with \code{exact_step = TRUE} (the default)
 \code{"logit"}'s steps are made exact too, otherwise they are one Newton step.
+
+\code{"logit"} is the default, with two classes and with more. On 8 public data
+sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5 repeated
+splits each) its test log-loss was lower than or tied with that of
+\code{"exponential"} on every set, and lower by 0.053 on average with 3 or more
+classes. \code{"exponential"} can need many more splits with many classes: on a
+set of 7 classes it chose 1,345 to 4,525 splits where \code{"logit"} chose about
+22.
 }
 
 \subsection{Factor predictors}{
