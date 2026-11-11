@@ -147,8 +147,8 @@ tuned$tune$search
 #> 3    2                 10              0.4            20      168        200
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
 #> 1  FALSE       0.4844060    R 0.1      2 0.3666121   0.069         TRUE
-#> 2  FALSE       0.4459042    R 0.1      2 0.3752002   0.043        FALSE
-#> 3  FALSE       0.3832057    R 0.1      2 0.3539268   0.162           NA
+#> 2  FALSE       0.4459042    R 0.1      2 0.3752002   0.044        FALSE
+#> 3  FALSE       0.3832057    R 0.1      2 0.3539268   0.163           NA
 #>   chosen_step2 chosen_step3 final
 #> 1        FALSE           NA FALSE
 #> 2           NA           NA FALSE

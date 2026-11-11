@@ -33,7 +33,7 @@ one <- time_fit(1)
 two <- time_fit(2)
 c(one_thread = one$seconds, two_threads = two$seconds)
 #>  one_thread two_threads 
-#>       9.028       5.095
+#>       9.013       5.083
 identical(predict(one$model, train), predict(two$model, train))
 #> [1] TRUE
 ```
@@ -76,7 +76,7 @@ t(sizes)
 #>      rows splits seconds
 #> [1,]  250    200     1.9
 #> [2,]  500    238     2.8
-#> [3,] 1000    336     5.1
+#> [3,] 1000    336     5.0
 ```
 
 Ways to make a fit faster, at some cost in accuracy or in what the model
