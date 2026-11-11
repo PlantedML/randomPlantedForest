@@ -19,6 +19,9 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
 
   if (possible_trees.empty())
     return min_split;
+  // The loss's running sums (FamilyLoss::scan_terms): kept per leaf and feature with its sorted order (LeafDimState)
+  const size_t scan_T = loss_fn ? loss_fn->scan_terms() : 0;
+  std::vector<double> scan_b;
   unsigned int raw_candidates = (unsigned int)std::ceil(this->t_try * possible_trees.size());
   unsigned int upper = std::min<unsigned int>((unsigned int)this->max_candidates_, (unsigned int)possible_trees.size());
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
@@ -142,6 +145,10 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
       std::vector<double> *unique_ptr = nullptr;
       std::vector<std::vector<double>> prefix_cf;
       std::vector<double> total_cf;
+      // the loss's running sums (FamilyLoss::scan_terms): the prefix sums of its row terms [i * T + q], the leaf's
+      // value
+      std::vector<double> term_prefix;
+      double term_vp = 0;
     };
     // Keyed by Leaf* then by k (dimension index)
     std::unordered_map<Leaf *, std::unordered_map<int, LeafDimState>> local_states;
@@ -316,10 +323,19 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
         }
         if (state.right > state.left)
           state.used_flags.assign((size_t)(state.right - state.left), 0);
-        // Build prefix sums for fast evaluation
-        build_prefix_and_total_given_order(
-            Y, *leaf_ptr, state.order_cf, this->value_size, state.prefix_cf, state.total_cf
-        );
+        // Build prefix sums for fast evaluation (the loss's terms, or Y)
+        if (scan_T > 0) {
+          const size_t m_st = leaf_ptr->individuals.size();
+          state.term_prefix.resize(m_st * scan_T);
+          if (m_st > 0) {
+            loss_fn->prefix_terms(*leaf_ptr, state.order_cf.data(), m_st, state.term_prefix.data());
+            state.term_vp = loss_fn->region_value(&state.term_prefix[(m_st - 1) * scan_T], m_st);
+          }
+        } else {
+          build_prefix_and_total_given_order(
+              Y, *leaf_ptr, state.order_cf, this->value_size, state.prefix_cf, state.total_cf
+          );
+        }
         state.initialized = true;
       }
       const std::vector<double> &wts_view = bucket.has_local ? bucket.wts : *(bucket.wts_src);
@@ -362,7 +378,15 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
 
       double loss = 0.0;
       std::vector<double> sum_s_adj(this->value_size, 0.0), sum_b_adj(this->value_size, 0.0);
-      for (size_t p = 0; p < this->value_size; ++p) {
+      if (scan_T > 0) {
+        const double *s = &state.term_prefix[(pos_in_sorted - 1) * scan_T];
+        const double *tot = &state.term_prefix[(m_eval - 1) * scan_T];
+        scan_b.resize(scan_T);
+        for (size_t q = 0; q < scan_T; ++q)
+          scan_b[q] = tot[q] - s[q];
+        loss = loss_fn->scan_score(s, scan_b.data(), pos_in_sorted, m_eval - pos_in_sorted, state.term_vp);
+      }
+      for (size_t p = 0; p < this->value_size && scan_T == 0; ++p) {
         const double sum_s_base = state.prefix_cf[p][pos_in_sorted - 1];
         const double sum_b_base = state.total_cf[p] - sum_s_base;
         sum_s_adj[p] = sum_s_base;
@@ -372,7 +396,7 @@ Split RandomPlantedForest::calcOptimalSplit_resTrees(
           loss -= (sum_b_adj[p] * sum_b_adj[p]) / static_cast<double>(m_eval - pos_in_sorted);
         }
       }
-      if (loss_fn) { // the loss's criterion (classification), from the same sums
+      if (loss_fn && scan_T == 0) { // the loss's criterion (classification), from the same sums
         curr_split.sum_s = sum_s_adj;
         curr_split.sum_b = sum_b_adj;
         loss = loss_fn->score(curr_split, *leaf_ptr, k, sp, X);

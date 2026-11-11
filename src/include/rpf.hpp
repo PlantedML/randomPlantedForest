@@ -67,6 +67,44 @@ struct FamilyLoss {
   ) = 0;
   // The family (index n) has finished growing.
   virtual void finish(size_t n) = 0;
+  // The running-sum scan. A loss whose criterion is a function of the sums of per-row terms over a split's two sides
+  // (classification's logit and exponential) returns their number T > 0. The searches then build those sums as they
+  // build the sums of Y (prefix sums along a leaf's sorted rows, sums per bin, or one pass over the leaf's rows per
+  // try) and score a threshold with scan_score(), at a cost that does not grow with the leaf's rows where the sums are
+  // prefix sums. 0 (the default): score() for every try.
+  virtual size_t scan_terms() const { return 0; }
+  // out[0 .. T) += row ind's terms
+  virtual void add_terms(int ind, double *out) const
+  {
+    (void)ind;
+    (void)out;
+  }
+  // out[i T .. (i + 1) T) = the sums of the terms of the rows leaf.individuals[order[0 .. i]], i < m
+  virtual void prefix_terms(const Leaf &leaf, const size_t *order, size_t m, double *out) const
+  {
+    (void)leaf;
+    (void)order;
+    (void)m;
+    (void)out;
+  }
+  // The parent region's part of the criterion, from its term sums t and n rows (once per leaf and feature)
+  virtual double region_value(const double *t, size_t n) const
+  {
+    (void)t;
+    (void)n;
+    return 0;
+  }
+  // The criterion of the split whose sides have the term sums s (ns rows below the threshold) and b (nb rows), vp the
+  // parent's region_value(): smaller is better, INF if the split gains nothing
+  virtual double scan_score(const double *s, const double *b, size_t ns, size_t nb, double vp) const
+  {
+    (void)s;
+    (void)b;
+    (void)ns;
+    (void)nb;
+    (void)vp;
+    return std::numeric_limits<double>::infinity();
+  }
 };
 
 struct RPFParams {

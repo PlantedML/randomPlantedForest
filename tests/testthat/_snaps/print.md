@@ -58,9 +58,8 @@
              delete_leaves: TRUE
       
       -- Loss 
-           loss: logit
-          delta: 0.001
-        epsilon: 0.1
+              loss: logit
+        exact_step: TRUE
       
       i Fit using 1 thread, also the default for `predict()` and `purify()`.
 

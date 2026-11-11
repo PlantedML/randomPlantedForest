@@ -22,25 +22,26 @@ test_that("an infinite outcome is an error, infinite predictors are not", {
   expect_true(all(is.finite(predict(fit, dat)$.pred)))
 })
 
-test_that("epsilon and delta must give a non-empty truncation range", {
+test_that("delta and epsilon are no longer arguments; exact_step must be TRUE or FALSE", {
+  # the logit and exponential losses have no clamps (their truncation of class shares is gone), so an old call that
+  # gives delta or epsilon is an error, for every loss and the regression too
   dat <- input_data()
   dat$cl <- factor(dat$y > median(dat$y))
   fit_cl <- function(...) rpf_050(cl ~ x1 + x2, data = dat, n_families = 2, n_splits = 5, ...)
-
-  for (loss in c("logit", "exponential")) {
-    for (eps in c(0, 0.5, 0.7, 1)) {
-      expect_error(fit_cl(loss = loss, epsilon = eps), "epsilon. must be greater than 0 and less than 0.5")
-    }
-    expect_s3_class(fit_cl(loss = loss, epsilon = 0.49), "rpf")
-    expect_error(fit_cl(loss = loss, delta = 0.5), "delta. must be")
-    expect_s3_class(fit_cl(loss = loss, delta = 0.49), "rpf")
+  for (loss in c("logit", "exponential", "L2")) {
+    expect_error(fit_cl(loss = loss, delta = 0.001), "delta")
+    expect_error(fit_cl(loss = loss, epsilon = 0.1), "epsilon")
   }
-  expect_error(fit_cl(loss = "logit", delta = 0), "delta. must be greater than 0")
-  expect_s3_class(fit_cl(loss = "exponential", delta = 0), "rpf")
-
-  # unused by the other losses, which keep accepting [0, 1]
-  expect_s3_class(fit_cl(loss = "L2", epsilon = 0, delta = 0.7), "rpf")
-  expect_s3_class(rpf_050(y ~ x1 + x2, data = dat, n_families = 2, epsilon = 0), "rpf")
+  expect_error(rpf_050(y ~ x1 + x2, data = dat, n_families = 2, epsilon = 0.1), "epsilon")
+  expect_error(rpf_050(dat[c("x1", "x2")], dat$cl, n_families = 2, delta = 0.001), "delta")
+  expect_error(rpf_050(as.matrix(dat[c("x1", "x2")]), dat$cl, n_families = 2, epsilon = 0.1), "epsilon")
+  for (bad in list(NA, 1, "yes", c(TRUE, FALSE))) {
+    expect_error(fit_cl(loss = "logit", exact_step = bad), "exact_step")
+  }
+  expect_s3_class(fit_cl(loss = "logit", exact_step = FALSE), "rpf")
+  # unused by the other losses, and by the regression
+  expect_s3_class(fit_cl(loss = "L2", exact_step = FALSE), "rpf")
+  expect_s3_class(rpf_050(y ~ x1 + x2, data = dat, n_families = 2, exact_step = FALSE), "rpf")
 })
 
 test_that("share_candidates must be positive", {

@@ -400,6 +400,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
   unsigned int n_candidates = std::max<unsigned int>(1u, std::min<unsigned int>(raw_candidates, upper));
   const int min_rows = this->min_leaf_rows_;
   const bool rows_check = min_rows > 1;
+  const size_t scan_T = loss_fn ? loss_fn->scan_terms() : 0;
   std::vector<size_t> sample_idxs = draw_leaves_candidates(X, possible_splits, n_candidates, sc);
 
   int best_idx = -1;
@@ -454,6 +455,43 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     }
     samples = this->deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try)
                                   : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)this->split_try);
+
+    // The loss's running sums (FamilyLoss::scan_terms): the prefix sums of its row terms along the sorted rows,
+    // [i * T + q], and the leaf's own value; a threshold then costs O(T), whatever the leaf's rows
+    if (scan_T > 0) {
+      std::vector<double> &tp = sc.prefix;
+      tp.resize(scan_T * m);
+      loss_fn->prefix_terms(*leafPtr, order.data(), m, tp.data());
+      const double *tot = tp.data() + (m - 1) * scan_T;
+      const double vp = loss_fn->region_value(tot, m);
+      sc.total.resize(scan_T);
+      for (size_t si = 0; si < samples.size(); ++si) {
+        const size_t uidx = static_cast<size_t>(samples[si]);
+        if (uidx >= unique.size() || uidx >= first_pos.size())
+          continue;
+        const double sp = unique[uidx];
+        const size_t pos = first_pos[uidx];
+        if (pos == 0 || pos >= m)
+          continue;
+        if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
+          continue;
+        if (pos < static_cast<size_t>(min_rows) || (m - pos) < static_cast<size_t>(min_rows))
+          continue;
+        const double *s = tp.data() + (pos - 1) * scan_T;
+        for (size_t q = 0; q < scan_T; ++q)
+          sc.total[q] = tot[q] - s[q];
+        const double loss = loss_fn->scan_score(s, sc.total.data(), pos, m - pos, vp);
+        if (loss < min_split.min_sum) {
+          min_split.min_sum = loss;
+          min_split.tree_index = it->tree;
+          min_split.leaf_index = leafPtr;
+          min_split.split_coordinate = k + 1;
+          min_split.split_point = sp;
+          best_idx = (int)idx;
+        }
+      }
+      continue;
+    }
 
     // Prefix sums once per candidate evaluation, into a reused buffer [p * m + i]
     std::vector<double> &prefix = sc.prefix;

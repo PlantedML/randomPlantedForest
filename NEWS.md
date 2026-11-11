@@ -20,6 +20,18 @@
   Classification fits of earlier versions cannot be reproduced this way: they change for every split structure and loss (see Bug fixes: classification uses regression's split structures, the largest value of a predictor can be split off, and three or more classes with the exponential loss use SAMME).
   The default call does more work than before: 0.2 s on `mtcars`, 0.4 s on `iris`, and about 2.3 minutes with a peak of 4.6 GB of resident memory (RSS; 2.7 GB of physical footprint, which varies by a few tenths of a GB from run to run) on California housing (16,512 rows) at 8 threads, measured with all changes of this version.
 
+* The classification losses `"logit"` and `"exponential"` (binary, and SAMME for three or more classes) no longer clamp class shares, and `rpf()`'s arguments `delta` and `epsilon` are removed: a call that gives either is an error (an unused argument).
+  Each new leaf's step now minimises the leaf's penalised loss: the loss of its rows, plus that of one pseudo-row, split evenly over the classes, at the leaf's current mean score (`?rpf`, "Classification losses").
+  A split is scored by its gain over the parent leaf's own step, and each new leaf pays for its pseudo-row.
+  So a leaf of one class converges to a finite level (`log(2 n + 1)` for `n` rows and two classes) and is not moved again, instead of being split and pushed further in every round (scores of several hundred after 300 rounds); splitting such a leaf, or repeating a split whose leaves are at their optimum, gains nothing and is not made; and a round in which no candidate gains makes no split.
+  Previously the split criterion credited a split with the parent leaf's own step at a class share clamped to `[delta, 1 - delta]`, while the update clamped it to `[epsilon, 1 - epsilon]`, so pure and nearly pure leaves won over splits that separate classes, and logit's leaves reset the mean score to the log-odds of the raw share, which is not a step of the loss and left fits underconfident.
+  With the defaults (`n_splits` out of bag, pruning), on six data sets (penguins, a 300-row and a 4,000-row simulated set, each with two and three classes; 3 seeds), the test log-loss of the exponential loss changes by -0.018 to +0.010 on five sets and by +0.048 on the 300-row three-class set (worse in all three seeds), and that of the logit loss by -0.017 to +0.016.
+  At fixed split counts the exponential loss no longer overfits (300 splits: 0.58 against 3.42 on the 300-row three-class set, 0.08 against 1.00 on two-class penguins); on the noisy 4,000-row sets at 300 splits both fit the noise more than the clamped logit loss did (logit +0.03 and +0.05, exponential +0.05 and +0.13; all still below the old exponential loss), which the out-of-bag choice of `n_splits` avoids.
+  `rpf()` gains `exact_step` (default `TRUE`): logit's two new leaves get the exact minimisers of their penalised loss (Newton's method to convergence on the leaf's rows); `FALSE` takes one Newton step.
+  The exponential loss's step is exact by itself, so `exact_step` does not change its fits.
+  The split search scores a candidate from sums over its two sides built as regression builds them (along the leaf's sorted rows, or per bin), so classification fits are faster: at 1 thread on 10,000 rows (100 splits, 20 tree families) a binary fit takes 3.8 s instead of 7.9 s with the exponential loss and 3.6 s instead of 9.7 s with logit (regression: 2.7 s), a three-class fit 5.2 s instead of 7.1 s and 5.1 s instead of 11.5 s.
+  Classification fits with `"logit"` or `"exponential"` change; `"L1"` and `"L2"` fits and regression are unchanged, and a model saved before still loads, prints and predicts.
+
 ## Renamed arguments
 
 * Four arguments of `rpf()` and the split structures have clearer names; the prefix gives the unit (`n_` a count, `share_` a share in (0, 1], `max_` a cap):
@@ -141,7 +153,7 @@
 * Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaf"` for regression excluded that split, so binary predictors were never split on, and classification could not learn from them at all.
   Fitted models change for classification and for regression with `split_structure` other than `"leaf"`.
-* A tree family that makes no split predicts the mean outcome of its bootstrap sample, and for classification its class shares (truncated to `[epsilon, 1 - epsilon]` with `loss = "logit"` or `"exponential"`).
+* A tree family that makes no split predicts the mean outcome of its bootstrap sample, and for classification its rows' fit (with `loss = "logit"` or `"exponential"` the class shares smoothed by the losses' pseudo-row, see Breaking changes).
   Previously it predicted 0, a probability of 0.5: constant predictors, a single row or `min_leaf_rows` above half the rows gave an all-zero model, and families that could not split pulled the forest towards 0.
   `purify()` puts that value into the intercept.
   Fitted models change only where a family made no split.
@@ -154,7 +166,7 @@
 * `predict(type = "link")` works for classification forests with `loss = "L1"` or `"L2"`.
   It returns the raw predictions, as `type = "numeric"` does (the link is the identity).
   Previously it stopped with an error about the size of `pred`.
-* `rpf()` stops with a clear error on inputs that gave wrong fits without a warning or failed later: an infinite outcome, `epsilon` outside `(0, 0.5)`, `delta` of 0.5 or more (or 0 with `loss = "logit"`), `t_try = 0`, predictor names that are missing, duplicated or contain `:`, and interaction terms in the formula.
+* `rpf()` stops with a clear error on inputs that gave wrong fits without a warning or failed later: an infinite outcome, `t_try = 0`, predictor names that are missing, duplicated or contain `:`, and interaction terms in the formula.
   `rpf()` finds interactions itself, so write `y ~ x1 + x2` instead of `y ~ x1 * x2`; to fit a product as a predictor of its own, write `I(x1 * x2)` or add it to the data as a column.
   A character or logical outcome and a factor outcome with a single class get the package's own message instead of one from `hardhat` or `model.matrix()`.
   Unused levels of a factor outcome are dropped with a warning; previously a binary outcome with an unused level was fitted, but `predict()` failed.
@@ -168,7 +180,7 @@
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
 * `loss = "exponential"`, the default for classification, is with more than two classes the multiclass exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split criterion, the leaf step and the weights all come from the one loss `exp(-y.f / K)`.
-  Each row has one weight, `exp(-g)` with `g` its class's score, and a leaf moves the scores by `log(p_k) - mean_j log(p_j)`, with `p` its weighted class shares (clamped as before by `delta` for the criterion and `epsilon` for the step); `predict()` takes the softmax of the scores as before.
+  Each row has one weight, `exp(-g)` with `g` its class's score, and a leaf moves the scores by `log(V_k) - mean_j log(V_j)`, with `V` its class weight sums plus those of its pseudo-row (see the classification losses under Breaking changes); `predict()` takes the softmax of the scores as before.
   Previously each class had its own one-vs-rest weights, and its step was `log(p_k / p_0)` with `p_0 = 1 - sum_k p_k` mixing shares under the different weights; it is 0 at the start and was clamped to `epsilon`, so every class's score rose by a common `log(1 / epsilon)` that the softmax ignores but the weights did not.
   The weights then no longer matched the probabilities `predict()` gives (by factors up to 10^10 in small tests).
   With `n_splits` chosen out of bag (`n_splits = NULL`) and the forest pruned (`prune = TRUE`; order 3, 200 families, `n_try_split_points = 3`, `share_candidates = 0.1`, the fast draw) on two simulated three-class data sets, the pruned model's test log-loss was 0.022 and 0.036 above logit's; it is now 0.061 below and 0.003 above, with 15 and 25 splits chosen instead of 21–25 and 238–400, and on the larger set (4,000 rows) the fit is four times as fast.

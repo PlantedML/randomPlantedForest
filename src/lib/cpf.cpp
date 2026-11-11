@@ -1,4 +1,3 @@
-
 #include "cpf.hpp"
 #include <cmath>
 #include <numeric>
@@ -15,28 +14,10 @@ using namespace rpf_utils;
  * \brief Create a prediction model based on Random Forests for classification data sets.
  */
 
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// loss moved to lib/losses_*.cpp
-
-// Maps a loss-name string to `loss` and `calcLoss` (verbatim move of the
-// former inline if/else chain from the data-fitting constructor).
+// Maps a loss-name string to `loss` and, for L1 / L2 / median, `calcLoss`
 void ClassificationRPF::set_loss_function(const std::string &loss)
 {
+  calcLoss = nullptr;
   if (loss == "L1") {
     this->loss = LossType::L1;
     this->calcLoss = &ClassificationRPF::L1_loss;
@@ -48,124 +29,145 @@ void ClassificationRPF::set_loss_function(const std::string &loss)
     this->calcLoss = &ClassificationRPF::median_loss;
   } else if (loss == "logit") {
     this->loss = LossType::logit;
-    this->calcLoss = &ClassificationRPF::logit_loss;
-  } else if (loss == "logit_2") {
-    this->loss = LossType::logit_2;
-    this->calcLoss = &ClassificationRPF::logit_loss_2;
-  } else if (loss == "logit_3") {
-    this->loss = LossType::logit_3;
-    this->calcLoss = &ClassificationRPF::logit_loss_3;
-  } else if (loss == "logit_4") {
-    this->loss = LossType::logit_4;
-    this->calcLoss = &ClassificationRPF::logit_loss_4;
   } else if (loss == "exponential") {
     this->loss = LossType::exponential;
-    this->calcLoss = &ClassificationRPF::exponential_loss;
-  } else if (loss == "exponential_2") {
-    this->loss = LossType::exponential_2;
-    this->calcLoss = &ClassificationRPF::exponential_loss_2;
-  } else if (loss == "exponential_3") {
-    this->loss = LossType::exponential_3;
-    this->calcLoss = &ClassificationRPF::exponential_loss_3;
   } else {
     throw std::invalid_argument("Unknown loss function '" + loss + "'.");
   }
 }
 
-ClassificationRPF::ClassificationRPF(const std::string &loss, const RPFParams &params, double delta, double epsilon)
-    : RandomPlantedForest(params), delta(delta), epsilon(epsilon)
+ClassificationRPF::ClassificationRPF(
+    const std::string &loss, const RPFParams &params, bool exact_step, double prior_rows
+)
+    : RandomPlantedForest(params), exact_step_(exact_step), prior_rows_(prior_rows)
 {
   set_loss_function(loss);
 }
 
+void ClassificationRPF::set_drift_free()
+{
+  const size_t K = value_size > 0 ? (size_t)value_size : 1;
+  if (loss == LossType::logit)
+    df_ = DriftFree(DriftFree::logit, K, prior_rows_);
+  else if (loss == LossType::exponential)
+    df_ = DriftFree(K == 1 ? DriftFree::exp_binary : DriftFree::samme, K, prior_rows_);
+  else
+    df_ = DriftFree();
+}
+
 // The fit of one leaf holding the rows of a family that made no split (fit_null_leaf()): the leaf update of
-// create_tree_family() for that leaf, with the initial weights (0 for logit, 1 for exponential). For L1 and L2
-// that is the leaf's mean of the class indicators, for logit and exponential the link of the class shares,
-// truncated to [epsilon, 1 - epsilon] as the update truncates them. Each loss's prediction is then the leaf's
-// class shares (truncated for logit and exponential).
+// create_tree_family() for that leaf, from the initial scores 0 (and weights 1). L1 and L2: the leaf's mean of the
+// class indicators. logit: with exact_step the exact minimiser of the penalised loss, log((n_k + a / K1) / (n_ref +
+// a / K1)), otherwise its Newton step; exponential its step (cpf.hpp, DriftFree), binary log((n_1 + a / 2) / (n_0 +
+// a / 2)), SAMME log(n_k + a / K) - mean_j log(n_j + a / K).
 std::vector<double>
 ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows)
 {
   if (loss == LossType::median)
     return calcMedian(Y, rows);
-  std::vector<double> M = calcMean(Y, rows);
   if (loss == LossType::L1 || loss == LossType::L2)
-    return M;
-  // the class shares: logit codes the classes as 0 / 1, exponential as -1 / 1
-  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
-    for (auto &m : M)
-      m = (m + 1) / 2;
-  const double M_p = 1 - std::accumulate(M.begin(), M.end(), 0.0); // the reference class
-  auto truncated = [this](double m) { return std::min(std::max(epsilon, m), 1 - epsilon); };
-  auto above_eps = [this](double m) { return std::max(epsilon, m); };
-  std::vector<double> value(value_size, 0);
-  switch (this->loss) {
-  case LossType::logit:
-  case LossType::exponential:
-    for (size_t p = 0; p < value_size; ++p)
-      value[p] = log(truncated(M[p]) / truncated(M_p));
-    break;
-  case LossType::logit_2:
-  case LossType::logit_4:
-  case LossType::exponential_2:
-    for (size_t p = 0; p < value_size; ++p)
-      value[p] = log(above_eps(M[p]) / above_eps(1 - M[p]));
-    break;
-  case LossType::logit_3:
-  case LossType::exponential_3: {
-    double mean_log = log(above_eps(M_p));
-    for (size_t p = 0; p < value_size; ++p)
-      mean_log += log(above_eps(M[p]));
-    mean_log /= (double)(value_size + 1);
-    for (size_t p = 0; p < value_size; ++p)
-      value[p] = log(above_eps(M[p])) - mean_log;
-    break;
+    return calcMean(Y, rows);
+  const size_t K = value_size;
+  std::vector<double> value(K, 0.0);
+  if (loss == LossType::logit && exact_step_) {
+    std::vector<double> n(K, 0.0);
+    double n_ref = 0;
+    for (int i : rows) {
+      double s = 0;
+      for (size_t p = 0; p < K; ++p) {
+        n[p] += Y[i][p];
+        s += Y[i][p];
+      }
+      n_ref += 1 - s;
+    }
+    const double ak = df_.a / (double)(K + 1);
+    for (size_t p = 0; p < K; ++p)
+      value[p] = std::log((n[p] + ak) / (n_ref + ak));
+    return value;
   }
-  default:
-    break;
+  std::vector<double> t(df_.T, 0.0), zero(K, 0.0), p0(K, 1.0 / (double)(K + 1));
+  for (int i : rows) {
+    if (loss == LossType::logit)
+      df_.add_logit(Y[i].data(), zero.data(), p0.data(), t.data());
+    else
+      df_.add_exp(Y[i].data(), zero.data(), 1.0, t.data());
   }
+  DriftFree::Scratch sc;
+  df_.value(t.data(), (double)rows.size(), value.data(), nullptr, sc);
+  for (double &v : value)
+    if (!std::isfinite(v))
+      v = 0;
   return value;
 }
 
 // ----------------- the loss of a tree family -----------------
 // The split searches (splits_*.cpp) and create_tree_family() (rpf.cpp) are regression's: the same candidate pool, the
-// same sampling of candidates, leaves and thresholds (and therefore the same random draws), the same aging and the
-// same sums of Y over each try's two sides. A classification family scores each try with calcLoss, which needs the
-// individuals on both sides (I_s / I_b, in the order of the leaf's individuals) and the weights W, and after each
-// split it updates the weights (or, for L1 / L2 / median, the working rows' Y) and sets the leaves' values from the
-// loss's step. For L2, calcLoss is L2_loss (rpf.cpp): regression's expression in regression's order. With loss "L2"
-// on a 0/1 response a classification fit is therefore the regression fit, bit for bit, ties in loss included.
+// same sampling of candidates, leaves and thresholds (and therefore the same random draws), the same aging. L1 / L2 /
+// median score each try with calcLoss from the individuals on both sides (I_s / I_b, in the order of the leaf's
+// individuals) and the sums of Y the search passes, and after a split update the working rows' Y; for L2, calcLoss is
+// L2_loss (rpf.cpp), regression's expression in regression's order, so loss "L2" on a 0/1 response is the regression
+// fit, bit for bit, ties included. logit and exponential (cpf.hpp, DriftFree) keep each row's scores (and the
+// exponential its weight) and score a try from the sums of the rows' terms over its two sides: by the running sums
+// the searches build (scan_terms() etc.), or with set_parameters("scan", 0) by a pass over the leaf's rows (score()).
+// The winner's steps always come from a pass over its rows (finalize()), so the two give the same splits and leaf
+// values but for exact ties between candidates (the sums are added in another order).
 
 class ClassificationRPF::Loss : public FamilyLoss {
 public:
   Loss(ClassificationRPF &forest, std::vector<std::vector<double>> &samples_Y, const std::vector<int> &boot_idx)
-      : f(forest), Y(samples_Y)
+      : f(forest), Y(samples_Y), df(forest.df_)
   {
-    const size_t vs = f.value_size;
-    switch (f.loss) {
-    case LossType::exponential:
-    case LossType::exponential_2:
-    case LossType::exponential_3:
-      weights.assign((size_t)f.sample_size, std::vector<double>(vs, 1));
-      break;
-    default: // logit (the log-odds start at 0), L1 / L2 / median (unused)
-      weights.assign((size_t)f.sample_size, std::vector<double>(vs, 0));
-    }
+    const size_t n = (size_t)f.sample_size, K = f.value_size;
     if (f.keep_weights_)
       kept_rows = boot_idx;
-    // logit: the candidate-independent terms of the loss (losses_logit.cpp); TLS holds a pointer to them while the
-    // family grows
-    if (f.loss == LossType::logit) {
-      logit_terms.reset(weights, Y, vs);
-      tls_logit_terms_ptr = &logit_terms;
+    drift = f.loss == LossType::logit || f.loss == LossType::exponential;
+    if (!drift)
+      return;
+    T = df.T;
+    scores.assign(n, std::vector<double>(K, 0.0));
+    if (f.loss == LossType::exponential) {
+      wt.assign(n, 1.0);
+    } else {
+      keep_terms = f.logit_terms_ < 0 ? K + 1 <= keep_terms_max : f.logit_terms_ != 0;
+      if (keep_terms) {
+        terms.assign(n * T, 0.0);
+        std::vector<double> p0(K, 1.0 / (double)(K + 1));
+        for (size_t i = 0; i < n; ++i)
+          df.add_logit(Y[i].data(), scores[i].data(), p0.data(), &terms[i * T]);
+      } else {
+        probs.assign(n, std::vector<double>(K, 1.0 / (double)(K + 1)));
+      }
     }
+    side_s.resize(T);
+    side_b.resize(T);
   }
-  ~Loss() override { tls_logit_terms_ptr = nullptr; }
 
   double score(Split &trial, const Leaf &leaf, int k, double sp, const std::vector<std::vector<double>> &X) override
   {
+    if (drift) { // the pass: the sums of the terms over the two sides, in the leaf's row order
+      std::fill(side_s.begin(), side_s.end(), 0.0);
+      std::fill(side_b.begin(), side_b.end(), 0.0);
+      size_t ns = 0, nb = 0;
+      for (int ind : leaf.individuals) {
+        if (X[ind][k] < sp) {
+          add_terms(ind, side_s.data());
+          ++ns;
+        } else {
+          add_terms(ind, side_b.data());
+          ++nb;
+        }
+      }
+      trial.min_sum = INF;
+      if (ns == 0 || nb == 0)
+        return INF;
+      parent.resize(T);
+      for (size_t q = 0; q < T; ++q)
+        parent[q] = side_s[q] + side_b[q];
+      const double vp = df.value(parent.data(), (double)(ns + nb), nullptr, nullptr, dsc);
+      trial.min_sum = df.score(side_s.data(), side_b.data(), (double)ns, (double)nb, vp, dsc);
+      return trial.min_sum;
+    }
     trial.Y = &Y;
-    trial.W = &weights;
     trial.I_s.clear();
     trial.I_b.clear();
     for (int ind : leaf.individuals) {
@@ -178,11 +180,44 @@ public:
     return trial.min_sum;
   }
 
+  // The winner's sides (I_s / I_b) and steps (M_s / M_b), by a pass over its rows; its score stays the search's
   void finalize(Split &winner, const std::vector<std::vector<double>> &X) override
   {
     if (std::isinf(winner.min_sum) || winner.leaf_index == nullptr)
       return;
-    score(winner, *winner.leaf_index, winner.split_coordinate - 1, winner.split_point, X);
+    if (!drift) {
+      score(winner, *winner.leaf_index, winner.split_coordinate - 1, winner.split_point, X);
+      return;
+    }
+    const int k = winner.split_coordinate - 1;
+    winner.I_s.clear();
+    winner.I_b.clear();
+    std::fill(side_s.begin(), side_s.end(), 0.0);
+    std::fill(side_b.begin(), side_b.end(), 0.0);
+    for (int ind : winner.leaf_index->individuals) {
+      if (X[ind][k] < winner.split_point) {
+        winner.I_s.push_back(ind);
+        add_terms(ind, side_s.data());
+      } else {
+        winner.I_b.push_back(ind);
+        add_terms(ind, side_b.data());
+      }
+    }
+    const size_t K = f.value_size;
+    winner.M_s.assign(K, 0.0);
+    winner.M_b.assign(K, 0.0);
+    if (f.loss == LossType::logit && f.exact_step_) {
+      df.logit_exact_step(winner.I_s, scores, Y, winner.M_s);
+      df.logit_exact_step(winner.I_b, scores, Y, winner.M_b);
+    } else {
+      df.value(side_s.data(), (double)winner.I_s.size(), winner.M_s.data(), nullptr, dsc);
+      df.value(side_b.data(), (double)winner.I_b.size(), winner.M_b.data(), nullptr, dsc);
+    }
+    // a step that is not finite (not seen; a Hessian that is not positive definite) leaves the rows where they are
+    for (std::vector<double> *M : {&winner.M_s, &winner.M_b})
+      for (double &v : *M)
+        if (!std::isfinite(v))
+          v = 0;
   }
 
   void apply(
@@ -195,17 +230,107 @@ public:
 
   void finish(size_t n) override
   {
-    // (tests) the weights as the family's growth leaves them (cpf.hpp)
-    if (f.keep_weights_ && n < f.kept_weights_.size())
-      f.kept_weights_[n] = KeptWeights{std::move(kept_rows), std::move(weights)};
+    // (tests) the rows' state as the family's growth leaves it (cpf.hpp)
+    if (!f.keep_weights_ || n >= f.kept_weights_.size())
+      return;
+    KeptWeights kw;
+    kw.rows = std::move(kept_rows);
+    kw.scores = std::move(scores);
+    if (!wt.empty()) {
+      kw.weights.resize(wt.size());
+      for (size_t i = 0; i < wt.size(); ++i)
+        kw.weights[i].assign(1, wt[i]);
+    }
+    f.kept_weights_[n] = std::move(kw);
+  }
+
+  // ---- the running sums (rpf.hpp) ----
+  size_t scan_terms() const override { return drift && f.scan_ ? T : 0; }
+
+  void add_terms(int ind, double *out) const override
+  {
+    if (keep_terms) {
+      const double *t = &terms[(size_t)ind * T];
+      for (size_t q = 0; q < T; ++q)
+        out[q] += t[q];
+    } else if (f.loss == LossType::logit) {
+      df.add_logit(Y[ind].data(), scores[ind].data(), probs[ind].data(), out);
+    } else {
+      df.add_exp(Y[ind].data(), scores[ind].data(), wt[ind], out);
+    }
+  }
+
+  void prefix_terms(const Leaf &leaf, const size_t *order, size_t m, double *out) const override
+  {
+    if (m == 0)
+      return;
+    std::fill(out, out + T, 0.0);
+    add_terms(leaf.individuals[order[0]], out);
+    for (size_t i = 1; i < m; ++i) {
+      double *o = out + i * T;
+      if (keep_terms) {
+        const double *t = &terms[(size_t)leaf.individuals[order[i]] * T];
+        for (size_t q = 0; q < T; ++q)
+          o[q] = o[q - T] + t[q];
+      } else {
+        std::copy(o - T, o, o);
+        add_terms(leaf.individuals[order[i]], o);
+      }
+    }
+  }
+
+  double region_value(const double *t, size_t n) const override
+  {
+    return df.value(t, (double)n, nullptr, nullptr, dsc);
+  }
+
+  double scan_score(const double *s, const double *b, size_t ns, size_t nb, double vp) const override
+  {
+    if (ns == 0 || nb == 0)
+      return INF;
+    return df.score(s, b, (double)ns, (double)nb, vp, dsc);
   }
 
 private:
   ClassificationRPF &f;
   std::vector<std::vector<double>> &Y; // the family's working rows' Y
-  std::vector<std::vector<double>> weights;
-  LogitTerms logit_terms;
-  std::vector<int> kept_rows; // (keep_weights_, tests) each working row's row in the data
+  const DriftFree &df;
+  bool drift = false;      // logit or exponential
+  size_t T = 0;            // their terms per row
+  bool keep_terms = false; // logit: each row's terms are kept (terms), otherwise its probabilities (probs)
+  std::vector<std::vector<double>> scores, probs;
+  std::vector<double> wt, terms;
+  std::vector<double> side_s, side_b, parent, refresh_p; // scratch
+  mutable DriftFree::Scratch dsc;                        // scratch of the loss's arithmetic
+  std::vector<int> kept_rows;                            // (keep_weights_, tests) each working row's row in the data
+  // logit: row i's probabilities, or its terms, after its scores changed
+  void refresh(size_t i)
+  {
+    const size_t K = f.value_size;
+    double *pr;
+    if (keep_terms) {
+      refresh_p.resize(K);
+      pr = refresh_p.data();
+    } else {
+      pr = probs[i].data();
+    }
+    const double *F = scores[i].data();
+    double mx = 0;
+    for (size_t q = 0; q < K; ++q)
+      mx = std::max(mx, F[q]);
+    double den = std::exp(-mx);
+    for (size_t q = 0; q < K; ++q) {
+      pr[q] = std::exp(F[q] - mx);
+      den += pr[q];
+    }
+    for (size_t q = 0; q < K; ++q)
+      pr[q] /= den;
+    if (keep_terms) {
+      double *t = &terms[i * T];
+      std::fill(t, t + T, 0.0);
+      df.add_logit(Y[i].data(), F, pr, t);
+    }
+  }
 };
 
 std::unique_ptr<FamilyLoss>
@@ -214,8 +339,8 @@ ClassificationRPF::family_loss(std::vector<std::vector<double>> &samples_Y, cons
   return std::unique_ptr<FamilyLoss>(new Loss(*this, samples_Y, boot_idx));
 }
 
-// The leaves' increments from the loss's step at the split's statistics (M_s, M_b, ...), and the update of the
-// weights of the split leaf's individuals (L1 / L2 / median: of their Y)
+// The leaves' increments, the steps of the split's two sides (M_s, M_b), and the update of the split leaf's rows: L1 /
+// L2 / median their Y; logit their scores (and probabilities or terms); exponential their scores and weights
 void ClassificationRPF::Loss::apply(
     const Split &curr_split,
     const std::vector<std::vector<double>> &samples_X,
@@ -224,16 +349,17 @@ void ClassificationRPF::Loss::apply(
     std::vector<double> &update_b
 )
 {
-  const size_t value_size = f.value_size;
-  const double epsilon = f.epsilon;
+  const size_t K = f.value_size;
   update_s = curr_split.M_s;
   update_b = curr_split.M_b;
+  const int k = curr_split.split_coordinate - 1;
+  const double sp = curr_split.split_point;
   switch (f.loss) {
   case LossType::L1:
   case LossType::L2:
   case LossType::median: {
     for (int individual : curr_split.leaf_index->individuals) {
-      if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
+      if (samples_X[individual][k] < sp) {
         samples_Y[individual] -= update_s;
       } else {
         samples_Y[individual] -= update_b;
@@ -242,262 +368,47 @@ void ClassificationRPF::Loss::apply(
     break;
   }
   case LossType::logit: {
-
-    std::vector<double> M_s = curr_split.M_s;
-    std::vector<double> M_b = curr_split.M_b;
-
-    std::for_each(M_s.begin(), M_s.end(), [epsilon](double &M) { M = std::min(std::max(epsilon, M), 1 - epsilon); });
-    std::for_each(M_b.begin(), M_b.end(), [epsilon](double &M) { M = std::min(std::max(epsilon, M), 1 - epsilon); });
-
-    double M_sp = std::min(std::max(epsilon, curr_split.M_sp), 1 - epsilon);
-    double M_bp = std::min(std::max(epsilon, curr_split.M_bp), 1 - epsilon);
-
-    std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-    std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
-
-    for (size_t p = 0; p < value_size; ++p) {
-      update_s[p] = log(M_s[p] / M_sp) - W_s_mean[p];
-      update_b[p] = log(M_b[p] / M_bp) - W_b_mean[p];
-    }
-
     for (int individual : curr_split.leaf_index->individuals) {
-      if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-        weights[individual] += update_s;
-      } else {
-        weights[individual] += update_b;
-      }
-      if (tls_logit_terms_ptr == &logit_terms)
-        logit_terms.update_row((size_t)individual);
+      const std::vector<double> &c = samples_X[individual][k] < sp ? update_s : update_b;
+      std::vector<double> &F = scores[(size_t)individual];
+      for (size_t q = 0; q < K; ++q)
+        F[q] += c[q];
+      refresh((size_t)individual);
     }
-
-    break;
-  }
-  case LossType::logit_2: {
-
-    std::vector<double> M_s = curr_split.M_s;
-    std::vector<double> M_b = curr_split.M_b;
-
-    std::vector<double> M_s2 = curr_split.M_s;
-    std::vector<double> M_b2 = curr_split.M_b;
-
-    std::for_each(M_s.begin(), M_s.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-    std::for_each(M_b.begin(), M_b.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-
-    std::for_each(M_s2.begin(), M_s2.end(), [epsilon](double &M) { M = std::max(epsilon, 1 - M); });
-    std::for_each(M_b2.begin(), M_b2.end(), [epsilon](double &M) { M = std::max(epsilon, 1 - M); });
-
-    std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-    std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
-
-    for (size_t p = 0; p < value_size; ++p) {
-      update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
-      update_b[p] = log(M_b[p] / M_b2[p]) - W_b_mean[p];
-    }
-
-    for (int individual : curr_split.leaf_index->individuals) {
-      if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-        weights[individual] += update_s;
-      } else {
-        weights[individual] += update_b;
-      }
-    }
-
-    break;
-  }
-  case LossType::logit_3: {
-
-    std::vector<double> M_s = curr_split.M_s;
-    std::vector<double> M_b = curr_split.M_b;
-
-    std::for_each(M_s.begin(), M_s.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-    std::for_each(M_b.begin(), M_b.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-
-    std::for_each(M_s.begin(), M_s.end(), [&](double &M) { M = log(M); });
-    std::for_each(M_b.begin(), M_b.end(), [&](double &M) { M = log(M); });
-
-    double M_sp = std::max(epsilon, curr_split.M_sp);
-    double M_bp = std::max(epsilon, curr_split.M_bp);
-
-    M_sp = log(M_sp);
-    M_bp = log(M_bp);
-
-    double sum_s = (std::accumulate(M_s.begin(), M_s.end(), 0.0) + M_sp) / (M_s.size() + 1);
-    double sum_b = (std::accumulate(M_b.begin(), M_b.end(), 0.0) + M_bp) / (M_b.size() + 1);
-
-    std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-    std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
-
-    for (unsigned int p = 0; p < M_s.size(); ++p) {
-      update_s[p] = M_s[p] - sum_s - W_s_mean[p];
-      update_b[p] = M_b[p] - sum_b - W_b_mean[p];
-    }
-
-    for (int individual : curr_split.leaf_index->individuals) {
-      if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-        weights[individual] += update_s;
-      } else {
-        weights[individual] += update_b;
-      }
-    }
-
-    break;
-  }
-  case LossType::logit_4: {
-
-    std::vector<double> M_s = curr_split.M_s;
-    std::vector<double> M_b = curr_split.M_b;
-
-    std::vector<double> M_s2 = curr_split.M_s;
-    std::vector<double> M_b2 = curr_split.M_b;
-
-    std::for_each(M_s.begin(), M_s.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-    std::for_each(M_b.begin(), M_b.end(), [epsilon](double &M) { M = std::max(epsilon, M); });
-
-    std::for_each(M_s2.begin(), M_s2.end(), [epsilon](double &M) { M = std::max(epsilon, 1 - M); });
-    std::for_each(M_b2.begin(), M_b2.end(), [epsilon](double &M) { M = std::max(epsilon, 1 - M); });
-
-    std::vector<double> W_s_mean = calcMean(*curr_split.W, curr_split.I_s);
-    std::vector<double> W_b_mean = calcMean(*curr_split.W, curr_split.I_b);
-
-    for (size_t p = 0; p < value_size; ++p) {
-      update_s[p] = log(M_s[p] / M_s2[p]) - W_s_mean[p];
-      update_b[p] = log(M_b[p] / M_b2[p]) - W_b_mean[p];
-    }
-
-    for (int individual : curr_split.leaf_index->individuals) {
-      if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-        weights[individual] += update_s;
-      } else {
-        weights[individual] += update_b;
-      }
-    }
-
     break;
   }
   case LossType::exponential: {
-
-    // K >= 3 classes, SAMME (cpf.hpp): the step from the class shares the criterion left in M_s / M_b, clamped
-    // to [epsilon, 1 - epsilon]; each row's one weight times exp(-a_c), c its class
-    if (value_size > 1) {
-      f.samme_step(curr_split.M_s, epsilon, update_s);
-      f.samme_step(curr_split.M_b, epsilon, update_b);
-      std::vector<double> fac_s(value_size), fac_b(value_size);
-      for (size_t k = 0; k < value_size; ++k) {
-        fac_s[k] = exp(-update_s[k]);
-        fac_b[k] = exp(-update_b[k]);
+    // binary: the weight times exp(-y c / 2); SAMME: times exp(-d_c), c the row's class
+    std::vector<double> fac_s(K + 1), fac_b(K + 1);
+    if (K == 1) {
+      fac_s[0] = std::exp(-0.5 * update_s[0]);
+      fac_s[1] = std::exp(0.5 * update_s[0]);
+      fac_b[0] = std::exp(-0.5 * update_b[0]);
+      fac_b[1] = std::exp(0.5 * update_b[0]);
+    } else {
+      for (size_t q = 0; q < K; ++q) {
+        fac_s[q] = std::exp(-update_s[q]);
+        fac_b[q] = std::exp(-update_b[q]);
       }
-      for (int individual : curr_split.leaf_index->individuals) {
-        const std::vector<double> &y = samples_Y[individual];
-        size_t k = 0;
-        while (k + 1 < value_size && !(y[k] > 0))
-          ++k;
-        const double f =
-            samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point ? fac_s[k] : fac_b[k];
-        for (double &w : weights[individual])
-          w *= f;
-      }
-      break;
     }
-
-    // binary
-    std::vector<double> sum_s = curr_split.M_s;
-    std::vector<double> sum_b = curr_split.M_b;
-
-    std::for_each(sum_s.begin(), sum_s.end(), [epsilon](double &S) {
-      S = std::min(std::max(epsilon, S), 1 - epsilon);
-    });
-    std::for_each(sum_b.begin(), sum_b.end(), [epsilon](double &S) {
-      S = std::min(std::max(epsilon, S), 1 - epsilon);
-    });
-
-    double sum_sp = std::min(std::max(epsilon, curr_split.M_sp), 1 - epsilon);
-    double sum_bp = std::min(std::max(epsilon, curr_split.M_bp), 1 - epsilon);
-
-    for (unsigned int p = 0; p < sum_s.size(); ++p) {
-      update_s[p] = log(sum_s[p] / sum_sp);
-      update_b[p] = log(sum_b[p] / sum_bp);
-    }
-
     for (int individual : curr_split.leaf_index->individuals) {
-      for (unsigned int p = 0; p < update_s.size(); ++p) {
-        if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_s[p]);
-        } else {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_b[p]);
-        }
+      const bool small = samples_X[individual][k] < sp;
+      const std::vector<double> &c = small ? update_s : update_b;
+      const std::vector<double> &fac = small ? fac_s : fac_b;
+      const std::vector<double> &y = samples_Y[individual];
+      size_t cls;
+      if (K == 1) {
+        cls = y[0] > 0 ? 0 : 1;
+      } else {
+        cls = 0;
+        while (cls + 1 < K && !(y[cls] > 0))
+          ++cls;
       }
+      wt[(size_t)individual] *= fac[cls];
+      std::vector<double> &F = scores[(size_t)individual];
+      for (size_t q = 0; q < K; ++q)
+        F[q] += c[q];
     }
-
-    break;
-  }
-  case LossType::exponential_2: {
-
-    std::vector<double> sum_s = curr_split.M_s;
-    std::vector<double> sum_b = curr_split.M_b;
-    std::vector<double> sum_s2 = curr_split.M_s;
-    std::vector<double> sum_b2 = curr_split.M_b;
-
-    std::for_each(sum_s.begin(), sum_s.end(), [epsilon](double &S) { S = std::max(epsilon, S); });
-    std::for_each(sum_b.begin(), sum_b.end(), [epsilon](double &S) { S = std::max(epsilon, S); });
-
-    std::for_each(sum_s2.begin(), sum_s2.end(), [epsilon](double &S) { S = std::max(epsilon, 1 - S); });
-    std::for_each(sum_b2.begin(), sum_b2.end(), [epsilon](double &S) { S = std::max(epsilon, 1 - S); });
-
-    for (size_t p = 0; p < value_size; ++p) {
-      update_s[p] = log(sum_s[p] / sum_s2[p]);
-      update_b[p] = log(sum_b[p] / sum_b2[p]);
-    }
-
-    for (int individual : curr_split.leaf_index->individuals) {
-      for (size_t p = 0; p < value_size; ++p) {
-        if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_s[p]);
-        } else {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_b[p]);
-        }
-      }
-    }
-
-    break;
-  }
-  case LossType::exponential_3: {
-
-    std::vector<double> sum_s = curr_split.M_s;
-    std::vector<double> sum_b = curr_split.M_b;
-
-    std::for_each(sum_s.begin(), sum_s.end(), [epsilon](double &S) { S = std::max(epsilon, S); });
-    std::for_each(sum_b.begin(), sum_b.end(), [epsilon](double &S) { S = std::max(epsilon, S); });
-
-    std::for_each(sum_s.begin(), sum_s.end(), [&](double &S) { S = log(S); });
-    std::for_each(sum_b.begin(), sum_b.end(), [&](double &S) { S = log(S); });
-
-    double sum_sp = std::max(epsilon, curr_split.M_sp);
-    double sum_bp = std::max(epsilon, curr_split.M_bp);
-
-    sum_sp = log(sum_sp);
-    sum_bp = log(sum_bp);
-
-    sum_sp += std::accumulate(sum_s.begin(), sum_s.end(), 0.0);
-    sum_bp += std::accumulate(sum_b.begin(), sum_b.end(), 0.0);
-
-    sum_sp = sum_sp / (sum_s.size() + 1);
-    sum_bp = sum_bp / (sum_b.size() + 1);
-
-    for (size_t p = 0; p < sum_s.size(); ++p) {
-      update_s[p] = sum_s[p] - sum_sp;
-      update_b[p] = sum_b[p] - sum_bp;
-    }
-
-    for (int individual : curr_split.leaf_index->individuals) {
-      for (size_t p = 0; p < update_s.size(); ++p) {
-        if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point) {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_s[p]);
-        } else {
-          weights[individual][p] *= exp(-0.5 * samples_Y[individual][p] * update_b[p]);
-        }
-      }
-    }
-
     break;
   }
   }
@@ -506,6 +417,7 @@ void ClassificationRPF::Loss::apply(
 // fit forest to new data
 void ClassificationRPF::fit()
 {
+  set_drift_free();
   kept_weights_.assign(keep_weights_ ? (size_t)n_trees : 0, KeptWeights());
   // Use the base class multithreaded trainer with RNG seeding identical to regression
   RandomPlantedForest::fit();
@@ -541,35 +453,20 @@ void ClassificationRPF::set_parameters(const std::vector<std::string> &keys, con
       this->max_interaction = values[i];
     } else if (keys[i] == "cv") {
       this->cross_validate = values[i];
-    } else if (keys[i] == "loss") {
-      if (keys[i] == "L1") {
-        this->loss = LossType::L1;
-        this->calcLoss = &ClassificationRPF::L1_loss;
-      } else if (keys[i] == "L2") {
-        this->loss = LossType::L2;
-        this->calcLoss = &ClassificationRPF::L2_loss;
-      } else if (keys[i] == "median") {
-        this->loss = LossType::median;
-        this->calcLoss = &ClassificationRPF::median_loss;
-      } else if (keys[i] == "logit") {
-        this->loss = LossType::logit;
-        this->calcLoss = &ClassificationRPF::logit_loss;
-      } else if (keys[i] == "exponential") {
-        this->loss = LossType::exponential;
-        this->calcLoss = &ClassificationRPF::exponential_loss;
-      } else {
-        warn("Unkown loss function.");
-      }
-    } else if (keys[i] == "delta") {
-      this->delta = values[i];
-    } else if (keys[i] == "epsilon") {
-      this->epsilon = values[i];
     } else if (keys[i] == "split_decay_rate") {
       this->split_decay_rate_ = values[i];
     } else if (keys[i] == "max_candidates") {
       this->max_candidates_ = static_cast<size_t>(values[i]);
+    } else if (keys[i] == "exact_step") {
+      this->exact_step_ = values[i] != 0;
+    } else if (keys[i] == "prior_rows") {
+      this->prior_rows_ = values[i];
     } else if (keys[i] == "keep_weights") { // internal, for tests (cpf.hpp)
       this->keep_weights_ = values[i] != 0;
+    } else if (keys[i] == "scan") { // internal, for tests (cpf.hpp)
+      this->scan_ = values[i] != 0;
+    } else if (keys[i] == "logit_terms") { // internal, for measurements (cpf.hpp)
+      this->logit_terms_ = values[i] < 0 ? -1 : (values[i] != 0 ? 1 : 0);
     } else {
       warn("Unkown parameter key  '" + keys[i] + "' .");
     }
@@ -588,9 +485,8 @@ double ClassificationRPF::oob_row_error(
 {
   const size_t V = value_size;
   const std::vector<double> &y = Y[i];
-  const bool logit_like =
-      loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4;
-  const bool expo = loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3;
+  const bool logit_like = loss == LossType::logit;
+  const bool expo = loss == LossType::exponential;
   if (!logit_like && !expo) {
     double e = 0, q = 0;
     for (size_t v = 0; v < V; ++v) {
@@ -648,9 +544,9 @@ int ClassificationRPF::score_centring() const
 {
   if (value_size < 2)
     return 0;
-  if (loss == LossType::logit || loss == LossType::logit_2 || loss == LossType::logit_3 || loss == LossType::logit_4)
+  if (loss == LossType::logit)
     return 1;
-  if (loss == LossType::exponential || loss == LossType::exponential_2 || loss == LossType::exponential_3)
+  if (loss == LossType::exponential)
     return 2;
   return 0;
 }

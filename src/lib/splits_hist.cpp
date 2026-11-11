@@ -94,6 +94,8 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
 
   // Use per-feature effective bin count based on actual cut count for stability
   int best_idx = -1;
+  const size_t scan_T = loss_fn ? loss_fn->scan_terms() : 0;
+  std::vector<double> scan_sum, scan_b;
   for (size_t idx : sample_idxs) {
     auto it = possible_splits.begin();
     std::advance(it, idx);
@@ -114,8 +116,68 @@ Split RandomPlantedForest::calcOptimalSplit_hist(
     if (Kf < 2)
       continue; // cannot split without at least 2 bins
     std::vector<int> cnt(Kf, 0);
-    std::vector<std::vector<double>> sum(Kf, std::vector<double>(this->value_size, 0.0));
     const bool have_cached = (tls_working_bin_id_ptr != nullptr && (size_t)k < tls_working_bin_id_ptr->size());
+    // The loss's running sums (FamilyLoss::scan_terms): its row terms summed per bin, then their prefix sums over the
+    // bins [b * T + q]; a boundary then costs O(T)
+    if (scan_T > 0) {
+      scan_sum.assign(Kf * scan_T, 0.0);
+      for (int ind : leafPtr->individuals) {
+        int b = 0;
+        if (have_cached) {
+          b = (*tls_working_bin_id_ptr)[(size_t)k][(size_t)ind];
+        } else if (!cuts_k.empty()) {
+          b = (int)std::distance(cuts_k.begin(), std::upper_bound(cuts_k.begin(), cuts_k.end(), X[ind][k]));
+          b = std::min(std::max(b, 0), (int)Kf - 1);
+        }
+        cnt[(size_t)b] += 1;
+        loss_fn->add_terms(ind, &scan_sum[(size_t)b * scan_T]);
+      }
+      for (size_t b = 1; b < Kf; ++b) {
+        cnt[b] += cnt[b - 1];
+        for (size_t q = 0; q < scan_T; ++q)
+          scan_sum[b * scan_T + q] += scan_sum[(b - 1) * scan_T + q];
+      }
+      const int total_n = (int)m;
+      const double *tot = &scan_sum[(Kf - 1) * scan_T];
+      int first_valid = -1, last_valid = -1;
+      for (size_t b_left = 0; b_left + 1 <= Kf - 1; ++b_left) {
+        const int ln = cnt[b_left];
+        if (ln >= leaf_min && total_n - ln >= leaf_min) {
+          if (first_valid < 0)
+            first_valid = (int)b_left;
+          last_valid = (int)b_left;
+        }
+      }
+      if (first_valid < 0 || last_valid < first_valid)
+        continue;
+      std::vector<int> samples =
+          this->deterministic ? compute_even_spread_indices(first_valid, last_valid + 1, (size_t)this->split_try)
+                              : sample_unique_ints_uniform_R(first_valid, last_valid + 1, (size_t)this->split_try);
+      const double vp = loss_fn->region_value(tot, m);
+      scan_b.resize(scan_T);
+      for (int b_left : samples) {
+        if (b_left < first_valid || b_left > last_valid)
+          continue;
+        const int left_n = cnt[(size_t)b_left], right_n = total_n - left_n;
+        if (left_n < leaf_min || right_n < leaf_min)
+          continue;
+        const double sp = cuts_k[(size_t)std::min<size_t>((size_t)b_left, cuts_k.size() - 1)];
+        const double *s = &scan_sum[(size_t)b_left * scan_T];
+        for (size_t q = 0; q < scan_T; ++q)
+          scan_b[q] = tot[q] - s[q];
+        const double loss = loss_fn->scan_score(s, scan_b.data(), (size_t)left_n, (size_t)right_n, vp);
+        if (loss < min_split.min_sum) {
+          min_split.min_sum = loss;
+          min_split.tree_index = it->tree;
+          min_split.leaf_index = leafPtr;
+          min_split.split_coordinate = k + 1;
+          min_split.split_point = sp;
+          best_idx = (int)idx;
+        }
+      }
+      continue;
+    }
+    std::vector<std::vector<double>> sum(Kf, std::vector<double>(this->value_size, 0.0));
     if (have_cached) {
       const std::vector<int> &bin_k = (*tls_working_bin_id_ptr)[(size_t)k];
       for (int ind : leafPtr->individuals) {

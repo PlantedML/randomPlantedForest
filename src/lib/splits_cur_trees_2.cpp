@@ -96,6 +96,8 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
   const int min_rows = this->min_leaf_rows_;
   const bool rows_check = min_rows > 1;
   int best_idx = -1;
+  const size_t scan_T = loss_fn ? loss_fn->scan_terms() : 0;
+  std::vector<double> scan_prefix, scan_s, scan_b;
   for (size_t idx : sample_idxs) {
     auto it = possible_splits.begin();
     std::advance(it, idx);
@@ -168,6 +170,59 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees2(
           std::sort(samples.begin(), samples.end());
         }
         const bool single_eval = (samples.size() == 1);
+        // The loss's running sums (FamilyLoss::scan_terms): the prefix sums of its row terms along the leaf's sorted
+        // rows [i * T + q] (one threshold: the two sides' sums by a pass, as for Y)
+        if (scan_T > 0) {
+          scan_prefix.resize(single_eval ? scan_T : m * scan_T);
+          scan_s.assign(scan_T, 0.0);
+          scan_b.assign(scan_T, 0.0);
+          size_t ns_single = 0;
+          if (single_eval) {
+            const double sp = (*unique_ptr)[samples[0]];
+            for (int ind : leaf.individuals) {
+              if (X[ind][k] < sp) {
+                loss_fn->add_terms(ind, scan_s.data());
+                ++ns_single;
+              } else {
+                loss_fn->add_terms(ind, scan_b.data());
+              }
+            }
+            for (size_t q = 0; q < scan_T; ++q)
+              scan_prefix[q] = scan_s[q] + scan_b[q];
+          } else {
+            loss_fn->prefix_terms(leaf, order_cf.data(), m, scan_prefix.data());
+          }
+          const double *tot = single_eval ? scan_prefix.data() : &scan_prefix[(m - 1) * scan_T];
+          const double vp = loss_fn->region_value(tot, m);
+          for (size_t si = 0; si < samples.size(); ++si) {
+            const double sp = (*unique_ptr)[samples[si]];
+            size_t pos = static_cast<size_t>(
+                std::lower_bound(sorted_vals_cf.begin(), sorted_vals_cf.end(), sp) - sorted_vals_cf.begin()
+            );
+            if (pos == 0 || pos >= m)
+              continue;
+            if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
+              continue;
+            if (!single_eval) {
+              const double *s = &scan_prefix[(pos - 1) * scan_T];
+              std::copy(s, s + scan_T, scan_s.begin());
+              for (size_t q = 0; q < scan_T; ++q)
+                scan_b[q] = tot[q] - s[q];
+            } else if (ns_single != pos) {
+              continue;
+            }
+            const double loss = loss_fn->scan_score(scan_s.data(), scan_b.data(), pos, m - pos, vp);
+            if (loss < min_split.min_sum) {
+              min_split.min_sum = loss;
+              min_split.tree_index = curr_tree;
+              min_split.leaf_index = &leaf;
+              min_split.split_coordinate = k + 1;
+              min_split.split_point = sp;
+              best_idx = (int)idx;
+            }
+          }
+          continue;
+        }
         std::vector<std::vector<double>> prefix_cf; // [value_size][m]
         std::vector<double> total_cf;               // [value_size]
         if (!single_eval)

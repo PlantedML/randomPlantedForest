@@ -58,7 +58,7 @@ test_that("loss L2 on a 0/1 response is the regression fit, bit for bit, with mi
         set.seed(5)
         reg <- new(RandomPlantedForest, y, x, c(p, opt))
         set.seed(5)
-        cls <- new(ClassificationRPF, y, x, "L2", c(p, 0, 0.1, opt))
+        cls <- new(ClassificationRPF, y, x, "L2", c(p, opt))
         label <- sprintf("min_leaf_rows %d, exact %d, deterministic %d, %d threads", opt[1], opt[2], det, nt)
         expect_identical(cls$get_model(), reg$get_model(), label = label)
         expect_identical(cls$predict_matrix(x, 0, 1L), reg$predict_matrix(x, 0, 1L), label = label)
@@ -87,8 +87,10 @@ test_that("classification leaves keep min_leaf_rows rows, and no infeasible entr
     d <- cl_sim(classes = classes)
     for (loss in c("L2", "logit", "exponential")) {
       # One candidate per round, and always one with a valid threshold (the
-      # constant leaf), so every round splits unless an entry without one is
-      # drawn; overwritten leaves (delete_leaves) make such entries.
+      # constant leaf), so with L2 every round splits unless an entry without
+      # one is drawn; overwritten leaves (delete_leaves) make such entries.
+      # logit and exponential make no split in a round whose candidate gains
+      # nothing, so there only the rows are checked (the draw is the same).
       fit <- function(exact, nthreads = 1L) {
         set.seed(3)
         with_exact_draw(
@@ -110,7 +112,11 @@ test_that("classification leaves keep min_leaf_rows rows, and no infeasible entr
         label <- sprintf("%d classes, %s, exact %s", classes, loss, exact)
         for (st in cl_leaf_stats(fit(exact), d$x)) {
           expect_gte(min(st$rows), 5, label = label)
-          expect_equal(st$splits, 100, label = label)
+          if (loss == "L2") {
+            expect_equal(st$splits, 100, label = label)
+          } else {
+            expect_gt(st$splits, 0, label = label)
+          }
         }
       }
       expect_identical(fit(FALSE)$fit$get_model(), fit(FALSE, nthreads = 2L)$fit$get_model())
@@ -145,14 +151,16 @@ test_that("classification min_leaf_rows is validated, stored, printed and restor
   )
   r <- rpf_unmarshal(rpf_marshal(f))
   expect_identical(predict(r, d$x, type = "prob"), predict(f, d$x, type = "prob"))
-  # [..., split_mode, delta, epsilon, min_leaf_rows, exact_draw]; models saved
-  # before have neither: 1 and the exact draw
+  # [..., split_mode, min_leaf_rows, exact_draw, exact_step, prior_rows]; models
+  # saved before have none of the four: 1, the exact draw, TRUE and 1
   pars <- rpf_param_vector(f$params, "classification")
   expect_length(pars, 17)
-  expect_equal(pars[16:17], c(10, 0))
+  expect_equal(pars[14:17], c(10, 0, 1, 1))
   params <- f$params
   params$min_leaf_rows <- NULL
   params$exact_draw <- NULL
-  expect_equal(rpf_param_vector(params, "classification")[16:17], c(1, 1))
+  params$exact_step <- NULL
+  params$prior_rows <- NULL
+  expect_equal(rpf_param_vector(params, "classification")[14:17], c(1, 1, 1, 1))
   expect_length(new(ClassificationRPF, "L2", pars[1:15])$get_model(), 0)
 })

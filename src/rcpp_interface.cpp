@@ -77,32 +77,34 @@ RandomPlantedForest make_rpf(const NumericVector &parameters, const List &constr
   return RandomPlantedForest(params);
 }
 
-// Classification vectors append delta and epsilon to the 13 regression values,
-// then min_leaf_rows and exact_draw. Older vectors (marshaled models) lack the
-// last two: 1 and the exact draw.
+// Classification vectors are regression's 15 values (the 13, min_leaf_rows,
+// exact_draw), then exact_step and prior_rows (the pseudo-rows a of logit and
+// exponential, cpf.hpp); a vector without them gets TRUE and 1.
 ClassificationRPF
 make_cpf(const std::string &loss, const NumericVector &parameters, bool fitting, const List &constraints)
 {
   std::vector<double> pars = as<std::vector<double>>(parameters);
-  std::vector<double> base(pars.begin(), pars.begin() + std::min<size_t>(pars.size(), pars.size() >= 13 ? 13 : 12));
-  RPFParams params = parse_rpf_params(base);
   const bool sized = pars.size() >= 15 && pars.size() <= 17;
-  double delta = sized ? pars[13] : 0.1;
-  double epsilon = sized ? pars[14] : 0;
-  if (pars.size() >= 16 && sized)
-    params.min_leaf_rows = static_cast<int>(pars[15]);
-  if (pars.size() >= 17 && sized)
-    params.exact_draw = (pars[16] != 0);
-  if (!sized) {
+  RPFParams params;
+  bool exact_step = true;
+  double prior_rows = 1;
+  if (sized) {
+    params = parse_rpf_params(std::vector<double>(pars.begin(), pars.begin() + 15));
+    if (pars.size() >= 16)
+      exact_step = pars[15] != 0;
+    if (pars.size() >= 17)
+      prior_rows = pars[16];
+  } else {
     if (!fitting)
       Rcpp::stop("ClassificationRPF requires 15 to 17 parameters, got %d", (int)pars.size());
     Rcout << "Wrong number of parameters - set to default." << std::endl;
-    const int mode = params.split_structure_mode;
-    params = RPFParams();
-    params.split_structure_mode = mode;
+    if (pars.size() >= 13)
+      params.split_structure_mode = static_cast<int>(pars[12]);
   }
+  if (!(prior_rows > 0) || !std::isfinite(prior_rows))
+    Rcpp::stop("ClassificationRPF: the prior rows must be positive and finite, got %g", prior_rows);
   params.interaction_constraints = parse_constraints(constraints);
-  return ClassificationRPF(loss, params, delta, epsilon);
+  return ClassificationRPF(loss, params, exact_step, prior_rows);
 }
 
 List model_to_list(const std::vector<FamilyExport> &model, int feature_size)
@@ -539,6 +541,82 @@ NumericVector leaves_draw_counts(
       seed_from_r()
   );
   return NumericVector(counts.begin(), counts.end());
+}
+
+List classif_check(
+    const std::string &loss,
+    const NumericMatrix &Y,
+    const NumericMatrix &F,
+    const IntegerVector &side,
+    bool exact_step,
+    double prior_rows
+)
+{
+  const size_t n = (size_t)Y.nrow(), K = (size_t)Y.ncol();
+  if ((size_t)F.nrow() != n || (size_t)F.ncol() != K || (size_t)side.size() != n || K == 0)
+    Rcpp::stop("classif_check: Y, F and side must have the same rows, Y and F the same columns");
+  if (loss != "logit" && loss != "exponential")
+    Rcpp::stop("classif_check: loss must be \"logit\" or \"exponential\"");
+  const DriftFree df(
+      loss == "logit" ? DriftFree::logit : (K == 1 ? DriftFree::exp_binary : DriftFree::samme), K, prior_rows
+  );
+  const Matrix2D y = to_matrix2d(Y), f = to_matrix2d(F);
+  std::vector<double> ts(df.T, 0.0), tb(df.T, 0.0), tp(df.T, 0.0), p(K);
+  std::vector<int> rows_s, rows_b;
+  for (size_t i = 0; i < n; ++i) {
+    double *out = side[i] == 0 ? ts.data() : tb.data();
+    (side[i] == 0 ? rows_s : rows_b).push_back((int)i);
+    if (df.kind == DriftFree::logit) {
+      double mx = 0;
+      for (size_t q = 0; q < K; ++q)
+        mx = std::max(mx, f[i][q]);
+      double den = std::exp(-mx);
+      for (size_t q = 0; q < K; ++q) {
+        p[q] = std::exp(f[i][q] - mx);
+        den += p[q];
+      }
+      for (size_t q = 0; q < K; ++q)
+        p[q] /= den;
+      df.add_logit(y[i].data(), f[i].data(), p.data(), out);
+    } else {
+      // binary exp(-y F / 2); SAMME exp(-F_c), c the class coded 1 (the last if none is)
+      double w;
+      if (K == 1) {
+        w = std::exp(-0.5 * y[i][0] * f[i][0]);
+      } else {
+        size_t c = 0;
+        while (c + 1 < K && !(y[i][c] > 0))
+          ++c;
+        w = std::exp(-f[i][c]);
+      }
+      df.add_exp(y[i].data(), f[i].data(), w, out);
+    }
+  }
+  for (size_t q = 0; q < df.T; ++q)
+    tp[q] = ts[q] + tb[q];
+  const double ns = (double)rows_s.size(), nb = (double)rows_b.size();
+  NumericVector newton_s(K), newton_b(K);
+  double scs = 0, scb = 0;
+  DriftFree::Scratch sc;
+  const double vs = df.value(ts.data(), ns, newton_s.begin(), &scs, sc);
+  const double vb = df.value(tb.data(), nb, newton_b.begin(), &scb, sc);
+  const double vp = df.value(tp.data(), ns + nb, nullptr, nullptr, sc);
+  NumericVector step_s = Rcpp::clone(newton_s), step_b = Rcpp::clone(newton_b);
+  if (df.kind == DriftFree::logit && exact_step) {
+    std::vector<double> c;
+    df.logit_exact_step(rows_s, f, y, c);
+    step_s = NumericVector(c.begin(), c.end());
+    df.logit_exact_step(rows_b, f, y, c);
+    step_b = NumericVector(c.begin(), c.end());
+  }
+  return List::create(
+      Named("score") = df.score(ts.data(), tb.data(), ns, nb, vp, sc),
+      Named("raw") = vs + vb - vp,
+      Named("step_s") = step_s,
+      Named("step_b") = step_b,
+      Named("newton_s") = newton_s,
+      Named("newton_b") = newton_b
+  );
 }
 
 // ---- The panel form of purified components (coarsen.hpp)

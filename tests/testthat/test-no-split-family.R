@@ -29,30 +29,50 @@ test_that("a family without a split predicts the mean of its rows", {
   expect_equal(predict(fit, dat[1:3, ])$.pred, rep(dat$y[1], 3))
 })
 
-test_that("a classification family without a split predicts the class shares", {
+test_that("a classification family without a split predicts its rows' fit", {
   dat <- no_split_data()
   dat[c("x1", "x2")] <- 1
   shares <- function(y) as.numeric(prop.table(table(y)))
-  for (loss in c("exponential", "logit", "L1", "L2")) {
-    fit <- rpf_050(cl ~ x1 + x2, data = dat, n_families = 1, n_splits = 5, deterministic = TRUE, loss = loss)
-    expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), shares(dat$cl), label = paste(loss, "binary"))
-    fit <- rpf_050(cl3 ~ x1 + x2, data = dat, n_families = 1, n_splits = 5, deterministic = TRUE, loss = loss)
-    expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), shares(dat$cl3), label = paste(loss, "3 classes"))
+  # exponential, and logit with exact_step: the minimiser of the penalised loss from the scores 0, the class shares
+  # with one pseudo-row split evenly over the classes
+  smoothed <- function(y) {
+    n <- as.numeric(table(y))
+    (n + 1 / length(n)) / (sum(n) + 1)
   }
-
-  # logit and exponential truncate the shares to [epsilon, 1 - epsilon], as in every leaf
-  dat$rare <- factor(ifelse(seq_len(nrow(dat)) <= 97, "a", "b"))
-  for (loss in c("exponential", "logit")) {
-    fit <- rpf_050(
-      rare ~ x1 + x2,
+  # logit with exact_step = FALSE: one Newton step from the scores 0, the pseudo-rows' Hessian at its bound
+  # (1 / 2)(I - 11' / K1); in the coding with the first class at 0 (the step does not depend on the coding)
+  newton <- function(y) {
+    n <- as.numeric(table(y))
+    K1 <- length(n)
+    K <- K1 - 1
+    H <- sum(n) * (diag(K) / K1 - matrix(1 / K1^2, K, K)) + 0.5 * (diag(K) - matrix(1 / K1, K, K))
+    step <- solve(H, n[-1] - sum(n) / K1)
+    exp(c(0, step)) / sum(exp(c(0, step)))
+  }
+  fit <- function(y, ...) {
+    rpf_050(
+      stats::as.formula(paste(y, "~ x1 + x2")),
       data = dat,
       n_families = 1,
       n_splits = 5,
       deterministic = TRUE,
-      loss = loss,
-      epsilon = 0.1
+      ...
     )
-    expect_equal(unlist(predict(fit, dat[1, ]), use.names = FALSE), c(0.9, 0.1), label = loss)
+  }
+  p1 <- function(f) unlist(predict(f, dat[1, ]), use.names = FALSE)
+  for (y in c("cl", "cl3")) {
+    for (loss in c("L1", "L2")) {
+      expect_equal(p1(fit(y, loss = loss)), shares(dat[[y]]), label = paste(loss, y))
+    }
+    expect_equal(p1(fit(y, loss = "exponential")), smoothed(dat[[y]]), tolerance = 1e-12, label = y)
+    expect_equal(p1(fit(y, loss = "logit")), smoothed(dat[[y]]), tolerance = 1e-12, label = y)
+    expect_equal(p1(fit(y, loss = "logit", exact_step = FALSE)), newton(dat[[y]]), tolerance = 1e-12, label = y)
+  }
+
+  # no clamp: a rare class keeps its smoothed share (3 of 100 rows: 3.5 / 101)
+  dat$rare <- factor(ifelse(seq_len(nrow(dat)) <= 97, "a", "b"))
+  for (loss in c("exponential", "logit")) {
+    expect_equal(p1(fit("rare", loss = loss)), c(97.5, 3.5) / 101, tolerance = 1e-12, label = loss)
   }
 })
 

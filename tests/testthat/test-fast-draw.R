@@ -151,10 +151,13 @@ test_that("models stored without min_leaf_rows and exact_draw rebuild with 1 and
   expect_equal(pars[14:15], c(1, 1))
   expect_equal(rpf_param_vector(c(params, exact_draw = FALSE), "regression")[14:15], c(1, 0))
   expect_equal(rpf_param_vector(c(params, min_leaf_rows = 5L, exact_draw = FALSE), "regression")[14:15], c(5, 0))
-  # classification: [..., split_mode, delta, epsilon, min_leaf_rows, exact_draw]
+  # classification: [..., split_mode, min_leaf_rows, exact_draw, exact_step, prior_rows]; the delta and epsilon of a
+  # model saved by an earlier version are not used
   pars <- rpf_param_vector(c(params, delta = 0, epsilon = 0.1), "classification")
   expect_length(pars, 17)
-  expect_equal(pars[14:17], c(0, 0.1, 1, 1))
+  expect_equal(pars[14:17], c(1, 1, 1, 1))
+  pars <- rpf_param_vector(c(params, exact_step = FALSE, prior_rows = 2), "classification")
+  expect_equal(pars[14:17], c(1, 1, 0, 2))
 })
 
 test_that("print() mentions the exact draw (not the default)", {
