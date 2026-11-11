@@ -98,7 +98,7 @@ public:
   bool exact_step() const { return exact_step_; }
 
 protected:
-  // Maps a loss name to `loss` and `calcLoss`; throws on unknown names.
+  // Maps a loss name to `loss`; throws on unknown names.
   void set_loss_function(const std::string &loss);
 
 private:
@@ -110,7 +110,6 @@ private:
     exponential
   };
   LossType loss;
-  void (ClassificationRPF::*calcLoss)(Split &) = nullptr; // L1, L2, median: the criterion from the sides' rows
   bool exact_step_ = true;
   double prior_rows_ = 1;
   DriftFree df_;
@@ -128,7 +127,7 @@ private:
   void set_drift_free();
   std::vector<double> null_leaf_value(const std::vector<std::vector<double>> &Y, const std::vector<int> &rows) override;
   // The loss of one tree family (FamilyLoss, rpf.hpp): logit and exponential its rows' scores and weights, the running
-  // sums and the steps; L1 / L2 / median its working rows' Y and calcLoss (cpf.cpp)
+  // sums and the steps; L1 / L2 / median its working rows' Y and the criterion from the sides' rows (cpf.cpp)
   class Loss;
   std::unique_ptr<FamilyLoss>
   family_loss(std::vector<std::vector<double>> &samples_Y, const std::vector<int> &boot_idx) override;

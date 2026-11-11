@@ -14,19 +14,15 @@ using namespace rpf_utils;
  * \brief Create a prediction model based on Random Forests for classification data sets.
  */
 
-// Maps a loss-name string to `loss` and, for L1 / L2 / median, `calcLoss`
+// Maps a loss-name string to `loss`
 void ClassificationRPF::set_loss_function(const std::string &loss)
 {
-  calcLoss = nullptr;
   if (loss == "L1") {
     this->loss = LossType::L1;
-    this->calcLoss = &ClassificationRPF::L1_loss;
   } else if (loss == "L2") {
     this->loss = LossType::L2;
-    this->calcLoss = &ClassificationRPF::L2_loss;
   } else if (loss == "median") {
     this->loss = LossType::median;
-    this->calcLoss = &ClassificationRPF::median_loss;
   } else if (loss == "logit") {
     this->loss = LossType::logit;
   } else if (loss == "exponential") {
@@ -103,9 +99,9 @@ ClassificationRPF::null_leaf_value(const std::vector<std::vector<double>> &Y, co
 // ----------------- the loss of a tree family -----------------
 // The split searches (splits_*.cpp) and create_tree_family() (rpf.cpp) are regression's: the same candidate pool, the
 // same sampling of candidates, leaves and thresholds (and therefore the same random draws), the same aging. L1 / L2 /
-// median score each try with calcLoss from the individuals on both sides (I_s / I_b, in the order of the leaf's
-// individuals) and the sums of Y the search passes, and after a split update the working rows' Y; for L2, calcLoss is
-// L2_loss (rpf.cpp), regression's expression in regression's order, so loss "L2" on a 0/1 response is the regression
+// median score each try with L1_loss / L2_loss / median_loss from the individuals on both sides (I_s / I_b, in the
+// order of the leaf's individuals) and the sums of Y the search passes, and after a split update the working rows' Y;
+// L2_loss (rpf.cpp) is regression's expression in regression's order, so loss "L2" on a 0/1 response is the regression
 // fit, bit for bit, ties included. logit and exponential (cpf.hpp, DriftFree) keep each row's scores (and the
 // exponential its weight) and score a try from the sums of the rows' terms over its two sides: by the running sums
 // the searches build (scan_terms() etc.), or with set_parameters("scan", 0) by a pass over the leaf's rows (score()).
@@ -176,7 +172,21 @@ public:
       else
         trial.I_b.push_back(ind);
     }
-    (f.*f.calcLoss)(trial);
+    // a switch, not a pointer to member function: GCC's -fsanitize=vptr (in -fsanitize=undefined) miscompiled that
+    // call, a false report followed by a crash
+    switch (f.loss) {
+    case LossType::L1:
+      f.L1_loss(trial);
+      break;
+    case LossType::L2:
+      f.L2_loss(trial);
+      break;
+    case LossType::median:
+      f.median_loss(trial);
+      break;
+    default: // logit and exponential score above
+      break;
+    }
     return trial.min_sum;
   }
 
@@ -270,8 +280,10 @@ public:
       double *o = out + i * T;
       if (keep_terms) {
         const double *t = &terms[(size_t)leaf.individuals[order[i]] * T];
+        // the previous prefix; o[q - T] would wrap the unsigned index (undefined pointer arithmetic)
+        const double *prev = o - T;
         for (size_t q = 0; q < T; ++q)
-          o[q] = o[q - T] + t[q];
+          o[q] = prev[q] + t[q];
       } else {
         std::copy(o - T, o, o);
         add_terms(leaf.individuals[order[i]], o);
