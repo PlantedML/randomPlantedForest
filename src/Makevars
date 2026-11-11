@@ -2,6 +2,10 @@ SOURCES=lib/cpf.cpp lib/grid.cpp lib/helper.cpp lib/rpf.cpp lib/trees.cpp lib/in
 
 OBJECTS = $(SOURCES:.cpp=.o)
 
+# C++17: the split searches use if statements with an initializer (R >= 4.3 compiles C++17 by default, R 4.1
+# and 4.2 compile C++14)
+CXX_STD = CXX17
+
 PKG_CPPFLAGS=-I./include -I./lib
 PKG_CXXFLAGS = -DNDEBUG
 

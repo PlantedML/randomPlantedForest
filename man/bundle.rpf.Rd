@@ -33,5 +33,6 @@ tmp <- tempfile(fileext = ".rds")
 saveRDS(b, tmp)
 restored <- bundle::unbundle(readRDS(tmp))
 predict(restored, mtcars)
+unlink(tmp)
 \dontshow{\}) # examplesIf}
 }

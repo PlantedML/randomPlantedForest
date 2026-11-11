@@ -256,7 +256,7 @@ List rects_to_list(const rpf_rect::PurifiedForest *pf)
           List::create(
               Named("feat") = wrap(g.feat),
               Named("table") = wrap(g.table),
-              Named("box") = IntegerVector(g.rects.box.begin(), g.rects.box.end()),
+              Named("box") = r_vector<IntegerVector>(g.rects.box),
               Named("w") = wrap(g.rects.w),
               Named("nodes") = wrap(nodes),
               Named("csts") = wrap(g.index.csts),
@@ -304,7 +304,10 @@ rpf_rect::PurifiedForest list_to_rects(const List &x, int value_size)
       g.table = as<std::vector<double>>(gl["table"]);
       g.rects = rpf_rect::RectList((int)g.feat.size(), value_size);
       IntegerVector box = gl["box"];
-      g.rects.box.assign(box.begin(), box.end());
+      if (box.size() > 0)
+        g.rects.box.assign(box.begin(), box.end());
+      else
+        g.rects.box.clear();
       g.rects.w = as<std::vector<double>>(gl["w"]);
       std::vector<int> nodes = as<std::vector<int>>(gl["nodes"]);
       if (nodes.size() % 7 != 0)
@@ -392,7 +395,7 @@ List columns_to_list(ComponentColumns &cc, int n, int value_size)
   // each vector is freed once copied
   auto num = [n](std::vector<double> &v, int ncol) {
     NumericMatrix m(n, ncol);
-    std::copy(v.begin(), v.end(), m.begin());
+    copy_to_r(v.begin(), v.end(), m.begin());
     std::vector<double>().swap(v);
     return m;
   };
@@ -507,7 +510,7 @@ NumericMatrix rpf_store_eval(SEXP store, const NumericMatrix &X, const List sets
     S.push_back(as<std::vector<int>>(sets[k]));
   std::vector<double> v = B->eval(REAL(X), X.nrow(), X.ncol(), S, nthreads);
   NumericMatrix out(X.nrow(), (int)S.size() * B->value_size());
-  std::copy(v.begin(), v.end(), out.begin());
+  copy_to_r(v.begin(), v.end(), out.begin());
   return out;
 }
 
@@ -645,7 +648,7 @@ static List cuts_to_list(const std::vector<std::vector<double>> &cuts)
 {
   List out(cuts.size());
   for (size_t i = 0; i < cuts.size(); ++i)
-    out[(R_xlen_t)i] = NumericVector(cuts[i].begin(), cuts[i].end());
+    out[(R_xlen_t)i] = r_vector<NumericVector>(cuts[i]);
   return out;
 }
 

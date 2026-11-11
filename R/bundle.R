@@ -17,6 +17,7 @@
 #' saveRDS(b, tmp)
 #' restored <- bundle::unbundle(readRDS(tmp))
 #' predict(restored, mtcars)
+#' unlink(tmp)
 #' @exportS3Method bundle::bundle
 bundle.rpf <- function(x, ...) {
   bundle::bundle_constr(

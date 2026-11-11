@@ -258,8 +258,9 @@ struct RandomPlantedForest::AloneFit {
   std::mutex m;
   std::condition_variable cv; // the pool and the pilot wait on it
   // a paused family waits on its own (wake()): with one for all, every change woke every paused family's thread, and
-  // with many families paused the system time of those wake-ups was many times the fit's, also at nthreads = 1
-  std::unique_ptr<std::condition_variable[]> paused_cv;
+  // with many families paused the system time of those wake-ups was many times the fit's, also at nthreads = 1.
+  // A vector, not new[]: its length check bounds the allocation, where GCC's LTO warned -Walloc-size-larger-than
+  std::vector<std::condition_variable> paused_cv;
   std::atomic<size_t> bound{0}; // a family grows to this many checkpoints (read at each checkpoint)
   std::atomic<size_t> bound_free{
       0};                   // the estimate without the cap on pausing (phase 2), for families that cannot pause
@@ -486,7 +487,7 @@ struct RandomPlantedForest::AloneFit {
   void wake()
   {
     cv.notify_all();
-    if (!paused_cv)
+    if (paused_cv.empty())
       return;
     int free = permits;
     for (size_t b = 0; b < fam.size(); ++b) {
@@ -935,7 +936,7 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
   A.forest = this;
   A.V = V;
   A.fam.assign(B, AloneFit::Family());
-  A.paused_cv.reset(new std::condition_variable[B]);
+  A.paused_cv = std::vector<std::condition_variable>(B);
   A.counted.assign(B, 0);
   for (auto *v : {&A.s0, &A.s1, &A.q})
     v->assign(C, {});

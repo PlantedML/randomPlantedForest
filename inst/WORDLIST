@@ -1,4 +1,5 @@
 AISTATS
+Bikesharing
 CMD
 CV's
 Codecov
@@ -34,6 +35,7 @@ extensibility
 extralearners
 fallbacks
 glex
+growing's
 libc
 libstdc
 lifecycle's

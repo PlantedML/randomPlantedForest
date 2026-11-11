@@ -51,6 +51,7 @@ tmp <- tempfile(fileext = ".rds")
 saveRDS(blob, tmp)
 restored <- rpf_unmarshal(readRDS(tmp))
 all.equal(predict(fit, mtcars), predict(restored, mtcars))
+unlink(tmp)
 }
 \seealso{
 \code{\link[=rpf_is_valid]{rpf_is_valid()}}; \code{\link[=bundle.rpf]{bundle()}} for the same through the bundle package.
