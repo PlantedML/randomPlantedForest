@@ -584,6 +584,49 @@ test_that("rule R's likelihood fit: recovers beta, never above D's deviance, fin
   expect_true(all(is.finite(c(co2$alpha, co2$beta))))
 })
 
+test_that("the choice does not score rule R under the log-loss with more coefficients than rows", {
+  set.seed(5)
+  n <- 40
+  x <- as.data.frame(matrix(runif(n * 7), n, 7, dimnames = list(NULL, paste0("x", 1:7))))
+  y <- factor(ifelse(x$x1 + x$x2 * x$x3 + rnorm(n, sd = 0.3) > 1, "b", "a"))
+  set.seed(3)
+  fit <- rpf_050(x, y, loss = "logit", max_interaction = 3, n_families = 20, n_splits = 40)
+  pr <- prune_components(fit, x, y, seed = 1, max_panels = Inf)
+  oob <- pr$oob
+  # tau = 0 keeps more components than there are rows
+  r0 <- which(oob$rule == "R" & oob$tau == 0)
+  expect_gt(oob$n_kept[r0], n)
+  expect_true(all(is.na(oob[r0, c("oob_loss", "se_loss", "oob_loss_raw", "se_loss_raw")])))
+  expect_false(oob$min[r0] || oob$one_se[r0])
+  expect_identical(sum(oob$min), 1L)
+  expect_identical(sum(oob$one_se), 1L)
+  # D is scored for every tau, and R where it has fewer coefficients than half the rows
+  expect_true(all(is.finite(oob$oob_loss[oob$rule == "D"])))
+  expect_true(all(is.finite(oob$oob_loss[oob$rule == "R" & oob$n_kept < n / 2])))
+  expect_true(is.finite(oob$oob_loss[oob$one_se]))
+  # a given R and tau is fitted as given
+  given <- prune_components(fit, x, y, rule = "R", tau = 0, max_panels = Inf)
+  expect_length(given$beta, oob$n_kept[r0])
+  expect_true(all(is.finite(c(given$intercept, given$beta))))
+  # no candidate that can be scored
+  expect_error(
+    prune_components(fit, x, y, rule = "R", tau = c(0, 1e-12), seed = 1, max_panels = Inf),
+    "cannot be fitted for any"
+  )
+  # the CV's folds likewise
+  cv <- prune_components(fit, x, y, select_by = "cv", seed = 1, max_panels = Inf)$cv
+  c0 <- which(cv$rule == "R" & cv$tau == 0)
+  expect_true(is.na(cv$cv_loss[c0]))
+  expect_false(cv$min[c0] || cv$one_se[c0])
+  expect_true(all(is.finite(cv$cv_loss[cv$rule == "D"])))
+  # the squared error's least squares have a minimum-norm solution: scored
+  set.seed(3)
+  fit2 <- rpf_050(x, y, loss = "L2", max_interaction = 3, n_families = 20, n_splits = 40)
+  o2 <- prune_components(fit2, x, y, seed = 1, max_panels = Inf)$oob
+  expect_gt(o2$n_kept[o2$rule == "R" & o2$tau == 0], n)
+  expect_false(anyNA(o2))
+})
+
 test_that("rule R's likelihood fit with more coefficients than rows takes minimum-norm steps", {
   ns <- cp_ns()
   set.seed(11)

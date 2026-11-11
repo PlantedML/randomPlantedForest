@@ -286,7 +286,7 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
   # of an orthonormal basis Q of that space, the coefficients being th0 + Q c: t(Z) = Q R (pivoted), so the design in
   # these coordinates is Z Q = t(R) with its rows back in order. The steps are the same up to rounding, each from a
   # Hessian of n V columns instead of p (a pruning's first candidates keep thousands of components of a wide forest)
-  wide <- p > n * V
+  wide <- crit_fit_R_wide(crit, k, n)
   if (wide) {
     th0 <- th
     off <- scores(th0)
@@ -346,6 +346,14 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
   alpha <- numeric(V)
   alpha[free_a] <- th[seq_len(na)]
   list(alpha = alpha, beta = th[na + seq_len(k)])
+}
+
+# Whether rule R's likelihood fit of k components on n rows (crit_fit_R(), log-loss) has more coefficients than fitted
+# scores. Its rows can then be separated (given any scores, unless rows coincide), so the likelihood has no maximum:
+# the out-of-bag choice does not score such a candidate (prune_oob_score_crit()).
+crit_fit_R_wide <- function(crit, k, n) {
+  n_alpha <- crit$V - (crit$link == "softmax")
+  crit$type == "logloss" && n_alpha + k > n * crit$V
 }
 
 # The scores alpha + sum_S beta_S f_S (rows x V) of rule R's coefficients `coef` on the component-major components F

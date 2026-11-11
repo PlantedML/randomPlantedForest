@@ -265,6 +265,10 @@
   Rule `"R"`'s coefficients are fitted by Newton's method, and a threshold that keeps more components than there are rows (the first thresholds of a forest on many predictors keep thousands) decomposed a Hessian of that many rows and columns in every iteration.
   Such a Hessian is singular and each step is its minimum-norm solution, which lies in the space the rows span; the iterations now run in that space, on a Hessian of as many rows and columns as there are fitted scores.
   The steps are the same up to rounding, so the models are the same wherever no threshold keeps more components than rows; where one does, only that candidate's reported out-of-bag loss changes: its rows are separable, its likelihood has no maximum, and the value is where the iterations end.
+* `prune_components()` no longer scores rule `"R"` under the log-loss (`loss = "logit"` or `"exponential"`) for a threshold that keeps more components than the rows its coefficients are fitted on.
+  Such rows can be separated perfectly, so the likelihood has no maximum: each fold's fit ran its 50 iterations, each on a Hessian of as many rows and columns as fitted scores, and ended at a loss several times the other candidates'.
+  The candidate's losses in the table are now `NA` and it is not chosen, which removes most of the pruning time on data with many predictors and a thousand rows or more, or with three or more classes.
+  A given `"R"` and `tau` (no choice) is fitted as before.
 * The display of a pruned model that keeps many components of three or more predictors is much faster, with bitwise the same models.
   It asked for the panel forms two components at a time, and each such call read the whole forest; a first pruning that keeps every component of a forest on 60 predictors has ten thousand of them.
   Now one call covers them all, finds each component's own cut points from the trees of one of its predictors instead of from every tree, and passes over the tree families only for the components it coarsens, still two at a time.

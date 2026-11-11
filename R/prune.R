@@ -148,6 +148,12 @@
 #'   `oob_loss`, `se_loss`, `oob_loss_raw` and `se_loss_raw` (the mean criterion) instead of the RMSE columns, and
 #'   `cv_loss` and `se_loss` for CV; `select = "1se"` uses the SE of the mean criterion. A binary forest with
 #'   `"L1"` or `"L2"` has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
+#' - With the log-loss, `"R"` is not scored for a `tau` that keeps more components than the rows its coefficients are
+#'   fitted on (with the intercepts: more coefficients than fitted scores). Such rows can be separated perfectly, so
+#'   the likelihood has no maximum, and a fit would only end where its iterations stop. The candidate's losses in the
+#'   table are `NA` and it is not chosen; `"D"` is scored for every `tau`. A forest on many predictors has thousands of
+#'   components, so this is usually the case at `tau = 0` when there are fewer rows than that. A given `"R"` and `tau`
+#'   (no choice) is fitted as given.
 #' - The display coarsens a component with one form (`C`, `q`, cuts) for all score columns, chosen by the variance
 #'   kept of the centred columns; its stored form is one per score column.
 #' - [`predict()`][predict.rpf_pruned] takes `type` as [predict.rpf()] does, and [predict_components()] has one column
@@ -211,7 +217,8 @@
 #' - `oob`: `NULL` unless the pair was chosen out of bag; otherwise a `data.frame` with one row per candidate: `rule`,
 #'   `tau`, `oob_rmse` (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
 #'   Details), `se_mse` (from its per-fold MSEs), `oob_rmse_raw` and `se_mse_raw` (uncorrected), `n_kept`, `min` and
-#'   `one_se` (the two choices). Its attribute `n_rows` is the number of rows with an OOB family.
+#'   `one_se` (the two choices). Its attribute `n_rows` is the number of rows with an OOB family. For classification
+#'   see Details; there the losses of a candidate that is not scored are `NA`.
 #' - `cv`: `NULL` unless the pair was chosen by CV; otherwise a `data.frame` with one row per candidate: `rule`, `tau`,
 #'   `cv_rmse`, `se_mse` (SE of the CV MSE), `n_kept` (mean over the folds), `min` and `one_se`.
 #' - `select`, `select_by`, `fold_id`, `seed`: as used (`fold_id` and `seed` are `NULL` if no choice was made). For a
@@ -923,13 +930,19 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
       kept <- names(dec$share)[dec$share >= cand$tau[i]]
       key <- paste(cand$rule[i], paste(kept, collapse = ","))
       if (is.null(cache[[key]])) {
-        rf <- prune_fit_rule(cand$rule[i], cand$tau[i], dec, y_own)
-        cache[[key]] <- if (is.null(crit)) {
-          sum((prune_predict_dec(rf, dec$other) - y_ho)^2)
+        # rule R under the log-loss with more coefficients than the fold's fit has scores: not scored
+        wide <- cand$rule[i] == "R" && !is.null(crit) && crit_fit_R_wide(crit, length(kept), sum(!ho))
+        cache[[key]] <- if (wide) {
+          NA_real_
         } else {
-          # the held-out rows' criterion of the scores alpha + sum_S beta_S f_S (no correction: the whole forest)
-          G <- crit_predict_R(rf, dec$other, match(names(rf$beta), names(dec$share)), crit$V)
-          sum(crit_loss_raw(crit, which(ho), G))
+          rf <- prune_fit_rule(cand$rule[i], cand$tau[i], dec, y_own)
+          if (is.null(crit)) {
+            sum((prune_predict_dec(rf, dec$other) - y_ho)^2)
+          } else {
+            # the held-out rows' criterion of the scores alpha + sum_S beta_S f_S (no correction: the whole forest)
+            G <- crit_predict_R(rf, dec$other, match(names(rf$beta), names(dec$share)), crit$V)
+            sum(crit_loss_raw(crit, which(ho), G))
+          }
         }
       }
       sse[i, k] <- cache[[key]]
@@ -948,7 +961,7 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
   cv_rmse <- sqrt(rowSums(sse) / n)
   mse_k <- sweep(sse, 2, n_k, "/")
   se_mse <- apply(mse_k, 1, stats::sd) / sqrt(length(fids))
-  ch <- prune_choose(cv_rmse, se_mse, cand)
+  ch <- prune_choose_scored(cv_rmse, se_mse, cand)
   if (!is.null(crit)) {
     out <- data.frame(
       rule = cand$rule,
@@ -996,6 +1009,24 @@ prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
   ok <- ok[cand$tau[ok] == max(cand$tau[ok])]
   one <- ok[order(rmse[ok], rule_rank[ok])][1]
   list(min = seq_along(rmse) == best, one_se = seq_along(rmse) == one)
+}
+
+# prune_choose() among the candidates that were scored. One not scored (NA: rule R under the log-loss where it has
+# more coefficients than fitted scores, crit_fit_R_wide()) is not chosen.
+prune_choose_scored <- function(rmse, se, cand, left_out = NULL, call = rlang::caller_env()) {
+  scored <- !is.na(rmse)
+  if (!any(scored)) {
+    cli::cli_abort(
+      c(
+        "Rule {.val R} cannot be fitted for any {.arg tau}: each keeps more components than there are training rows.",
+        "i" = "Give larger thresholds {.arg tau}, or rule {.val D}."
+      ),
+      call = call
+    )
+  }
+  ch <- prune_choose(rmse[scored], se[scored], cand[scored, , drop = FALSE], left_out = left_out[scored])
+  among <- function(x) replace(logical(length(rmse)), scored, x)
+  list(min = among(ch$min), one_se = among(ch$one_se))
 }
 
 # Below this many tree families the default scores by CV instead of out of bag (T072's simulation: from 10 families
@@ -1323,26 +1354,31 @@ prune_oob_score_crit <- function(o, dec, feature_names, crit, cand, fold_id, n_t
     ki <- which(dec$share >= cand$tau[i])
     key <- paste(cand$rule[i], paste(ki, collapse = ","))
     if (is.null(cache[[key]])) {
-      if (cand$rule[i] == "D") {
-        G <- I_oob + crit_sum_comp(F_oob, ki, V)
-        G0 <- I0 + crit_sum_comp(F0, ki, V)
-        G1 <- I1 + crit_sum_comp(F1, ki, V)
+      if (cand$rule[i] == "R" && crit_fit_R_wide(crit, length(ki), n_use - max(n_k))) {
+        # more coefficients than the scores a fold's fit has: no maximum of the likelihood, so not scored
+        cache[[key]] <- list(sse = rep(NA_real_, length(fids)), sse_corr = rep(NA_real_, length(fids)))
       } else {
-        G <- G0 <- G1 <- matrix(0, n_use, V)
-        for (k in fids) {
-          te <- fid == k
-          coef <- crit_fit_R(cu, F_oob, ki, which(!te), start_alpha = dec$intercept)
-          sub <- function(Fm) Fm[te, , drop = FALSE]
-          G[te, ] <- crit_predict_R(coef, sub(F_oob), ki, V)
-          G0[te, ] <- crit_predict_R(coef, sub(F0), ki, V)
-          G1[te, ] <- crit_predict_R(coef, sub(F1), ki, V)
+        if (cand$rule[i] == "D") {
+          G <- I_oob + crit_sum_comp(F_oob, ki, V)
+          G0 <- I0 + crit_sum_comp(F0, ki, V)
+          G1 <- I1 + crit_sum_comp(F1, ki, V)
+        } else {
+          G <- G0 <- G1 <- matrix(0, n_use, V)
+          for (k in fids) {
+            te <- fid == k
+            coef <- crit_fit_R(cu, F_oob, ki, which(!te), start_alpha = dec$intercept)
+            sub <- function(Fm) Fm[te, , drop = FALSE]
+            G[te, ] <- crit_predict_R(coef, sub(F_oob), ki, V)
+            G0[te, ] <- crit_predict_R(coef, sub(F0), ki, V)
+            G1[te, ] <- crit_predict_R(coef, sub(F1), ki, V)
+          }
         }
+        r <- crit_rows(crit, rows, G, G0, G1, m0, m1, n_trees, impute = TRUE)
+        cache[[key]] <- list(
+          sse = vapply(fids, function(k) sum(r$e[fid == k]), numeric(1)),
+          sse_corr = vapply(fids, function(k) sum(r$corr[fid == k]), numeric(1))
+        )
       }
-      r <- crit_rows(crit, rows, G, G0, G1, m0, m1, n_trees, impute = TRUE)
-      cache[[key]] <- list(
-        sse = vapply(fids, function(k) sum(r$e[fid == k]), numeric(1)),
-        sse_corr = vapply(fids, function(k) sum(r$corr[fid == k]), numeric(1))
-      )
     }
     sse[i, ] <- cache[[key]]$sse
     sse_corr[i, ] <- cache[[key]]$sse_corr
@@ -1351,7 +1387,7 @@ prune_oob_score_crit <- function(o, dec, feature_names, crit, cand, fold_id, n_t
   se_of <- function(x) apply(sweep(x, 2, n_k, "/"), 1, stats::sd) / sqrt(length(fids))
   loss <- pmax(rowSums(sse_corr), 0) / n_use
   se <- se_of(sse_corr)
-  ch <- prune_choose(sqrt(loss), se, cand, left_out = loss == 0)
+  ch <- prune_choose_scored(sqrt(loss), se, cand, left_out = loss == 0, call = call)
   table <- data.frame(
     rule = cand$rule,
     tau = cand$tau,

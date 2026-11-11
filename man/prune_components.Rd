@@ -96,7 +96,8 @@ which \link[=print.rpf_pruned]{print()} shows. As the components need not be unc
 \item \code{oob}: \code{NULL} unless the pair was chosen out of bag; otherwise a \code{data.frame} with one row per candidate: \code{rule},
 \code{tau}, \code{oob_rmse} (corrected; used for the choice; 0 where the correction exceeds the uncorrected MSE, see
 Details), \code{se_mse} (from its per-fold MSEs), \code{oob_rmse_raw} and \code{se_mse_raw} (uncorrected), \code{n_kept}, \code{min} and
-\code{one_se} (the two choices). Its attribute \code{n_rows} is the number of rows with an OOB family.
+\code{one_se} (the two choices). Its attribute \code{n_rows} is the number of rows with an OOB family. For classification
+see Details; there the losses of a candidate that is not scored are \code{NA}.
 \item \code{cv}: \code{NULL} unless the pair was chosen by CV; otherwise a \code{data.frame} with one row per candidate: \code{rule}, \code{tau},
 \code{cv_rmse}, \code{se_mse} (SE of the CV MSE), \code{n_kept} (mean over the folds), \code{min} and \code{one_se}.
 \item \code{select}, \code{select_by}, \code{fold_id}, \code{seed}: as used (\code{fold_id} and \code{seed} are \code{NULL} if no choice was made). For a
@@ -291,6 +292,12 @@ probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \
 \code{oob_loss}, \code{se_loss}, \code{oob_loss_raw} and \code{se_loss_raw} (the mean criterion) instead of the RMSE columns, and
 \code{cv_loss} and \code{se_loss} for CV; \code{select = "1se"} uses the SE of the mean criterion. A binary forest with
 \code{"L1"} or \code{"L2"} has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
+\item With the log-loss, \code{"R"} is not scored for a \code{tau} that keeps more components than the rows its coefficients are
+fitted on (with the intercepts: more coefficients than fitted scores). Such rows can be separated perfectly, so
+the likelihood has no maximum, and a fit would only end where its iterations stop. The candidate's losses in the
+table are \code{NA} and it is not chosen; \code{"D"} is scored for every \code{tau}. A forest on many predictors has thousands of
+components, so this is usually the case at \code{tau = 0} when there are fewer rows than that. A given \code{"R"} and \code{tau}
+(no choice) is fitted as given.
 \item The display coarsens a component with one form (\code{C}, \code{q}, cuts) for all score columns, chosen by the variance
 kept of the centred columns; its stored form is one per score column.
 \item \code{\link[=predict.rpf_pruned]{predict()}} takes \code{type} as \code{\link[=predict.rpf]{predict.rpf()}} does, and \code{\link[=predict_components]{predict_components()}} has one column
