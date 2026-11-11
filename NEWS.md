@@ -251,6 +251,8 @@
   Each tree family's out-of-bag predictions are added to the checkpoints' sums as the family delivers them, instead of being kept until the stop is decided; the pool of split candidates keeps no record of its entries; and `options(randomPlantedForest.adaptive_pause_gb)`, the memory of the families waiting for the stop, defaults to 0.25 GB instead of 1 GB.
   With the default call at 8 threads, growing's peak physical footprint falls from 2.2 GB to 1.1 GB on California housing (16,512 rows; pruning, at about 2 GB, is now the call's peak there), and from 2.0 GB to 0.8 GB on 20,000 simulated rows with 10 predictors, where the call's peak resident memory (RSS) falls from 2.6 GB to 1.5 GB.
   On 80,000 simulated rows the smaller pause budget alone lowers the call's peak footprint from 2.9 GB to 2.0 GB (RSS 4.9 GB to 4.0 GB), in 41.7 s instead of 42.0 s.
+* `rpf_marshal()` of a large forest is several times as fast: the forest's lists of trees and leaves are allocated at their final lengths instead of grown by one element at a time, which copied each list for every element.
+  On a California housing forest of 50 tree families and 274,759 leaves, `rpf_marshal()` takes 0.25 s instead of 1.16 s; the blob is the same.
 
 # randomPlantedForest 0.5.0
 
