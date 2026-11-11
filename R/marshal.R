@@ -36,6 +36,7 @@
 #' saveRDS(blob, tmp)
 #' restored <- rpf_unmarshal(readRDS(tmp))
 #' all.equal(predict(fit, mtcars), predict(restored, mtcars))
+#' unlink(tmp)
 rpf_marshal <- function(x, include_data = FALSE) {
   checkmate::assert_flag(include_data)
   if (inherits(x, "rpf_pruned")) {
