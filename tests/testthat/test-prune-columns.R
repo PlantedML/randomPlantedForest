@@ -106,7 +106,7 @@ test_that("the pruned model stores its kept components only and predicts from th
     }
     expect_identical(predict(pr, d$xt)$.pred, pr$intercept + rowSums(sweep(M, 2, pr$beta, "*")))
     expect_identical(unname(as.matrix(predict_components(pr, d$xt)$m)), sweep(M, 2, pr$beta, "*"))
-    expect_identical(predict(pr, d$xt, nthreads = 3)$.pred, predict(pr, d$xt)$.pred)
+    expect_identical(predict(pr, d$xt, nthreads = 2)$.pred, predict(pr, d$xt)$.pred)
     # the store is built once and kept
     expect_true(ns$rpf_store_valid(pr$cache$.store))
   }

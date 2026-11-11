@@ -161,7 +161,10 @@ test_that("what needs the forest is an error naming keep_forest = TRUE", {
   expect_error(is_purified(f), msg, fixed = TRUE)
   expect_error(predict(f, d), msg, fixed = TRUE)
   expect_error(predict_components(f, d), msg, fixed = TRUE)
-  expect_error(plot(f), msg, fixed = TRUE)
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    # without ggplot2 (a Suggests), plot() asks for it first
+    expect_error(plot(f), msg, fixed = TRUE)
+  }
   expect_error(rpf_boxes(f), msg, fixed = TRUE)
   expect_error(rpf_marshal(f), msg, fixed = TRUE)
   # the forest's description prints, and says the forest was not kept
