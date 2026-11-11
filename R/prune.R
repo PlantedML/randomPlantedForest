@@ -810,10 +810,11 @@ dec_cols <- function(dec, comps) {
   if (is.null(dec$V)) i else crit_blk(i, dec$V)
 }
 
-# Minimum-norm least squares (as LAPACK's gelsd with the default cutoff eps * max(dim) * largest singular value)
-prune_lstsq <- function(X, y) {
+# Minimum-norm least squares (as LAPACK's gelsd with the default cutoff eps * max(dim) * largest singular value).
+# size: the dimension in the cutoff, for an X that stands for a larger matrix with the same nonzero singular values
+prune_lstsq <- function(X, y, size = max(dim(X))) {
   s <- svd(X)
-  tol <- max(dim(X)) * .Machine$double.eps * s$d[1]
+  tol <- size * .Machine$double.eps * s$d[1]
   d <- ifelse(s$d > tol, 1 / s$d, 0)
   as.numeric(s$v %*% (d * crossprod(s$u, y)))
 }

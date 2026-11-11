@@ -219,6 +219,8 @@ crit_sum_comp <- function(F, ki, V) {
 # fitted on. Squared error: least squares stacked over (row, score column). Log-loss: maximum likelihood by Newton's
 # method with step halving from beta = 1 and alpha = start_alpha (rule D's model); it stops at a relative change of
 # the deviance below 1e-10, after 50 iterations, or where the deviance no longer falls (finite on separable data).
+# With more coefficients than fitted scores the steps are minimum-norm steps, computed in the row space of the design
+# (see below); the rows are then separable, so the result is where the iterations end, not a maximum.
 # Returns list(alpha = V values, beta = length(ki) values).
 crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
   V <- crit$V
@@ -250,13 +252,14 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     }
     cbind(E, Fv[[v]])
   })
-  eta <- function(th) {
+  scores <- function(th) {
     G <- matrix(0, n, V)
     for (v in seq_len(V)) {
       G[, v] <- as.numeric(Xv[[v]] %*% th)
     }
     G
   }
+  eta <- scores
   dev <- function(th) sum(crit_logloss(crit, eta(th), cls)$e)
   # the indicator of the class among the free score columns (logit's first level: none)
   Yc <- matrix(0, n, V)
@@ -278,19 +281,41 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     th <- c(rep(0, na), rep(1, k))
     d_old <- dev(th)
   }
+  # More coefficients than fitted scores (p > n V): the p x p Hessian is singular, and every step is its minimum-norm
+  # solution, which lies in the row space of the stacked design Z (n V x p). So Newton runs on the n V coordinates c
+  # of an orthonormal basis Q of that space, the coefficients being th0 + Q c: t(Z) = Q R (pivoted), so the design in
+  # these coordinates is Z Q = t(R) with its rows back in order. The steps are the same up to rounding, each from a
+  # Hessian of n V columns instead of p (a pruning's first candidates keep thousands of components of a wide forest)
+  wide <- p > n * V
+  if (wide) {
+    th0 <- th
+    off <- scores(th0)
+    basis <- qr(t(do.call(rbind, Xv)), LAPACK = TRUE)
+    Zr <- t(qr.R(basis))
+    Zr[basis$pivot, ] <- Zr
+    Xv <- lapply(seq_len(V), function(v) Zr[(v - 1L) * n + seq_len(n), , drop = FALSE])
+    eta <- function(th) off + scores(th)
+    th <- numeric(n * V)
+  }
+  pr <- length(th)
   for (it in seq_len(50)) {
     P <- crit_logloss(crit, eta(th), cls)$P
     R <- P - Yc
-    grad <- numeric(p)
-    H <- matrix(0, p, p)
-    U <- matrix(0, n, p)
+    grad <- numeric(pr)
+    H <- matrix(0, pr, pr)
+    U <- matrix(0, n, pr)
     for (v in seq_len(V)) {
       grad <- grad + as.numeric(crossprod(Xv[[v]], R[, v]))
       H <- H + crossprod(Xv[[v]] * P[, v], Xv[[v]])
       U <- U + Xv[[v]] * P[, v]
     }
     H <- H - crossprod(U)
-    step <- tryCatch(solve(H, grad), error = function(e) prune_lstsq(H, grad))
+    step <- if (wide) {
+      # the cutoff of the singular values as for the p x p Hessian (its nonzero singular values are these)
+      prune_lstsq(H, grad, size = p)
+    } else {
+      tryCatch(solve(H, grad), error = function(e) prune_lstsq(H, grad))
+    }
     if (!all(is.finite(step))) {
       break
     }
@@ -314,6 +339,9 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     if (rel < 1e-10) {
       break
     }
+  }
+  if (wide) {
+    th <- th0 + as.numeric(qr.qy(basis, c(th, numeric(p - pr))))
   }
   alpha <- numeric(V)
   alpha[free_a] <- th[seq_len(na)]

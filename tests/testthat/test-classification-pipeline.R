@@ -583,3 +583,60 @@ test_that("rule R's likelihood fit: recovers beta, never above D's deviance, fin
   co2 <- ns$crit_fit_R(cb, x1, 1L, 1:100, start_alpha = 0)
   expect_true(all(is.finite(c(co2$alpha, co2$beta))))
 })
+
+test_that("rule R's likelihood fit with more coefficients than rows takes minimum-norm steps", {
+  ns <- cp_ns()
+  set.seed(11)
+  # Every distinct row several times, in more than one class: the rows are not separable, so the likelihood has a
+  # maximum, at the scores of the class shares; many coefficients reach them, and the fit is the start plus the
+  # minimum-norm change that does
+  m <- 8
+  k <- 40
+  F <- matrix(rnorm(m * k), m, k)[rep(seq_len(m), 3), ]
+  n <- 3L * m
+  cb <- structure(
+    list(
+      type = "logloss",
+      link = "sigmoid",
+      V = 1L,
+      K = 2L,
+      cls = rep(c(2L, 2L, 1L), each = m),
+      centre = "none",
+      n = n
+    ),
+    class = "rpf_crit"
+  )
+  co <- ns$crit_fit_R(cb, F, seq_len(k), seq_len(n), start_alpha = 0.2)
+  Z <- cbind(1, F)
+  start <- c(0.2, rep(1, k))
+  expect_equal(as.numeric(Z %*% c(co$alpha, co$beta)), rep(log(2), n), tolerance = 1e-6)
+  expect_equal(c(co$alpha, co$beta), start + ns$prune_lstsq(Z, log(2) - as.numeric(Z %*% start)), tolerance = 1e-6)
+  # the fit on some of the rows, as the folds of the out-of-bag choice fit it
+  idx <- c(1:6, m + 1:6, 2 * m + 1:6)
+  cs <- ns$crit_fit_R(cb, F, seq_len(k), idx, start_alpha = 0.2)
+  expect_equal(as.numeric(Z[idx, ] %*% c(cs$alpha, cs$beta)), rep(log(2), length(idx)), tolerance = 1e-6)
+
+  # three classes (logit: two scores against the first level, one beta per component for both)
+  m <- 6
+  k <- 60
+  F <- matrix(rnorm(m * 2 * k), m, 2 * k)[rep(seq_len(m), 4), ]
+  n <- 4L * m
+  cm <- structure(
+    list(
+      type = "logloss",
+      link = "softmax_ref",
+      V = 2L,
+      K = 3L,
+      cls = rep(c(1L, 2L, 2L, 3L), each = m),
+      centre = "ref",
+      n = n
+    ),
+    class = "rpf_crit"
+  )
+  co <- ns$crit_fit_R(cm, F, seq_len(k), seq_len(n), start_alpha = c(0.1, -0.1))
+  Z <- rbind(cbind(1, 0, F[, 2 * seq_len(k) - 1]), cbind(0, 1, F[, 2 * seq_len(k)]))
+  start <- c(0.1, -0.1, rep(1, k))
+  target <- rep(c(log(2), 0), each = n)
+  expect_equal(as.numeric(Z %*% c(co$alpha, co$beta)), target, tolerance = 1e-6)
+  expect_equal(c(co$alpha, co$beta), start + ns$prune_lstsq(Z, target - as.numeric(Z %*% start)), tolerance = 1e-6)
+})

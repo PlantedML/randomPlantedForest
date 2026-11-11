@@ -261,6 +261,10 @@
   The blob is the same.
 * Pruning a forest with more components than training rows (few rows, many predictors) is faster, with bitwise the same models.
   Rule `"R"`'s least squares for a threshold that keeps more components than rows computed a pivoted QR decomposition first, which such a fit can never use.
+* Pruning a classification forest (`loss = "logit"` or `"exponential"`) with more components than training rows no longer takes minutes to hours: the default call on 208 rows and 60 predictors takes seconds.
+  Rule `"R"`'s coefficients are fitted by Newton's method, and a threshold that keeps more components than there are rows (the first thresholds of a forest on many predictors keep thousands) decomposed a Hessian of that many rows and columns in every iteration.
+  Such a Hessian is singular and each step is its minimum-norm solution, which lies in the space the rows span; the iterations now run in that space, on a Hessian of as many rows and columns as there are fitted scores.
+  The steps are the same up to rounding, so the models are the same wherever no threshold keeps more components than rows; where one does, only that candidate's reported out-of-bag loss changes: its rows are separable, its likelihood has no maximum, and the value is where the iterations end.
 
 # randomPlantedForest 0.5.0
 
