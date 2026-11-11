@@ -18,8 +18,9 @@ test_that("invalid arguments are rejected", {
 
   binary <- data.frame(x = mtcars$wt, y = factor(mtcars$am))
   fit_classif <- function(...) rpf_050(y ~ x, data = binary, n_families = 2, loss = "logit", ...)
-  expect_error(fit_classif(delta = 2))
-  expect_error(fit_classif(epsilon = -0.1))
+  expect_error(fit_classif(delta = 0.001))
+  expect_error(fit_classif(epsilon = 0.1))
+  expect_error(fit_classif(exact_step = NA))
 })
 
 test_that("split search parameters are passed through and stored", {
@@ -53,19 +54,26 @@ test_that("delete_leaves changes the fitted forest", {
   expect_false(identical(fit_with(TRUE), fit_with(FALSE)))
 })
 
-test_that("delta and epsilon are used by the logit loss", {
+test_that("exact_step changes logit fits, not exponential ones, and is stored", {
   set.seed(1)
   dat <- data.frame(x1 = runif(100), x2 = runif(100))
-  dat$y <- factor(ifelse(dat$x1 > 0.5, "a", "b"))
-  fit_with <- function(...) {
+  dat$y <- factor(ifelse(dat$x1 + 0.3 * rnorm(100) > 0.5, "a", "b"))
+  fit_with <- function(loss, ...) {
     set.seed(2)
-    fit <- rpf_050(y ~ ., data = dat, n_families = 3, loss = "logit", ...)
-    predict(fit, dat, type = "link")$.pred
+    rpf_050(y ~ ., data = dat, n_families = 3, loss = loss, ...)
   }
+  pred <- function(fit) predict(fit, dat, type = "link")$.pred
 
-  default <- fit_with()
-  expect_false(identical(default, fit_with(delta = 0.1)))
-  expect_false(identical(default, fit_with(epsilon = 0.3)))
+  default <- fit_with("logit")
+  expect_true(default$params$exact_step)
+  expect_identical(pred(default), pred(fit_with("logit", exact_step = TRUE)))
+  newton <- fit_with("logit", exact_step = FALSE)
+  expect_false(newton$params$exact_step)
+  expect_false(identical(pred(default), pred(newton)))
+  # the exponential's step is exact by itself
+  expect_identical(pred(fit_with("exponential")), pred(fit_with("exponential", exact_step = FALSE)))
+  # stored for classification only
+  expect_null(rpf_050(mpg ~ cyl + wt, data = mtcars, n_families = 2)$params$exact_step)
 })
 
 test_that("max_interaction above the number of predictors is capped silently", {

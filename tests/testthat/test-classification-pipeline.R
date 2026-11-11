@@ -244,7 +244,8 @@ test_that("max_panels = Inf gives the first pruning's model; coarsened multiclas
 
 test_that("threads do not change the classification pipeline", {
   skip_on_cran()
-  d <- cp_data(300)
+  # 600 rows: the three-class logit fit keeps a component of three predictors, which the display coarsens
+  d <- cp_data(600)
   # the exact draw: the three-class fit below has coarsened components with it
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old))
@@ -389,11 +390,13 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
 
 test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
   skip_on_cran()
-  # on macOS arm64 the corrected log-loss is flat over hundreds of splits here, and the estimate from part of the
-  # families kept finding new minima: the families grew to about 2.8 times the stop (9,523 splits for 10 x 336). A
-  # family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so each
-  # grows to the stop. (the stop on a new minimum alone; the plateau stop, the default, stops this curve at 71 splits
-  # and chooses 42.) Other platforms grow other forests, with other curves: there the bounds are checked at their stops
+  # A family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so
+  # on a long, flat out-of-bag curve each grows to about the stop (before that fix, the estimate from part of the
+  # families kept finding new minima, and the families grew to about 2.8 times the stop). The curve here is long and
+  # flat on macOS arm64 at the greediness 1 / 0.025: the stop on a new minimum alone stops at 200 splits and chooses
+  # 100, the plateau stop (the default) at 141 and 100. (The logit loss of N18 stops after 15 splits at 10 / 0.4,
+  # where every family grows past its stop by the pause's doubling.) Other platforms grow other forests, with other
+  # curves: there the bounds are checked at their stops
   d <- cp_data(300)
   old <- options(randomPlantedForest.exact_draw = TRUE, randomPlantedForest.adaptive_tolerance = 0)
   on.exit(options(old))
@@ -404,8 +407,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     loss = "logit",
     max_interaction = 3,
     n_families = 10,
-    n_try_split_points = 10,
-    share_candidates = 0.4,
+    n_try_split_points = 1,
+    share_candidates = 0.025,
     prune = FALSE
   )
   st <- f$fit$adaptive_stats()
@@ -420,8 +423,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     loss = "logit",
     max_interaction = 3,
     n_families = 10,
-    n_try_split_points = 10,
-    share_candidates = 0.4,
+    n_try_split_points = 1,
+    share_candidates = 0.025,
     n_splits = f$params$splits,
     prune = FALSE
   )
@@ -435,17 +438,17 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     loss = "logit",
     max_interaction = 3,
     n_families = 10,
-    n_try_split_points = 10,
-    share_candidates = 0.4,
+    n_try_split_points = 1,
+    share_candidates = 0.025,
     prune = FALSE
   )
   expect_lte(p$splits_oob$n_splits, p$splits_oob$stopped_at)
   expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * p$splits_oob$stopped_at)
   # the flat curve of the comment above
   if (on_macos_arm64()) {
-    expect_identical(f$params$splits, 168L)
-    expect_identical(stop_f, 336L)
-    expect_identical(p$splits_oob[c("n_splits", "stopped_at")], list(n_splits = 42L, stopped_at = 71L))
+    expect_identical(f$params$splits, 100L)
+    expect_identical(stop_f, 200L)
+    expect_identical(p$splits_oob[c("n_splits", "stopped_at")], list(n_splits = 100L, stopped_at = 141L))
   }
 })
 

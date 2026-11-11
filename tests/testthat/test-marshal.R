@@ -7,7 +7,7 @@ test_that("params-only constructors create empty, unfitted objects", {
   expect_length(fit$get_model(), 0)
   expect_false(fit$is_purified())
 
-  cfit <- new(ClassificationRPF, "L2", c(pars, 0, 0.1))
+  cfit <- new(ClassificationRPF, "L2", c(pars, 1, 1))
   expect_length(cfit$get_model(), 0)
 
   expect_error(new(ClassificationRPF, "L2", pars), "15 to 17 parameters")

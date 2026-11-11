@@ -11,7 +11,8 @@ Y_cs <- matrix(rbinom(n_cs, 1, plogis(eta_cs)), ncol = 1)
 dat_cs <- data.frame(y = factor(Y_cs[, 1]), X_cs)
 
 # Low-level parameter vectors: max_interaction, n_families, n_splits, n_try_split_points, share_candidates, purify,
-# deterministic, nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure (+ delta, epsilon)
+# deterministic, nthreads, cv, split_decay_rate, max_candidates, delete_leaves, split_structure (classification: +
+# min_leaf_rows, exact_draw, as regression's defaults)
 reg_params <- function(mode, deterministic = 0, n_families = 3, n_splits = 25) {
   c(2, n_families, n_splits, 5, 0.4, 0, deterministic, 1, 0, 0.1, 50, 1, mode)
 }
@@ -43,7 +44,7 @@ test_that("classification with loss L2 reproduces regression on a 0/1 response",
       set.seed(5)
       reg <- new(RandomPlantedForest, Y_cs, X_cs, p)
       set.seed(5)
-      cls <- new(ClassificationRPF, Y_cs, X_cs, "L2", c(p, 0, 0.1))
+      cls <- new(ClassificationRPF, Y_cs, X_cs, "L2", c(p, 1, 1))
       d <- max(abs(cls$predict_matrix(X_cs, 0, 1L) - reg$predict_matrix(X_cs, 0, 1L)))
       expect_lt(d, 1e-10, label = paste(nm, "deterministic =", det))
     }
@@ -109,18 +110,7 @@ test_that("split_decay_rate changes a res_trees classification fit", {
 })
 
 test_that("all classification losses run under every split structure, binary and multiclass", {
-  losses <- c(
-    "logit",
-    "logit_2",
-    "logit_3",
-    "logit_4",
-    "exponential",
-    "exponential_2",
-    "exponential_3",
-    "L1",
-    "L2",
-    "median"
-  )
+  losses <- c("logit", "exponential", "L1", "L2", "median")
   cls3 <- cut(eta_cs + rnorm(n_cs), 3, labels = FALSE)
   Y_multi <- outer(cls3, 1:3, "==") * 1
   for (Y in list(binary = Y_cs, multiclass = Y_multi)) {
@@ -128,7 +118,7 @@ test_that("all classification losses run under every split structure, binary and
       Yl <- if (startsWith(loss, "exponential")) 2 * Y - 1 else Y
       for (nm in names(structures)) {
         set.seed(8)
-        cls <- new(ClassificationRPF, Yl, X_cs, loss, c(reg_params(structures[[nm]], n_splits = 15), 0, 0.1))
+        cls <- new(ClassificationRPF, Yl, X_cs, loss, c(reg_params(structures[[nm]], n_splits = 15), 1, 1))
         pr <- cls$predict_matrix(X_cs, 0, 1L)
         expect_equal(dim(pr), c(n_cs, ncol(Y)), label = paste(loss, nm))
         expect_true(all(is.finite(pr)), label = paste(loss, nm, ncol(Y)))

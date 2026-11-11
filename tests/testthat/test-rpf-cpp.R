@@ -53,6 +53,6 @@ test_that("set_data loads without fitting and fit() matches the fitting construc
 })
 
 test_that("unknown classification loss errors", {
-  pars <- c(1, 50, 30, 10, 0.4, 0, 0, 1, 0, 0.1, 50, 1, 3, 0, 0.1)
+  pars <- c(1, 50, 30, 10, 0.4, 0, 0, 1, 0, 0.1, 50, 1, 3, 1, 1)
   expect_error(new(ClassificationRPF, "nope", pars), "Unknown loss")
 })

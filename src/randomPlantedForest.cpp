@@ -54,6 +54,8 @@ RCPP_MODULE(mod_rpf)
 {
   // internal, for tests: inclusion counts of the two draws of split_structure = "leaves"
   Rcpp::function("rpf_leaves_draw_counts", &leaves_draw_counts);
+  // internal, for tests: the logit and exponential losses' criterion and steps on one split (cpf.hpp)
+  Rcpp::function("rpf_classif_check", &classif_check);
   // a coarsened component from its stored form (prune_components(max_panels = ))
   Rcpp::function("rpf_coarse_build", &rpf_coarse_build);
   Rcpp::function("rpf_coarse_eval", &rpf_coarse_eval);
@@ -82,6 +84,6 @@ RCPP_MODULE(mod_rpf)
       .constructor<std::string, const Rcpp::NumericVector>()
       .constructor<std::string, const Rcpp::NumericVector, const Rcpp::List>();
   expose_methods(cpf);
-  // internal, for tests: the loss weights of each family's sample rows (set_parameters("keep_weights", 1))
+  // internal, for tests: the scores and loss weights of each family's sample rows (set_parameters("keep_weights", 1))
   cpf.method("kept_weights", &RcppCPF::kept_weights);
 }

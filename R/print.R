@@ -121,11 +121,13 @@ format.rpf <- function(x, ...) {
     print_params(growing)
     if (x$mode == "classification") {
       cli::cli_h3("Loss")
-      loss_params <- if (params$loss %in% c("logit", "exponential")) {
-        c("loss", "delta", "epsilon")
-      } else {
-        "loss"
-      }
+      # logit: its exact_step (a model saved by an earlier version has none, and delta / epsilon, which are not shown:
+      # its losses were replaced); the pseudo-rows only when set by the option
+      loss_params <- c(
+        "loss",
+        if (identical(params$loss, "logit") && !is.null(params$exact_step)) "exact_step",
+        if (params$loss %in% c("logit", "exponential") && !is.null(params$prior_rows)) "prior_rows"
+      )
       print_params(params[loss_params])
     }
 

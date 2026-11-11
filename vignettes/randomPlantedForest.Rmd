@@ -248,7 +248,7 @@ predict(rpfit_species, head(penguins), type = "class")
 ```
 
 The default loss for classification is `"exponential"`, which gives proper probability estimates (with more than two classes it is the multiclass exponential loss SAMME).
-`"logit"` gives similar results after pruning but is slower, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
+`"logit"` (the multinomial log-likelihood) gives similar results after pruning, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
 Note that with `loss = "logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
 
 ## Using `recipes`

@@ -84,7 +84,8 @@ test_that("every leaf keeps min_leaf_rows rows of the bootstrap sample, in every
 test_that("leaves without a threshold that keeps min_leaf_rows rows are never drawn", {
   # Order 1, one candidate and one try per round: every round has a leaf with a valid threshold (the constant leaf,
   # with all rows, stays), so every round splits unless a leaf without one is drawn. delete_leaves (the default) makes
-  # small leaves by overwriting the split leaf.
+  # small leaves by overwriting the split leaf. Classification with L2, which splits whenever it can: logit and
+  # exponential make no split in a round whose candidate gains nothing, and the draw is the same for every loss.
   for (outcome in c("regression", "binary", "3 classes")) {
     d <- mlrs_sim(outcome)
     for (s in mlrs_structures) {
@@ -99,7 +100,8 @@ test_that("leaves without a threshold that keeps min_leaf_rows rows are never dr
           max_candidates = 1,
           n_try_split_points = 1,
           min_leaf_rows = 20,
-          exact = exact
+          exact = exact,
+          loss = if (outcome == "regression") NULL else "L2"
         )
         for (st in mlrs_leaf_stats(f, d$x)) {
           expect_gte(min(st$rows), 20, label = label)
@@ -169,7 +171,7 @@ test_that("loss L2 on a 0/1 response is the regression fit with min_leaf_rows, i
         set.seed(5)
         reg <- new(RandomPlantedForest, y, x, c(p, opt))
         set.seed(5)
-        cls <- new(ClassificationRPF, y, x, "L2", c(p, 0, 0.1, opt))
+        cls <- new(ClassificationRPF, y, x, "L2", c(p, opt))
         label <- sprintf("structure %d, min_leaf_rows %d, deterministic %d", mode, m, det)
         expect_identical(cls$get_model(), reg$get_model(), label = label)
         expect_identical(cls$predict_matrix(x, 0, 1L), reg$predict_matrix(x, 0, 1L), label = label)

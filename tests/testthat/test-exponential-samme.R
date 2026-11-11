@@ -1,7 +1,8 @@
 # The exponential loss with K >= 3 classes is SAMME (Zhu, Zou, Rosset and Hastie 2009): one loss, exp(-y.f / K),
 # gives the split criterion, the leaf step and one weight per row. The forest stores g = f / (K - 1), whose softmax
 # predict() returns, so after growing every row's weight must be exp(-g_c), c the row's class, recomputed from the
-# scores the forest predicts at the row. Binary data keep master's code: the weight exp(-y g / 2), y = -1 / 1.
+# scores the forest predicts at the row, and the family's scores must be those predictions. Binary data: the weight
+# exp(-y g / 2), y = -1 / 1.
 
 samme_data <- function(K, n = 150) {
   set.seed(3)
@@ -12,8 +13,8 @@ samme_data <- function(K, n = 150) {
   d
 }
 
-# one family grown with its weights kept (internal hook): the data rows of its sample, their classes, their weights and
-# the scores the forest predicts there
+# one family grown with its weights kept (internal hook): the data rows of its sample, their classes, their weights,
+# their scores in the family and the scores the forest predicts there
 samme_family <- function(d, structure, deterministic) {
   set.seed(1)
   m <- rpf(
@@ -36,6 +37,7 @@ samme_family <- function(d, structure, deterministic) {
   list(
     class = as.integer(d$y[rows]),
     w = kw[[1]]$weights,
+    scores = kw[[1]]$scores,
     g = as.matrix(predict(m, d[rows, ], type = "link")),
     p = as.matrix(predict(m, d[rows, ], type = "prob"))
   )
@@ -49,9 +51,10 @@ test_that("multiclass exponential (SAMME): each row's weight is exp(-g_c) of its
       for (det in c(FALSE, TRUE)) {
         lab <- sprintf("K = %d, %s, deterministic = %s", K, s, det)
         f <- samme_family(d, s, det)
-        expect_identical(dim(f$w), c(nrow(d), K), label = lab)
-        # one weight per row, kept in each of its K columns
-        expect_true(all(f$w == f$w[, 1]), label = lab)
+        # one weight per row
+        expect_identical(dim(f$w), c(nrow(d), 1L), label = lab)
+        expect_identical(dim(f$scores), c(nrow(d), K), label = lab)
+        expect_equal(f$scores, f$g, tolerance = 1e-12, ignore_attr = TRUE, label = lab)
         g_c <- f$g[cbind(seq_along(f$class), f$class)]
         expect_lt(max(abs(f$w[, 1] / exp(-g_c) - 1)), 1e-12, label = lab)
         # the fit moved the scores, which sum to 0 over the classes (every leaf step does), and predict() gives their
@@ -64,18 +67,19 @@ test_that("multiclass exponential (SAMME): each row's weight is exp(-g_c) of its
   }
 })
 
-test_that("binary exponential: the weight is exp(-y g / 2) of the predicted score (master's code)", {
+test_that("binary exponential: the weight is exp(-y g / 2) of the predicted score", {
   d <- samme_data(2)
   for (det in c(FALSE, TRUE)) {
     f <- samme_family(d, "leaf", det)
     expect_identical(dim(f$w), c(nrow(d), 1L))
+    expect_equal(f$scores, f$g, tolerance = 1e-12, ignore_attr = TRUE)
     y <- ifelse(f$class == 2, 1, -1)
     expect_lt(max(abs(f$w[, 1] / exp(-y * f$g[, 1] / 2) - 1)), 1e-12)
     expect_gt(max(abs(f$g)), 0.5)
   }
 })
 
-test_that("the multiclass exponential's first leaf step is SAMME's: log p_k - mean_j log p_j of the clamped shares", {
+test_that("the exponential's first leaf step is log(n_k + a / K) - mean_j log(n_j + a / K), a = 1 pseudo-row", {
   d <- samme_data(3)
   set.seed(1)
   m <- rpf(
@@ -91,13 +95,34 @@ test_that("the multiclass exponential's first leaf step is SAMME's: log p_k - me
     prune = FALSE
   )
   g <- as.matrix(predict(m, d, type = "link"))
-  # the one split leaves two leaves, all weights 1 before it: the step from each leaf's class shares, clamped to
-  # [epsilon, 1 - epsilon] (epsilon = 0.1)
+  # the one split leaves two leaves, all weights 1 and scores 0 before it: each leaf's step from its class counts n_k
+  # and one pseudo-row split over the K classes at its mean score 0, no clamp
   side <- factor(apply(round(g, 12), 1, paste, collapse = " "))
   expect_length(levels(side), 2)
   for (s in levels(side)) {
     in_leaf <- side == s
-    p <- pmin(pmax(tabulate(as.integer(d$y[in_leaf]), 3) / sum(in_leaf), 0.1), 0.9)
-    expect_equal(unname(g[which(in_leaf)[1], ]), log(p) - mean(log(p)), tolerance = 1e-14)
+    v <- tabulate(as.integer(d$y[in_leaf]), 3) + 1 / 3
+    expect_equal(unname(g[which(in_leaf)[1], ]), log(v) - mean(log(v)), tolerance = 1e-14)
+  }
+  # binary: log((n_1 + 1 / 2) / (n_0 + 1 / 2))
+  d2 <- samme_data(2)
+  set.seed(1)
+  m <- rpf(
+    y ~ .,
+    data = d2,
+    loss = "exponential",
+    max_interaction = 1,
+    n_families = 1,
+    n_splits = 1,
+    n_try_split_points = 3,
+    share_candidates = 1,
+    deterministic = TRUE,
+    prune = FALSE
+  )
+  g <- predict(m, d2, type = "link")[[1]]
+  for (s in unique(round(g, 12))) {
+    in_leaf <- round(g, 12) == s
+    n <- tabulate(as.integer(d2$y[in_leaf]), 2)
+    expect_equal(g[which(in_leaf)[1]], log((n[2] + 0.5) / (n[1] + 0.5)), tolerance = 1e-14)
   }
 })

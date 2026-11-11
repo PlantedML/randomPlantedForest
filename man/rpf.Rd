@@ -25,8 +25,7 @@ rpf(x, ...)
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -54,8 +53,7 @@ rpf(x, ...)
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -83,8 +81,7 @@ rpf(x, ...)
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -112,8 +109,7 @@ rpf(x, ...)
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -215,23 +211,17 @@ components.}
 \item{loss}{\verb{[character(1) | NULL: NULL]}: Loss function. \code{NULL} uses \code{"L2"} for
 regression, the only supported loss, and \code{"exponential"} for classification
 (with more than two classes the multiclass exponential loss SAMME).
-Classification also supports \code{"logit"}, which gives similar results but is
-slower, and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do
-not yield proper probability estimates.}
+Classification also supports \code{"logit"} (the multinomial log-likelihood),
+and \code{"L1"} and \code{"L2"}, which fit class indicators directly and do not yield
+proper probability estimates. See "Classification losses" in Details.}
 
-\item{delta}{\verb{[numeric(1): 0.001]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
-Class proportions are truncated to \verb{[delta, 1 - delta]} when computing the
-loss of a split. Must be less than 0.5, from where every proportion is
-truncated to the same value, and positive for \code{"logit"}: with \code{delta = 0},
-nodes containing a single class have infinite loss and their splits are
-always rejected.}
-
-\item{epsilon}{\verb{[numeric(1): 0.1]}: Only used if \code{loss} is \code{"logit"} or \code{"exponential"}.
-Class proportions are truncated to \verb{[epsilon, 1 - epsilon]} when computing
-the fit in a leaf. Unlike \code{delta}, this caps the size of individual leaf
-updates and acts as regularization: smaller values permit larger jumps on
-the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
-values of pure leaves are infinite, and from 0.5 on every leaf value is 0.}
+\item{exact_step}{\verb{[logical(1): TRUE]}: Only used with \code{loss = "logit"}: whether
+the two leaves of each split get the exact minimisers of the penalised loss
+(Newton's method to convergence on the leaf's rows), or one Newton step from
+the sums the split search scored them by (\code{FALSE}, faster). The split
+search is the same either way. The exponential loss's step is exact by
+itself, so \code{exact_step} does not change \code{"exponential"} fits. See
+"Classification losses" in Details.}
 
 \item{prune}{\verb{[logical(1) | NULL: NULL]}: Whether to return the pruned model
 instead of the forest: the forest is pruned by \code{\link[=prune_components]{prune_components()}} with
@@ -387,17 +377,37 @@ default of the other structures, and of \code{"leaf"} before). \code{tune} searc
 this greediness out of bag.
 
 For classification, \code{"exponential"} (the default) and \code{"logit"} fit on the
-link scale and are transformed to probabilities. With more than two classes
-\code{"exponential"} is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
-and Hastie, 2009): with one score per class, summing to 0, a row's weight is
-\code{exp(-g)}, \code{g} the score of its class, and the probabilities are the softmax
-of the scores. With \code{n_splits} chosen out of bag and the forest pruned (the
-defaults), \code{"exponential"} was as accurate as \code{"logit"} in simulations and
-about twice as fast. Nothing bounds its scores once a tree family's
-bootstrap sample is separated, though, so with a large fixed \code{n_splits} its
-log-loss can grow with the splits, where \code{"logit"}'s does not. \code{"L1"} and
-\code{"L2"} fit class indicators directly and their probabilities are truncated
-to \verb{[0, 1]}.
+link scale and are transformed to probabilities; see "Classification
+losses". \code{"L1"} and \code{"L2"} fit class indicators directly and their
+probabilities are truncated to \verb{[0, 1]}.
+}
+
+\subsection{Classification losses}{
+
+\code{"exponential"} and \code{"logit"} fit scores on the link scale: with two classes
+one score, the log-odds of the second class; with more, \code{"logit"} one score
+per class but the first (whose score is 0) and \code{"exponential"} one score per
+class, summing to 0 (the multiclass exponential loss SAMME of Zhu, Zou,
+Rosset and Hastie, 2009, whose row weight is \code{exp(-g)}, \code{g} the score of its
+class). The probabilities are the softmax of the scores.
+
+Every split moves the scores of the rows of each new leaf by one step, which
+minimises the leaf's penalised loss: the loss of its rows, plus that of one
+pseudo-row (split evenly over the classes) at the leaf's current mean score.
+The pseudo-row pulls the step towards no change, so a leaf whose rows
+all have one class moves towards a finite level (about \verb{log(2 n + 1)} for
+\code{n} rows and two classes) and is not moved further once it is there, and no
+clamp of the class shares is needed. A split is scored by its gain over the
+parent leaf's own step, and each new leaf pays for its pseudo-row, so
+splitting a leaf of one class gains nothing, nor does repeating a split whose
+leaves are at their optimum, and such splits are not made. A round in which
+no candidate gains makes no split. The candidates' gains come from sums over
+their two sides (the second-order Newton gain for \code{"logit"}, the exact gain
+for \code{"exponential"}), built as regression builds its sums (along the leaf's
+sorted rows, so that a split point costs the same whatever the leaf's size;
+for \code{"tree_then_leaf"} one pass over the leaf per split point).
+\code{"exponential"}'s step is exact; with \code{exact_step = TRUE} (the default)
+\code{"logit"}'s steps are made exact too, otherwise they are one Newton step.
 }
 
 \subsection{Factor predictors}{

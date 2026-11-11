@@ -72,6 +72,20 @@ Rcpp::NumericVector leaves_draw_counts(
     const Rcpp::IntegerVector &rows_ok
 );
 
+// For tests: the classification losses' arithmetic (cpf.hpp, DriftFree) on one split of the rows of Y (n x K, coded
+// as the loss codes it: logit 0 / 1, the reference class all 0; exponential -1 / 1) with the scores F (n x K) and the
+// weights the scores give (exponential). side: 0 below the threshold, 1 not. Returns list(score: the criterion, Inf
+// if no gain; raw: the sides' values minus the parent's; step_s, step_b: the steps the leaves get (logit: exact with
+// exact_step); newton_s, newton_b: the steps from the sums).
+Rcpp::List classif_check(
+    const std::string &loss,
+    const Rcpp::NumericMatrix &Y,
+    const Rcpp::NumericMatrix &F,
+    const Rcpp::IntegerVector &side,
+    bool exact_step,
+    double prior_rows
+);
+
 template <class Core> class RcppForest {
 public:
   // Construct and fit (regression)
@@ -267,9 +281,9 @@ public:
     Rcpp::RNGScope scope;
     core.set_parameters(Rcpp::as<std::vector<std::string>>(keys), Rcpp::as<std::vector<double>>(values));
   }
-  // Internal, for tests (classification only; registered for ClassificationRPF alone): the loss weights each family's
+  // Internal, for tests (classification only; registered for ClassificationRPF alone): the rows' state each family's
   // growth ended with after set_parameters("keep_weights", 1), per family list(rows = the data row of each sample row,
-  // 1-based; weights = sample rows x value_size)
+  // 1-based; scores = sample rows x value_size (logit and exponential); weights = sample rows x 1 (exponential))
   Rcpp::List kept_weights()
   {
     const auto &kw = core.kept_weights();
@@ -277,8 +291,11 @@ public:
     for (size_t b = 0; b < kw.size(); ++b) {
       Rcpp::IntegerVector rows(kw[b].rows.begin(), kw[b].rows.end());
       rows = rows + 1;
-      out[(R_xlen_t)b] =
-          Rcpp::List::create(Rcpp::Named("rows") = rows, Rcpp::Named("weights") = from_matrix2d(kw[b].weights));
+      out[(R_xlen_t)b] = Rcpp::List::create(
+          Rcpp::Named("rows") = rows,
+          Rcpp::Named("weights") = from_matrix2d(kw[b].weights),
+          Rcpp::Named("scores") = from_matrix2d(kw[b].scores)
+      );
     }
     return out;
   }

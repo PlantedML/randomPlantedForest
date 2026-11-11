@@ -64,22 +64,38 @@ test_that("the leaf index gives the scan's predictions bitwise (classification)"
   yb <- factor(ifelse(f + rnorm(n, sd = 0.2) > 0.75, "a", "b"))
   y3 <- factor(cut(f + rnorm(n, sd = 0.2), 3, labels = c("a", "b", "c")))
   X <- leaf_test_rows(x, n_random = 300)
-  for (loss in c("L2", "exponential")) {
+  check <- function(fit, label) {
+    expect_identical(fit$fit$predict_matrix(X, 0, 2L), scan_rows(fit, X), label = label)
+    expect_identical(
+      fit$fit$predict_matrix(X[, 1:2], c(1, 2), 2L),
+      scan_rows(fit, X[, 1:2], c(1, 2)),
+      label = paste(label, "x1:x2")
+    )
+  }
+  for (loss in c("L2", "exponential", "logit")) {
     for (y in list(yb, y3)) {
       for (dl in c(TRUE, FALSE)) {
         set.seed(6)
         fit <- rpf_050(x, y, max_interaction = 3, n_families = 4, n_splits = 150, loss = loss, delete_leaves = dl)
         label <- paste(loss, nlevels(y), dl)
-        expect_gt(max_tree_leaves(fit), 64, label = label)
-        expect_identical(fit$fit$predict_matrix(X, 0, 2L), scan_rows(fit, X), label = label)
-        expect_identical(
-          fit$fit$predict_matrix(X[, 1:2], c(1, 2), 2L),
-          scan_rows(fit, X[, 1:2], c(1, 2)),
-          label = paste(label, "x1:x2")
-        )
+        # logit and exponential stop growing a family once no split gains, here before 64 leaves
+        if (loss == "L2") {
+          expect_gt(max_tree_leaves(fit), 64, label = label)
+        }
+        check(fit, label)
       }
     }
   }
+  # an exponential forest with a tree of more than 64 leaves: more rows
+  set.seed(4)
+  n <- 1000
+  x <- data.frame(x1 = runif(n), x2 = runif(n), x3 = runif(n))
+  f <- x$x1 + x$x2 * x$x3
+  yb <- factor(ifelse(f + rnorm(n, sd = 0.2) > 0.75, "a", "b"))
+  set.seed(6)
+  fit <- rpf_050(x, yb, max_interaction = 3, n_families = 4, n_splits = 150, delete_leaves = FALSE)
+  expect_gt(max_tree_leaves(fit), 64)
+  check(fit, "exponential, 1000 rows")
 })
 
 test_that("predict() gives the same predictions for all rows at once as in chunks", {

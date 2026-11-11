@@ -91,21 +91,16 @@
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
 #'   regression, the only supported loss, and `"exponential"` for classification
 #'   (with more than two classes the multiclass exponential loss SAMME).
-#'   Classification also supports `"logit"`, which gives similar results but is
-#'   slower, and `"L1"` and `"L2"`, which fit class indicators directly and do
-#'   not yield proper probability estimates.
-#' @param delta `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or `"exponential"`.
-#'   Class proportions are truncated to `[delta, 1 - delta]` when computing the
-#'   loss of a split. Must be less than 0.5, from where every proportion is
-#'   truncated to the same value, and positive for `"logit"`: with `delta = 0`,
-#'   nodes containing a single class have infinite loss and their splits are
-#'   always rejected.
-#' @param epsilon `[numeric(1): 0.1]`: Only used if `loss` is `"logit"` or `"exponential"`.
-#'   Class proportions are truncated to `[epsilon, 1 - epsilon]` when computing
-#'   the fit in a leaf. Unlike `delta`, this caps the size of individual leaf
-#'   updates and acts as regularization: smaller values permit larger jumps on
-#'   the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
-#'   values of pure leaves are infinite, and from 0.5 on every leaf value is 0.
+#'   Classification also supports `"logit"` (the multinomial log-likelihood),
+#'   and `"L1"` and `"L2"`, which fit class indicators directly and do not yield
+#'   proper probability estimates. See "Classification losses" in Details.
+#' @param exact_step `[logical(1): TRUE]`: Only used with `loss = "logit"`: whether
+#'   the two leaves of each split get the exact minimisers of the penalised loss
+#'   (Newton's method to convergence on the leaf's rows), or one Newton step from
+#'   the sums the split search scored them by (`FALSE`, faster). The split
+#'   search is the same either way. The exponential loss's step is exact by
+#'   itself, so `exact_step` does not change `"exponential"` fits. See
+#'   "Classification losses" in Details.
 #' @param prune `[logical(1) | NULL: NULL]`: Whether to return the pruned model
 #'   instead of the forest: the forest is pruned by [prune_components()] with
 #'   its defaults on the training rows, and the result is its `rpf_pruned`
@@ -237,17 +232,36 @@
 #' this greediness out of bag.
 #'
 #' For classification, `"exponential"` (the default) and `"logit"` fit on the
-#' link scale and are transformed to probabilities. With more than two classes
-#' `"exponential"` is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
-#' and Hastie, 2009): with one score per class, summing to 0, a row's weight is
-#' `exp(-g)`, `g` the score of its class, and the probabilities are the softmax
-#' of the scores. With `n_splits` chosen out of bag and the forest pruned (the
-#' defaults), `"exponential"` was as accurate as `"logit"` in simulations and
-#' about twice as fast. Nothing bounds its scores once a tree family's
-#' bootstrap sample is separated, though, so with a large fixed `n_splits` its
-#' log-loss can grow with the splits, where `"logit"`'s does not. `"L1"` and
-#' `"L2"` fit class indicators directly and their probabilities are truncated
-#' to `[0, 1]`.
+#' link scale and are transformed to probabilities; see "Classification
+#' losses". `"L1"` and `"L2"` fit class indicators directly and their
+#' probabilities are truncated to `[0, 1]`.
+#'
+#' ## Classification losses
+#'
+#' `"exponential"` and `"logit"` fit scores on the link scale: with two classes
+#' one score, the log-odds of the second class; with more, `"logit"` one score
+#' per class but the first (whose score is 0) and `"exponential"` one score per
+#' class, summing to 0 (the multiclass exponential loss SAMME of Zhu, Zou,
+#' Rosset and Hastie, 2009, whose row weight is `exp(-g)`, `g` the score of its
+#' class). The probabilities are the softmax of the scores.
+#'
+#' Every split moves the scores of the rows of each new leaf by one step, which
+#' minimises the leaf's penalised loss: the loss of its rows, plus that of one
+#' pseudo-row (split evenly over the classes) at the leaf's current mean score.
+#' The pseudo-row pulls the step towards no change, so a leaf whose rows
+#' all have one class moves towards a finite level (about `log(2 n + 1)` for
+#' `n` rows and two classes) and is not moved further once it is there, and no
+#' clamp of the class shares is needed. A split is scored by its gain over the
+#' parent leaf's own step, and each new leaf pays for its pseudo-row, so
+#' splitting a leaf of one class gains nothing, nor does repeating a split whose
+#' leaves are at their optimum, and such splits are not made. A round in which
+#' no candidate gains makes no split. The candidates' gains come from sums over
+#' their two sides (the second-order Newton gain for `"logit"`, the exact gain
+#' for `"exponential"`), built as regression builds its sums (along the leaf's
+#' sorted rows, so that a split point costs the same whatever the leaf's size;
+#' for `"tree_then_leaf"` one pass over the leaf per split point).
+#' `"exponential"`'s step is exact; with `exact_step = TRUE` (the default)
+#' `"logit"`'s steps are made exact too, otherwise they are one Newton step.
 #'
 #' ## Factor predictors
 #'
@@ -627,8 +641,7 @@ rpf.formula <- function(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -671,8 +684,7 @@ rpf.formula <- function(
     min_leaf_rows = min_leaf_rows,
     interaction_constraints = interaction_constraints,
     loss = loss,
-    delta = delta,
-    epsilon = epsilon,
+    exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
     tune = tune,
@@ -704,8 +716,7 @@ rpf.data.frame <- function(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -735,8 +746,7 @@ rpf.data.frame <- function(
     min_leaf_rows = min_leaf_rows,
     interaction_constraints = interaction_constraints,
     loss = loss,
-    delta = delta,
-    epsilon = epsilon,
+    exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
     tune = tune,
@@ -768,8 +778,7 @@ rpf.matrix <- function(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -799,8 +808,7 @@ rpf.matrix <- function(
     min_leaf_rows = min_leaf_rows,
     interaction_constraints = interaction_constraints,
     loss = loss,
-    delta = delta,
-    epsilon = epsilon,
+    exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
     tune = tune,
@@ -832,8 +840,7 @@ rpf.recipe <- function(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -866,8 +873,7 @@ rpf.recipe <- function(
     min_leaf_rows = min_leaf_rows,
     interaction_constraints = interaction_constraints,
     loss = loss,
-    delta = delta,
-    epsilon = epsilon,
+    exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
     tune = tune,
@@ -899,8 +905,7 @@ rpf_bridge <- function(
   min_leaf_rows,
   interaction_constraints,
   loss,
-  delta,
-  epsilon,
+  exact_step,
   prune,
   max_panels,
   tune,
@@ -956,24 +961,7 @@ rpf_bridge <- function(
   # "median" loss is implemented but discarded
   loss_functions <- switch(outcomes$mode, "regression" = "L2", "classification" = c("L1", "L2", "logit", "exponential"))
   checkmate::assert_choice(loss, choices = loss_functions)
-  checkmate::assert_number(delta, lower = 0, upper = 1)
-  checkmate::assert_number(epsilon, lower = 0, upper = 1)
-  if (loss %in% c("logit", "exponential")) {
-    # Both truncate class proportions to [value, 1 - value], which is empty from 0.5 on
-    if (delta >= 0.5 || (loss == "logit" && delta <= 0)) {
-      range <- if (loss == "logit") "greater than 0" else "at least 0"
-      cli::cli_abort(
-        "With {.code loss = \"{loss}\"}, {.arg delta} must be {range} and less than 0.5, not {delta}.",
-        call = call
-      )
-    }
-    if (epsilon <= 0 || epsilon >= 0.5) {
-      cli::cli_abort(
-        "With {.code loss = \"{loss}\"}, {.arg epsilon} must be greater than 0 and less than 0.5, not {epsilon}.",
-        call = call
-      )
-    }
-  }
+  checkmate::assert_flag(exact_step)
 
   checkmate::assert_flag(prune, null.ok = TRUE)
   checkmate::assert_flag(deterministic)
@@ -1047,8 +1035,6 @@ rpf_bridge <- function(
     min_leaf_rows = as.integer(min_leaf_rows),
     interaction_constraints = interaction_constraints,
     split_structure = split_structure_code(split_structure),
-    delta = delta,
-    epsilon = epsilon,
     deterministic = deterministic,
     nthreads = nthreads,
     # the pruning leaves the forest unpurified (prune_components()), so that rpf(prune = TRUE) is its pruning
@@ -1056,6 +1042,11 @@ rpf_bridge <- function(
     exact_draw = rpf_exact_draw(call = call),
     keep_level_order = predictors$keep_level_order
   )
+  if (outcomes$mode == "classification") {
+    # logit's steps (exponential's are exact anyway), and the losses' pseudo-rows, by an option for studies only
+    params$exact_step <- exact_step
+    params$prior_rows <- rpf_prior_rows(call = call)
+  }
 
   if (!is.null(control)) {
     return(tune_run(processed, outcomes, predictors, params, control, max_panels, export_forest, call = call))
@@ -1166,11 +1157,25 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
   exact_draw
 }
 
+# The pseudo-rows a of the logit and exponential losses (1): the undocumented
+# option randomPlantedForest.prior_rows, for studies; NULL if it is not set.
+rpf_prior_rows <- function(call = rlang::caller_env()) {
+  a <- getOption("randomPlantedForest.prior_rows")
+  if (is.null(a)) {
+    return(NULL)
+  }
+  if (!is.numeric(a) || length(a) != 1 || !is.finite(a) || a <= 0) {
+    cli::cli_abort("The option {.code randomPlantedForest.prior_rows} must be a positive number.", call = call)
+  }
+  as.double(a)
+}
+
 # Assemble the positional parameter vector for the C++ constructors.
-# 15 elements for regression (+ min_leaf_rows, exact_draw), 17 (+ delta,
-# epsilon, min_leaf_rows, exact_draw) for classification. Models saved before
-# these options existed have no such entries in their params and were fitted
-# with min_leaf_rows = 1 and the exact draw.
+# 15 elements for regression (the 13, min_leaf_rows, exact_draw), 17 for
+# classification (+ exact_step, prior_rows). Models saved before these options
+# existed have no such entries in their params and were fitted with
+# min_leaf_rows = 1 and the exact draw; the delta and epsilon in the params of
+# a classification model saved by an earlier version are not used.
 rpf_param_vector <- function(params, mode) {
   # the stored code (renamed_split_structures); a new name is taken too
   structure <- params$split_structure
@@ -1200,10 +1205,11 @@ rpf_param_vector <- function(params, mode) {
     params$delete_leaves,
     split_mode
   )
+  base <- c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
   if (mode == "classification") {
-    base <- c(base, params$delta, params$epsilon)
+    base <- c(base, params$exact_step %||% TRUE, params$prior_rows %||% 1)
   }
-  c(base, params$min_leaf_rows %||% 1L, params$exact_draw %||% TRUE)
+  base
 }
 
 # Main fitting function and interface to C++ implementation

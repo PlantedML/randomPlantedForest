@@ -423,9 +423,30 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
   };
   std::vector<Try> tries;
   std::vector<rpf_ct1::Lane> lanes;
+  // The loss's running sums (FamilyLoss::scan_terms): each try's two sides' sums of the loss's row terms, by one pass
+  // over its leaf's rows, as regression sums Y here
+  const size_t scan_T = loss_fn ? loss_fn->scan_terms() : 0;
+  std::vector<double> scan_tot;
   // The sums of tries[from..): with one column in lanes (rpf_ct1::lane_sums), with several row by row
   auto evaluate = [&](size_t from) {
-    if (one_column) {
+    if (scan_T > 0) {
+      for (size_t i = from; i < tries.size(); ++i) {
+        Try &t = tries[i];
+        t.sum_s.assign(scan_T, 0.0);
+        t.sum_b.assign(scan_T, 0.0);
+        t.ns = 0;
+        t.nb = 0;
+        for (int ind : t.leaf->individuals) {
+          if (X[ind][t.k] < t.sp) {
+            loss_fn->add_terms(ind, t.sum_s.data());
+            ++t.ns;
+          } else {
+            loss_fn->add_terms(ind, t.sum_b.data());
+            ++t.nb;
+          }
+        }
+      }
+    } else if (one_column) {
       lanes.resize(tries.size() - from);
       for (size_t i = from; i < tries.size(); ++i) {
         const Try &t = tries[i];
@@ -456,7 +477,13 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
       if (t.ns == 0 || t.nb == 0)
         continue;
       double loss = 0.0;
-      if (loss_fn) { // the loss's criterion (classification), from the same sums
+      if (scan_T > 0) {
+        scan_tot.resize(scan_T);
+        for (size_t q = 0; q < scan_T; ++q)
+          scan_tot[q] = t.sum_s[q] + t.sum_b[q];
+        const double vp = loss_fn->region_value(scan_tot.data(), t.ns + t.nb);
+        loss = loss_fn->scan_score(t.sum_s.data(), t.sum_b.data(), t.ns, t.nb, vp);
+      } else if (loss_fn) { // the loss's criterion (classification), from the same sums
         if (one_column) {
           curr_split.sum_s.assign(1, t.s);
           curr_split.sum_b.assign(1, t.b);
@@ -481,7 +508,9 @@ Split RandomPlantedForest::calcOptimalSplit_curTrees1(
         min_split.split_coordinate = t.k + 1;
         min_split.split_point = t.sp;
         best_idx = (int)t.idx;
-        if (one_column) {
+        if (scan_T > 0) {
+          // the loss's winner needs no sums of Y (finalize)
+        } else if (one_column) {
           min_split.sum_s.assign(1, t.s);
           min_split.sum_b.assign(1, t.b);
         } else {
