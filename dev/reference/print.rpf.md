@@ -1,6 +1,15 @@
-# Print an rpf
+# Print a Random Planted Forest
 
-Print an rpf
+Shows a forest (class `rpf`, from
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+with `prune = FALSE`): the kind of model and its formula, the number of
+tree families and of splits (with how the splits were chosen), the
+predictors and the interaction order, whether the forest is purified,
+the settings of the split search and the number of threads. A pruned
+model, the default of
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+is printed by
+[`print.rpf_pruned()`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md).
 
 ## Usage
 
@@ -27,7 +36,8 @@ Invisibly: `x`.
 
 ## See also
 
-[`rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md).
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+[`print.rpf_pruned()`](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md).
 
 ## Examples
 

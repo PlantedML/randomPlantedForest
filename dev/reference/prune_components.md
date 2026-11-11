@@ -275,11 +275,9 @@ rules are available:
   each training row's out-of-bag components instead of the forest's own,
   for a chosen and for a given rule and `tau`. The forest's own
   components have fitted the training rows' noise, so least squares on
-  them scale the components up (on California housing the three-way
-  interactions by about 1.3, where new data wants about 0.9). With
-  `select_by = "cv"`, and where the default falls back to it (see
-  below), the least squares use the forest's own components on the
-  training rows.
+  them scale the components up. With `select_by = "cv"`, and where the
+  default falls back to it (see below), the least squares use the
+  forest's own components on the training rows.
 
 **The choice.** If more than one pair of `rule` and `tau` is given (the
 default: both rules and the grid 0, 0.01%, 0.03%, 0.1%, 0.3%, 1%, 3%,
@@ -338,15 +336,11 @@ components.
   SE for `"1se"` from the per-fold MSEs.
 
 - With few families the OOB means average only one to a few families,
-  and many rows have none (16% at 4 families). In a simulation (p = 6, n
-  = 800, 60 replicates) the corrected OOB error of the unpruned `"D"`
-  was within 1.5% of the test error at 4, 10, 20 and 50 families, that
-  of `"R"` within 4.4% except once (+11.5% at 10 families with a 3-way
-  interaction), and the OOB choice was as good as the CV's or better
-  from 10 families on (within 0.4% in test error, or better by 7-10%
-  where the CV's fold fits choose poorly). Below 10 families
-  (`n_families`), the default `select_by` scores by CV instead (with a
-  message); an explicit `select_by = "oob"` warns.
+  and many rows have none (16% at 4 families). From 10 families on, the
+  OOB choice is usually as good as the CV's, or better where the CV's
+  fold fits choose poorly. Below 10 families (`n_families`), the default
+  `select_by` scores by CV instead (with a message); an explicit
+  `select_by = "oob"` warns.
 
 - A deterministic forest has no out-of-bag rows, and a forest restored
   by
@@ -419,16 +413,14 @@ rule and `tau`, or a pair chosen by CV, is applied again as it is (R's
 coefficients out of bag if the first pruning fitted them so, else in
 sample; a CV choice is not repeated, as it would need the display in
 every fold's refit). The prediction then uses the coarsened components,
-so the pruning judges the model that is shown. In simulations (48 data
-sets) this second pruning had 0.49% lower test error than pruning and
-then coarsening, and 0.57% lower than not coarsening; on California
-housing (50 families, order 3) the default keeps 30 components, shown in
-75 heat maps. If no kept component needs coarsening, the model is the
+so the pruning judges the model that is shown. This second pruning is
+usually a little more accurate than pruning and then coarsening, or than
+not coarsening. If no kept component needs coarsening, the model is the
 first pruning's. The display costs about as much again as the out-of-bag
 pruning: a purification restricted to the components being coarsened
 (two at a time) for their candidates, and one for their out-of-bag
-values; the stored coarsened components take a few MB each on 16,000
-rows at order 3, more at higher orders.
+values; the stored coarsened components take a few MB each on large data
+at order 3, more at higher orders.
 
 **Purification.** The pruning needs every component's values at the
 training rows (and out of bag, its OOB means), not the purified forest:
@@ -469,17 +461,12 @@ does). Only the components the forest has are evaluated (at most
 subsets of the trees' predictor sets). The memory is the forest's plus
 about `n` doubles per component, three times that for the out-of-bag
 choice, plus one family's components at a time per thread; storing the
-kept components passes over the families once more. On California
-housing (16,512 rows, 200 families, `n_try_split_points = 3`,
-`share_candidates = 0.1`, the fast draw, 8 threads; measured when this
-column pass was added) the whole call of
-`rpf(n_splits = NULL, prune = TRUE)` peaked at 2.3 GB of physical
-footprint (4.1 GB of resident memory, RSS) at order 3, and at 6.4 GB
-(9.9 GB RSS) at order 8 (all predictors), most of it the 31 coarsened
-components the display keeps; there
+kept components passes over the families once more. So the whole call of
+`rpf(n_splits = NULL, prune = TRUE)` can need much less memory than
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
-alone needs more than 12 GB of RSS. `nthreads` speeds up the fits and
-the purification.
+of the forest alone, most so at high orders, where most of it goes to
+the coarsened components the display keeps. `nthreads` speeds up the
+fits and the purification.
 
 **Classification.** A classification forest is pruned the same way, with
 its scores: one for a binary outcome, one per class otherwise. Every

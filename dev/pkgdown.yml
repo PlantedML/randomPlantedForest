@@ -2,8 +2,14 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
+  articles/classification: classification.html
+  articles/growing: growing.html
+  articles/number-of-splits-and-tuning: number-of-splits-and-tuning.html
+  articles/pruning: pruning.html
   randomPlantedForest: randomPlantedForest.html
-last_built: 2026-11-11T19:39Z
+  articles/reading-the-model: reading-the-model.html
+  articles/speed-and-memory: speed-and-memory.html
+last_built: 2026-11-11T19:44Z
 urls:
   reference: https://plantedml.com/randomPlantedForest/reference
   article: https://plantedml.com/randomPlantedForest/articles

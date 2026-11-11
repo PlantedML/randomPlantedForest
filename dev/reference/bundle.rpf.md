@@ -1,4 +1,4 @@
-# Bundle an rpf model
+# Bundle a Random Planted Forest
 
 Method for
 [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)

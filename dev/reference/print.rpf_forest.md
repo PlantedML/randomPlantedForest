@@ -1,7 +1,10 @@
 # Compact printing of forest structures
 
-These methods are provided to avoid flooding the console with long
-nested lists containing tree structures.
+The flattened forest that
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+stores with `export_forest = TRUE` (as `$forest`) is a long nested list
+of trees. These methods print a one-line summary instead of the whole
+list.
 
 ## Usage
 
@@ -27,6 +30,11 @@ str(object, ...)
 - object:
 
   `[rpf_forest]`: Flattened forest.
+
+## Value
+
+Invisibly: `x` (`object` for
+[`str()`](https://rdrr.io/r/utils/str.html)).
 
 ## See also
 

@@ -10,7 +10,8 @@
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Random Planted Forest: A Directly Interpretable Tree Ensemble">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><link href="extra.css" rel="stylesheet">
+<meta property="og:title" content="Random Planted Forest: A Directly Interpretable Tree Ensemble">
 <meta name="description" content="Implements Random Planted Forest (Hiabu, Mammen and Meyer, 2020) &lt;doi:10.48550/arXiv.2012.14563&gt;, a directly interpretable tree ensemble for regression and classification. Trees are restricted to a maximum number of interacting predictors, so the fitted model decomposes exactly into main effects and low-order interactions, a functional ANOVA decomposition that can be extracted for interpretation. Fitting and prediction are multithreaded, and fitted models can be serialized.">
 <meta property="og:description" content="Implements Random Planted Forest (Hiabu, Mammen and Meyer, 2020) &lt;doi:10.48550/arXiv.2012.14563&gt;, a directly interpretable tree ensemble for regression and classification. Trees are restricted to a maximum number of interacting predictors, so the fitted model decomposes exactly into main effects and low-order interactions, a functional ANOVA decomposition that can be extracted for interpretation. Fitting and prediction are multithreaded, and fitted models can be serialized.">
 <meta name="robots" content="noindex">
@@ -33,8 +34,25 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="articles/randomPlantedForest.html">Get started</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Understanding the model</h6></li>
+    <li><a class="dropdown-item" href="articles/reading-the-model.html">Reading the model</a></li>
+    <li><a class="dropdown-item" href="articles/growing.html">How the forest is grown</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting</h6></li>
+    <li><a class="dropdown-item" href="articles/number-of-splits-and-tuning.html">The number of splits and further tuning</a></li>
+    <li><a class="dropdown-item" href="articles/pruning.html">Pruning to a sparse model</a></li>
+    <li><a class="dropdown-item" href="articles/classification.html">Classification</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>In practice</h6></li>
+    <li><a class="dropdown-item" href="articles/speed-and-memory.html">Speed, memory and saving models</a></li>
+  </ul>
+</li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
-<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">News</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -61,80 +79,143 @@
 </h1></div>
 <!-- badges: start -->
 
-<p><code>randomPlantedForest</code> implements Random Planted Forest (<a href="https://arxiv.org/abs/2012.14563" class="external-link">Hiabu, Mammen &amp; Meyer</a>), a tree ensemble whose predictions you can read off directly, without post-hoc explanation methods.</p>
-<p>Like a random forest, it averages many tree-based models grown on bootstrap samples. Unlike a random forest, each of these models is a sum of trees that each split on a fixed set of predictors, and <code>max_interaction</code> bounds how many predictors that can be. With <code>max_interaction = 1</code> the forest is an additive model; with <code>2</code> it adds pairwise interactions, and so on. As a result, the fitted model decomposes exactly into an intercept, main effects and interactions up to that order:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover><mi>m</mi><mo accent="true">̂</mo></mover><mo stretchy="false" form="prefix">(</mo><mi>x</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mn>0</mn></msub><mo>+</mo><munder><mo>∑</mo><mi>k</mi></munder><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mi>k</mi></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mi>k</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>&lt;</mo><mi>l</mi></mrow></munder><msub><mover><mi>m</mi><mo accent="true">̂</mo></mover><mrow><mi>k</mi><mi>l</mi></mrow></msub><mo stretchy="false" form="prefix">(</mo><msub><mi>x</mi><mi>k</mi></msub><mo>,</mo><msub><mi>x</mi><mi>l</mi></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><mi>…</mi></mrow><annotation encoding="application/x-tex">\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k &lt; l} \hat m_{kl}(x_k, x_l) + \dots</annotation></semantics></math></p>
-<p>Each component can be inspected and plotted on its own, and together they sum to the prediction.</p>
-<p>By default <code><a href="reference/rpf.html">rpf()</a></code> fits up to three-way interactions, chooses the number of splits out of bag while the forest grows, and leaves out the components that are too small to matter, so it returns a sparse final model (<code>prune = FALSE</code> returns the whole forest).</p>
+<p><code>randomPlantedForest</code> implements Random Planted Forest (<a href="https://arxiv.org/abs/2012.14563" class="external-link">Hiabu, Mammen &amp; Meyer</a>), a tree ensemble whose predictions you can read off directly. The explanation is exact and is not a post-hoc approximation.</p>
+<p>The fitted model is a short sum of main effects and interactions. Interactions of order three or higher are simplified such that they can be displayed as the sum of a limited number (<code>max_panels</code>) of heat maps; often without loss in accuracy.</p>
+<p><img src="reference/figures/README-lead-figure-1.png" alt="The four components of a fitted model: three curves and one heat map, with the true functions drawn over the curves." width="50%"></p>
+<p>The figure shows a model fitted to simulated data, <math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>y</mi><mo>=</mo><mn>1</mn><mo>+</mo><mrow><mi mathvariant="normal">sin</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>π</mi><msub><mi>x</mi><mn>1</mn></msub><mo stretchy="false" form="postfix">)</mo><mo>+</mo><mn>2</mn><mo stretchy="false" form="prefix">(</mo><msubsup><mi>x</mi><mn>2</mn><mn>2</mn></msubsup><mo>−</mo><mn>1</mn><mi>/</mi><mn>3</mn><mo stretchy="false" form="postfix">)</mo><mo>+</mo><msub><mi>x</mi><mn>3</mn></msub><mi>/</mi><mn>2</mn><mo>+</mo><mn>2</mn><msub><mi>x</mi><mn>1</mn></msub><msub><mi>x</mi><mn>2</mn></msub><mo>+</mo><mtext mathvariant="normal">noise</mtext><mo>,</mo></mrow><annotation encoding="application/x-tex">y = 1 + \sin(\pi x_1) + 2(x_2^2 - 1/3) + x_3/2 + 2x_1x_2 + \text{noise},</annotation></semantics></math> with a fourth predictor <code>x4</code> that has no effect. The model found the four true components and nothing else, in one call:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span><span class="op">)</span></span></code></pre></div>
+<div class="section level2">
+<h2 id="why-use-it">Why use it<a class="anchor" aria-label="anchor" href="#why-use-it"></a>
+</h2>
+<ul>
+<li><p><strong>Interpretability &amp; Accuracy</strong> A random planted forest can be fully visualized and provides state-of-the-art accuracy. By default the fit prunes irrelevant terms such that the fit is easier to comprehend and only keeps relevant terms.</p></li>
+<li><p><strong>No tuning needed</strong> While some parameters can be changed, random planted forest works very well in its default settings and needs no tuning.</p></li>
+<li>
+<p><strong>Instead of a GAM or GA²M.</strong></p>
+<ul>
+<li>You do not specify the interactions: the forest finds which pairs and triples matter.</li>
+<li>Smoothness is not assumed.</li>
+</ul>
+</li>
+<li>
+<p><strong>When it does not fit.</strong></p>
+<ul>
+<li>Outcomes driven by interactions of many predictors (images, text)</li>
+<li>Data too large (if memory or computational time is an issue one can reduce the number of families <code>n_families</code> and the maximal order of interaction <code>max_interaction</code>; usually at the cost of some accuracy)</li>
+<li>Complex data (work in progress): e.g. time series, dependent rows, survival data etc.</li>
+</ul>
+</li>
+</ul>
+<div class="section level3">
+<h3 id="benchmark-wip">Benchmark: WIP<a class="anchor" aria-label="anchor" href="#benchmark-wip"></a>
+</h3>
+<!-- TODO(benchmark): accuracy and time against random forests, boosting and GAMs on public data sets. -->
+<p>A comparison of accuracy and fitting time with random forests, boosting and GAMs on public data sets will be added here.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="what-the-default-does">What the default does<a class="anchor" aria-label="anchor" href="#what-the-default-does"></a>
+</h2>
+<p>A plain <code>rpf(y ~ ., data)</code> takes three steps, each with its own switch:</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>Grow</strong> 200 tree families of up to three-way interactions, choosing the number of splits out of bag while they grow (<code>n_splits = NULL</code>).</li>
+<li>
+<strong>Prune</strong> the forest’s components to those that matter, with the rule and threshold chosen out of bag (<code>prune = TRUE</code>).</li>
+<li>
+<strong>Simplify</strong>: every kept three-way component is coarsened such that it can be visualized as the sum of at most 10 heat maps, and the model is pruned again (<code>max_panels = 10</code>).</li>
+</ol>
+</div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>Install the development version from <a href="https://plantedml.r-universe.dev/packages" class="external-link">r-universe</a> with</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"randomPlantedForest"</span>, repos <span class="op">=</span> <span class="st">"https://plantedml.r-universe.dev"</span><span class="op">)</span></span></code></pre></div>
-<p>or from <a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">GitHub</a> with</p>
+<p>From <a href="https://plantedml.r-universe.dev/randomPlantedForest" class="external-link">r-universe</a>:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"randomPlantedForest"</span>, repos <span class="op">=</span> <span class="st">"https://plantedml.r-universe.dev"</span><span class="op">)</span></span></code></pre></div>
+<p>or from <a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">GitHub</a>:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"PlantedML/randomPlantedForest"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
+<h2 id="regression">Regression<a class="anchor" aria-label="anchor" href="#regression"></a>
 </h2>
-<p><code><a href="reference/rpf.html">rpf()</a></code> takes a formula, x/y data or a <a href="https://recipes.tidymodels.org/" class="external-link">recipe</a>, and <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> returns a tibble as in tidymodels:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<p>Ozone in New York, from daily temperature, wind and sunlight:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/PlantedML/randomPlantedForest" class="external-link">randomPlantedForest</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">mtcars</span><span class="op">$</span><span class="va">cyl</span><span class="op">)</span></span>
-<span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">mpg</span> <span class="op">~</span> <span class="va">cyl</span> <span class="op">+</span> <span class="va">wt</span> <span class="op">+</span> <span class="va">hp</span>, data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
-<span><span class="va">rpfit</span></span>
+<span><span class="va">air</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html" class="external-link">na.omit</a></span><span class="op">(</span><span class="va">airquality</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">ozone</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">Ozone</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">air</span><span class="op">)</span></span>
+<span><span class="va">ozone</span></span>
 <span><span class="co">#&gt; ── Random Planted Forest model ─────────────────────────────────────────────────</span></span>
-<span><span class="co">#&gt; Regression. Prediction = intercept + the sum of 3 components.</span></span>
-<span><span class="co">#&gt; Intercept: 20.1901</span></span>
+<span><span class="co">#&gt; Regression. Prediction = intercept + the sum of 4 components.</span></span>
+<span><span class="co">#&gt; Intercept: 47.1412</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Components (largest first), importance = share of the variance of the prediction on the training rows:</span></span>
 <span><span class="co">#&gt;  component importance</span></span>
-<span><span class="co">#&gt;  cyl       14%       </span></span>
-<span><span class="co">#&gt;  wt        13%       </span></span>
-<span><span class="co">#&gt;  hp        11%       </span></span>
+<span><span class="co">#&gt;  Temp      41%       </span></span>
+<span><span class="co">#&gt;  Wind      32%       </span></span>
+<span><span class="co">#&gt;  Temp:Wind 13%       </span></span>
+<span><span class="co">#&gt;  Solar.R   3.1%      </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; How it was chosen:</span></span>
-<span><span class="co">#&gt;   The forest: 200 tree families of 7 splits (chosen out of bag; growing stopped at 12).</span></span>
-<span><span class="co">#&gt;   From the forest's 7 nonzero components (purified): those with a share of at least 3% of the forest's Var(prediction), as they are (rule D).</span></span>
+<span><span class="co">#&gt;   The forest: 200 tree families of 35 splits (chosen out of bag; growing stopped at 35).</span></span>
+<span><span class="co">#&gt;   From the forest's 25 nonzero components (purified): those with a share of at least 1% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).</span></span>
 <span><span class="co">#&gt;   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.</span></span>
-<span><span class="co">#&gt;   Left out: 4 components, shares together 0.41% (largest cyl:wt, 0.21%).</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; # A tibble: 6 × 1</span></span>
+<span><span class="co">#&gt;   Left out: 21 components, shares together 2.9% (largest Month, 0.83%).</span></span></code></pre></div>
+<p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> returns a tibble, and <code><a href="reference/predict_components.html">predict_components()</a></code> the components, which add up to it:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">ozone</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">air</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 3 × 1</span></span>
 <span><span class="co">#&gt;   .pred</span></span>
 <span><span class="co">#&gt;   &lt;dbl&gt;</span></span>
-<span><span class="co">#&gt; 1  20.7</span></span>
-<span><span class="co">#&gt; 2  20.2</span></span>
-<span><span class="co">#&gt; 3  25.6</span></span>
-<span><span class="co">#&gt; 4  19.6</span></span>
-<span><span class="co">#&gt; 5  16.7</span></span>
-<span><span class="co">#&gt; 6  19.3</span></span></code></pre></div>
-<p>On these 32 cars the final model has the three main effects; the interactions, which explain less than 1% of the variance of the prediction, are left out.</p>
-<p><code><a href="reference/predict_components.html">predict_components()</a></code> returns the decomposition: one column per component of the model, plus the intercept.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">components</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">rpfit</span>, new_data <span class="op">=</span> <span class="va">mtcars</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">components</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
-<span><span class="co">#&gt;             wt         hp        cyl</span></span>
-<span><span class="co">#&gt;          &lt;num&gt;      &lt;num&gt;      &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:  0.50125240  0.3024038 -0.3017086</span></span>
-<span><span class="co">#&gt; 2:  0.02433186  0.3024038 -0.3017086</span></span>
-<span><span class="co">#&gt; 3:  1.31127379  1.5655240  2.5146038</span></span>
-<span><span class="co">#&gt; 4: -0.57728154  0.3024038 -0.3017086</span></span>
-<span><span class="co">#&gt; 5: -0.97647808 -0.6675734 -1.8815153</span></span>
-<span><span class="co">#&gt; 6: -1.14911679  0.5190305 -0.3017086</span></span></code></pre></div>
-<p>The <a href="https://plantedml.com/glex/" class="external-link">glex</a> package plots these components:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">glex</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"wt"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"hp"</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">components</span>, <span class="st">"cyl"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-effects-1.png" width="100%"></p>
-<p>The <a href="https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html">Get started</a> guide covers classification, recipes, saving models and more on interpreting components, and the <a href="https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html" class="external-link">Bikesharing decomposition</a> article works through a larger example.</p>
+<span><span class="co">#&gt; 1  31.0</span></span>
+<span><span class="co">#&gt; 2  22.8</span></span>
+<span><span class="co">#&gt; 3  17.4</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">ozone</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">air</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">m</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      Solar.R        Wind      Temp Temp:Wind</span></span>
+<span><span class="co">#&gt;        &lt;num&gt;       &lt;num&gt;     &lt;num&gt;     &lt;num&gt;</span></span>
+<span><span class="co">#&gt; 1:  2.062333   1.8646920 -16.29678 -3.804457</span></span>
+<span><span class="co">#&gt; 2: -3.976785   0.9708856 -15.70053 -5.606435</span></span>
+<span><span class="co">#&gt; 3: -1.213864 -10.5361640 -15.41624 -2.609963</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="classification">Classification<a class="anchor" aria-label="anchor" href="#classification"></a>
+</h2>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">penguins</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html" class="external-link">na.omit</a></span><span class="op">(</span><span class="fu">palmerpenguins</span><span class="fu">::</span><span class="va"><a href="https://allisonhorst.github.io/palmerpenguins/reference/penguins.html" class="external-link">penguins</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">by_sex</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">sex</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">by_sex</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 3 × 2</span></span>
+<span><span class="co">#&gt;   .pred_female .pred_male</span></span>
+<span><span class="co">#&gt;          &lt;dbl&gt;      &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt; 1        0.161      0.839</span></span>
+<span><span class="co">#&gt; 2        0.541      0.459</span></span>
+<span><span class="co">#&gt; 3        0.774      0.226</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
+</h2>
+<ul>
+<li>
+<a href="https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html">Get started</a>: fit, print, predict, read the components.</li>
+<li>
+<a href="https://plantedml.com/randomPlantedForest/articles/reading-the-model.html">Reading the model</a>, <a href="https://plantedml.com/randomPlantedForest/articles/growing.html">How the forest is grown</a>.</li>
+<li>
+<a href="https://plantedml.com/randomPlantedForest/articles/number-of-splits-and-tuning.html">The number of splits and further tuning</a>, <a href="https://plantedml.com/randomPlantedForest/articles/pruning.html">Pruning to a sparse model</a>, <a href="https://plantedml.com/randomPlantedForest/articles/classification.html">Classification</a>.</li>
+<li>
+<a href="https://plantedml.com/randomPlantedForest/articles/speed-and-memory.html">Speed, memory and saving models</a>.</li>
+<li>The <a href="https://plantedml.com/glex/" class="external-link">glex</a> package plots the components and computes other explanations from them.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
+</h2>
+<p>Hiabu, M., Mammen, E., &amp; Meyer, J. T. (2020). Random Planted Forest: a directly interpretable tree ensemble. arXiv preprint arXiv:2012.14563. <a href="https://doi.org/10.48550/arXiv.2012.14563" class="external-link uri">https://doi.org/10.48550/arXiv.2012.14563</a></p>
+<p><code>citation("randomPlantedForest")</code> gives the BibTeX entry.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

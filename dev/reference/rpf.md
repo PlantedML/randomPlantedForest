@@ -462,19 +462,17 @@ components, not the forest (`keep_forest = TRUE` keeps the forest too).
 
 ### Choosing parameters
 
-The defaults were chosen on 44 simulated data sets and California
-housing (regression) and carried over to classification.
+The defaults were chosen for regression and carried over to
+classification.
 
 `max_interaction` sets which effects the model can represent: `1` for an
 additive model, `2` to add pairwise interactions, `3` (the default)
-three-way interactions. Order 3 had 15% lower test error than order 2 on
-the simulated sets and 1.5% lower on California housing. Higher orders
-gain only where the truth has such interactions, cost much more time (no
-limit was 11 to 41 times slower on California housing, and worse there),
-and the pruned model rarely keeps a component of more than three
-predictors, so it is shown in at most `max_panels` heat maps anyway.
-With a higher `max_interaction`, splits are spread over more possible
-components.
+three-way interactions. Order 3 is often more accurate than order 2.
+Higher orders gain only where the truth has such interactions, cost much
+more time (no limit, `0`, is often much slower), and the pruned model
+rarely keeps a component of more than three predictors, so it is shown
+in at most `max_panels` heat maps anyway. With a higher
+`max_interaction`, splits are spread over more possible components.
 
 `n_splits` sets how closely the model follows the data. By default it is
 chosen out of bag while the forest grows (see "Choosing `n_splits` out
@@ -483,19 +481,17 @@ of bag"), so it need not be tuned.
 `n_families` averages over bootstrap samples to reduce variance, and
 fitting and prediction time grow linearly with it. Each tree family is
 itself a complete model, a sum of trees covering all components, rather
-than a single tree, but averaging more of them still pays off: the test
-error fell by about 2% per doubling of the families up to 200 on the
-simulated sets, and the pruned models were sparser (California housing:
-34 instead of 47 kept components at 200 instead of 50 families). Hence
-the default of 200, at the price of time; use fewer for a quick look.
+than a single tree, but averaging more of them still pays off: more
+families usually lower the test error a little, and the pruned models
+are usually sparser. Hence the default of 200, at the price of time; use
+fewer for a quick look.
 
 The split search parameters (`split_structure`, `n_try_split_points`,
 `share_candidates`, `max_candidates`, `split_decay_rate`) trade speed
 for a more thorough, more greedy search. For `"leaf"`, a less greedy
-search is better: 3 split points per candidate and 10% of the possible
-splits per round (the default) had 5.7% to 6.8% lower test error than 10
-and 40% (the default of the other structures, and of `"leaf"` before).
-`tune` searches this greediness out of bag.
+search is usually better, so its default is 3 split points per candidate
+and 10% of the possible splits per round, against 10 and 40% for the
+other structures. `tune` searches this greediness out of bag.
 
 For classification, `"logit"` (the default) and `"exponential"` fit on
 the link scale and are transformed to probabilities; see "Classification
@@ -542,13 +538,10 @@ size; for `"tree_then_leaf"` one pass over the leaf per split point).
 `"logit"`'s steps are made exact too, otherwise they are one Newton
 step.
 
-`"logit"` is the default, with two classes and with more. On 8 public
-data sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5
-repeated splits each) its test log-loss was lower than or tied with that
-of `"exponential"` on every set, and lower by 0.053 on average with 3 or
-more classes. `"exponential"` can need many more splits with many
-classes: on a set of 7 classes it chose 1,345 to 4,525 splits where
-`"logit"` chose about 22.
+`"logit"` is the default, with two classes and with more: its test
+log-loss is usually as low as that of `"exponential"` or lower, more so
+with three or more classes. `"exponential"` can need many more splits
+with many classes.
 
 ### Factor predictors
 
@@ -657,11 +650,11 @@ candidates under the two draws, so with many splits, near saturation,
 their fits differ in distribution, though not in accuracy. With
 `min_leaf_rows`, both leave out the same candidates: those whose leaf
 has no threshold with that many rows on each side. The fast draw is
-about 2.5 times as fast on large data with many splits. The option is
-read when the forest is fitted and stored in `params$exact_draw`; it
-does not affect the other split structures. To reproduce a regression
-fit of version 0.5.0, set it and give 0.5.0's defaults, as the example
-"A regression forest of version 0.5.0" does:
+faster on large data with many splits. The option is read when the
+forest is fitted and stored in `params$exact_draw`; it does not affect
+the other split structures. To reproduce a regression fit of version
+0.5.0, set it and give 0.5.0's defaults, as the example "A regression
+forest of version 0.5.0" does:
 
     options(randomPlantedForest.exact_draw = TRUE)
 
@@ -741,15 +734,11 @@ with a warning if the error was still falling there. The result is the
 forest at the lowest error (ties go to fewer splits; a corrected error
 at or below 0, a correction that overshot, is not chosen unless all
 are): the forest that `rpf()` with that many `n_splits` and the same
-seed returns. On 52 data sets (44 synthetic, 8 splits of California
-housing) the first rule alone chose the same `n_splits` as the lowest
-error along a fixed budget of 3,200 splits on 50 of them, and a later,
-lower minimum on the other two, while growing 0.72 of the splits. The
-plateau stop chose the same `n_splits` as the first rule alone on all 44
-synthetic sets, the 4 California sets tried and 24 classification fits
-(logit and exponential loss), while growing 10% (regression) to 29%
-(classification) fewer splits; it matters most on long, flat out-of-bag
-curves.
+seed returns. The first rule alone usually chooses the same `n_splits`
+as the lowest error along a long fixed budget of splits, while growing
+fewer. The plateau stop usually chooses the same `n_splits` as the first
+rule alone, while growing fewer splits; it matters most on long, flat
+out-of-bag curves.
 
 The families grow one at a time, `nthreads` together, each to the stop
 estimated from the families grown before it. A grown family keeps only
@@ -760,16 +749,11 @@ state while the waiting families fit in
 `getOption("randomPlantedForest.adaptive_pause_gb", 0.25)` GB, so that
 it can grow on cheaply if the stop comes later; otherwise it is freed,
 and grown again from its seed if needed. The option trades memory for
-time; the fit depends neither on it nor on `nthreads`. A budget of 0.25
-GB instead of 1 GB lowered the peak memory of the default call by about
-0.9 GB on 80,000 simulated rows in the same time, while a budget of 0
-can cost much more time (families grown again). Growing all families
-together would hold every family's growing state until the stop: about
-18 GB of resident memory (RSS) on California housing (16,512 rows) at
-200 families and `max_interaction = 3`, where the fit one family at a
-time peaks at 3.4 GB of RSS (2.3 GB of physical footprint; the adaptive
-fit alone, measured when it was added: `n_try_split_points = 3`,
-`share_candidates = 0.1`, the exact draw, 8 threads).
+time; the fit depends neither on it nor on `nthreads`. A smaller budget
+lowers the peak memory, while a budget of 0 can cost much more time
+(families grown again). Growing all families together would hold every
+family's growing state until the stop, which on large data needs several
+times the memory of growing them one at a time.
 
 ### Pruning
 
@@ -797,10 +781,8 @@ out-of-bag rows, so with `deterministic = TRUE` `prune = NULL` means
 
 The pruned model does not keep the forest (`keep_forest = FALSE`): it
 predicts, prints and shows its components from what it stores, the same,
-bit for bit, as with the forest, and is a fraction of the forest's size
-(California housing: about 0.2 GB against 0.6 GB for the forest of 200
-families). What needs the forest is then an error that says so: pruning
-again,
+bit for bit, as with the forest, and is a fraction of the forest's size.
+What needs the forest is then an error that says so: pruning again,
 [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md),
 the forest's own
 [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md),
@@ -834,8 +816,7 @@ The pruning keeps or drops a component for all classes, sizes it by its
 variance summed over the score columns centred across the classes, and
 fits one coefficient per kept component shared by the classes (see
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)).
-The criterion was checked against the test log-loss on simulated data;
-the defaults were chosen on regression and carried over.
+The defaults were chosen for regression and carried over.
 
 ### Tuning out of bag
 
@@ -863,16 +844,10 @@ forest is grown from the same random number state, so the result is the
 model that `rpf(n_splits = NULL, prune = TRUE)` returns at the chosen
 settings from that state.
 
-On 48 data sets (fresh seeds; 44 synthetic, 4 of California housing) the
-full search had 10.8% lower test error than 10 / 0.4 (the default of
-earlier versions; no family of data sets worse than +0.9%), and 2.8%
-lower than 5-fold cross-validation over the same settings at 1/24 of its
-cost; the quick preset had 9.4% lower test error (worst +0.4%). In those
-studies a forest was scored with the pruning's choice of the time (the
-lowest out-of-bag error, R's coefficients fitted in sample); the sparse
-default of
-[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
-used here was not compared there. A search costs about as many fits as
+The full search often lowers the test error clearly against the
+greediest point, 10 / 0.4, and does as well as 5-fold cross-validation
+over the same settings, or better, at a small fraction of its cost; the
+quick preset gets most of the gain. A search costs about as many fits as
 it grows forests, and their prunings.
 
 ## References
@@ -889,6 +864,21 @@ Coppersmith, D., Hong, S. J. & Hosking, J. R. (1999). Partitioning
 nominal attributes in decision trees. Data Mining and Knowledge
 Discovery 3:197–217.
 [doi:10.1023/A:1009869804967](https://doi.org/10.1023/A%3A1009869804967)
+
+## See also
+
+[`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
+and
+[print()](https://plantedml.com/randomPlantedForest/dev/reference/print.rpf_pruned.md)
+of the pruned model,
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+for its components,
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+for other pruning rules,
+[`tune_control()`](https://plantedml.com/randomPlantedForest/dev/reference/tune_control.md)
+for `tune`, and
+[`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+to save a model.
 
 ## Examples
 
@@ -1013,8 +1003,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.081         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.080         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.066        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE

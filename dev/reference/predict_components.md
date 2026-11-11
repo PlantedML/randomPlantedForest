@@ -1,8 +1,12 @@
-# Extract predicted components from a Random Planted Forest
+# The components of a Random Planted Forest's prediction
 
-Prediction components are a functional decomposition of the model
-prediction. The sum of all components equals the overall predicted value
-for an observation.
+Evaluates the components of a model at the rows of `new_data`: its
+intercept and one column per main effect and interaction. They are a
+functional decomposition of the prediction: for every row, the intercept
+plus the components equals the prediction. For a pruned model, the
+default of
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+these are its kept components.
 
 ## Usage
 
@@ -152,11 +156,38 @@ of the pruned model. Components that are not kept are absent, not zero
 columns. If `predictors` or `max_interaction` leave out kept components,
 their sum is returned as `remainder`.
 
+## See also
+
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
+for how the components are identified,
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+for the pruned model's components. The glex package plots the result
+with [`plot()`](https://rdrr.io/r/graphics/plot.default.html).
+
 ## Examples
 
 ``` r
+# The default model: its kept components add up to its prediction
+set.seed(1)
+model <- rpf(mpg ~ wt + hp + cyl, data = mtcars)
+components <- predict_components(model, mtcars[1:3, ])
+components$m
+#>            wt        hp        cyl
+#>         <num>     <num>      <num>
+#> 1:  0.3989752 0.2785334 -0.3703708
+#> 2: -0.1242620 0.2785334 -0.3703708
+#> 3:  1.6816513 1.1853078  2.4229759
+components$intercept + rowSums(components$m)
+#> [1] 20.50687 19.98363 25.48966
+predict(model, mtcars[1:3, ])
+#> # A tibble: 3 × 1
+#>   .pred
+#>   <dbl>
+#> 1  20.5
+#> 2  20.0
+#> 3  25.5
 
-# Regression task, only some predictors
+# A forest: all its components up to its max_interaction
 train <-  mtcars[1:20, 1:4]
 test <-  mtcars[21:32, 1:4]
 

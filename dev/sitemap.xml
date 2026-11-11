@@ -1,7 +1,13 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/LICENSE.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/classification.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/growing.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/articles/index.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/number-of-splits-and-tuning.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/pruning.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/articles/randomPlantedForest.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/reading-the-model.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/dev/articles/speed-and-memory.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/authors.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/dev/news/index.html</loc></url>

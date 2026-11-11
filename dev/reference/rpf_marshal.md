@@ -72,6 +72,12 @@ and
 and its blob is the model without the caches of its built indices
 (`include_data` has nothing to include).
 
+## See also
+
+[`rpf_is_valid()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_is_valid.md);
+[`bundle()`](https://plantedml.com/randomPlantedForest/dev/reference/bundle.rpf.md)
+for the same through the bundle package.
+
 ## Examples
 
 ``` r

@@ -1,0 +1,9 @@
+/* On a phone, code and its output wrap instead of scrolling sideways:
+   the printed summary of a model has lines of about 120 characters. */
+@media (max-width: 575.98px) {
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    hyphens: none;
+  }
+}
