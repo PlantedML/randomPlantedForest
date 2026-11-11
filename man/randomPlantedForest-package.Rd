@@ -6,7 +6,7 @@
 \alias{randomPlantedForest-package}
 \title{randomPlantedForest: Random Planted Forest: A Directly Interpretable Tree Ensemble}
 \description{
-Implements Random Planted Forest (Hiabu, Mammen and Meyer, 2020) \doi{10.48550/arXiv.2012.14563}, a directly interpretable tree ensemble for regression and classification. Trees are restricted to a maximum number of interacting predictors, so the fitted model decomposes exactly into main effects and low-order interactions, a functional ANOVA decomposition that can be extracted for interpretation. Fitting and prediction are multithreaded, and fitted models can be serialized.
+Implements Random Planted Forest, a directly interpretable tree ensemble for regression and classification introduced by Hiabu, Mammen and Meyer (2020) \doi{10.48550/arXiv.2012.14563}. Trees are restricted to a maximum number of interacting predictors, so the fitted model decomposes exactly into main effects and low-order interactions, a functional ANOVA decomposition that can be extracted for interpretation. Fitting and prediction can use several threads, and fitted models can be serialized.
 }
 \seealso{
 Useful links:

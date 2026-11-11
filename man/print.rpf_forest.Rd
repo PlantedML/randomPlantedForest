@@ -16,8 +16,12 @@
 
 \item{object}{\verb{[rpf_forest]}: Flattened forest.}
 }
+\value{
+Invisibly: \code{x} (\code{object} for \code{str()}).
+}
 \description{
-These methods are provided to avoid flooding the console with long nested lists containing tree structures.
+The flattened forest that \code{\link[=rpf]{rpf()}} stores with \code{export_forest = TRUE} (as \verb{$forest}) is a long nested list of
+trees. These methods print a one-line summary instead of the whole list.
 }
 \examples{
 

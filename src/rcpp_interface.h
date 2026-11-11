@@ -8,6 +8,19 @@
 #include <Rcpp.h>
 #include "cpf.hpp"
 
+// R gives a vector of length 0 the data pointer 1, and libc++'s std::copy of an empty range to or from such a vector
+// is undefined behaviour (UBSAN: "store to misaligned address 0x000000000001"). copy_to_r() and r_vector() copy only
+// when there is something to copy.
+template <class It, class Out> inline void copy_to_r(It first, It last, Out out)
+{
+  if (first != last)
+    std::copy(first, last, out);
+}
+template <class V, class C> inline V r_vector(const C &x)
+{
+  return x.empty() ? V(0) : V(x.begin(), x.end());
+}
+
 Matrix2D to_matrix2d(const Rcpp::NumericMatrix &m);
 Rcpp::NumericMatrix from_matrix2d(const Matrix2D &m);
 std::set<int> to_int_set(const Rcpp::NumericVector &v);
@@ -235,7 +248,7 @@ public:
       S.push_back(Rcpp::as<std::vector<int>>(sets[k]));
     std::vector<double> pred = core.predict_components(REAL(X), X.nrow(), X.ncol(), S, nthreads);
     Rcpp::NumericMatrix out(X.nrow(), (int)(S.size() * core.get_value_size()));
-    std::copy(pred.begin(), pred.end(), out.begin());
+    copy_to_r(pred.begin(), pred.end(), out.begin());
     return out;
   }
   Rcpp::List purified_components()

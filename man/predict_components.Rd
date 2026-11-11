@@ -4,7 +4,7 @@
 \alias{predict_components}
 \alias{predict_components.rpf}
 \alias{predict_components.rpf_pruned}
-\title{Extract predicted components from a Random Planted Forest}
+\title{The components of a Random Planted Forest's prediction}
 \usage{
 predict_components(object, new_data, ...)
 
@@ -66,8 +66,9 @@ For multiclass classification, one column per target level.
 }
 }
 \description{
-Prediction components are a functional decomposition of the model prediction.
-The sum of all components equals the overall predicted value for an observation.
+Evaluates the components of a model at the rows of \code{new_data}: its intercept and one column per main effect and
+interaction. They are a functional decomposition of the prediction: for every row, the intercept plus the
+components equals the prediction. For a pruned model, the default of \code{\link[=rpf]{rpf()}}, these are its kept components.
 }
 \details{
 Extracts all possible components up to \code{max_interaction} degrees,
@@ -97,8 +98,15 @@ If \code{predictors} or \code{max_interaction} leave out kept components, their 
 }
 
 \examples{
+# The default model: its kept components add up to its prediction
+set.seed(1)
+model <- rpf(mpg ~ wt + hp + cyl, data = mtcars)
+components <- predict_components(model, mtcars[1:3, ])
+components$m
+components$intercept + rowSums(components$m)
+predict(model, mtcars[1:3, ])
 
-# Regression task, only some predictors
+# A forest: all its components up to its max_interaction
 train <-  mtcars[1:20, 1:4]
 test <-  mtcars[21:32, 1:4]
 
@@ -126,4 +134,8 @@ cbind(
   prediction = predict(rpfit, test)
 )
 
+}
+\seealso{
+\code{\link[=purify]{purify()}} for how the components are identified, \code{\link[=prune_components]{prune_components()}} for the pruned model's
+components. The glex package plots the result with \code{plot()}.
 }

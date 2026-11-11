@@ -14,28 +14,29 @@ knitr::opts_chunk$set(
   fig.width = 7,
   fig.height = 4.5
 )
-# The classification and recipes sections use suggested packages
-has_suggests <- requireNamespace("palmerpenguins", quietly = TRUE) &&
-  requireNamespace("recipes", quietly = TRUE)
-has_plot <- requireNamespace("ggplot2", quietly = TRUE) &&
-  requireNamespace("patchwork", quietly = TRUE)
+# The classification section uses a suggested package
+has_penguins <- requireNamespace("palmerpenguins", quietly = TRUE)
+# The plots use the suggested packages glex, ggplot2 and patchwork
+has_glex <- all(vapply(c("glex", "ggplot2", "patchwork"), requireNamespace, logical(1), quietly = TRUE))
+site <- "https://plantedml.com/randomPlantedForest/articles/"
 ```
 
-`randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen & Meyer](https://arxiv.org/abs/2012.14563)), a directly interpretable tree ensemble.
-Its defining feature is that the maximum order of interaction between predictors can be bounded via `max_interaction`: the fitted model then decomposes exactly into main effects, two-way interactions, and so on, a functional ANOVA decomposition, with no post-hoc approximation needed.
+`randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen & Meyer](https://arxiv.org/abs/2012.14563)), a tree ensemble whose predictions you can read off directly.
+The fitted model is a short sum of main effects and interactions: these components add up exactly to the prediction, so the explanation is exact and not a post-hoc approximation, and each component can be plotted on its own.
+Interactions of three predictors are simplified such that each can be displayed as the sum of a limited number (`max_panels`) of heat maps.
+
+This guide fits a model, prints it, predicts with it and reads its components.
 
 ```{r setup}
 library(randomPlantedForest)
 ```
 
-## Fitting a regression model
+## A first model
 
-To see what the model recovers, we simulate data where the true components are known.
-The outcome depends on `x1`, `x2` and `x3` through main effects of different shapes and on `x1` and `x2` jointly through a product interaction with `x4` having no effect at all:
+To see what the model recovers, we simulate data whose components are known.
+The outcome depends on `x1`, `x2` and `x3` through main effects of different shapes, and on `x1` and `x2` jointly through a product; `x4` has no effect:
 
 $$y = 1 + \sin(\pi x_1) + 2\left(x_2^2 - \tfrac{1}{3}\right) + \tfrac{x_3}{2} + 2 x_1 x_2 + \varepsilon$$
-
-With uniform predictors on $[-1, 1]$, each term has mean zero and the interaction has no main-effect part, so the terms are exactly the components the model is meant to estimate.
 
 ```{r simulate}
 set.seed(1)
@@ -59,257 +60,112 @@ sim$y <- 1 +
   rnorm(n, sd = 0.3)
 ```
 
-```{r fit-default}
+With uniform, independent predictors each term has mean zero, and the product has no main-effect part, so the four terms are exactly the components the model estimates.
+
+```{r fit}
 model <- rpf(y ~ ., data = sim, nthreads = 2)
 model
 ```
 
+The model has found the three main effects and the `x1:x2` interaction, and nothing else.
 With its defaults, `rpf()` does three things in one call:
 
-1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while the families grow: by the error on the training rows that a family's bootstrap sample left out (out of bag), stopping once more splits no longer help (`n_splits = NULL`).
-2. It prunes the forest's components with `prune_components()`: a component is kept if its share of the variance of the prediction is large enough, either as it is or with one refitted coefficient per kept component; the rule and the threshold are again chosen out of bag (`prune = NULL`, that is `TRUE`).
-3. It shows every kept component of three predictors in at most 10 heat maps (`max_panels = 10`), coarsening it if needed, and prunes again.
+1. It grows a forest of 200 tree families, each a sum of trees on up to three predictors (`max_interaction = 3`), and chooses the number of splits while they grow, by the error on the training rows each family did not see (out of bag).
+2. It prunes the forest's components: it keeps those with a large enough share of the variance of the prediction, and refits one coefficient per kept component, choosing the rule and the threshold out of bag.
+3. It simplifies every kept component of three predictors: the component is coarsened such that it can be shown as the sum of at most 10 heat maps (`max_panels = 10`), and the model is pruned again.
 
-The result is the pruned model.
-Here it keeps the three main effects and the `x1:x2` interaction, and drops `x4` and the other interactions, which the data do not have.
-`predict_components()` gives every kept component as it enters the prediction (see "Decomposing predictions" below):
+The printout lists the components with their importance, their share of the variance of the prediction, and then how they were chosen.
+[Reading the model](`r paste0(site, "reading-the-model.html")`) explains it line by line.
 
-```{r components-default}
-names(predict_components(model, new_data = sim)$m)
-```
+## Predictions
 
-Prediction works as usual:
+`predict()` returns a tibble, as in tidymodels:
 
-```{r predict-regression}
+```{r predict}
 predict(model, new_data = head(sim))
 ```
 
-The pruned model holds its kept components, not the forest it was pruned from, which is much larger: what it does above needs no forest.
-To prune the same forest again with other settings, keep it with `keep_forest = TRUE` (it is then in `model$fit`), or fit with `prune = FALSE` and call `prune_components()`.
-`prune = FALSE` returns the forest itself, with all its components, as earlier versions did.
-`max_interaction` is the central choice of the method: lower values give a more constrained model, `max_interaction = 0` allows interactions of any order.
-`n_families` sets the number of tree families, and `n_splits = <number>` fixes the number of splits instead of choosing it.
-The forest below is restricted to main effects and two-way interactions:
+## The components
 
-```{r fit-regression}
-rpfit <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 50, prune = FALSE)
-rpfit
-```
-
-Note that `rpf()` does not handle missing values: rows containing `NA` must be imputed or removed beforehand (see the `recipes` section below for one way to do this as part of the model specification).
-
-## Inside a tree family
-
-The forest averages `n_families` tree families.
-Unlike a single CART tree, a family consists of several trees, each splitting on its own set of variables, and it predicts a point by adding up the values of all leaves containing it.
-New trees grow from existing ones by splitting on an additional variable, and `max_interaction = 2` limits each tree to at most two variables.
-
-To look at one family, we fit a forest with a single, small family to the same data:
-
-```{r fit-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
-small <- rpf(y ~ ., data = sim, max_interaction = 2, n_families = 1, n_splits = 10, prune = FALSE)
-plot(small)
-```
-
-The trees are arranged in rows by the number of variables they split on, with the leaves coloured by their value.
-`plot(type = "boxes")` draws the same leaves in variable space instead, one panel per tree:
-
-```{r boxes-small, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
-plot(small, type = "boxes")
-```
-
-These trees are not yet the components of the decomposition.
-The leaves of different trees overlap, so an effect can be spread over several trees: the quadratic effect of `x2`, for instance, can just as well be carried by trees on `x2` together with another variable as by a tree on `x2` alone.
-Purification moves each effect to the lowest-order tree it belongs to, without changing the family's predictions:
-
-```{r boxes-purified, eval = has_plot, fig.width = 10, fig.height = 6, out.width = "100%"}
-purify(small)
-plot(small, type = "boxes")
-```
-
-Now each panel is one component: the main effects resemble the true shapes, `x1:x2` shows the sign pattern of a product, and the root value is the intercept, close to the true value of 1.
-Averaging these components over all tree families gives the decomposition of the whole forest, which `predict_components()` computes.
-With a single family and few splits the estimates are coarse, which is why the next section uses the forest of 50 families fitted above.
-The pruned model's components are the same averages over its families, but only the kept ones, each multiplied by its coefficient.
-
-## Decomposing predictions
-
-Because the interaction order is bounded, the prediction function is a sum of low-dimensional components:
-
-$$\hat{m}(x) = \hat{m}_0 + \sum_k \hat{m}_k(x_k) + \sum_{k < l} \hat{m}_{kl}(x_k, x_l)$$
-
-`predict_components()` returns exactly this decomposition: an intercept and one column per main effect and interaction term, evaluated on the supplied data.
-The forest is *purified* internally to make the decomposition unique, which is why the print method above reports the purification state.
-For the pruned model, `predict_components(model, new_data = sim)` returns the kept components in the same form.
+`predict_components()` evaluates every component at the rows of `new_data`:
 
 ```{r components}
-components <- predict_components(rpfit, new_data = sim)
-
+components <- predict_components(model, new_data = sim)
 components$intercept
-names(components$m)
+head(components$m)
 ```
 
-The components sum exactly to the model prediction:
+Each column of `m` is one component's contribution to the prediction, on the scale of the outcome.
+With the intercept they add up to the prediction:
 
 ```{r components-sum}
-pred_sum <- components$intercept + rowSums(components$m)
-pred_direct <- predict(rpfit, new_data = sim)$.pred
-
-all.equal(pred_sum, pred_direct)
-```
-
-Each column of `components$m` is the isolated contribution of one predictor (or one pair) to the prediction, on the scale of the outcome.
-Their standard deviations give a simple importance measure: the three main effects and the `x1:x2` interaction dominate, while `x4` and the other interactions are close to zero, as they should be.
-
-```{r components-sd}
-round(sort(sapply(components$m, sd), decreasing = TRUE), 3)
-```
-
-The estimated main effects follow the true functions (blue lines).
-As with any tree-based model, they flatten out towards the edges of the data, where few observations are available to determine them.
-
-```{r main-effects, fig.height = 3}
-op <- par(mfrow = c(1, 3), mar = c(4, 4, 1, 1))
-for (v in names(true_effects)) {
-  ylim <- range(components$m[[v]], true_effects[[v]](sim[[v]]))
-  plot(
-    sim[[v]],
-    components$m[[v]],
-    pch = 20,
-    col = "darkgray",
-    ylim = ylim,
-    xlab = v,
-    ylab = "component"
-  )
-  curve(true_effects[[v]](x), add = TRUE, lwd = 2, col = "blue")
-}
-par(op)
-```
-
-The interaction is a function of two variables, so it is shown as a heatmap.
-We evaluate the estimated `x1:x2` component on a grid. Note `x3` and `x4` must be present in the new data but do not affect this component.
-
-```{r interaction, fig.height = 3.5}
-grid_points <- seq(-1, 1, length.out = 50)
-grid <- expand.grid(x1 = grid_points, x2 = grid_points, x3 = 0, x4 = 0)
-estimated <- predict_components(rpfit, new_data = grid, predictors = c("x1", "x2"))$m[["x1:x2"]]
-
-surfaces <- list(
-  true = outer(grid_points, grid_points, function(x1, x2) 2 * x1 * x2),
-  estimated = matrix(estimated, nrow = length(grid_points))
+all.equal(
+  components$intercept + rowSums(components$m),
+  predict(model, new_data = sim)$.pred
 )
-zlim <- c(-1, 1) * max(abs(unlist(surfaces)))
-
-op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
-for (s in names(surfaces)) {
-  image(
-    grid_points,
-    grid_points,
-    surfaces[[s]],
-    zlim = zlim,
-    col = hcl.colors(51, "Blue-Red 3"),
-    xlab = "x1",
-    ylab = "x2",
-    main = paste(s, "x1:x2")
-  )
-}
-par(op)
 ```
 
-The plots above are drawn manually from `predict_components()` for illustration.
-The [`glex`](https://plantedml.com/glex/) package provides `ggplot2` versions of them: `glex()` computes the decomposition for a fitted `rpf` object, and `plot_main_effect()` and `plot_twoway_effects()` draw main effects and two-way interactions.
+The [glex](https://plantedml.com/glex/) package plots the components.
+A main effect is a curve:
+
+```{r main-effects, eval = has_glex, fig.alt = "The estimated main effects of x1, x2 and x3 as curves.", fig.height = 3}
+library(glex)
+library(patchwork)
+
+plot(components, "x1") + plot(components, "x2") + plot(components, "x3")
+```
+
+The curves follow the true functions: a sine, a parabola and a line.
+Like any tree-based model, they are step functions and flatten towards the edges of the data, where few rows determine them.
+
+An interaction of two predictors is drawn as the data, coloured by the component's value.
+The `x1:x2` component is positive where `x1` and `x2` have the same sign, as the product `2 x1 x2` is:
+
+```{r interaction, eval = has_glex, fig.alt = "The x1:x2 component as a scatter of the data coloured by its value: positive where x1 and x2 have the same sign.", fig.height = 3.5}
+plot(components, c("x1", "x2"))
+```
+
+[Reading the model](`r paste0(site, "reading-the-model.html")`) shows more plots, also of components of three predictors.
 
 ## Classification
 
-For a factor outcome, `rpf()` automatically fits a classification forest.
-We illustrate with the `penguins` data from `palmerpenguins`, removing missing values first.
+For a factor outcome, `rpf()` fits a classification model, with the same steps and defaults.
+`predict()` gives probabilities, or classes with `type = "class"`:
 
-### Binary
-
-```{r classif-binary, eval = has_suggests}
+```{r classification, eval = has_penguins}
 penguins <- na.omit(palmerpenguins::penguins)
+by_species <- rpf(species ~ ., data = penguins, nthreads = 2)
 
-rpfit_sex <- rpf(sex ~ ., data = penguins, nthreads = 2)
-
-predict(rpfit_sex, head(penguins), type = "prob")
-predict(rpfit_sex, head(penguins), type = "class")
+predict(by_species, penguins[c(1, 200, 300), ])
+predict(by_species, penguins[c(1, 200, 300), ], type = "class")
 ```
 
-A classification model goes through the same steps as a regression model: the number of splits is chosen out of bag and the components are pruned, both by the log-loss of the predicted probabilities.
-With the default `loss = "logit"` (or `"exponential"`), `type = "link"` additionally gives raw predictions on the log-odds scale.
+With the default loss, `"logit"`, the components add up to scores on the log-odds scale (one score with two classes, otherwise one per class), which `predict()` turns into probabilities; see [Classification](`r paste0(site, "classification.html")`).
 
-### Multiclass
+## Settings you may want
 
-Multiclass classification works the same way: probability predictions contain one column per class:
+- `max_interaction` caps the number of predictors per component: `1` for an additive model, `2` for pairs, `3` (the default) for triples.
+- `max_panels` sets how many heat maps a component that has three or more predictors may need (10); fewer are easier to read, and `Inf` leaves these components as the forest has them.
+- `n_families` sets the number of tree families (200); fewer fit faster, more usually give better accuracy.
+- `nthreads` fits in parallel; the result does not depend on it.
+- `tune = TRUE` (or `"quick"`, a shorter search): tunes, out of bag, how greedily splits are searched (`n_try_split_points`, `share_candidates`) and the smallest leaf (`min_leaf_rows`). The defaults usually do well without it.
 
-```{r classif-multiclass, eval = has_suggests}
-rpfit_species <- rpf(species ~ ., data = penguins, nthreads = 2)
+Two further settings can be useful for investigating a model, but are usually not recommended:
 
-predict(rpfit_species, head(penguins), type = "prob")
-predict(rpfit_species, head(penguins), type = "class")
-```
+- `n_splits = <number>` fixes the number of splits. By default it is learned while the forest grows, which is usually better than a fixed number.
+- `prune = FALSE` returns the whole forest (class `rpf`), without pruning: many more components, most of them tiny. The resulting forest is also not purified automatically if `prune` is `FALSE`.
 
-The default loss for classification is `"logit"` (the multinomial log-likelihood), which gives proper probability estimates.
-`"exponential"` (with more than two classes the multiclass exponential loss SAMME) gives them too, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
-Note that with `"logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
+`rpf()` takes a formula, x and y, or a [recipes](https://recipes.tidymodels.org/) recipe.
+It does not accept missing values: impute or remove them first, for instance with a recipe.
 
-## Using `recipes`
+A pruned model (the default) is plain R data, which `saveRDS()` keeps as it is.
+A forest (`prune = FALSE`), or a model fitted with `keep_forest = TRUE`, holds a C++ object that `saveRDS()` does not keep: save `rpf_marshal(model)` and restore it with `rpf_unmarshal()`.
 
-`rpf()` also accepts a [`recipes`](https://recipes.tidymodels.org/) recipe in place of a formula, so preprocessing can be bundled with the model specification.
-This makes it easy to add preprocessing steps, such as imputing missing values, which `rpf()` itself does not accept:
+## Where next
 
-```{r recipes, message = FALSE, eval = has_suggests}
-library(recipes)
-
-# rows with a missing outcome still need to be dropped by hand
-peng_raw <- subset(palmerpenguins::penguins, !is.na(body_mass_g))
-
-rec <- recipe(body_mass_g ~ ., data = peng_raw) |>
-  step_impute_median(all_numeric_predictors()) |>
-  step_impute_mode(all_nominal_predictors())
-
-rpfit_rec <- rpf(rec, data = peng_raw, nthreads = 2)
-
-predict(rpfit_rec, head(peng_raw))
-```
-
-The preprocessing steps are stored with the model and applied automatically in `predict()`.
-
-## Saving and restoring models
-
-An `rpf` object holds its forest in an external pointer to a C++ object, which `saveRDS()` cannot preserve, meaning that a naively saved and restored model is not usable:
-
-```{r saveRDS-trap, error = TRUE}
-tmp <- tempfile(fileext = ".rds")
-saveRDS(rpfit, tmp)
-broken <- readRDS(tmp)
-
-rpf_is_valid(broken)
-predict(broken, head(sim))
-```
-
-Use `rpf_marshal()` to convert the model into a plain R list before saving, and `rpf_unmarshal()` after loading:
-
-```{r marshal}
-saveRDS(rpf_marshal(rpfit), tmp)
-restored <- rpf_unmarshal(readRDS(tmp))
-
-all.equal(
-  predict(restored, head(sim)),
-  predict(rpfit, head(sim))
-)
-```
-
-A pruned model, the default of `rpf()`, has no C++ forest unless it was fitted with `keep_forest = TRUE`: it is plain R data, and `saveRDS()` stores it as it is.
-
-```{r saveRDS-pruned}
-saveRDS(model, tmp)
-all.equal(predict(readRDS(tmp), head(sim)), predict(model, head(sim)))
-```
-
-A pruned model with its forest (`keep_forest = TRUE`) is saved like the forest: `rpf_marshal(model)`.
-Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method wrapping the same mechanism is available via `bundle::bundle()` and `bundle::unbundle()`.
-
-```{r cleanup, include = FALSE}
-unlink(tmp)
-```
+- [Reading the model](`r paste0(site, "reading-the-model.html")`): the printed summary, importance, plots, three-way components.
+- [How the forest is grown](`r paste0(site, "growing.html")`): tree families, `max_interaction`, the split search.
+- [The number of splits and further tuning](`r paste0(site, "number-of-splits-and-tuning.html")`): the out-of-bag stop and `tune`.
+- [Pruning to a sparse model](`r paste0(site, "pruning.html")`): what is left out and why.
+- [Classification](`r paste0(site, "classification.html")`).
+- [Speed, memory and saving models](`r paste0(site, "speed-and-memory.html")`), with tidymodels and mlr3.

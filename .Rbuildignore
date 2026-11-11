@@ -28,3 +28,4 @@
 ^TODO\.md$
 ^README\.html$
 ^\.clang-format$
+^cran-comments\.md$

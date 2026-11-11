@@ -2,7 +2,7 @@
 % Please edit documentation in R/print.R
 \name{print.rpf}
 \alias{print.rpf}
-\title{Print an rpf}
+\title{Print a Random Planted Forest}
 \usage{
 \method{print}{rpf}(x, ...)
 }
@@ -15,11 +15,14 @@
 Invisibly: \code{x}.
 }
 \description{
-Print an rpf
+Shows a forest (class \code{rpf}, from \code{\link[=rpf]{rpf()}} with \code{prune = FALSE}): the kind of model and its formula, the number of
+tree families and of splits (with how the splits were chosen), the predictors and the interaction order, whether
+the forest is purified, the settings of the split search and the number of threads. A pruned model, the default of
+\code{\link[=rpf]{rpf()}}, is printed by \code{\link[=print.rpf_pruned]{print.rpf_pruned()}}.
 }
 \examples{
 rpf(mpg ~ cyl + wt + drat, data = mtcars, max_interaction = 2, n_families = 10, prune = FALSE)
 }
 \seealso{
-\code{\link{rpf}}.
+\code{\link[=rpf]{rpf()}}, \code{\link[=print.rpf_pruned]{print.rpf_pruned()}}.
 }

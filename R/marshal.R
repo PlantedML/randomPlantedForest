@@ -27,6 +27,7 @@
 #' @return `rpf_marshal()` returns a list of class `rpf_marshaled`
 #'   (`rpf_pruned_marshaled` for a pruned forest);
 #'   `rpf_unmarshal()` returns an object of class [rpf] (`rpf_pruned`).
+#' @seealso [rpf_is_valid()]; [`bundle()`][bundle.rpf] for the same through the bundle package.
 #' @export
 #' @examples
 #' fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
@@ -35,6 +36,7 @@
 #' saveRDS(blob, tmp)
 #' restored <- rpf_unmarshal(readRDS(tmp))
 #' all.equal(predict(fit, mtcars), predict(restored, mtcars))
+#' unlink(tmp)
 rpf_marshal <- function(x, include_data = FALSE) {
   checkmate::assert_flag(include_data)
   if (inherits(x, "rpf_pruned")) {
@@ -167,17 +169,31 @@ rpf_unmarshal <- function(blob) {
   do.call(new_rpf, c(list(fit = fit, blueprint = blob$blueprint, forest = forest), fields))
 }
 
-#' Check whether an rpf object's C++ forest is still alive
+#' Check whether a model's C++ forest is still alive
 #'
-#' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
-#' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable. A pruned model without its forest
+#' The C++ forest does not survive [saveRDS()]; an `rpf` object, or an `rpf_pruned` one fitted with
+#' `keep_forest = TRUE`, restored via [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable, and
+#' [`predict()`][predict.rpf()] on it is an error that says so. A pruned model without its forest
 #' (`keep_forest = FALSE`, the default) has no C++ forest and is always valid; the `fit` of such a model is not (it
 #' has no forest to use).
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
 #'   [prune_components()], possibly restored from disk.
 #' @return `TRUE` if the underlying model can be used, `FALSE` otherwise (also for the `fit` of a pruned model
 #'   without its forest).
+#' @seealso [rpf_marshal()] to save a model so that it can be restored.
 #' @export
+#' @examples
+#' fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
+#' tmp <- tempfile(fileext = ".rds")
+#'
+#' # saveRDS() alone loses the C++ forest
+#' saveRDS(fit, tmp)
+#' rpf_is_valid(readRDS(tmp))
+#'
+#' # rpf_marshal() keeps it
+#' saveRDS(rpf_marshal(fit), tmp)
+#' rpf_is_valid(rpf_unmarshal(readRDS(tmp)))
+#' unlink(tmp)
 rpf_is_valid <- function(x) {
   if (inherits(x, "rpf_pruned")) {
     # without its forest a pruned model is plain R data: it survives saveRDS() as it is
