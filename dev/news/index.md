@@ -591,6 +591,17 @@
   skips those the forest does not hold, instead of one pass per
   component: on a 10-feature full-order fit (1,023 components, 636 of
   them not held), 5,000 rows take 0.5 s instead of 2.0 s.
+- Classification uses the split search of regression: one implementation
+  of the five split structures, which differ between the two only in how
+  a candidate split is scored. So classification gets the faster
+  `"tree_then_leaf"` and `"leaf"` and the smaller finished forests of
+  regression, with bitwise the same fits. On simulated data with 16,512
+  rows and 8 predictors (`max_interaction = 3`, 10,000 splits, 50 tree
+  families, 8 threads, binary, `loss = "exponential"`),
+  `"tree_then_leaf"` takes 759 s instead of 1,044 s with a peak memory
+  of 1.2 GB instead of 2.9 GB, and `"leaf"` 97 s instead of 113 s. With
+  three classes the peak memory of `"tree_then_leaf"` falls about
+  threefold (2.4 GB to 0.8 GB at 1,000 splits).
 - [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
   and so `rpf(prune = TRUE)` and `rpf(tune = )`, no longer build the
   purified store of all components. Each tree family is purified in
