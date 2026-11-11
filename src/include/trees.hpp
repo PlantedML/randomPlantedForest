@@ -19,7 +19,15 @@ class DecisionTree;
 // unique sorted values (threshold sampling), the unique count (to skip leaves with too few thresholds) and, with
 // min_leaf_rows, the range of thresholds that keep enough rows on each side. They are
 // functions of the leaf's rows and are needed only while the family grows.
+// leaf_then_feature (`leaves`): a leaf's rows stably sorted by one feature, and the first position of each distinct
+// value in that order (so distinct value u is the feature's value at rows[first_pos[u]])
+struct LeafOrder {
+  std::vector<int32_t> rows;
+  std::vector<int32_t> first_pos;
+};
+
 struct LeafCache {
+  std::unordered_map<int, LeafOrder> leaf_order_cache;
   std::unordered_map<int, std::vector<size_t>> order_cache;
   std::unordered_map<int, std::vector<double>> sorted_vals_cache;
   std::unordered_map<int, std::vector<double>> unique_vals_cache;

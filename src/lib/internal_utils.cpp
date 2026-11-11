@@ -316,15 +316,24 @@ std::vector<int> compute_even_spread_indices(int left_inclusive, int right_exclu
 
 std::vector<int> sample_unique_ints_uniform_R(int left_inclusive, int right_exclusive, size_t k)
 {
-  std::vector<int> result;
+  std::vector<int> result, all;
+  sample_unique_ints_uniform_into(left_inclusive, right_exclusive, k, result, all);
+  return result;
+}
+
+void sample_unique_ints_uniform_into(
+    int left_inclusive, int right_exclusive, size_t k, std::vector<int> &result, std::vector<int> &all
+)
+{
+  result.clear();
   int range = right_exclusive - left_inclusive;
   if (range <= 0)
-    return result;
+    return;
   k = std::min<size_t>(k, static_cast<size_t>(range));
   if (k == 0)
-    return result;
+    return;
   if (k * 4 >= static_cast<size_t>(range)) {
-    std::vector<int> all(range);
+    all.resize((size_t)range);
     std::iota(all.begin(), all.end(), left_inclusive);
     for (size_t i = 0; i < k; ++i) {
       size_t j = i + static_cast<size_t>(rng_runif01() * (double)(all.size() - i));
@@ -334,19 +343,29 @@ std::vector<int> sample_unique_ints_uniform_R(int left_inclusive, int right_excl
     }
     result.assign(all.begin(), all.begin() + static_cast<long>(k));
     std::sort(result.begin(), result.end());
-    return result;
+    return;
   }
-  std::unordered_set<int> used;
+  // rejection of the values already drawn: a scan of the few drawn so far, or a hash set for many
   result.reserve(k);
-  while (result.size() < k) {
-    int s = rng_randint(left_inclusive, right_exclusive);
-    if (s >= right_exclusive)
-      s = right_exclusive - 1;
-    if (used.insert(s).second)
-      result.push_back(s);
+  if (k <= 32) {
+    while (result.size() < k) {
+      int s = rng_randint(left_inclusive, right_exclusive);
+      if (s >= right_exclusive)
+        s = right_exclusive - 1;
+      if (std::find(result.begin(), result.end(), s) == result.end())
+        result.push_back(s);
+    }
+  } else {
+    std::unordered_set<int> used;
+    while (result.size() < k) {
+      int s = rng_randint(left_inclusive, right_exclusive);
+      if (s >= right_exclusive)
+        s = right_exclusive - 1;
+      if (used.insert(s).second)
+        result.push_back(s);
+    }
   }
   std::sort(result.begin(), result.end());
-  return result;
 }
 
 } // namespace rpf_utils

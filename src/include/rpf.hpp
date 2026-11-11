@@ -87,6 +87,13 @@ struct FamilyLoss {
     (void)m;
     (void)out;
   }
+  // The same for rows given as row indices: out[i T .. (i + 1) T) = the sums of the terms of the rows rows[0 .. i]
+  virtual void prefix_terms_rows(const int32_t *rows, size_t m, double *out) const
+  {
+    (void)rows;
+    (void)m;
+    (void)out;
+  }
   // The parent region's part of the criterion, from its term sums t and n rows (once per leaf and feature)
   virtual double region_value(const double *t, size_t n) const
   {

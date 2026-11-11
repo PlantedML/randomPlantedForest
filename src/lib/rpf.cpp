@@ -595,12 +595,21 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
     if (!T)
       return;
+    // without interaction constraints dims_allowed() only compares the order of T's dims plus the feature
+    const bool plain = interaction_constraints_.empty();
+    const size_t t_order = T->split_dims.size() - T->split_dims.count(0);
     for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-      std::set<int> res_dims = T->split_dims;
-      res_dims.insert(feature_dim);
-      res_dims.erase(0);
-      if (!dims_allowed(res_dims))
-        continue;
+      if (plain) {
+        const size_t order = t_order + (T->split_dims.count(feature_dim) ? 0 : 1);
+        if (max_interaction >= 0 && order > (size_t)max_interaction)
+          continue;
+      } else {
+        std::set<int> res_dims = T->split_dims;
+        res_dims.insert(feature_dim);
+        res_dims.erase(0);
+        if (!dims_allowed(res_dims))
+          continue;
+      }
       if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
         possible_splits.emplace_back(feature_dim, T, li);
     }
@@ -769,8 +778,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       path_split(*path, curr_split, &inc_s, &inc_b);
 
     Leaf leaf_s, leaf_b;
-    leaf_s.individuals = curr_split.I_s;
-    leaf_b.individuals = curr_split.I_b;
+    leaf_s.individuals = std::move(curr_split.I_s); // (the split's row lists are not read again)
+    leaf_b.individuals = std::move(curr_split.I_b);
     leaf_s.value = inc_s;
     leaf_b.value = inc_b;
     leaf_s.intervals = curr_split.leaf_index->intervals;
@@ -794,7 +803,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       // Compute index BEFORE any push_back that may reallocate
       size_t idx_b = static_cast<size_t>(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
       // Assign by value to avoid aliasing issues if vector reallocates later
-      *curr_split.leaf_index = leaf_b;
+      // (the move drops the split leaf's caches, as the copy of a fresh leaf did)
+      *curr_split.leaf_index = std::move(leaf_b);
       if (min_leaf_rows_ > 1 && leaf_pool) // the entries of the overwritten leaf refer to leaf_b now
         for (size_t i = 0; i < possible_splits.size(); ++i) {
           SplitCandidate &c = possible_splits[i];
@@ -804,7 +814,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
               leaves_scratch.sampler.dirty.push_back(i);
           }
         }
-      curr_split.tree_index->leaves.push_back(leaf_s);
+      curr_split.tree_index->leaves.push_back(std::move(leaf_s));
       size_t idx_s = curr_split.tree_index->leaves.size() - 1;
       if (leaf_pool) {
         add_leaf_candidates(curr_split.tree_index, idx_b);
@@ -815,8 +825,8 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       }
     } else {
       // both halves are appended to the tree of the resulting dims, the smaller first
-      found_tree->leaves.push_back(leaf_s);
-      found_tree->leaves.push_back(leaf_b);
+      found_tree->leaves.push_back(std::move(leaf_s));
+      found_tree->leaves.push_back(std::move(leaf_b));
       size_t idx_s = found_tree->leaves.size() - 2;
       size_t idx_b = found_tree->leaves.size() - 1;
       if (leaf_pool) {

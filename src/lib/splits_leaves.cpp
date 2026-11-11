@@ -24,40 +24,106 @@ void min_rows_range(const std::vector<size_t> &first_pos, size_t m, int leaf_siz
 } // namespace rpf_utils
 
 namespace {
-// The leaf's cached stable order and sorted values of feature k, by reference.
-// Computed and cached as ensure_order_and_sorted_vals_for_leaf() does when
-// missing (the same caches, the same conditions), without copying them out.
-// The references stay valid while no entry of these two maps is erased
-// (unordered_map nodes do not move).
-void leaf_order_refs(
-    const std::vector<std::vector<double>> &X,
-    Leaf &leaf,
-    int k,
-    const std::vector<size_t> *&order,
-    const std::vector<double> *&sorted_vals
-)
+// Each working row's rank in feature k among the family's rows (sc.rank[k]), computed when the feature is first
+// searched: rows with equal values share a rank, a smaller value has a smaller rank. "Equal" is the comparator's
+// (neither value below the other), so -0 and +0 share a rank, as they tie in a sort by value.
+const std::vector<uint32_t> &family_rank(const std::vector<std::vector<double>> &X, int k, LeavesScratch &sc)
+{
+  if (sc.rank_owner != static_cast<const void *>(&X) || sc.rank.size() != X[0].size()) {
+    sc.rank_owner = &X;
+    sc.rank.assign(X[0].size(), std::vector<uint32_t>());
+    sc.rank_max.assign(X[0].size(), 0);
+  }
+  std::vector<uint32_t> &rank = sc.rank[(size_t)k];
+  if (rank.size() == X.size())
+    return rank;
+  const size_t n = X.size();
+  std::vector<std::pair<double, uint32_t>> v(n);
+  for (size_t i = 0; i < n; ++i)
+    v[i] = {X[i][(size_t)k], (uint32_t)i};
+  std::sort(v.begin(), v.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+  rank.resize(n);
+  uint32_t r = 0;
+  for (size_t j = 0; j < n; ++j) {
+    if (j > 0 && v[j - 1].first < v[j].first)
+      ++r;
+    rank[v[j].second] = r;
+  }
+  sc.rank_max[(size_t)k] = r;
+  return rank;
+}
+
+// The leaf's rows stably sorted by feature k and the first position of each distinct value, cached in the leaf
+// until its rows change. The order is the one std::stable_sort gives the leaf's rows by X[row][k]: the rows are
+// sorted by (the row's rank in the family, its position in the leaf), as integers. Leaves of up to 256 rows are
+// sorted by comparison; larger ones by a radix sort on the rank (least significant digit first, which keeps the
+// positions' order among equal ranks).
+const LeafOrder &leaf_order(const std::vector<std::vector<double>> &X, Leaf &leaf, int k, LeavesScratch &sc)
 {
   const size_t m = leaf.individuals.size();
-  auto it = leaf.cache().order_cache.find(k);
-  if (it == leaf.cache().order_cache.end() || it->second.size() != m) {
-    std::vector<size_t> &o = leaf.cache().order_cache[k];
-    o.resize(m);
-    std::iota(o.begin(), o.end(), 0);
-    std::stable_sort(o.begin(), o.end(), [&](size_t a, size_t b) {
-      return X[leaf.individuals[a]][k] < X[leaf.individuals[b]][k];
-    });
-    it = leaf.cache().order_cache.find(k);
+  auto &cache = leaf.cache().leaf_order_cache;
+  auto it = cache.find(k);
+  if (it != cache.end() && it->second.rows.size() == m)
+    return it->second;
+  const std::vector<uint32_t> &rank = family_rank(X, k, sc);
+  std::vector<uint64_t> &key = sc.sort_keys;
+  key.resize(m);
+  for (size_t i = 0; i < m; ++i)
+    key[i] = ((uint64_t)rank[(size_t)leaf.individuals[i]] << 32) | (uint64_t)i;
+  if (m <= 256) {
+    std::sort(key.begin(), key.end());
+  } else {
+    const int bits = 11;
+    const uint64_t mask = (1u << bits) - 1;
+    std::vector<uint64_t> &tmp = sc.sort_tmp;
+    tmp.resize(m);
+    uint64_t *src = key.data(), *dst = tmp.data();
+    uint32_t count[1u << bits];
+    for (int shift = 32; shift < 64 && (sc.rank_max[(size_t)k] >> (shift - 32)) != 0; shift += bits) {
+      std::fill(count, count + (1u << bits), 0u);
+      for (size_t i = 0; i < m; ++i)
+        ++count[(src[i] >> shift) & mask];
+      uint32_t at = 0;
+      for (uint32_t d = 0; d < (1u << bits); ++d) {
+        const uint32_t c = count[d];
+        count[d] = at;
+        at += c;
+      }
+      for (size_t i = 0; i < m; ++i)
+        dst[count[(src[i] >> shift) & mask]++] = src[i];
+      std::swap(src, dst);
+    }
+    if (src != key.data())
+      std::copy(src, src + m, key.data());
   }
-  order = &it->second;
-  auto is = leaf.cache().sorted_vals_cache.find(k);
-  if (is == leaf.cache().sorted_vals_cache.end() || is->second.size() != m) {
-    std::vector<double> &sv = leaf.cache().sorted_vals_cache[k];
-    sv.resize(m);
-    for (size_t i = 0; i < m; ++i)
-      sv[i] = X[leaf.individuals[(*order)[i]]][k];
-    is = leaf.cache().sorted_vals_cache.find(k);
+  LeafOrder &lo = cache[k];
+  lo.rows.resize(m);
+  lo.first_pos.clear();
+  uint64_t prev = 0;
+  for (size_t i = 0; i < m; ++i) {
+    lo.rows[i] = (int32_t)leaf.individuals[(size_t)(key[i] & 0xffffffffu)];
+    const uint64_t r = key[i] >> 32;
+    if (i == 0 || r != prev)
+      lo.first_pos.push_back((int32_t)i);
+    prev = r;
   }
-  sorted_vals = &is->second;
+  lo.first_pos.shrink_to_fit();
+  return lo;
+}
+
+// min_rows_range() on a leaf's cached first positions
+void min_rows_range_of(
+    const std::vector<int32_t> &first_pos, size_t m, int leaf_size, int min_rows, int &lo, int &hi_excl
+)
+{
+  const int n_distinct = (int)first_pos.size();
+  // (positions are below m <= INT32_MAX: compared as 64-bit integers)
+  const int64_t mr = (int64_t)min_rows, mm = (int64_t)m;
+  const auto beg = first_pos.begin(), end = first_pos.end();
+  const int a = (int)(std::lower_bound(beg, end, mr) - beg);
+  const int b = mm >= mr ? (int)(std::upper_bound(beg, end, mm - mr) - beg) : 0;
+  lo = std::max(leaf_size, a);
+  hi_excl = std::min(n_distinct - leaf_size + 1, b);
 }
 
 // The age-weighted draw of n_candidates pool entries without replacement, as
@@ -420,57 +486,43 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     if (m < static_cast<size_t>(2 * leaf_size) || m < static_cast<size_t>(2 * min_rows))
       continue;
 
-    // The leaf's cached order and sorted values by reference; its distinct
-    // values and their first positions in one pass, into reused buffers
-    const std::vector<size_t> *order_p;
-    const std::vector<double> *sorted_p;
-    leaf_order_refs(X, *leafPtr, k, order_p, sorted_p);
-    const std::vector<size_t> &order = *order_p;
-    const std::vector<double> &sorted_vals = *sorted_p;
-    std::vector<double> &unique = sc.unique;
-    std::vector<size_t> &first_pos = sc.first_pos;
-    unique.clear();
-    first_pos.clear();
-    if (!sorted_vals.empty()) {
-      unique.push_back(sorted_vals[0]);
-      first_pos.push_back(0);
-      for (size_t i = 1; i < sorted_vals.size(); ++i) {
-        if (sorted_vals[i] != unique.back())
-          unique.push_back(sorted_vals[i]);
-        if (sorted_vals[i] != sorted_vals[i - 1])
-          first_pos.push_back(i);
-      }
-    }
+    // The leaf's rows sorted by the feature, and the first position of each distinct value (cached in the leaf)
+    const LeafOrder &lord = leaf_order(X, *leafPtr, k, sc);
+    const int32_t *rows = lord.rows.data();
+    const std::vector<int32_t> &first_pos = lord.first_pos;
+    const size_t n_unique = first_pos.size();
 
-    if (unique.size() < 2 * static_cast<size_t>(leaf_size))
+    if (n_unique < 2 * static_cast<size_t>(leaf_size))
       continue;
 
-    std::vector<int> samples;
+    std::vector<int> &samples = sc.samples;
     int left = leaf_size;
-    int right_exclusive = (int)unique.size() - leaf_size + 1;
+    int right_exclusive = (int)n_unique - leaf_size + 1;
     if (rows_check) { // only thresholds with at least min_rows rows on each side
-      min_rows_range(first_pos, m, leaf_size, min_rows, left, right_exclusive);
+      min_rows_range_of(first_pos, m, leaf_size, min_rows, left, right_exclusive);
       if (left >= right_exclusive)
         continue;
     }
-    samples = this->deterministic ? compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try)
-                                  : sample_unique_ints_uniform_R(left, right_exclusive, (size_t)this->split_try);
+    if (this->deterministic)
+      samples = compute_even_spread_indices(left, right_exclusive, (size_t)this->split_try);
+    else
+      sample_unique_ints_uniform_into(left, right_exclusive, (size_t)this->split_try, samples, sc.samples_all);
 
     // The loss's running sums (FamilyLoss::scan_terms): the prefix sums of its row terms along the sorted rows,
     // [i * T + q], and the leaf's own value; a threshold then costs O(T), whatever the leaf's rows
     if (scan_T > 0) {
       std::vector<double> &tp = sc.prefix;
       tp.resize(scan_T * m);
-      loss_fn->prefix_terms(*leafPtr, order.data(), m, tp.data());
+      loss_fn->prefix_terms_rows(rows, m, tp.data());
       const double *tot = tp.data() + (m - 1) * scan_T;
       const double vp = loss_fn->region_value(tot, m);
       sc.total.resize(scan_T);
       for (size_t si = 0; si < samples.size(); ++si) {
         const size_t uidx = static_cast<size_t>(samples[si]);
-        if (uidx >= unique.size() || uidx >= first_pos.size())
+        if (uidx >= n_unique)
           continue;
-        const double sp = unique[uidx];
-        const size_t pos = first_pos[uidx];
+        const size_t pos = (size_t)first_pos[uidx];
+        const double sp = X[(size_t)rows[pos]][(size_t)k]; // the distinct value: the first of its run
         if (pos == 0 || pos >= m)
           continue;
         if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))
@@ -502,7 +554,7 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
       double acc = 0.0;
       double *pp = prefix.data() + p * m;
       for (size_t i = 0; i < m; ++i) {
-        acc += Y[leafPtr->individuals[order[i]]][p];
+        acc += Y[(size_t)rows[i]][p];
         pp[i] = acc;
       }
       total[p] = pp[m - 1];
@@ -510,10 +562,10 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
 
     for (size_t si = 0; si < samples.size(); ++si) {
       const size_t uidx = static_cast<size_t>(samples[si]);
-      if (uidx >= unique.size() || uidx >= first_pos.size())
+      if (uidx >= n_unique)
         continue;
-      const double sp = unique[uidx];
-      const size_t pos = first_pos[uidx];
+      const size_t pos = (size_t)first_pos[uidx];
+      const double sp = X[(size_t)rows[pos]][(size_t)k]; // the distinct value: the first of its run
       if (pos == 0 || pos >= m)
         continue;
       if (pos < static_cast<size_t>(leaf_size) || (m - pos) < static_cast<size_t>(leaf_size))

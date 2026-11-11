@@ -52,6 +52,11 @@ std::vector<size_t> sample_weighted_indices_filtered(const std::vector<double> &
 
 std::vector<int> compute_even_spread_indices(int left_inclusive, int right_exclusive, size_t max_draws);
 std::vector<int> sample_unique_ints_uniform_R(int left_inclusive, int right_exclusive, size_t k);
+// The same draw (the same random numbers, the same result) into `result`, with `all` as scratch: no allocation once
+// the two vectors have grown
+void sample_unique_ints_uniform_into(
+    int left_inclusive, int right_exclusive, size_t k, std::vector<int> &result, std::vector<int> &all
+);
 
 // Fenwick helpers used by cur_trees_1 sampling cache
 void fenwick_add(std::vector<double> &bit, size_t idx1, double delta);
@@ -147,10 +152,17 @@ struct LeavesSampler {
 // it, for the same reason as above. The fast draw's sampler lives here too, so
 // it lasts exactly one tree family.
 struct LeavesScratch {
-  std::vector<double> unique, prefix, total;
-  std::vector<size_t> first_pos;
+  std::vector<double> prefix, total;
   std::vector<std::pair<double, size_t>> keys;
   LeavesSampler sampler;
+  // Per feature, each working row's rank among the family's rows: rows with equal values share a rank and a smaller
+  // value has a smaller rank (empty until the feature is first searched). A leaf's rows sorted by these integers are
+  // its rows sorted by the feature. rank_owner: the working rows the ranks belong to.
+  const void *rank_owner = nullptr;
+  std::vector<std::vector<uint32_t>> rank;
+  std::vector<uint32_t> rank_max; // per feature: the largest rank
+  std::vector<uint64_t> sort_keys, sort_tmp;
+  std::vector<int> samples, samples_all; // the thresholds drawn for a candidate, and the draw's scratch
 };
 
 namespace rpf_utils {

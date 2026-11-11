@@ -279,6 +279,26 @@ public:
     }
   }
 
+  void prefix_terms_rows(const int32_t *rows, size_t m, double *out) const override
+  {
+    if (m == 0)
+      return;
+    std::fill(out, out + T, 0.0);
+    add_terms(rows[0], out);
+    for (size_t i = 1; i < m; ++i) {
+      double *o = out + i * T;
+      const double *prev = o - T;
+      if (keep_terms) {
+        const double *t = &terms[(size_t)rows[i] * T];
+        for (size_t q = 0; q < T; ++q)
+          o[q] = prev[q] + t[q];
+      } else {
+        std::copy(prev, prev + T, o);
+        add_terms(rows[i], o);
+      }
+    }
+  }
+
   double region_value(const double *t, size_t n) const override
   {
     return df.value(t, (double)n, nullptr, nullptr, dsc);
