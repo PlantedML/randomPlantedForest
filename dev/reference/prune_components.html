@@ -72,7 +72,8 @@ again.</p>
 <span>  fold_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  seed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  keep_forest <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -151,10 +152,19 @@ on it.</p></dd>
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p><code>[logical(1): FALSE]</code>: Report the progress of the choice.</p></dd>
 
+
+<dt id="arg-keep-forest">keep_forest<a class="anchor" aria-label="anchor" href="#arg-keep-forest"></a></dt>
+<dd><p><code>[logical(1): FALSE]</code>: Whether the pruned model keeps the forest <code>object</code> in <code>fit</code>. By default
+it keeps only the forest's description (you still have <code>object</code>): the model predicts from the components it
+keeps and is plain R data, which <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> stores as it is. <code>TRUE</code> keeps the forest, as <code><a href="rpf.html">rpf()</a></code>'s
+<code>keep_forest</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An object of class <code>rpf_pruned</code>, a list with elements:</p><ul><li><p><code>fit</code>: <code>object</code>, as it was (not purified by the pruning).</p></li>
+    <p>An object of class <code>rpf_pruned</code>, a list with elements:</p><ul><li><p><code>fit</code>: the description of <code>object</code> (its blueprint, <code>mode</code>, <code>params</code>, and with <code>n_splits = NULL</code> its <code>oob_path</code>
+and <code>splits_oob</code>), without the forest (<code>fit$fit</code> is <code>NULL</code>), so that a use of the forest from it is an error that
+says so. With <code>keep_forest = TRUE</code>, <code>object</code> as it was (not purified by the pruning).</p></li>
 <li><p><code>rule</code>, <code>tau</code>: the chosen rule and threshold.</p></li>
 <li><p><code>intercept</code>: <code>alpha</code> (the forest's intercept <code>f_0</code> for <code>"D"</code>); for classification one per score column.</p></li>
 <li><p><code>beta</code>: named vector of the coefficients of the kept components (all 1 for <code>"D"</code>). For <code>"R"</code> with <code>select_by</code>
@@ -205,7 +215,8 @@ saving and loading). In <code>coarse</code> and <code>asis</code> alike, a panel
 full resolution.</p></li>
 <li><p><code>store</code>: the pieces of the kept components that are not coarsened, from which the model predicts (see
 <strong>Purification</strong>), and <code>cache</code>, an environment holding them built for prediction.</p></li>
-</ul><p>Use <code><a href="predict.rpf_pruned.html">predict()</a></code> and <code><a href="predict_components.html">predict_components()</a></code> on it, and <code><a href="rpf_marshal.html">rpf_marshal()</a></code> to save it.</p>
+</ul><p>Use <code><a href="predict.rpf_pruned.html">predict()</a></code> and <code><a href="predict_components.html">predict_components()</a></code> on it. Without its forest, save it with
+<code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code>; with it, with <code><a href="rpf_marshal.html">rpf_marshal()</a></code> (which works either way).</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

@@ -30,6 +30,7 @@ rpf(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -59,6 +60,7 @@ rpf(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -88,6 +90,7 @@ rpf(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -117,6 +120,7 @@ rpf(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -296,6 +300,23 @@ rpf(
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)).
   A whole number of at least 1, or `Inf` for no coarsening.
 
+- keep_forest:
+
+  `[logical(1): FALSE]`: Used only when pruning: whether the pruned
+  model keeps the forest it was pruned from, in `$fit`. By default it
+  does not: the model predicts from the components it keeps, so the
+  forest's memory is free when `rpf()` returns, and the model is plain R
+  data that [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) stores as
+  it is. `TRUE` keeps the forest, for pruning it again with other
+  settings
+  ([`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  on `$fit`),
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md),
+  or its own predictions; such a model is saved with
+  [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md).
+  With `prune = FALSE` it has no effect: the result is the forest. See
+  "Pruning" in Details.
+
 - tune:
 
   `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether to
@@ -333,8 +354,10 @@ rpf(
 - export_forest:
 
   `[logical(1): FALSE]`: Whether to store the flattened forest in the
-  returned object as `$forest` (with `prune = TRUE`, in the forest:
-  `$fit$forest`). If `FALSE`, it is `NULL`, which saves memory.
+  returned object as `$forest` (with `prune = TRUE` and
+  `keep_forest = TRUE`, in the forest: `$fit$forest`; a pruned model
+  without its forest has neither). If `FALSE`, it is `NULL`, which saves
+  memory.
 
 - deterministic:
 
@@ -388,12 +411,14 @@ stopped at the cap while the error was still falling, neither stop rule
 reached). When pruning (the default), an object of class `rpf_pruned`
 (see
 [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)),
-whose element `fit` is the forest (not purified), with the elements
-above: the pruned model's OOB path is `$fit$oob_path`, and with
-`n_splits = NULL` the chosen number of splits `$fit$params$splits` and
-the stop `$fit$splits_oob`. With `tune`, the `rpf_pruned` model of the
-chosen forest, with an element `tune`: `search`, the search table (one
-row per forest grown, in the order grown: `step`, `n_try_split_points`,
+whose element `fit` describes the forest with the elements above: the
+pruned model's OOB path is `$fit$oob_path`, and with `n_splits = NULL`
+the chosen number of splits `$fit$params$splits` and the stop
+`$fit$splits_oob`. Without `keep_forest`, `fit` holds no forest
+(`$fit$fit` is `NULL`); with `keep_forest = TRUE` it is the forest (not
+purified). With `tune`, the `rpf_pruned` model of the chosen forest,
+with an element `tune`: `search`, the search table (one row per forest
+grown, in the order grown: `step`, `n_try_split_points`,
 `share_candidates`, `min_leaf_rows`, the chosen `n_splits`,
 `stopped_at`, `capped`, the forest's corrected OOB RMSE
 `oob_rmse_forest` (as the pruning scores it: its rule `"D"` at
@@ -430,9 +455,10 @@ call:
 The result, of class `rpf_pruned`, has methods for
 [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md),
 [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
-and [`print()`](https://rdrr.io/r/base/print.html). `prune = FALSE`
-returns the forest (class `rpf`) instead, and `n_splits = <number>` fits
-a fixed number of splits.
+and [`print()`](https://rdrr.io/r/base/print.html). It holds the kept
+components, not the forest (`keep_forest = TRUE` keeps the forest too).
+`prune = FALSE` returns the forest (class `rpf`) instead, and
+`n_splits = <number>` fits a fixed number of splits.
 
 ### Choosing parameters
 
@@ -759,6 +785,21 @@ out of bag, prunes and returns the model to show. Pruning needs
 out-of-bag rows, so with `deterministic = TRUE` `prune = NULL` means
 `FALSE` and `prune = TRUE` is an error.
 
+The pruned model does not keep the forest (`keep_forest = FALSE`): it
+predicts, prints and shows its components from what it stores, the same,
+bit for bit, as with the forest, and is a fraction of the forest's size
+(California housing: about 0.2 GB against 0.6 GB for the forest of 200
+families). What needs the forest is then an error that says so: pruning
+again,
+[`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md),
+the forest's own
+[`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md),
+[`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
+and
+[plot()](https://plantedml.com/randomPlantedForest/dev/reference/plot.rpf.md).
+With `keep_forest = TRUE` the forest is in `$fit`, so that
+`prune_components(model$fit, data, ...)` prunes it again.
+
 ### Classification
 
 A classification forest goes through the same steps (the OOB path,
@@ -963,8 +1004,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.063         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.045        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.051         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.038        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE

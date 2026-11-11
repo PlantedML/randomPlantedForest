@@ -76,6 +76,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  keep_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
@@ -105,6 +106,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  keep_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
@@ -134,6 +136,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  keep_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
@@ -163,6 +166,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>  keep_forest <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  purify <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nthreads <span class="op">=</span> <span class="fl">1</span>,</span>
@@ -331,6 +335,18 @@ pruned again (the <code>max_panels</code> of <code><a href="prune_components.htm
 at least 1, or <code>Inf</code> for no coarsening.</p></dd>
 
 
+<dt id="arg-keep-forest">keep_forest<a class="anchor" aria-label="anchor" href="#arg-keep-forest"></a></dt>
+<dd><p><code>[logical(1): FALSE]</code>: Used only when pruning: whether
+the pruned model keeps the forest it was pruned from, in <code>$fit</code>. By
+default it does not: the model predicts from the components it keeps, so
+the forest's memory is free when <code>rpf()</code> returns, and the model is plain R
+data that <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> stores as it is. <code>TRUE</code> keeps the forest, for
+pruning it again with other settings (<code><a href="prune_components.html">prune_components()</a></code> on <code>$fit</code>),
+<code><a href="purify.html">purify()</a></code>, or its own predictions; such a model is saved with
+<code><a href="rpf_marshal.html">rpf_marshal()</a></code>. With <code>prune = FALSE</code> it has no effect: the result is the
+forest. See "Pruning" in Details.</p></dd>
+
+
 <dt id="arg-tune">tune<a class="anchor" aria-label="anchor" href="#arg-tune"></a></dt>
 <dd><p><code>[logical(1) | character(1) | rpf_tune_control: FALSE]</code>: Whether
 to tune the greediness (<code>n_try_split_points</code>, <code>share_candidates</code>) and
@@ -357,8 +373,9 @@ settings, call <code><a href="purify.html">purify()</a></code> after fitting ins
 
 <dt id="arg-export-forest">export_forest<a class="anchor" aria-label="anchor" href="#arg-export-forest"></a></dt>
 <dd><p><code>[logical(1): FALSE]</code>: Whether to store the flattened forest in
-the returned object as <code>$forest</code> (with <code>prune = TRUE</code>, in the forest:
-<code>$fit$forest</code>). If <code>FALSE</code>, it is <code>NULL</code>, which saves memory.</p></dd>
+the returned object as <code>$forest</code> (with <code>prune = TRUE</code> and
+<code>keep_forest = TRUE</code>, in the forest: <code>$fit$forest</code>; a pruned model without
+its forest has neither). If <code>FALSE</code>, it is <code>NULL</code>, which saves memory.</p></dd>
 
 
 <dt id="arg-deterministic">deterministic<a class="anchor" aria-label="anchor" href="#arg-deterministic"></a></dt>
@@ -409,10 +426,12 @@ the checkpoints grown, and <code>$splits_oob</code> a list with the chosen <code
 (whether it stopped at the cap while the error was still falling, neither
 stop rule reached).
 When pruning (the default), an object of class <code>rpf_pruned</code> (see
-<code><a href="prune_components.html">prune_components()</a></code>), whose element <code>fit</code> is the forest (not purified),
-with the elements above: the pruned model's OOB path is <code>$fit$oob_path</code>, and
+<code><a href="prune_components.html">prune_components()</a></code>), whose element <code>fit</code> describes the forest with the
+elements above: the pruned model's OOB path is <code>$fit$oob_path</code>, and
 with <code>n_splits = NULL</code> the chosen number of splits <code>$fit$params$splits</code> and
-the stop <code>$fit$splits_oob</code>.
+the stop <code>$fit$splits_oob</code>. Without <code>keep_forest</code>, <code>fit</code> holds no forest
+(<code>$fit$fit</code> is <code>NULL</code>); with <code>keep_forest = TRUE</code> it is the forest (not
+purified).
 With <code>tune</code>, the <code>rpf_pruned</code> model of the chosen forest, with an element
 <code>tune</code>: <code>search</code>, the search table (one row per forest grown, in the order
 grown: <code>step</code>, <code>n_try_split_points</code>, <code>share_candidates</code>, <code>min_leaf_rows</code>,
@@ -439,7 +458,8 @@ defaults (<code>prune = NULL</code>): the sparse rule, chosen out of bag;</p></l
 <code>max_panels = 10</code> heat maps and prunes again.</p></li>
 </ol><p>The result, of class <code>rpf_pruned</code>, has methods for
 <code><a href="predict.rpf_pruned.html">predict()</a></code>, <code><a href="predict_components.html">predict_components()</a></code> and <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>.
-<code>prune = FALSE</code> returns the forest (class <code>rpf</code>) instead, and
+It holds the kept components, not the forest (<code>keep_forest = TRUE</code> keeps the
+forest too). <code>prune = FALSE</code> returns the forest (class <code>rpf</code>) instead, and
 <code>n_splits = &lt;number&gt;</code> fits a fixed number of splits.</p><div class="section">
 <h3 id="choosing-parameters">Choosing parameters<a class="anchor" aria-label="anchor" href="#choosing-parameters"></a></h3>
 
@@ -740,6 +760,15 @@ number state, for every interface. For other settings of the pruning (<code>rule
 number of splits out of bag, prunes and returns the model to show. Pruning
 needs out-of-bag rows, so with <code>deterministic = TRUE</code> <code>prune = NULL</code> means
 <code>FALSE</code> and <code>prune = TRUE</code> is an error.</p>
+<p>The pruned model does not keep the forest (<code>keep_forest = FALSE</code>): it
+predicts, prints and shows its components from what it stores, the same,
+bit for bit, as with the forest, and is a fraction of the forest's size
+(California housing: about 0.2 GB against 0.6 GB for the forest of 200
+families). What needs the forest is then an error that says so: pruning
+again, <code><a href="purify.html">purify()</a></code>, the forest's own <code><a href="predict.rpf.html">predict()</a></code>,
+<code><a href="predict_components.html">predict_components()</a></code> and <a href="plot.rpf.html">plot()</a>. With <code>keep_forest = TRUE</code>
+the forest is in <code>$fit</code>, so that <code>prune_components(model$fit, data, ...)</code>
+prunes it again.</p>
 </div>
 
 <div class="section">
@@ -934,8 +963,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1                  3            0.100             1       84        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1                  1            0.025             1      100        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.063         TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.045        FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.051         TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.038        FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   chosen_step2 chosen_step3 final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           NA           NA  TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           NA           NA FALSE</span>

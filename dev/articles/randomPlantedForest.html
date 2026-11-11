@@ -166,14 +166,19 @@ enters the prediction (see “Decomposing predictions” below):</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>  4.00  </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>  1.17  </span></span>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>  0.831</span></span></code></pre></div>
-<p><code>prune = FALSE</code> returns the forest itself, with all its
-components, as earlier versions did. <code>max_interaction</code> is the
-central choice of the method: lower values give a more constrained
-model, <code>max_interaction = 0</code> allows interactions of any
-order. <code>n_families</code> sets the number of tree families, and
-<code>n_splits = &lt;number&gt;</code> fixes the number of splits
-instead of choosing it. The forest below is restricted to main effects
-and two-way interactions:</p>
+<p>The pruned model holds its kept components, not the forest it was
+pruned from, which is much larger: what it does above needs no forest.
+To prune the same forest again with other settings, keep it with
+<code>keep_forest = TRUE</code> (it is then in <code>model$fit</code>),
+or fit with <code>prune = FALSE</code> and call
+<code><a href="../reference/prune_components.html">prune_components()</a></code>. <code>prune = FALSE</code> returns the
+forest itself, with all its components, as earlier versions did.
+<code>max_interaction</code> is the central choice of the method: lower
+values give a more constrained model, <code>max_interaction = 0</code>
+allows interactions of any order. <code>n_families</code> sets the
+number of tree families, and <code>n_splits = &lt;number&gt;</code>
+fixes the number of splits instead of choosing it. The forest below is
+restricted to main effects and two-way interactions:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rpfit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">sim</span>, max_interaction <span class="op">=</span> <span class="fl">2</span>, n_families <span class="op">=</span> <span class="fl">50</span>, prune <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">rpfit</span></span>
@@ -483,9 +488,17 @@ list before saving, and <code><a href="../reference/rpf_marshal.html">rpf_unmars
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
-<p>Pruned models are saved the same way:
-<code>rpf_marshal(model)</code>. Alternatively, a <a href="https://rstudio.github.io/bundle/" class="external-link"><code>bundle</code></a> method
-wrapping the same mechanism is available via
+<p>A pruned model, the default of <code><a href="../reference/rpf.html">rpf()</a></code>, has no C++ forest
+unless it was fitted with <code>keep_forest = TRUE</code>: it is plain R
+data, and <code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> stores it as it is.</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">tmp</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sim</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>A pruned model with its forest (<code>keep_forest = TRUE</code>) is
+saved like the forest: <code>rpf_marshal(model)</code>. Alternatively, a
+<a href="https://rstudio.github.io/bundle/" class="external-link"><code>bundle</code></a>
+method wrapping the same mechanism is available via
 <code><a href="https://rstudio.github.io/bundle/reference/bundle.html" class="external-link">bundle::bundle()</a></code> and <code><a href="https://rstudio.github.io/bundle/reference/bundle.html" class="external-link">bundle::unbundle()</a></code>.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -120,6 +120,12 @@ predict(model, new_data = head(sim))
 #> 6  0.831
 ```
 
+The pruned model holds its kept components, not the forest it was pruned
+from, which is much larger: what it does above needs no forest. To prune
+the same forest again with other settings, keep it with
+`keep_forest = TRUE` (it is then in `model$fit`), or fit with
+`prune = FALSE` and call
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
 `prune = FALSE` returns the forest itself, with all its components, as
 earlier versions did. `max_interaction` is the central choice of the
 method: lower values give a more constrained model,
@@ -504,9 +510,23 @@ all.equal(
 #> [1] TRUE
 ```
 
-Pruned models are saved the same way: `rpf_marshal(model)`.
-Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method
-wrapping the same mechanism is available via
+A pruned model, the default of
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+has no C++ forest unless it was fitted with `keep_forest = TRUE`: it is
+plain R data, and [`saveRDS()`](https://rdrr.io/r/base/readRDS.html)
+stores it as it is.
+
+``` r
+
+saveRDS(model, tmp)
+all.equal(predict(readRDS(tmp), head(sim)), predict(model, head(sim)))
+#> [1] TRUE
+```
+
+A pruned model with its forest (`keep_forest = TRUE`) is saved like the
+forest: `rpf_marshal(model)`. Alternatively, a
+[`bundle`](https://rstudio.github.io/bundle/) method wrapping the same
+mechanism is available via
 [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)
 and
 [`bundle::unbundle()`](https://rstudio.github.io/bundle/reference/bundle.html).

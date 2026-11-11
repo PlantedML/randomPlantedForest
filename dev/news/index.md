@@ -120,6 +120,47 @@
   choice was 1,345 to 4,525 splits (310 to 990 s per fit), where
   `"logit"` chose 22 on average.
 
+- A pruned model no longer holds the forest it was pruned from:
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  with pruning (the default) and
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
+  return the model without it, and their new argument
+  `keep_forest = TRUE` keeps it. The model predicts, prints and gives
+  its components from what it stores, bit for bit as with the forest, so
+  [`predict()`](https://rdrr.io/r/stats/predict.html) (every `type`),
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md),
+  [`print()`](https://rdrr.io/r/base/print.html), the display,
+  [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+  and `bundle()` work as before; the fit itself is unchanged. What is
+  lost by default is the forest in `$fit`: pruning it again
+  (`prune_components(model$fit, data, ...)`),
+  [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md),
+  and the forest’s own
+  [`predict()`](https://rdrr.io/r/stats/predict.html),
+  [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md),
+  [`plot()`](https://rdrr.io/r/graphics/plot.default.html) and
+  [`rpf_boxes()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_boxes.md)
+  are an error that names `keep_forest = TRUE`. `$fit` still describes
+  the forest (`$params`, `$oob_path`, `$splits_oob`, the blueprint), and
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)’
+  caller still has the forest it passed. To get the forest back, fit
+  with `keep_forest = TRUE`, or with `prune = FALSE` and prune with
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md).
+  With `prune = FALSE` the argument has no effect. On California housing
+  (16,512 rows, 8 threads) the forest is 0.6 GB of memory, which is free
+  when
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  returns, and the model 0.19 GB; the model without its forest is plain
+  R data, so [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) and
+  [`readRDS()`](https://rdrr.io/r/base/readRDS.html) give a model that
+  predicts (6 s, 113 MB), and
+  [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
+  takes no time and gives a blob of the model’s size, against 13 s and
+  1.15 GB with the forest. Models saved with their forest by an earlier
+  version
+  ([`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md))
+  still load, print and predict, and keep their forest.
+
 ### Renamed arguments
 
 - Four arguments of

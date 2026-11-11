@@ -62,7 +62,15 @@ or
 the pruning (rule, coefficients, components, the table of the choice,
 the stored kept components, the display's coarsened components) as it
 is. The restored model predicts as before, from its stored components,
-so it needs no training data for that.
+so it needs no training data for that. A pruned model without its forest
+(the default of
+[`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+and
+[`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md),
+`keep_forest = FALSE`) is plain R data:
+[`saveRDS()`](https://rdrr.io/r/base/readRDS.html) stores it as it is,
+and its blob is the model without the caches of its built indices
+(`include_data` has nothing to include).
 
 ## Examples
 

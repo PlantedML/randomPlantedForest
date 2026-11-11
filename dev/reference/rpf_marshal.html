@@ -94,7 +94,10 @@ With it, the in-bag counts of the bootstrap samples are stored too, so that
 <p>A pruned forest from <code><a href="prune_components.html">prune_components()</a></code> or <code><a href="rpf.html">rpf()</a></code> (class <code>rpf_pruned</code>) is marshaled
 the same way: its forest as above, and the pruning (rule, coefficients,
 components, the table of the choice, the stored kept components, the display's coarsened components) as it is. The
-restored model predicts as before, from its stored components, so it needs no training data for that.</p>
+restored model predicts as before, from its stored components, so it needs no training data for that. A pruned
+model without its forest (the default of <code><a href="rpf.html">rpf()</a></code> and <code><a href="prune_components.html">prune_components()</a></code>, <code>keep_forest = FALSE</code>) is plain R data:
+<code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS()</a></code> stores it as it is, and its blob is the model without the caches of its built indices
+(<code>include_data</code> has nothing to include).</p>
     </div>
 
     <div class="section level2">

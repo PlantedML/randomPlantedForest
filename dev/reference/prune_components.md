@@ -25,7 +25,8 @@ prune_components(
   fold_id = NULL,
   seed = NULL,
   nthreads = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  keep_forest = FALSE
 )
 ```
 
@@ -117,11 +118,26 @@ prune_components(
 
   `[logical(1): FALSE]`: Report the progress of the choice.
 
+- keep_forest:
+
+  `[logical(1): FALSE]`: Whether the pruned model keeps the forest
+  `object` in `fit`. By default it keeps only the forest's description
+  (you still have `object`): the model predicts from the components it
+  keeps and is plain R data, which
+  [`saveRDS()`](https://rdrr.io/r/base/readRDS.html) stores as it is.
+  `TRUE` keeps the forest, as
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)'s
+  `keep_forest`.
+
 ## Value
 
 An object of class `rpf_pruned`, a list with elements:
 
-- `fit`: `object`, as it was (not purified by the pruning).
+- `fit`: the description of `object` (its blueprint, `mode`, `params`,
+  and with `n_splits = NULL` its `oob_path` and `splits_oob`), without
+  the forest (`fit$fit` is `NULL`), so that a use of the forest from it
+  is an error that says so. With `keep_forest = TRUE`, `object` as it
+  was (not purified by the pruning).
 
 - `rule`, `tau`: the chosen rule and threshold.
 
@@ -221,9 +237,10 @@ Use
 [`predict()`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf_pruned.md)
 and
 [`predict_components()`](https://plantedml.com/randomPlantedForest/dev/reference/predict_components.md)
-on it, and
+on it. Without its forest, save it with
+[`saveRDS()`](https://rdrr.io/r/base/readRDS.html); with it, with
 [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
-to save it.
+(which works either way).
 
 ## Details
 
