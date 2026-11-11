@@ -137,5 +137,5 @@ cbind(
 }
 \seealso{
 \code{\link[=purify]{purify()}} for how the components are identified, \code{\link[=prune_components]{prune_components()}} for the pruned model's
-components. The glex package plots the result with \code{autoplot()}.
+components. The glex package plots the result with \code{plot()}.
 }

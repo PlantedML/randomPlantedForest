@@ -55,10 +55,10 @@ truth <- function(f) {
   geom_line(aes(x, y), data = data.frame(x = seq(-1, 1, 0.01), y = f(seq(-1, 1, 0.01))),
             inherit.aes = FALSE, colour = "orange", linewidth = 0.8)
 }
-panels <- (autoplot(comp, "x1") + truth(function(x) sin(pi * x))) +
-  (autoplot(comp, "x2") + truth(function(x) 2 * (x^2 - 1 / 3))) +
-  (autoplot(comp, "x3") + truth(function(x) x / 2)) +
-  autoplot(comp, c("x1", "x2")) +
+panels <- (plot(comp, "x1") + truth(function(x) sin(pi * x))) +
+  (plot(comp, "x2") + truth(function(x) 2 * (x^2 - 1 / 3))) +
+  (plot(comp, "x3") + truth(function(x) x / 2)) +
+  plot(comp, c("x1", "x2")) +
   plot_annotation(
     title = sprintf("prediction = %.2f + m(x1) + m(x2) + m(x3) + m(x1, x2)", comp$intercept),
     subtitle = "fitted components (dark) and the true functions (orange)"

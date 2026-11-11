@@ -110,10 +110,9 @@ A main effect is a curve:
 
 ```{r main-effects, eval = has_glex, fig.alt = "The estimated main effects of x1, x2 and x3 as curves.", fig.height = 3}
 library(glex)
-library(ggplot2)
 library(patchwork)
 
-autoplot(components, "x1") + autoplot(components, "x2") + autoplot(components, "x3")
+plot(components, "x1") + plot(components, "x2") + plot(components, "x3")
 ```
 
 The curves follow the true functions: a sine, a parabola and a line.
@@ -123,7 +122,7 @@ An interaction of two predictors is drawn as the data, coloured by the component
 The `x1:x2` component is positive where `x1` and `x2` have the same sign, as the product `2 x1 x2` is:
 
 ```{r interaction, eval = has_glex, fig.alt = "The x1:x2 component as a scatter of the data coloured by its value: positive where x1 and x2 have the same sign.", fig.height = 3.5}
-autoplot(components, c("x1", "x2"))
+plot(components, c("x1", "x2"))
 ```
 
 [Reading the model](`r paste0(site, "reading-the-model.html")`) shows more plots, also of components of three predictors.

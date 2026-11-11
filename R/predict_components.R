@@ -65,7 +65,7 @@
 #' @importFrom utils combn
 #'
 #' @seealso [purify()] for how the components are identified, [prune_components()] for the pruned model's
-#'   components. The glex package plots the result with `autoplot()`.
+#'   components. The glex package plots the result with `plot()`.
 #'
 #' @examples
 #' # The default model: its kept components add up to its prediction

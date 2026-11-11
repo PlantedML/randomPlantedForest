@@ -132,7 +132,7 @@ Here it multiplies the three-way component by `r round(three$beta, 2)`, and the 
 glex has another measure, the mean absolute contribution of each component over the rows:
 
 ```{r vi, fig.alt = "Bar chart of the mean absolute contribution of each of the four components.", fig.height = 3}
-autoplot(glex_vi(comp))
+plot(glex_vi(comp))
 ```
 
 The two measures need not give the same order.
@@ -140,7 +140,7 @@ The variance weights large contributions more than the mean absolute value does,
 
 ## Plots with glex
 
-`predict_components()` returns an object of class `glex`, which the [glex](https://plantedml.com/glex/) package draws with `autoplot()`.
+`predict_components()` returns an object of class `glex`, which the [glex](https://plantedml.com/glex/) package draws with `plot()`.
 A main effect is a curve; a two-way interaction is a scatter of the data coloured by the component's value.
 
 Here the true main effects are added as orange lines:
@@ -151,8 +151,8 @@ add_truth <- function(p, f) {
   p + geom_line(aes(x, y), data = transform(truth, y = f(x)), inherit.aes = FALSE,
                 colour = "orange", linewidth = 0.8)
 }
-add_truth(autoplot(comp, "x1"), function(x) sin(pi * x)) +
-  add_truth(autoplot(comp, "x2"), function(x) x)
+add_truth(plot(comp, "x1"), function(x) sin(pi * x)) +
+  add_truth(plot(comp, "x2"), function(x) x)
 ```
 
 The estimates follow the truth.
@@ -161,7 +161,7 @@ Like any tree-based model, they are step functions, and they flatten towards the
 The interaction `x1:x3` should look like the product `2 x1 x3`: positive where `x1` and `x3` have the same sign, negative where they differ.
 
 ```{r pair, fig.alt = "The x1:x3 component as a scatter of the data coloured by its value: positive where x1 and x3 have the same sign.", fig.height = 4}
-autoplot(comp, c("x1", "x3"))
+plot(comp, c("x1", "x3"))
 ```
 
 ## Components of three predictors

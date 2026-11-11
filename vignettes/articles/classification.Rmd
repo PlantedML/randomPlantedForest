@@ -25,7 +25,6 @@ The losses are described in "The losses" below.
 ```{r setup, message = FALSE}
 library(randomPlantedForest)
 library(glex)
-library(ggplot2)
 
 penguins <- na.omit(palmerpenguins::penguins)
 ```
@@ -60,7 +59,7 @@ With two classes there is one score, the log-odds of the second level of the out
 glex draws them as for regression:
 
 ```{r binary-plot, fig.alt = "The body mass component of the sex model as a step curve on the scale of the scores."}
-autoplot(comp, "body_mass_g")
+plot(comp, "body_mass_g")
 ```
 
 ## Three or more classes
@@ -89,7 +88,7 @@ A component is kept or dropped for all classes together: its size is its varianc
 glex draws one panel per score:
 
 ```{r multiclass-plot, fig.alt = "The bill length component of the species model, one panel for each class."}
-autoplot(comp3, "bill_length_mm")
+plot(comp3, "bill_length_mm")
 ```
 
 ## How the choices are scored
