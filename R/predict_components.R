@@ -1,7 +1,8 @@
-#' Extract predicted components from a Random Planted Forest
+#' The components of a Random Planted Forest's prediction
 #'
-#' Prediction components are a functional decomposition of the model prediction.
-#' The sum of all components equals the overall predicted value for an observation.
+#' Evaluates the components of a model at the rows of `new_data`: its intercept and one column per main effect and
+#' interaction. They are a functional decomposition of the prediction: for every row, the intercept plus the
+#' components equals the prediction. For a pruned model, the default of [rpf()], these are its kept components.
 #'
 #' Extracts all possible components up to `max_interaction` degrees,
 #' up to the value set when calling [`rpf()`]. The intercept is always included.
@@ -63,9 +64,19 @@
 #' @importFrom data.table as.data.table
 #' @importFrom utils combn
 #'
-#' @examples
+#' @seealso [purify()] for how the components are identified, [prune_components()] for the pruned model's
+#'   components. The glex package plots the result with `autoplot()`.
 #'
-#' # Regression task, only some predictors
+#' @examples
+#' # The default model: its kept components add up to its prediction
+#' set.seed(1)
+#' model <- rpf(mpg ~ wt + hp + cyl, data = mtcars)
+#' components <- predict_components(model, mtcars[1:3, ])
+#' components$m
+#' components$intercept + rowSums(components$m)
+#' predict(model, mtcars[1:3, ])
+#'
+#' # A forest: all its components up to its max_interaction
 #' train <-  mtcars[1:20, 1:4]
 #' test <-  mtcars[21:32, 1:4]
 #'

@@ -3,7 +3,7 @@
 \name{bundle.rpf}
 \alias{bundle.rpf}
 \alias{bundle.rpf_pruned}
-\title{Bundle an rpf model}
+\title{Bundle a Random Planted Forest}
 \usage{
 \method{bundle}{rpf}(x, ...)
 

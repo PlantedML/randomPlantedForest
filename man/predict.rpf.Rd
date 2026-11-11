@@ -2,7 +2,7 @@
 % Please edit documentation in R/predict_rpf.R
 \name{predict.rpf}
 \alias{predict.rpf}
-\title{Random Planted Forest Predictions}
+\title{Predict with a Random Planted Forest}
 \usage{
 \method{predict}{rpf}(
   object,
@@ -26,8 +26,12 @@ predictions which are not guaranteed to be valid probabilities in \verb{[0, 1]}.
 For \code{type = "prob"}, these are truncated to ensure this property.
 
 For classification, \code{type = "link"} is an alias for \code{type = "numeric"}.
-If \code{loss} is \code{"logit"} or \code{"exponential"}, the raw predictions have the
-additional interpretation similar to the linear predictor in a \code{\link{glm}}.
+If \code{loss} is \code{"logit"} or \code{"exponential"}, the raw predictions are the
+scores on the link scale, like the linear predictor of a \code{\link{glm}}: with two
+classes one score, the log-odds of the second class; with more, one score
+per class (\code{"exponential"}, summing to 0) or per class but the first
+(\code{"logit"}, whose first class has score 0). The probabilities of
+\code{type = "prob"} are their softmax (see "Classification losses" in \code{\link[=rpf]{rpf()}}).
 If \code{loss} is \code{"L1"} or \code{"L2"}, the link is the identity.}
 
 \item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads}
@@ -53,10 +57,26 @@ first level; they are reported with the first level's score 0 joined and
 centred across the \code{K} classes, which leaves the probabilities as they are.)
 }
 \description{
-Random Planted Forest Predictions
+Predictions of a forest (class \code{rpf}, from \code{\link[=rpf]{rpf()}} with \code{prune = FALSE}) for new data: the mean of its tree
+families' predictions. For classification, \code{type} chooses probabilities, classes or the raw scores. A pruned model,
+the default of \code{\link[=rpf]{rpf()}}, has its own method, \code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}}, with the same arguments.
+}
+\details{
+\code{new_data} is prepared as the training data were: by the formula or recipe of the fit, and with factor levels coded
+as in the fit (see "Factor predictors" in \code{\link[=rpf]{rpf()}}). Missing values are an error.
 }
 \examples{
-# Regression with L2 loss
-rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")], prune = FALSE)
-predict(rpfit, mtcars[, c("cyl", "wt")])
+# Regression: a tibble with the column .pred
+rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, n_families = 20, prune = FALSE)
+predict(rpfit, mtcars[1:3, ])
+
+# Classification: probabilities by default, or classes, or the raw scores
+rpfit <- rpf(Species ~ ., data = iris, n_families = 20, prune = FALSE)
+predict(rpfit, iris[c(1, 51, 101), ])
+predict(rpfit, iris[c(1, 51, 101), ], type = "class")
+predict(rpfit, iris[c(1, 51, 101), ], type = "link")
+}
+\seealso{
+\code{\link[=predict.rpf_pruned]{predict.rpf_pruned()}} for the pruned model, \code{\link[=predict_components]{predict_components()}} for the prediction as a sum of
+components.
 }

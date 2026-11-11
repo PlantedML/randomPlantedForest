@@ -37,12 +37,14 @@ Imports:
 Suggests:
     bundle,
     ggplot2,
+    glex,
     knitr,
     palmerpenguins,
     patchwork,
     recipes,
     rmarkdown,
     testthat (>= 3.0.0)
+Additional_repositories: https://plantedml.r-universe.dev
 LinkingTo:
     Rcpp
 VignetteBuilder:

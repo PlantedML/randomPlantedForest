@@ -1,4 +1,4 @@
-#' Bundle an rpf model
+#' Bundle a Random Planted Forest
 #'
 #' Method for [bundle::bundle()] wrapping [rpf_marshal()]/[rpf_unmarshal()],
 #' so rpf models work with the standard tidymodels serialization workflow.
