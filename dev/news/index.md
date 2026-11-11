@@ -8,6 +8,7 @@
   has new defaults: a plain `rpf(y ~ ., data)` now returns the pruned
   model (class `rpf_pruned`), for regression and classification. The new
   defaults, each switched by its argument:
+
   - `n_splits = NULL`: the number of splits is chosen out of bag while
     the forest grows (was 30).
   - `prune = NULL`: the forest is pruned by
@@ -56,6 +57,55 @@
   footprint, which varies by a few tenths of a GB from run to run) on
   California housing (16,512 rows) at 8 threads, measured with all
   changes of this version.
+
+- The classification losses `"logit"` and `"exponential"` (binary, and
+  SAMME for three or more classes) no longer clamp class shares, and
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)’s
+  arguments `delta` and `epsilon` are removed: a call that gives either
+  is an error (an unused argument). Each new leaf’s step now minimises
+  the leaf’s penalised loss: the loss of its rows, plus that of one
+  pseudo-row, split evenly over the classes, at the leaf’s current mean
+  score
+  ([`?rpf`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md),
+  “Classification losses”). A split is scored by its gain over the
+  parent leaf’s own step, and each new leaf pays for its pseudo-row. So
+  a leaf of one class converges to a finite level (`log(2 n + 1)` for
+  `n` rows and two classes) and is not moved again, instead of being
+  split and pushed further in every round (scores of several hundred
+  after 300 rounds); splitting such a leaf, or repeating a split whose
+  leaves are at their optimum, gains nothing and is not made; and a
+  round in which no candidate gains makes no split. Previously the split
+  criterion credited a split with the parent leaf’s own step at a class
+  share clamped to `[delta, 1 - delta]`, while the update clamped it to
+  `[epsilon, 1 - epsilon]`, so pure and nearly pure leaves won over
+  splits that separate classes, and logit’s leaves reset the mean score
+  to the log-odds of the raw share, which is not a step of the loss and
+  left fits underconfident. With the defaults (`n_splits` out of bag,
+  pruning), on six data sets (penguins, a 300-row and a 4,000-row
+  simulated set, each with two and three classes; 3 seeds), the test
+  log-loss of the exponential loss changes by -0.018 to +0.010 on five
+  sets and by +0.048 on the 300-row three-class set (worse in all three
+  seeds), and that of the logit loss by -0.017 to +0.016. At fixed split
+  counts the exponential loss no longer overfits (300 splits: 0.58
+  against 3.42 on the 300-row three-class set, 0.08 against 1.00 on
+  two-class penguins); on the noisy 4,000-row sets at 300 splits both
+  fit the noise more than the clamped logit loss did (logit +0.03 and
+  +0.05, exponential +0.05 and +0.13; all still below the old
+  exponential loss), which the out-of-bag choice of `n_splits` avoids.
+  [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
+  gains `exact_step` (default `TRUE`): logit’s two new leaves get the
+  exact minimisers of their penalised loss (Newton’s method to
+  convergence on the leaf’s rows); `FALSE` takes one Newton step. The
+  exponential loss’s step is exact by itself, so `exact_step` does not
+  change its fits. The split search scores a candidate from sums over
+  its two sides built as regression builds them (along the leaf’s sorted
+  rows, or per bin), so classification fits are faster: at 1 thread on
+  10,000 rows (100 splits, 20 tree families) a binary fit takes 3.8 s
+  instead of 7.9 s with the exponential loss and 3.6 s instead of 9.7 s
+  with logit (regression: 2.7 s), a three-class fit 5.2 s instead of 7.1
+  s and 5.1 s instead of 11.5 s. Classification fits with `"logit"` or
+  `"exponential"` change; `"L1"` and `"L2"` fits and regression are
+  unchanged, and a model saved before still loads, prints and predicts.
 
 ### Renamed arguments
 
@@ -409,11 +459,12 @@
   for classification and for regression with `split_structure` other
   than `"leaf"`.
 - A tree family that makes no split predicts the mean outcome of its
-  bootstrap sample, and for classification its class shares (truncated
-  to `[epsilon, 1 - epsilon]` with `loss = "logit"` or `"exponential"`).
-  Previously it predicted 0, a probability of 0.5: constant predictors,
-  a single row or `min_leaf_rows` above half the rows gave an all-zero
-  model, and families that could not split pulled the forest towards 0.
+  bootstrap sample, and for classification its rows’ fit (with
+  `loss = "logit"` or `"exponential"` the class shares smoothed by the
+  losses’ pseudo-row, see Breaking changes). Previously it predicted 0,
+  a probability of 0.5: constant predictors, a single row or
+  `min_leaf_rows` above half the rows gave an all-zero model, and
+  families that could not split pulled the forest towards 0.
   [`purify()`](https://plantedml.com/randomPlantedForest/dev/reference/purify.md)
   puts that value into the intercept. Fitted models change only where a
   family made no split.
@@ -434,10 +485,9 @@
   stopped with an error about the size of `pred`.
 - [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   stops with a clear error on inputs that gave wrong fits without a
-  warning or failed later: an infinite outcome, `epsilon` outside
-  `(0, 0.5)`, `delta` of 0.5 or more (or 0 with `loss = "logit"`),
-  `t_try = 0`, predictor names that are missing, duplicated or contain
-  `:`, and interaction terms in the formula.
+  warning or failed later: an infinite outcome, `t_try = 0`, predictor
+  names that are missing, duplicated or contain `:`, and interaction
+  terms in the formula.
   [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
   finds interactions itself, so write `y ~ x1 + x2` instead of
   `y ~ x1 * x2`; to fit a product as a predictor of its own, write
@@ -477,9 +527,9 @@
   Rosset and Hastie, 2009): the split criterion, the leaf step and the
   weights all come from the one loss `exp(-y.f / K)`. Each row has one
   weight, `exp(-g)` with `g` its class’s score, and a leaf moves the
-  scores by `log(p_k) - mean_j log(p_j)`, with `p` its weighted class
-  shares (clamped as before by `delta` for the criterion and `epsilon`
-  for the step); [`predict()`](https://rdrr.io/r/stats/predict.html)
+  scores by `log(V_k) - mean_j log(V_j)`, with `V` its class weight sums
+  plus those of its pseudo-row (see the classification losses under
+  Breaking changes); [`predict()`](https://rdrr.io/r/stats/predict.html)
   takes the softmax of the scores as before. Previously each class had
   its own one-vs-rest weights, and its step was `log(p_k / p_0)` with
   `p_0 = 1 - sum_k p_k` mixing shares under the different weights; it is

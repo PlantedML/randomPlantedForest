@@ -27,8 +27,7 @@ rpf(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -57,8 +56,7 @@ rpf(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -87,8 +85,7 @@ rpf(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -117,8 +114,7 @@ rpf(
   min_leaf_rows = 1,
   interaction_constraints = NULL,
   loss = NULL,
-  delta = 0.001,
-  epsilon = 0.1,
+  exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
   tune = FALSE,
@@ -264,28 +260,20 @@ rpf(
   `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
   regression, the only supported loss, and `"exponential"` for
   classification (with more than two classes the multiclass exponential
-  loss SAMME). Classification also supports `"logit"`, which gives
-  similar results but is slower, and `"L1"` and `"L2"`, which fit class
-  indicators directly and do not yield proper probability estimates.
+  loss SAMME). Classification also supports `"logit"` (the multinomial
+  log-likelihood), and `"L1"` and `"L2"`, which fit class indicators
+  directly and do not yield proper probability estimates. See
+  "Classification losses" in Details.
 
-- delta:
+- exact_step:
 
-  `[numeric(1): 0.001]`: Only used if `loss` is `"logit"` or
-  `"exponential"`. Class proportions are truncated to
-  `[delta, 1 - delta]` when computing the loss of a split. Must be less
-  than 0.5, from where every proportion is truncated to the same value,
-  and positive for `"logit"`: with `delta = 0`, nodes containing a
-  single class have infinite loss and their splits are always rejected.
-
-- epsilon:
-
-  `[numeric(1): 0.1]`: Only used if `loss` is `"logit"` or
-  `"exponential"`. Class proportions are truncated to
-  `[epsilon, 1 - epsilon]` when computing the fit in a leaf. Unlike
-  `delta`, this caps the size of individual leaf updates and acts as
-  regularization: smaller values permit larger jumps on the link scale.
-  Must be greater than 0 and less than 0.5: at 0 the leaf values of pure
-  leaves are infinite, and from 0.5 on every leaf value is 0.
+  `[logical(1): TRUE]`: Only used with `loss = "logit"`: whether the two
+  leaves of each split get the exact minimisers of the penalised loss
+  (Newton's method to convergence on the leaf's rows), or one Newton
+  step from the sums the split search scored them by (`FALSE`, faster).
+  The split search is the same either way. The exponential loss's step
+  is exact by itself, so `exact_step` does not change `"exponential"`
+  fits. See "Classification losses" in Details.
 
 - prune:
 
@@ -483,17 +471,39 @@ and 40% (the default of the other structures, and of `"leaf"` before).
 `tune` searches this greediness out of bag.
 
 For classification, `"exponential"` (the default) and `"logit"` fit on
-the link scale and are transformed to probabilities. With more than two
-classes `"exponential"` is the multiclass exponential loss SAMME (Zhu,
-Zou, Rosset and Hastie, 2009): with one score per class, summing to 0, a
-row's weight is `exp(-g)`, `g` the score of its class, and the
-probabilities are the softmax of the scores. With `n_splits` chosen out
-of bag and the forest pruned (the defaults), `"exponential"` was as
-accurate as `"logit"` in simulations and about twice as fast. Nothing
-bounds its scores once a tree family's bootstrap sample is separated,
-though, so with a large fixed `n_splits` its log-loss can grow with the
-splits, where `"logit"`'s does not. `"L1"` and `"L2"` fit class
-indicators directly and their probabilities are truncated to `[0, 1]`.
+the link scale and are transformed to probabilities; see "Classification
+losses". `"L1"` and `"L2"` fit class indicators directly and their
+probabilities are truncated to `[0, 1]`.
+
+### Classification losses
+
+`"exponential"` and `"logit"` fit scores on the link scale: with two
+classes one score, the log-odds of the second class; with more,
+`"logit"` one score per class but the first (whose score is 0) and
+`"exponential"` one score per class, summing to 0 (the multiclass
+exponential loss SAMME of Zhu, Zou, Rosset and Hastie, 2009, whose row
+weight is `exp(-g)`, `g` the score of its class). The probabilities are
+the softmax of the scores.
+
+Every split moves the scores of the rows of each new leaf by one step,
+which minimises the leaf's penalised loss: the loss of its rows, plus
+that of one pseudo-row (split evenly over the classes) at the leaf's
+current mean score. The pseudo-row pulls the step towards no change, so
+a leaf whose rows all have one class moves towards a finite level (about
+`log(2 n + 1)` for `n` rows and two classes) and is not moved further
+once it is there, and no clamp of the class shares is needed. A split is
+scored by its gain over the parent leaf's own step, and each new leaf
+pays for its pseudo-row, so splitting a leaf of one class gains nothing,
+nor does repeating a split whose leaves are at their optimum, and such
+splits are not made. A round in which no candidate gains makes no split.
+The candidates' gains come from sums over their two sides (the
+second-order Newton gain for `"logit"`, the exact gain for
+`"exponential"`), built as regression builds its sums (along the leaf's
+sorted rows, so that a split point costs the same whatever the leaf's
+size; for `"tree_then_leaf"` one pass over the leaf per split point).
+`"exponential"`'s step is exact; with `exact_step = TRUE` (the default)
+`"logit"`'s steps are made exact too, otherwise they are one Newton
+step.
 
 ### Factor predictors
 
@@ -861,9 +871,9 @@ predict(model, iris[c(1, 51, 101), ], type = "prob")
 #> # A tibble: 3 × 3
 #>   .pred_setosa .pred_versicolor .pred_virginica
 #>          <dbl>            <dbl>           <dbl>
-#> 1  0.997                0.00263      0.00000189
-#> 2  0.000000761          0.969        0.0313    
-#> 3  0.000000122          0.00362      0.996     
+#> 1      0.990            0.00949        0.000659
+#> 2      0.00296          0.976          0.0214  
+#> 3      0.00151          0.00189        0.997   
 
 # The forest instead of the pruned model, with x and y, pairwise interactions
 # and a fixed number of splits
@@ -941,8 +951,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.083         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.074         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.062        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE

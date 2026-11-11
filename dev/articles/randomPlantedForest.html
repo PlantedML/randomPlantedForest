@@ -358,12 +358,12 @@ from <code>palmerpenguins</code>, removing missing values first.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 2</span></span></span>
 <span><span class="co">#&gt;   .pred_female .pred_male</span></span>
 <span><span class="co">#&gt;          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        0.327     0.673 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        0.775     0.225 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        0.940     0.060<span style="text-decoration: underline;">2</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        0.807     0.193 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        0.181     0.819 </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        0.916     0.083<span style="text-decoration: underline;">6</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        0.135      0.865</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        0.587      0.413</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        0.773      0.227</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        0.657      0.343</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        0.129      0.871</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        0.872      0.128</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_sex</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"class"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
 <span><span class="co">#&gt;   .pred_class</span></span>
@@ -393,12 +393,12 @@ contain one column per class:</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 3</span></span></span>
 <span><span class="co">#&gt;   .pred_Adelie .pred_Chinstrap .pred_Gentoo</span></span>
 <span><span class="co">#&gt;          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        1.000        1.80<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.60<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        1.000        3.98<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     9.66<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        1.000        2.74<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     4.47<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        1.000        1.89<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.04<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        1.000        2.25<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     1.18<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        1.000        2.76<span style="color: #949494;">e</span><span style="color: #BB0000;">-13</span>     6.91<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>        1.000        5.73<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span>     6.17<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>        1.000        3.44<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span>     1.86<span style="color: #949494;">e</span><span style="color: #BB0000;">- 8</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>        1.000        1.94<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span>     1.07<span style="color: #949494;">e</span><span style="color: #BB0000;">- 9</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span>        1.000        5.18<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span>     4.37<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span>        1.000        5.66<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span>     2.30<span style="color: #949494;">e</span><span style="color: #BB0000;">-11</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span>        1.000        1.30<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span>     1.29<span style="color: #949494;">e</span><span style="color: #BB0000;">- 9</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">rpfit_species</span>, <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">penguins</span><span class="op">)</span>, type <span class="op">=</span> <span class="st">"class"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 1</span></span></span>
 <span><span class="co">#&gt;   .pred_class</span></span>
@@ -411,13 +411,14 @@ contain one column per class:</p>
 <span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> Adelie</span></span></code></pre></div>
 <p>The default loss for classification is <code>"exponential"</code>,
 which gives proper probability estimates (with more than two classes it
-is the multiclass exponential loss SAMME). <code>"logit"</code> gives
-similar results after pruning but is slower, while <code>"L1"</code> and
-<code>"L2"</code> fit class indicators directly and do not yield proper
-probabilities. Note that with <code>loss = "logit"</code>, multiclass
-models are fit on a reference-class (log-odds) scale, so link
-predictions and components have one column less than there are classes:
-see <code><a href="../reference/predict.rpf.html">?predict.rpf</a></code> for details.</p>
+is the multiclass exponential loss SAMME). <code>"logit"</code> (the
+multinomial log-likelihood) gives similar results after pruning, while
+<code>"L1"</code> and <code>"L2"</code> fit class indicators directly
+and do not yield proper probabilities. Note that with
+<code>loss = "logit"</code>, multiclass models are fit on a
+reference-class (log-odds) scale, so link predictions and components
+have one column less than there are classes: see
+<code><a href="../reference/predict.rpf.html">?predict.rpf</a></code> for details.</p>
 </div>
 </div>
 <div class="section level2">

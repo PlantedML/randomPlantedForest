@@ -360,12 +360,12 @@ predict(rpfit_sex, head(penguins), type = "prob")
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1        0.327     0.673 
-#> 2        0.775     0.225 
-#> 3        0.940     0.0602
-#> 4        0.807     0.193 
-#> 5        0.181     0.819 
-#> 6        0.916     0.0836
+#> 1        0.135      0.865
+#> 2        0.587      0.413
+#> 3        0.773      0.227
+#> 4        0.657      0.343
+#> 5        0.129      0.871
+#> 6        0.872      0.128
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -397,12 +397,12 @@ predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000        1.80e-13     1.60e-11
-#> 2        1.000        3.98e-13     9.66e-10
-#> 3        1.000        2.74e-13     4.47e-11
-#> 4        1.000        1.89e-13     1.04e-11
-#> 5        1.000        2.25e-13     1.18e-11
-#> 6        1.000        2.76e-13     6.91e-11
+#> 1        1.000        5.73e-11     6.17e-11
+#> 2        1.000        3.44e-10     1.86e- 8
+#> 3        1.000        1.94e-10     1.07e- 9
+#> 4        1.000        5.18e-11     4.37e-11
+#> 5        1.000        5.66e-11     2.30e-11
+#> 6        1.000        1.30e-10     1.29e- 9
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -417,12 +417,12 @@ predict(rpfit_species, head(penguins), type = "class")
 
 The default loss for classification is `"exponential"`, which gives
 proper probability estimates (with more than two classes it is the
-multiclass exponential loss SAMME). `"logit"` gives similar results
-after pruning but is slower, while `"L1"` and `"L2"` fit class
-indicators directly and do not yield proper probabilities. Note that
-with `loss = "logit"`, multiclass models are fit on a reference-class
-(log-odds) scale, so link predictions and components have one column
-less than there are classes: see
+multiclass exponential loss SAMME). `"logit"` (the multinomial
+log-likelihood) gives similar results after pruning, while `"L1"` and
+`"L2"` fit class indicators directly and do not yield proper
+probabilities. Note that with `loss = "logit"`, multiclass models are
+fit on a reference-class (log-odds) scale, so link predictions and
+components have one column less than there are classes: see
 [`?predict.rpf`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
 for details.
 

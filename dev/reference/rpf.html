@@ -73,8 +73,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
-<span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -103,8 +102,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
-<span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -133,8 +131,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
-<span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -163,8 +160,7 @@ interaction components; see <code><a href="predict_components.html">predict_comp
 <span>  min_leaf_rows <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  interaction_constraints <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  loss <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  delta <span class="op">=</span> <span class="fl">0.001</span>,</span>
-<span>  epsilon <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  exact_step <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  prune <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_panels <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  tune <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -301,27 +297,19 @@ components.</p></dd>
 <dd><p><code>[character(1) | NULL: NULL]</code>: Loss function. <code>NULL</code> uses <code>"L2"</code> for
 regression, the only supported loss, and <code>"exponential"</code> for classification
 (with more than two classes the multiclass exponential loss SAMME).
-Classification also supports <code>"logit"</code>, which gives similar results but is
-slower, and <code>"L1"</code> and <code>"L2"</code>, which fit class indicators directly and do
-not yield proper probability estimates.</p></dd>
+Classification also supports <code>"logit"</code> (the multinomial log-likelihood),
+and <code>"L1"</code> and <code>"L2"</code>, which fit class indicators directly and do not yield
+proper probability estimates. See "Classification losses" in Details.</p></dd>
 
 
-<dt id="arg-delta">delta<a class="anchor" aria-label="anchor" href="#arg-delta"></a></dt>
-<dd><p><code>[numeric(1): 0.001]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
-Class proportions are truncated to <code>[delta, 1 - delta]</code> when computing the
-loss of a split. Must be less than 0.5, from where every proportion is
-truncated to the same value, and positive for <code>"logit"</code>: with <code>delta = 0</code>,
-nodes containing a single class have infinite loss and their splits are
-always rejected.</p></dd>
-
-
-<dt id="arg-epsilon">epsilon<a class="anchor" aria-label="anchor" href="#arg-epsilon"></a></dt>
-<dd><p><code>[numeric(1): 0.1]</code>: Only used if <code>loss</code> is <code>"logit"</code> or <code>"exponential"</code>.
-Class proportions are truncated to <code>[epsilon, 1 - epsilon]</code> when computing
-the fit in a leaf. Unlike <code>delta</code>, this caps the size of individual leaf
-updates and acts as regularization: smaller values permit larger jumps on
-the link scale. Must be greater than 0 and less than 0.5: at 0 the leaf
-values of pure leaves are infinite, and from 0.5 on every leaf value is 0.</p></dd>
+<dt id="arg-exact-step">exact_step<a class="anchor" aria-label="anchor" href="#arg-exact-step"></a></dt>
+<dd><p><code>[logical(1): TRUE]</code>: Only used with <code>loss = "logit"</code>: whether
+the two leaves of each split get the exact minimisers of the penalised loss
+(Newton's method to convergence on the leaf's rows), or one Newton step from
+the sums the split search scored them by (<code>FALSE</code>, faster). The split
+search is the same either way. The exponential loss's step is exact by
+itself, so <code>exact_step</code> does not change <code>"exponential"</code> fits. See
+"Classification losses" in Details.</p></dd>
 
 
 <dt id="arg-prune">prune<a class="anchor" aria-label="anchor" href="#arg-prune"></a></dt>
@@ -484,17 +472,38 @@ round (the default) had 5.7% to 6.8% lower test error than 10 and 40% (the
 default of the other structures, and of <code>"leaf"</code> before). <code>tune</code> searches
 this greediness out of bag.</p>
 <p>For classification, <code>"exponential"</code> (the default) and <code>"logit"</code> fit on the
-link scale and are transformed to probabilities. With more than two classes
-<code>"exponential"</code> is the multiclass exponential loss SAMME (Zhu, Zou, Rosset
-and Hastie, 2009): with one score per class, summing to 0, a row's weight is
-<code>exp(-g)</code>, <code>g</code> the score of its class, and the probabilities are the softmax
-of the scores. With <code>n_splits</code> chosen out of bag and the forest pruned (the
-defaults), <code>"exponential"</code> was as accurate as <code>"logit"</code> in simulations and
-about twice as fast. Nothing bounds its scores once a tree family's
-bootstrap sample is separated, though, so with a large fixed <code>n_splits</code> its
-log-loss can grow with the splits, where <code>"logit"</code>'s does not. <code>"L1"</code> and
-<code>"L2"</code> fit class indicators directly and their probabilities are truncated
-to <code>[0, 1]</code>.</p>
+link scale and are transformed to probabilities; see "Classification
+losses". <code>"L1"</code> and <code>"L2"</code> fit class indicators directly and their
+probabilities are truncated to <code>[0, 1]</code>.</p>
+</div>
+
+<div class="section">
+<h3 id="classification-losses">Classification losses<a class="anchor" aria-label="anchor" href="#classification-losses"></a></h3>
+
+
+<p><code>"exponential"</code> and <code>"logit"</code> fit scores on the link scale: with two classes
+one score, the log-odds of the second class; with more, <code>"logit"</code> one score
+per class but the first (whose score is 0) and <code>"exponential"</code> one score per
+class, summing to 0 (the multiclass exponential loss SAMME of Zhu, Zou,
+Rosset and Hastie, 2009, whose row weight is <code>exp(-g)</code>, <code>g</code> the score of its
+class). The probabilities are the softmax of the scores.</p>
+<p>Every split moves the scores of the rows of each new leaf by one step, which
+minimises the leaf's penalised loss: the loss of its rows, plus that of one
+pseudo-row (split evenly over the classes) at the leaf's current mean score.
+The pseudo-row pulls the step towards no change, so a leaf whose rows
+all have one class moves towards a finite level (about <code>log(2 n + 1)</code> for
+<code>n</code> rows and two classes) and is not moved further once it is there, and no
+clamp of the class shares is needed. A split is scored by its gain over the
+parent leaf's own step, and each new leaf pays for its pseudo-row, so
+splitting a leaf of one class gains nothing, nor does repeating a split whose
+leaves are at their optimum, and such splits are not made. A round in which
+no candidate gains makes no split. The candidates' gains come from sums over
+their two sides (the second-order Newton gain for <code>"logit"</code>, the exact gain
+for <code>"exponential"</code>), built as regression builds its sums (along the leaf's
+sorted rows, so that a split point costs the same whatever the leaf's size;
+for <code>"tree_then_leaf"</code> one pass over the leaf per split point).
+<code>"exponential"</code>'s step is exact; with <code>exact_step = TRUE</code> (the default)
+<code>"logit"</code>'s steps are made exact too, otherwise they are one Newton step.</p>
 </div>
 
 <div class="section">
@@ -833,9 +842,9 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 3 × 3</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .pred_setosa .pred_versicolor .pred_virginica</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>  0.997                0.002<span style="text-decoration: underline;">63</span>      0.000<span style="text-decoration: underline;">001</span>89</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>  0.000<span style="text-decoration: underline;">000</span>761          0.969        0.031<span style="text-decoration: underline;">3</span>    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>  0.000<span style="text-decoration: underline;">000</span>122          0.003<span style="text-decoration: underline;">62</span>      0.996     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>      0.990            0.009<span style="text-decoration: underline;">49</span>        0.000<span style="text-decoration: underline;">659</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>      0.002<span style="text-decoration: underline;">96</span>          0.976          0.021<span style="text-decoration: underline;">4</span>  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>      0.001<span style="text-decoration: underline;">51</span>          0.001<span style="text-decoration: underline;">89</span>        0.997   </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The forest instead of the pruned model, with x and y, pairwise interactions</span></span></span>
 <span class="r-in"><span><span class="co"># and a fixed number of splits</span></span></span>
@@ -913,8 +922,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1                  3            0.100             1       84        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1                  1            0.025             1      100        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.083         TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.059        FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.074         TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.062        FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   chosen_step2 chosen_step3 final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           NA           NA  TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           NA           NA FALSE</span>
