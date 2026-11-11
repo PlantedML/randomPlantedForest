@@ -84,9 +84,8 @@ gh-release:
 thanks:
 	Rscript -e "usethis::use_tidy_thanks()"
 
+# Build artifacts only: document() already rewrites NAMESPACE/man, so deleting them just breaks installs if doc fails
+.PHONY: clean
 clean:
-	-rm README.md
-	-rm -r README_cache
-	-rm man/*.Rd
-	-rm NAMESPACE
-	$(MAKE) doc
+	-rm -f src/*.o src/*.so src/lib/*.o
+	-rm -rf README_cache
