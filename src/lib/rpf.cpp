@@ -34,20 +34,6 @@ bool RandomPlantedForest::possibleExists(
   return false;
 }
 
-bool RandomPlantedForest::leafCandidateExists(
-    const std::vector<SplitCandidate> &possible_splits,
-    const std::shared_ptr<DecisionTree> &tree,
-    size_t leaf_idx,
-    int dim
-)
-{
-  for (const auto &c : possible_splits) {
-    if (c.dim == dim && c.tree.get() == tree.get() && c.leaf_idx == leaf_idx)
-      return true;
-  }
-  return false;
-}
-
 bool RandomPlantedForest::is_purified()
 {
   return purified;
@@ -377,17 +363,18 @@ Split RandomPlantedForest::calcOptimalSplit(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    TreeFamily &curr_family,
+    FamilyLoss *loss
 )
 {
   if (split_structure_mode_ == 3) {
-    return this->calcOptimalSplit_leaves(Y, X, possible_splits, curr_family);
+    return this->calcOptimalSplit_leaves(Y, X, possible_splits, curr_family, loss);
   } else if (split_structure_mode_ == 2) {
-    return this->calcOptimalSplit_curTrees1(Y, X, possible_splits, curr_family);
+    return this->calcOptimalSplit_curTrees1(Y, X, possible_splits, curr_family, loss);
   } else if (split_structure_mode_ == 1) {
-    return this->calcOptimalSplit_curTrees2(Y, X, possible_splits, curr_family);
+    return this->calcOptimalSplit_curTrees2(Y, X, possible_splits, curr_family, loss);
   } else if (split_structure_mode_ == 4) {
-    return this->calcOptimalSplit_hist(Y, X, possible_splits, curr_family);
+    return this->calcOptimalSplit_hist(Y, X, possible_splits, curr_family, loss);
   } else {
     // Not used for res_trees; a separate path below uses its own pool type
     return Split{};
@@ -495,544 +482,54 @@ RandomPlantedForest::null_leaf_value(const std::vector<std::vector<double>> &Y, 
   return calcMean(Y, rows);
 }
 
-void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
+std::unique_ptr<FamilyLoss>
+RandomPlantedForest::family_loss(std::vector<std::vector<double>> &samples_Y, const std::vector<int> &boot_idx)
 {
+  (void)samples_Y;
+  (void)boot_idx;
+  return nullptr; // regression: the squared error, scored and applied in the split searches and create_tree_family()
+}
 
-  TreeFamily curr_family;
-  curr_family.insert(
-      {std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves))}
-  );
-
-  // res_trees uses a separate pool
-  if (split_structure_mode_ == 0) {
-    std::vector<ResultingTreeCandidate> possible_trees;
-    for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-      if (!dims_allowed({feature_dim}))
-        continue;
-      auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
-      curr_family.insert({{feature_dim}, treePtr});
-      possible_trees.emplace_back(treePtr);
-    }
-
-    // Bootstrap samples
-    int sample_index;
-    init_inbag(n);
-    std::vector<std::vector<double>> samples_X, samples_Y;
-    if (deterministic) {
-      samples_X = X;
-      samples_Y = Y;
-      this->t_try = 1;
-    } else {
-      samples_X = std::vector<std::vector<double>>(sample_size);
-      samples_Y = std::vector<std::vector<double>>(sample_size);
-      for (size_t i = 0; i < (size_t)sample_size; ++i) {
-        sample_index = rng_randint(0, (int)sample_size);
-        add_inbag(n, sample_index);
-        samples_Y[i] = Y[sample_index];
-        samples_X[i] = X[sample_index];
-      }
-    }
-
-    std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
-    Split curr_split;
-    for (int split_count = 0; split_count < n_splits; ++split_count) {
-      if (path && !path_step(*path, split_count))
-        break;
-      curr_split = this->calcOptimalSplit_resTrees(samples_Y, samples_X, possible_trees, curr_family);
-      if (path && !std::isinf(curr_split.min_sum))
-        path_split(*path, curr_split);
-      if (!std::isinf(curr_split.min_sum)) {
-        // ensure D' and its one-step supersets are in pool
-        std::set<int> Dprime = curr_split.tree_index->split_dims;
-        Dprime.insert(curr_split.split_coordinate);
-        Dprime.erase(0);
-        if (!resultingTreeExists(possible_trees, Dprime)) {
-          if (auto found = treeExists(Dprime, curr_family))
-            possible_trees.emplace_back(found);
-          else {
-            curr_family.insert({Dprime, std::make_shared<DecisionTree>(DecisionTree(Dprime))});
-            possible_trees.emplace_back(curr_family[Dprime]);
-          }
-        }
-        for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-          std::set<int> U = Dprime;
-          U.insert(feature_dim);
-          if (U.size() == Dprime.size())
-            continue;
-          if (!dims_allowed(U))
-            continue;
-          if (resultingTreeExists(possible_trees, U))
-            continue;
-          if (auto found = treeExists(U, curr_family))
-            possible_trees.emplace_back(found);
-          else {
-            curr_family.insert({U, std::make_shared<DecisionTree>(DecisionTree(U))});
-            possible_trees.emplace_back(curr_family[U]);
-          }
-        }
-
-        // Mutate residuals (restore old behavior)
-        for (int individual : curr_split.leaf_index->individuals) {
-          if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point)
-            samples_Y[individual] -= curr_split.M_s;
-          else
-            samples_Y[individual] -= curr_split.M_b;
-        }
-        Leaf leaf_s, leaf_b;
-        leaf_s.individuals = curr_split.I_s;
-        leaf_b.individuals = curr_split.I_b;
-        leaf_s.value = curr_split.M_s;
-        leaf_b.value = curr_split.M_b;
-        leaf_s.intervals = curr_split.leaf_index->intervals;
-        leaf_b.intervals = curr_split.leaf_index->intervals;
-        leaf_s.intervals[curr_split.split_coordinate - 1].second = curr_split.split_point;
-        leaf_b.intervals[curr_split.split_coordinate - 1].first = curr_split.split_point;
-        std::set<int> resulting_dims = curr_split.tree_index->split_dims;
-        resulting_dims.insert(curr_split.split_coordinate);
-        resulting_dims.erase(0);
-        std::shared_ptr<DecisionTree> found_tree = treeExists(resulting_dims, curr_family);
-        if (!found_tree) {
-          curr_family.insert({resulting_dims, std::make_shared<DecisionTree>(DecisionTree(resulting_dims))});
-          found_tree = curr_family[resulting_dims];
-        }
-        if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate)) && delete_leaves) {
-          leaf_s.value += curr_split.leaf_index->value;
-          leaf_b.value += curr_split.leaf_index->value;
-          *curr_split.leaf_index = leaf_b;
-          curr_split.tree_index->leaves.push_back(leaf_s);
-        } else {
-          found_tree->leaves.push_back(leaf_s);
-          found_tree->leaves.push_back(leaf_b);
-        }
-      }
-    }
-
-    fit_null_leaf(curr_family, samples_Y);
-
-    // Final memory cleanup: drop training-only buffers and shrink containers
-    auto keys = getKeys(curr_family);
-    for (auto &key : keys) {
-      auto itTree = curr_family.find(key);
-      if (itTree == curr_family.end())
-        continue;
-      auto &treePtr = itTree->second;
-      if (treePtr->leaves.size() == 0) {
-        curr_family.erase(itTree);
-        continue;
-      }
-      for (auto &leaf : treePtr->leaves) {
-        // Individuals are not used after training; caches are training-only
-        leaf.individuals.clear();
-        leaf.individuals.shrink_to_fit();
-        // Free the per-leaf caches
-        leaf.free_cache();
-        // Keep intervals and value but release spare capacity
-        leaf.intervals.shrink_to_fit();
-        leaf.value.shrink_to_fit();
-      }
-      // Clear per-dimension sampling caches (used only during training)
-      for (auto &v : treePtr->fenwick_by_dim_v) {
-        v.clear();
-        v.shrink_to_fit();
-      }
-      treePtr->fenwick_by_dim_v.clear();
-      treePtr->fenwick_by_dim_v.shrink_to_fit();
-      for (auto &v : treePtr->leaf_weights_by_dim_v) {
-        v.clear();
-        v.shrink_to_fit();
-      }
-      treePtr->leaf_weights_by_dim_v.clear();
-      treePtr->leaf_weights_by_dim_v.shrink_to_fit();
-      treePtr->weights_total_by_dim_v.clear();
-      treePtr->weights_total_by_dim_v.shrink_to_fit();
-      treePtr->weights_epoch_by_dim_v.clear();
-      treePtr->weights_epoch_by_dim_v.shrink_to_fit();
-      treePtr->leaves.shrink_to_fit();
-    }
-    tree_families[n] = curr_family;
+void RandomPlantedForest::update_leaf_weight(
+    TreeFamily &family, DecisionTree &tree, size_t idx, bool append, const std::vector<std::vector<double>> &X
+)
+{
+  // only if the weights are cached (cur_trees_1); the same weights as the lazy rebuild, from the family's ranks
+  if ((int)tree.fenwick_by_dim_v.size() < this->feature_size)
     return;
-  }
-
-  // Non-res_trees modes use SplitCandidate pool
-  std::vector<SplitCandidate> possible_splits;
-  if (split_structure_mode_ == 3 || split_structure_mode_ == 4) {
-    // The pool's (tree, leaf, feature) entries in a hash set, for the duplicate
-    // check (a linear scan of the pool, leafCandidateExists(), before). Entries
-    // are never removed, so the set and the pool hold the same entries.
-    struct EntryKey {
-      const DecisionTree *t;
-      size_t li;
-      int dim;
-      bool operator==(const EntryKey &o) const { return t == o.t && li == o.li && dim == o.dim; }
-    };
-    struct EntryHash {
-      size_t operator()(const EntryKey &e) const
-      {
-        size_t h = std::hash<const void *>()(e.t);
-        h ^= std::hash<size_t>()(e.li) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-        h ^= std::hash<int>()(e.dim) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-        return h;
-      }
-    };
-    std::unordered_set<EntryKey, EntryHash> pool_entries;
-    // Add per-leaf candidate entries for all dimensions, respecting max_interaction and dedup
-    auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
-      if (!T)
-        return;
-      for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-        std::set<int> res_dims = T->split_dims;
-        res_dims.insert(feature_dim);
-        res_dims.erase(0);
-        if (!dims_allowed(res_dims))
-          continue;
-        if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
-          possible_splits.emplace_back(feature_dim, T, li);
-      }
-    };
-    // leaves: seed with leaf-level candidates from null tree (single leaf at index 0)
-    auto null_tree = curr_family[{0}];
-    if (!null_tree->leaves.empty())
-      add_leaf_candidates(null_tree, 0);
-
-    // bootstrap
-    int sample_index;
-    init_inbag(n);
-    std::vector<std::vector<double>> samples_X, samples_Y;
-    std::vector<int> boot_idx(sample_size);
-    if (deterministic) {
-      samples_X = X;
-      samples_Y = Y;
-      this->t_try = 1;
-      for (size_t i = 0; i < (size_t)sample_size; ++i)
-        boot_idx[i] = static_cast<int>(i);
-    } else {
-      samples_X = std::vector<std::vector<double>>(sample_size);
-      samples_Y = std::vector<std::vector<double>>(sample_size);
-      for (size_t i = 0; i < (size_t)sample_size; ++i) {
-        sample_index = rng_randint(0, (int)sample_size);
-        add_inbag(n, sample_index);
-        boot_idx[i] = sample_index;
-        samples_Y[i] = Y[sample_index];
-        samples_X[i] = X[sample_index];
-      }
-    }
-
-    // In histogram mode, cache per-feature bin ids for the working (bootstrapped) dataset.
-    // The buffer lives on this function's stack; TLS only holds a pointer to it.
-    std::vector<std::vector<int>> working_bin_id;
-    if (split_structure_mode_ == 4) {
-      working_bin_id.assign((size_t)feature_size, std::vector<int>(sample_size, 0));
-      for (int k = 0; k < feature_size; ++k) {
-        // Reuse global precomputed bin ids via bootstrap index mapping
-        if (!feature_cut_points_.empty() && (size_t)k < sample_bin_id_.size()) {
-          for (size_t i = 0; i < (size_t)sample_size; ++i)
-            working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
-        } else {
-          // Fallback: compute on-the-fly (should be rare if cuts are available)
-          const auto &cuts_k =
-              (k >= 0 && k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
-          for (size_t i = 0; i < (size_t)sample_size; ++i) {
-            int bin = 0;
-            if (!cuts_k.empty()) {
-              auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), samples_X[i][k]);
-              bin = (int)std::distance(cuts_k.begin(), itb);
-            }
-            working_bin_id[k][i] = bin;
-          }
-        }
-      }
-      tls_working_bin_id_ptr = &working_bin_id;
-    }
-
-    // The leaves split search's scratch buffers, reused across this family's
-    // splits. They live on this function's stack; TLS only holds a pointer to
-    // them, detached by the guard however the function exits.
-    LeavesScratch leaves_scratch;
-    struct LeavesScratchGuard {
-      ~LeavesScratchGuard() { tls_leaves_scratch_ptr = nullptr; }
-    } leaves_scratch_guard;
-    tls_leaves_scratch_ptr = &leaves_scratch;
-
-    std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
-    Split curr_split;
-    for (int split_count = 0; split_count < n_splits; ++split_count) {
-      if (path && !path_step(*path, split_count))
-        break;
-
-      if (split_structure_mode_ == 4)
-        curr_split = this->calcOptimalSplit_hist(samples_Y, samples_X, possible_splits, curr_family);
-      else
-        curr_split = this->calcOptimalSplit_leaves(samples_Y, samples_X, possible_splits, curr_family);
-      if (path && !std::isinf(curr_split.min_sum))
-        path_split(*path, curr_split);
-
-      if (!std::isinf(curr_split.min_sum)) {
-
-        // Mutate residuals (restore old behavior)
-        for (int individual : curr_split.leaf_index->individuals) {
-          if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point)
-            samples_Y[individual] -= curr_split.M_s;
-          else
-            samples_Y[individual] -= curr_split.M_b;
-        }
-
-        Leaf leaf_s, leaf_b;
-        leaf_s.individuals = curr_split.I_s;
-        leaf_b.individuals = curr_split.I_b;
-        leaf_s.value = curr_split.M_s;
-        leaf_b.value = curr_split.M_b;
-        leaf_s.intervals = curr_split.leaf_index->intervals;
-        leaf_b.intervals = curr_split.leaf_index->intervals;
-        leaf_s.intervals[curr_split.split_coordinate - 1].second = curr_split.split_point;
-        leaf_b.intervals[curr_split.split_coordinate - 1].first = curr_split.split_point;
-
-        std::set<int> resulting_dims = curr_split.tree_index->split_dims;
-        resulting_dims.insert(curr_split.split_coordinate);
-        resulting_dims.erase(0);
-
-        std::shared_ptr<DecisionTree> found_tree = treeExists(resulting_dims, curr_family);
-        if (!found_tree) {
-          curr_family.insert({resulting_dims, std::make_shared<DecisionTree>(DecisionTree(resulting_dims))});
-          found_tree = curr_family[resulting_dims];
-        }
-
-        if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate)) && delete_leaves) {
-
-          leaf_s.value += curr_split.leaf_index->value;
-          leaf_b.value += curr_split.leaf_index->value;
-          // Compute index BEFORE any push_back that may reallocate
-          size_t idx_b = static_cast<size_t>(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
-          // Assign by value to avoid aliasing issues if vector reallocates later
-          *curr_split.leaf_index = leaf_b;
-          if (min_leaf_rows_ > 1) // the entries of the overwritten leaf refer to leaf_b now
-            for (size_t i = 0; i < possible_splits.size(); ++i) {
-              SplitCandidate &c = possible_splits[i];
-              if (c.tree.get() == curr_split.tree_index.get() && c.leaf_idx == idx_b) {
-                c.rows_ok = -1;
-                if (!exact_draw_ && !deterministic) // the fast draw sets their weights again
-                  leaves_scratch.sampler.dirty.push_back(i);
-              }
-            }
-          curr_split.tree_index->leaves.push_back(leaf_s);
-          size_t idx_s = curr_split.tree_index->leaves.size() - 1;
-          add_leaf_candidates(curr_split.tree_index, idx_b);
-          add_leaf_candidates(curr_split.tree_index, idx_s);
-          // (no loop over the tree's leaves clearing their unique-value caches: leaves and hist never fill them)
-        } else {
-
-          // Append by value; avoid referencing invalidated addresses
-          found_tree->leaves.push_back(leaf_s);
-          found_tree->leaves.push_back(leaf_b);
-          // Add candidates for both new leaves
-          size_t idx_s = found_tree->leaves.size() - 2;
-          size_t idx_b = found_tree->leaves.size() - 1;
-          add_leaf_candidates(found_tree, idx_s);
-          add_leaf_candidates(found_tree, idx_b);
-          // (no loop over the tree's leaves clearing their unique-value caches: leaves and hist never fill them)
-        }
-      }
-    }
-    // Detach the histogram working buffer; the stack-owned vector frees itself.
-    tls_working_bin_id_ptr = nullptr;
-
-    fit_null_leaf(curr_family, samples_Y);
-
-    // Final memory cleanup: drop training-only buffers and shrink containers
-    auto keys = getKeys(curr_family);
-    for (auto &key : keys) {
-      auto itTree = curr_family.find(key);
-      if (itTree == curr_family.end())
-        continue;
-      auto &treePtr = itTree->second;
-      if (treePtr->leaves.size() == 0) {
-        curr_family.erase(itTree);
-        continue;
-      }
-      for (auto &leaf : treePtr->leaves) {
-        leaf.individuals.clear();
-        leaf.individuals.shrink_to_fit();
-        leaf.free_cache();
-        leaf.intervals.shrink_to_fit();
-        leaf.value.shrink_to_fit();
-      }
-      for (auto &v : treePtr->fenwick_by_dim_v) {
-        v.clear();
-        v.shrink_to_fit();
-      }
-      treePtr->fenwick_by_dim_v.clear();
-      treePtr->fenwick_by_dim_v.shrink_to_fit();
-      for (auto &v : treePtr->leaf_weights_by_dim_v) {
-        v.clear();
-        v.shrink_to_fit();
-      }
-      treePtr->leaf_weights_by_dim_v.clear();
-      treePtr->leaf_weights_by_dim_v.shrink_to_fit();
-      treePtr->weights_total_by_dim_v.clear();
-      treePtr->weights_total_by_dim_v.shrink_to_fit();
-      treePtr->weights_epoch_by_dim_v.clear();
-      treePtr->weights_epoch_by_dim_v.shrink_to_fit();
-      treePtr->leaves.shrink_to_fit();
-    }
-    tree_families[n] = curr_family;
-    return;
-  }
-
-  // cur_trees_1 and cur_trees_2: initialize with {j} trees
-  for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-    if (!dims_allowed({feature_dim}))
+  rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(family[std::set<int>{0}]->ct1_ranks, X);
+  for (int kdim = 0; kdim < this->feature_size; ++kdim) {
+    auto &bit = tree.fenwick_by_dim_v[(size_t)kdim];
+    auto &wts = tree.leaf_weights_by_dim_v[(size_t)kdim];
+    if (bit.empty() || wts.size() != bit.size())
       continue;
-    auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
-    curr_family.insert({{feature_dim}, treePtr});
-    // leaf_idx unused for these modes
-    possible_splits.emplace_back(feature_dim, treePtr, static_cast<size_t>(0));
-  }
-
-  // bootstrap
-  int sample_index;
-  init_inbag(n);
-  std::vector<std::vector<double>> samples_X, samples_Y;
-  if (deterministic) {
-    samples_X = X;
-    samples_Y = Y;
-    this->t_try = 1;
-  } else {
-    samples_X = std::vector<std::vector<double>>(sample_size);
-    samples_Y = std::vector<std::vector<double>>(sample_size);
-    for (size_t i = 0; i < (size_t)sample_size; ++i) {
-      sample_index = rng_randint(0, (int)sample_size);
-      add_inbag(n, sample_index);
-      samples_Y[i] = Y[sample_index];
-      samples_X[i] = X[sample_index];
-    }
-  }
-
-  std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
-  Split curr_split;
-  for (int split_count = 0; split_count < n_splits; ++split_count) {
-    if (path && !path_step(*path, split_count))
-      break;
-    if (split_structure_mode_ == 2)
-      curr_split = this->calcOptimalSplit_curTrees1(samples_Y, samples_X, possible_splits, curr_family);
-    else
-      curr_split = this->calcOptimalSplit_curTrees2(samples_Y, samples_X, possible_splits, curr_family);
-    if (path && !std::isinf(curr_split.min_sum))
-      path_split(*path, curr_split);
-    if (!std::isinf(curr_split.min_sum)) {
-      // Update possible_splits like tryeveryleaf/splittrynew
-      for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
-        std::set<int> curr_dims = curr_split.tree_index->split_dims;
-        curr_dims.insert(curr_split.split_coordinate);
-        curr_dims.insert(feature_dim);
-        curr_dims.erase(0);
-        if (possibleExists(feature_dim, possible_splits, curr_dims))
-          continue;
-        if (!dims_allowed(curr_dims))
-          continue;
-        if (auto found = treeExists(curr_dims, curr_family))
-          possible_splits.emplace_back(feature_dim, found, static_cast<size_t>(0));
-        else {
-          curr_family.insert({curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))});
-          possible_splits.emplace_back(feature_dim, curr_family[curr_dims], static_cast<size_t>(0));
-        }
-      }
-
-      for (int individual : curr_split.leaf_index->individuals) {
-        if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point)
-          samples_Y[individual] -= curr_split.M_s;
-        else
-          samples_Y[individual] -= curr_split.M_b;
-      }
-      Leaf leaf_s, leaf_b;
-      leaf_s.individuals = curr_split.I_s;
-      leaf_b.individuals = curr_split.I_b;
-      leaf_s.value = curr_split.M_s;
-      leaf_b.value = curr_split.M_b;
-      leaf_s.intervals = curr_split.leaf_index->intervals;
-      leaf_b.intervals = curr_split.leaf_index->intervals;
-      leaf_s.intervals[curr_split.split_coordinate - 1].second = curr_split.split_point;
-      leaf_b.intervals[curr_split.split_coordinate - 1].first = curr_split.split_point;
-      std::set<int> resulting_dims = curr_split.tree_index->split_dims;
-      resulting_dims.insert(curr_split.split_coordinate);
-      resulting_dims.erase(0);
-      std::shared_ptr<DecisionTree> found_tree = treeExists(resulting_dims, curr_family);
-      if (!found_tree) {
-        curr_family.insert({resulting_dims, std::make_shared<DecisionTree>(DecisionTree(resulting_dims))});
-        found_tree = curr_family[resulting_dims];
-      }
-      if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate)) && delete_leaves) {
-        leaf_s.value += curr_split.leaf_index->value;
-        leaf_b.value += curr_split.leaf_index->value;
-        // index of the replaced leaf BEFORE push_back
-        size_t idx_b = static_cast<size_t>(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
-        *curr_split.leaf_index = leaf_b;
-        curr_split.tree_index->leaves.push_back(leaf_s);
-        size_t idx_s = curr_split.tree_index->leaves.size() - 1;
-        // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
-        if ((int)curr_split.tree_index->fenwick_by_dim_v.size() >= this->feature_size) {
-          rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(curr_family[std::set<int>{0}]->ct1_ranks, samples_X);
-          for (int kdim = 0; kdim < this->feature_size; ++kdim) {
-            auto &bit = curr_split.tree_index->fenwick_by_dim_v[(size_t)kdim];
-            auto &wts = curr_split.tree_index->leaf_weights_by_dim_v[(size_t)kdim];
-            if (!bit.empty() && wts.size() == bit.size()) {
-              // update replaced leaf
-              int leaf_min = this->n_leaves[kdim];
-              double w_new_b = rpf_ct1::leaf_weight(fr, curr_split.tree_index->leaves[idx_b], kdim, leaf_min);
-              double delta_b = w_new_b - (idx_b < wts.size() ? wts[idx_b] : 0.0);
-              if ((size_t)idx_b < wts.size())
-                wts[idx_b] = w_new_b;
-              if (delta_b != 0.0) {
-                rpf_utils::fenwick_add(bit, idx_b + 1, delta_b);
-                curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += delta_b;
-              }
-              // append new leaf
-              double w_new_s = rpf_ct1::leaf_weight(fr, curr_split.tree_index->leaves[idx_s], kdim, leaf_min);
-              rpf_utils::fenwick_push_back(bit, w_new_s);
-              wts.push_back(w_new_s);
-              curr_split.tree_index->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
-            }
-          }
-        }
-      } else {
-        found_tree->leaves.push_back(leaf_s);
-        found_tree->leaves.push_back(leaf_b);
-        size_t idx_s = found_tree->leaves.size() - 2;
-        size_t idx_b = found_tree->leaves.size() - 1;
-        // Incrementally update sampling caches if initialized (same weights as the lazy rebuild)
-        if ((int)found_tree->fenwick_by_dim_v.size() >= this->feature_size) {
-          rpf_ct1::FamilyRanks &fr = rpf_ct1::family_ranks(curr_family[std::set<int>{0}]->ct1_ranks, samples_X);
-          for (int kdim = 0; kdim < this->feature_size; ++kdim) {
-            auto &bit = found_tree->fenwick_by_dim_v[(size_t)kdim];
-            auto &wts = found_tree->leaf_weights_by_dim_v[(size_t)kdim];
-            if (!bit.empty() && wts.size() == bit.size()) {
-              int leaf_min = this->n_leaves[kdim];
-              // append s
-              double w_new_s = rpf_ct1::leaf_weight(fr, found_tree->leaves[idx_s], kdim, leaf_min);
-              rpf_utils::fenwick_push_back(bit, w_new_s);
-              wts.push_back(w_new_s);
-              found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_s;
-              // append b
-              double w_new_b = rpf_ct1::leaf_weight(fr, found_tree->leaves[idx_b], kdim, leaf_min);
-              rpf_utils::fenwick_push_back(bit, w_new_b);
-              wts.push_back(w_new_b);
-              found_tree->weights_total_by_dim_v[(size_t)kdim] += w_new_b;
-            }
-          }
-        }
+    const double w_new = rpf_ct1::leaf_weight(fr, tree.leaves[idx], kdim, this->n_leaves[kdim]);
+    if (append) {
+      rpf_utils::fenwick_push_back(bit, w_new);
+      wts.push_back(w_new);
+      tree.weights_total_by_dim_v[(size_t)kdim] += w_new;
+    } else {
+      const double delta_w = w_new - (idx < wts.size() ? wts[idx] : 0.0);
+      if (idx < wts.size())
+        wts[idx] = w_new;
+      if (delta_w != 0.0) {
+        rpf_utils::fenwick_add(bit, idx + 1, delta_w);
+        tree.weights_total_by_dim_v[(size_t)kdim] += delta_w;
       }
     }
   }
+}
 
-  fit_null_leaf(curr_family, samples_Y);
-
-  // Final memory cleanup: drop training-only buffers and shrink containers
-  auto keys = getKeys(curr_family);
+void RandomPlantedForest::finish_family(TreeFamily &family)
+{
+  auto keys = getKeys(family);
   for (auto &key : keys) {
-    auto itTree = curr_family.find(key);
-    if (itTree == curr_family.end())
+    auto itTree = family.find(key);
+    if (itTree == family.end())
       continue;
     auto &treePtr = itTree->second;
     if (treePtr->leaves.size() == 0) {
-      curr_family.erase(itTree);
+      family.erase(itTree);
       continue;
     }
     for (auto &leaf : treePtr->leaves) {
@@ -1061,7 +558,286 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
     treePtr->ct1_ranks.reset(); // cur_trees_1's ranks of the working rows
     treePtr->leaves.shrink_to_fit();
   }
+}
+
+// One tree family, for every loss and split structure. The loss (family_loss(); nullptr: regression) scores the
+// tries of the split searches and updates the family's rows after each split; everything else is the same code.
+void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, size_t n)
+{
+  TreeFamily curr_family;
+  curr_family.insert(
+      {std::set<int>{0}, std::make_shared<DecisionTree>(DecisionTree(std::set<int>{0}, initial_leaves))}
+  );
+  const int mode = split_structure_mode_;
+  const bool leaf_pool = (mode == 3 || mode == 4); // leaves, hist: (tree, leaf, feature) candidates
+
+  // The pool: res_trees draws trees; cur_trees_1 / cur_trees_2 draw (tree, feature) entries (leaf_idx unused), each
+  // {j} tree to begin with; leaves / hist draw (tree, leaf, feature) entries, the null tree's leaf to begin with.
+  std::vector<ResultingTreeCandidate> possible_trees;
+  std::vector<SplitCandidate> possible_splits;
+  // The pool's (tree, leaf, feature) entries in a hash set, for the duplicate check. Entries are never removed, so the
+  // set and the pool hold the same entries.
+  struct EntryKey {
+    const DecisionTree *t;
+    size_t li;
+    int dim;
+    bool operator==(const EntryKey &o) const { return t == o.t && li == o.li && dim == o.dim; }
+  };
+  struct EntryHash {
+    size_t operator()(const EntryKey &e) const
+    {
+      size_t h = std::hash<const void *>()(e.t);
+      h ^= std::hash<size_t>()(e.li) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+      h ^= std::hash<int>()(e.dim) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+  std::unordered_set<EntryKey, EntryHash> pool_entries;
+  // Add per-leaf candidate entries for all dimensions, respecting max_interaction and dedup
+  auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
+    if (!T)
+      return;
+    for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      std::set<int> res_dims = T->split_dims;
+      res_dims.insert(feature_dim);
+      res_dims.erase(0);
+      if (!dims_allowed(res_dims))
+        continue;
+      if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
+        possible_splits.emplace_back(feature_dim, T, li);
+    }
+  };
+  if (leaf_pool) {
+    auto null_tree = curr_family[{0}];
+    if (!null_tree->leaves.empty())
+      add_leaf_candidates(null_tree, 0);
+  } else {
+    for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+      if (!dims_allowed({feature_dim}))
+        continue;
+      auto treePtr = std::make_shared<DecisionTree>(DecisionTree({feature_dim}));
+      curr_family.insert({{feature_dim}, treePtr});
+      if (mode == 0)
+        possible_trees.emplace_back(treePtr);
+      else
+        possible_splits.emplace_back(feature_dim, treePtr, static_cast<size_t>(0));
+    }
+  }
+
+  // bootstrap: the working rows, and each one's row in the data
+  int sample_index;
+  init_inbag(n);
+  std::vector<std::vector<double>> samples_X, samples_Y;
+  std::vector<int> boot_idx(sample_size);
+  if (deterministic) {
+    samples_X = X;
+    samples_Y = Y;
+    this->t_try = 1;
+    for (size_t i = 0; i < (size_t)sample_size; ++i)
+      boot_idx[i] = static_cast<int>(i);
+  } else {
+    samples_X = std::vector<std::vector<double>>(sample_size);
+    samples_Y = std::vector<std::vector<double>>(sample_size);
+    for (size_t i = 0; i < (size_t)sample_size; ++i) {
+      sample_index = rng_randint(0, (int)sample_size);
+      add_inbag(n, sample_index);
+      boot_idx[i] = sample_index;
+      samples_Y[i] = Y[sample_index];
+      samples_X[i] = X[sample_index];
+    }
+  }
+
+  // In histogram mode, cache per-feature bin ids for the working (bootstrapped) dataset.
+  // The buffer lives on this function's stack; TLS only holds a pointer to it, detached by the guard.
+  std::vector<std::vector<int>> working_bin_id;
+  struct WorkingBinGuard {
+    ~WorkingBinGuard() { tls_working_bin_id_ptr = nullptr; }
+  } working_bin_guard;
+  if (mode == 4) {
+    working_bin_id.assign((size_t)feature_size, std::vector<int>(sample_size, 0));
+    for (int k = 0; k < feature_size; ++k) {
+      // Reuse global precomputed bin ids via bootstrap index mapping
+      if (!feature_cut_points_.empty() && (size_t)k < sample_bin_id_.size()) {
+        for (size_t i = 0; i < (size_t)sample_size; ++i)
+          working_bin_id[k][i] = sample_bin_id_[k][(size_t)boot_idx[i]];
+      } else {
+        // Fallback: compute on-the-fly (should be rare if cuts are available)
+        const auto &cuts_k =
+            (k >= 0 && k < (int)feature_cut_points_.size()) ? feature_cut_points_[k] : std::vector<double>{};
+        for (size_t i = 0; i < (size_t)sample_size; ++i) {
+          int bin = 0;
+          if (!cuts_k.empty()) {
+            auto itb = std::upper_bound(cuts_k.begin(), cuts_k.end(), samples_X[i][k]);
+            bin = (int)std::distance(cuts_k.begin(), itb);
+          }
+          working_bin_id[k][i] = bin;
+        }
+      }
+    }
+    tls_working_bin_id_ptr = &working_bin_id;
+  }
+
+  // The leaves split search's scratch buffers, reused across this family's
+  // splits. They live on this function's stack; TLS only holds a pointer to
+  // them, detached by the guard however the function exits.
+  LeavesScratch leaves_scratch;
+  struct LeavesScratchGuard {
+    ~LeavesScratchGuard() { tls_leaves_scratch_ptr = nullptr; }
+  } leaves_scratch_guard;
+  tls_leaves_scratch_ptr = &leaves_scratch;
+
+  // The loss's state for this family (classification: its weights), nullptr for regression
+  std::unique_ptr<FamilyLoss> loss = family_loss(samples_Y, boot_idx);
+
+  std::shared_ptr<PathTracker> path = path_start(n, &curr_family, &samples_Y);
+  Split curr_split;
+  std::vector<double> inc_s, inc_b;
+  for (int split_count = 0; split_count < n_splits; ++split_count) {
+    if (path && !path_step(*path, split_count))
+      break;
+
+    if (mode == 0)
+      curr_split = this->calcOptimalSplit_resTrees(samples_Y, samples_X, possible_trees, curr_family, loss.get());
+    else
+      curr_split = this->calcOptimalSplit(samples_Y, samples_X, possible_splits, curr_family, loss.get());
+    if (std::isinf(curr_split.min_sum))
+      continue;
+
+    if (mode == 0) {
+      // ensure D' and its one-step supersets are in pool
+      std::set<int> Dprime = curr_split.tree_index->split_dims;
+      Dprime.insert(curr_split.split_coordinate);
+      Dprime.erase(0);
+      if (!resultingTreeExists(possible_trees, Dprime)) {
+        if (auto found = treeExists(Dprime, curr_family))
+          possible_trees.emplace_back(found);
+        else {
+          curr_family.insert({Dprime, std::make_shared<DecisionTree>(DecisionTree(Dprime))});
+          possible_trees.emplace_back(curr_family[Dprime]);
+        }
+      }
+      for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+        std::set<int> U = Dprime;
+        U.insert(feature_dim);
+        if (U.size() == Dprime.size())
+          continue;
+        if (!dims_allowed(U))
+          continue;
+        if (resultingTreeExists(possible_trees, U))
+          continue;
+        if (auto found = treeExists(U, curr_family))
+          possible_trees.emplace_back(found);
+        else {
+          curr_family.insert({U, std::make_shared<DecisionTree>(DecisionTree(U))});
+          possible_trees.emplace_back(curr_family[U]);
+        }
+      }
+    } else if (!leaf_pool) {
+      // cur_trees_1 / cur_trees_2: the (tree, feature) candidates of the tree the split grows into
+      for (int feature_dim = 1; feature_dim <= feature_size; ++feature_dim) {
+        std::set<int> curr_dims = curr_split.tree_index->split_dims;
+        curr_dims.insert(curr_split.split_coordinate);
+        curr_dims.insert(feature_dim);
+        curr_dims.erase(0);
+        if (possibleExists(feature_dim, possible_splits, curr_dims))
+          continue;
+        if (!dims_allowed(curr_dims))
+          continue;
+        if (auto found = treeExists(curr_dims, curr_family))
+          possible_splits.emplace_back(feature_dim, found, static_cast<size_t>(0));
+        else {
+          curr_family.insert({curr_dims, std::make_shared<DecisionTree>(DecisionTree(curr_dims))});
+          possible_splits.emplace_back(feature_dim, curr_family[curr_dims], static_cast<size_t>(0));
+        }
+      }
+    }
+    // (leaves / hist: the new leaves' candidates below, once they have their indices)
+
+    // The family's rows and the new leaves' increments: regression subtracts the leaf means from the residuals
+    if (loss) {
+      loss->apply(curr_split, samples_X, samples_Y, inc_s, inc_b);
+    } else {
+      for (int individual : curr_split.leaf_index->individuals) {
+        if (samples_X[individual][curr_split.split_coordinate - 1] < curr_split.split_point)
+          samples_Y[individual] -= curr_split.M_s;
+        else
+          samples_Y[individual] -= curr_split.M_b;
+      }
+      inc_s = curr_split.M_s;
+      inc_b = curr_split.M_b;
+    }
+    // the OOB path follows the increments, before the leaves change
+    if (path)
+      path_split(*path, curr_split, &inc_s, &inc_b);
+
+    Leaf leaf_s, leaf_b;
+    leaf_s.individuals = curr_split.I_s;
+    leaf_b.individuals = curr_split.I_b;
+    leaf_s.value = inc_s;
+    leaf_b.value = inc_b;
+    leaf_s.intervals = curr_split.leaf_index->intervals;
+    leaf_b.intervals = curr_split.leaf_index->intervals;
+    leaf_s.intervals[curr_split.split_coordinate - 1].second = curr_split.split_point;
+    leaf_b.intervals[curr_split.split_coordinate - 1].first = curr_split.split_point;
+
+    std::set<int> resulting_dims = curr_split.tree_index->split_dims;
+    resulting_dims.insert(curr_split.split_coordinate);
+    resulting_dims.erase(0);
+    std::shared_ptr<DecisionTree> found_tree = treeExists(resulting_dims, curr_family);
+    if (!found_tree) {
+      curr_family.insert({resulting_dims, std::make_shared<DecisionTree>(DecisionTree(resulting_dims))});
+      found_tree = curr_family[resulting_dims];
+    }
+
+    if ((curr_split.tree_index->split_dims.count(curr_split.split_coordinate)) && delete_leaves) {
+      // the split leaf becomes the larger half, the smaller half is appended to its tree
+      leaf_s.value += curr_split.leaf_index->value;
+      leaf_b.value += curr_split.leaf_index->value;
+      // Compute index BEFORE any push_back that may reallocate
+      size_t idx_b = static_cast<size_t>(curr_split.leaf_index - &curr_split.tree_index->leaves[0]);
+      // Assign by value to avoid aliasing issues if vector reallocates later
+      *curr_split.leaf_index = leaf_b;
+      if (min_leaf_rows_ > 1) // the entries of the overwritten leaf refer to leaf_b now
+        for (size_t i = 0; i < possible_splits.size(); ++i) {
+          SplitCandidate &c = possible_splits[i];
+          if (c.tree.get() == curr_split.tree_index.get() && c.leaf_idx == idx_b) {
+            c.rows_ok = -1;
+            if (!exact_draw_ && !deterministic) // the fast draw sets their weights again
+              leaves_scratch.sampler.dirty.push_back(i);
+          }
+        }
+      curr_split.tree_index->leaves.push_back(leaf_s);
+      size_t idx_s = curr_split.tree_index->leaves.size() - 1;
+      if (leaf_pool) {
+        add_leaf_candidates(curr_split.tree_index, idx_b);
+        add_leaf_candidates(curr_split.tree_index, idx_s);
+      } else if (mode == 1 || mode == 2) {
+        update_leaf_weight(curr_family, *curr_split.tree_index, idx_b, false, samples_X);
+        update_leaf_weight(curr_family, *curr_split.tree_index, idx_s, true, samples_X);
+      }
+    } else {
+      // both halves are appended to the tree of the resulting dims, the smaller first
+      found_tree->leaves.push_back(leaf_s);
+      found_tree->leaves.push_back(leaf_b);
+      size_t idx_s = found_tree->leaves.size() - 2;
+      size_t idx_b = found_tree->leaves.size() - 1;
+      if (leaf_pool) {
+        add_leaf_candidates(found_tree, idx_s);
+        add_leaf_candidates(found_tree, idx_b);
+      } else if (mode == 1 || mode == 2) {
+        update_leaf_weight(curr_family, *found_tree, idx_s, true, samples_X);
+        update_leaf_weight(curr_family, *found_tree, idx_b, true, samples_X);
+      }
+    }
+  }
+
+  fit_null_leaf(curr_family, samples_Y);
+
+  // Final memory cleanup: drop training-only buffers and shrink containers
+  finish_family(curr_family);
   tree_families[n] = curr_family;
+  if (loss)
+    loss->finish(n);
 }
 
 // fit forest to new data

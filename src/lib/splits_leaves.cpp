@@ -380,7 +380,8 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
     const std::vector<std::vector<double>> &Y,
     const std::vector<std::vector<double>> &X,
     std::vector<SplitCandidate> &possible_splits,
-    TreeFamily &curr_family
+    TreeFamily &curr_family,
+    FamilyLoss *loss_fn
 )
 {
   Split curr_split, min_split;
@@ -483,11 +484,21 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
         continue;
 
       double loss = 0.0;
-      for (size_t p = 0; p < this->value_size; ++p) {
-        const double sum_s_base = prefix[p * m + pos - 1];
-        const double sum_b_base = total[p] - sum_s_base;
-        loss -= (sum_s_base * sum_s_base) / static_cast<double>(pos);
-        loss -= (sum_b_base * sum_b_base) / static_cast<double>(m - pos);
+      if (loss_fn) { // the loss's criterion (classification), from the same sums
+        curr_split.sum_s.resize(this->value_size);
+        curr_split.sum_b.resize(this->value_size);
+        for (size_t p = 0; p < this->value_size; ++p) {
+          curr_split.sum_s[p] = prefix[p * m + pos - 1];
+          curr_split.sum_b[p] = total[p] - curr_split.sum_s[p];
+        }
+        loss = loss_fn->score(curr_split, *leafPtr, k, sp, X);
+      } else {
+        for (size_t p = 0; p < this->value_size; ++p) {
+          const double sum_s_base = prefix[p * m + pos - 1];
+          const double sum_b_base = total[p] - sum_s_base;
+          loss -= (sum_s_base * sum_s_base) / static_cast<double>(pos);
+          loss -= (sum_b_base * sum_b_base) / static_cast<double>(m - pos);
+        }
       }
 
       if (loss < min_split.min_sum) {
@@ -511,6 +522,9 @@ Split RandomPlantedForest::calcOptimalSplit_leaves(
 
   rpf_utils::age_pool_by_sample(sample_idxs, best_idx, possible_splits);
   leaves_sampler_after_aging(possible_splits, sample_idxs, sc);
-  finalize_split_from_sums(min_split, X, this->value_size);
+  if (loss_fn)
+    loss_fn->finalize(min_split, X);
+  else
+    finalize_split_from_sums(min_split, X, this->value_size);
   return min_split;
 }
