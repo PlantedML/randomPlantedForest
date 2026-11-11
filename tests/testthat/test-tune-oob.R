@@ -15,6 +15,8 @@ to_tune <- function(d, search = 2:3, min_leaf_rows = c(1L, 20L), neighbours = TR
     max_interaction = 2,
     n_families = 10,
     tune = tune_control(ladder = ladder, search = search, min_leaf_rows = min_leaf_rows, neighbours = neighbours),
+    # the chosen forest is compared too
+    keep_forest = TRUE,
     ...
   )
 }
@@ -74,7 +76,8 @@ test_that("a one-point search equals set.seed(s); rpf(n_splits = NULL, prune = T
       n_try_split_points = 5L,
       share_candidates = 0.2,
       min_leaf_rows = m,
-      prune = TRUE
+      prune = TRUE,
+      keep_forest = TRUE
     )
     # and leaves the random number stream where that call leaves it
     expect_identical(after_tune, .Random.seed)
@@ -131,7 +134,8 @@ test_that("a one-point search passes split_structure to the forest", {
     n_try_split_points = 5L,
     share_candidates = 0.2,
     split_structure = "tree_then_leaf",
-    prune = TRUE
+    prune = TRUE,
+    keep_forest = TRUE
   )
   expect_identical(r$fit$params$split_structure, "cur_trees_1")
   expect_identical(strip_tune(r), strip_tune(p))

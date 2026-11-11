@@ -73,7 +73,10 @@ format.rpf <- function(x, ...) {
         cli::cli_alert_warning("Growing stopped at the cap while the out-of-bag error was still falling.")
       }
     }
-    if (is_purified(x)) {
+    if (!rpf_has_forest(x)) {
+      # the fit of a pruned model without its forest: the forest's description only
+      cli::cli_alert_info("The forest itself was not kept (pruned with {.code keep_forest = FALSE}).")
+    } else if (is_purified(x)) {
       cli::cli_alert_success("Forest is purified.")
     } else {
       cli::cli_alert_info("Forest is not purified.")

@@ -11,9 +11,12 @@ rpf_is_valid(x)
 \code{\link[=prune_components]{prune_components()}}, possibly restored from disk.}
 }
 \value{
-\code{TRUE} if the underlying model can be used, \code{FALSE} otherwise.
+\code{TRUE} if the underlying model can be used, \code{FALSE} otherwise (also for the \code{fit} of a pruned model
+without its forest).
 }
 \description{
 The C++ forest does not survive \code{\link[=saveRDS]{saveRDS()}}; an \code{rpf} object restored via
-\code{\link[=readRDS]{readRDS()}} without \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}} is unusable.
+\code{\link[=readRDS]{readRDS()}} without \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}} is unusable. A pruned model without its forest
+(\code{keep_forest = FALSE}, the default) has no C++ forest and is always valid; the \code{fit} of such a model is not (it
+has no forest to use).
 }

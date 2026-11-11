@@ -15,7 +15,8 @@
 #'
 #' The result, of class `rpf_pruned`, has methods for
 #' [`predict()`][predict.rpf_pruned], [predict_components()] and `print()`.
-#' `prune = FALSE` returns the forest (class `rpf`) instead, and
+#' It holds the kept components, not the forest (`keep_forest = TRUE` keeps the
+#' forest too). `prune = FALSE` returns the forest (class `rpf`) instead, and
 #' `n_splits = <number>` fits a fixed number of splits.
 #'
 #' @param x,y `[data.frame | matrix | recipe]`, `[numeric | factor]`:
@@ -114,6 +115,15 @@
 #'   a component is coarsened to at most `max_panels` heat maps and the model is
 #'   pruned again (the `max_panels` of [prune_components()]). A whole number of
 #'   at least 1, or `Inf` for no coarsening.
+#' @param keep_forest `[logical(1): FALSE]`: Used only when pruning: whether
+#'   the pruned model keeps the forest it was pruned from, in `$fit`. By
+#'   default it does not: the model predicts from the components it keeps, so
+#'   the forest's memory is free when `rpf()` returns, and the model is plain R
+#'   data that [saveRDS()] stores as it is. `TRUE` keeps the forest, for
+#'   pruning it again with other settings ([prune_components()] on `$fit`),
+#'   [purify()], or its own predictions; such a model is saved with
+#'   [rpf_marshal()]. With `prune = FALSE` it has no effect: the result is the
+#'   forest. See "Pruning" in Details.
 #' @param tune `[logical(1) | character(1) | rpf_tune_control: FALSE]`: Whether
 #'   to tune the greediness (`n_try_split_points`, `share_candidates`) and
 #'   `min_leaf_rows` out of bag (not with `deterministic = TRUE`, at least 10
@@ -130,8 +140,9 @@
 #' @param nthreads `[integer(1): 1]`: Number of threads for fitting. Also the default for
 #'   [predict()][predict.rpf()] and [purify()].
 #' @param export_forest `[logical(1): FALSE]`: Whether to store the flattened forest in
-#'   the returned object as `$forest` (with `prune = TRUE`, in the forest:
-#'   `$fit$forest`). If `FALSE`, it is `NULL`, which saves memory.
+#'   the returned object as `$forest` (with `prune = TRUE` and
+#'   `keep_forest = TRUE`, in the forest: `$fit$forest`; a pruned model without
+#'   its forest has neither). If `FALSE`, it is `NULL`, which saves memory.
 #' @param deterministic `[logical(1): FALSE]`: Whether to fit without randomness: no
 #'   bootstrap, the first `max_candidates` possible splits as candidates
 #'   (`share_candidates` and `split_decay_rate` are ignored) and evenly spaced thresholds. The
@@ -170,10 +181,12 @@
 #'   (whether it stopped at the cap while the error was still falling, neither
 #'   stop rule reached).
 #'   When pruning (the default), an object of class `rpf_pruned` (see
-#'   [prune_components()]), whose element `fit` is the forest (not purified),
-#'   with the elements above: the pruned model's OOB path is `$fit$oob_path`, and
+#'   [prune_components()]), whose element `fit` describes the forest with the
+#'   elements above: the pruned model's OOB path is `$fit$oob_path`, and
 #'   with `n_splits = NULL` the chosen number of splits `$fit$params$splits` and
-#'   the stop `$fit$splits_oob`.
+#'   the stop `$fit$splits_oob`. Without `keep_forest`, `fit` holds no forest
+#'   (`$fit$fit` is `NULL`); with `keep_forest = TRUE` it is the forest (not
+#'   purified).
 #'   With `tune`, the `rpf_pruned` model of the chosen forest, with an element
 #'   `tune`: `search`, the search table (one row per forest grown, in the order
 #'   grown: `step`, `n_try_split_points`, `share_candidates`, `min_leaf_rows`,
@@ -493,6 +506,16 @@
 #' needs out-of-bag rows, so with `deterministic = TRUE` `prune = NULL` means
 #' `FALSE` and `prune = TRUE` is an error.
 #'
+#' The pruned model does not keep the forest (`keep_forest = FALSE`): it
+#' predicts, prints and shows its components from what it stores, the same,
+#' bit for bit, as with the forest, and is a fraction of the forest's size
+#' (California housing: about 0.2 GB against 0.6 GB for the forest of 200
+#' families). What needs the forest is then an error that says so: pruning
+#' again, [purify()], the forest's own [`predict()`][predict.rpf()],
+#' [predict_components()] and [plot()][plot.rpf()]. With `keep_forest = TRUE`
+#' the forest is in `$fit`, so that `prune_components(model$fit, data, ...)`
+#' prunes it again.
+#'
 #' ## Classification
 #'
 #' A classification forest goes through the same steps (the OOB path,
@@ -657,6 +680,7 @@ rpf.formula <- function(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -700,6 +724,7 @@ rpf.formula <- function(
     exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
+    keep_forest = keep_forest,
     tune = tune,
     given = tune_given(environment(), old),
     purify = purify,
@@ -732,6 +757,7 @@ rpf.data.frame <- function(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -762,6 +788,7 @@ rpf.data.frame <- function(
     exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
+    keep_forest = keep_forest,
     tune = tune,
     given = tune_given(environment(), old),
     purify = purify,
@@ -794,6 +821,7 @@ rpf.matrix <- function(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -824,6 +852,7 @@ rpf.matrix <- function(
     exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
+    keep_forest = keep_forest,
     tune = tune,
     given = tune_given(environment(), old),
     purify = purify,
@@ -856,6 +885,7 @@ rpf.recipe <- function(
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -889,6 +919,7 @@ rpf.recipe <- function(
     exact_step = exact_step,
     prune = prune,
     max_panels = max_panels,
+    keep_forest = keep_forest,
     tune = tune,
     given = tune_given(environment(), old),
     purify = purify,
@@ -921,6 +952,7 @@ rpf_bridge <- function(
   exact_step,
   prune,
   max_panels,
+  keep_forest,
   tune,
   given,
   purify,
@@ -994,6 +1026,7 @@ rpf_bridge <- function(
   checkmate::assert_flag(purify)
   checkmate::assert_int(nthreads, lower = 1L)
   checkmate::assert_flag(export_forest)
+  checkmate::assert_flag(keep_forest)
   if (prune && deterministic) {
     cli::cli_abort(
       c(
@@ -1061,12 +1094,21 @@ rpf_bridge <- function(
     params$prior_rows <- rpf_prior_rows(call = call)
   }
 
+  # a pruned model without its forest holds no R list of it either (export_forest)
+  export_forest <- export_forest && (keep_forest || !prune)
   if (!is.null(control)) {
-    return(tune_run(processed, outcomes, predictors, params, control, max_panels, export_forest, call = call))
+    res <- tune_run(processed, outcomes, predictors, params, control, max_panels, export_forest, call = call)
+  } else {
+    res <- rpf_fit(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call = call)
+    if (prune) {
+      res <- rpf_prune(res, processed, max_panels, call = call)
+    }
   }
-  res <- rpf_fit(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call = call)
-  if (prune) {
-    res <- rpf_prune(res, processed, max_panels, call = call)
+  if (prune && !keep_forest) {
+    res <- pruned_drop_forest(res)
+    # nothing else refers to the forest: collected now, so that its memory is free when rpf() returns (to the
+    # process: the allocator may keep the freed blocks for its next allocations)
+    invisible(gc(verbose = FALSE))
   }
   res
 }

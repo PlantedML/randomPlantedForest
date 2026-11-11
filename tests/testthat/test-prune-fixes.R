@@ -245,7 +245,15 @@ test_that("tiny data: a corrected OOB error of 0 does not break the choice", {
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old))
   set.seed(1)
-  pm <- rpf_050(mpg ~ ., data = mtcars, n_families = 10, n_splits = NULL, prune = TRUE, nthreads = 1)
+  pm <- rpf_050(
+    mpg ~ .,
+    data = mtcars,
+    n_families = 10,
+    n_splits = NULL,
+    prune = TRUE,
+    nthreads = 1,
+    keep_forest = TRUE
+  )
   expect_s3_class(pm, "rpf_pruned")
   oob <- pm$oob
   zero <- oob$oob_rmse == 0

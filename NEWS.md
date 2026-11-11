@@ -37,6 +37,13 @@
   On 8 public data sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5 repeated 75 / 25 splits each), the test log-loss of `"logit"` was lower than or tied with that of `"exponential"` on every set: a tie on the binary sets (+0.0004 on average) and 0.053 lower with 3 or more classes (lower on 2 of the 4 sets, tied on the others).
   With many classes `"exponential"` can need many more splits: on Dry Bean (7 classes, 2,000 rows) the out-of-bag choice was 1,345 to 4,525 splits (310 to 990 s per fit), where `"logit"` chose 22 on average.
 
+* A pruned model no longer holds the forest it was pruned from: `rpf()` with pruning (the default) and `prune_components()` return the model without it, and their new argument `keep_forest = TRUE` keeps it.
+  The model predicts, prints and gives its components from what it stores, bit for bit as with the forest, so `predict()` (every `type`), `predict_components()`, `print()`, the display, `rpf_marshal()` and `bundle()` work as before; the fit itself is unchanged.
+  What is lost by default is the forest in `$fit`: pruning it again (`prune_components(model$fit, data, ...)`), `purify()`, and the forest's own `predict()`, `predict_components()`, `plot()` and `rpf_boxes()` are an error that names `keep_forest = TRUE`. `$fit` still describes the forest (`$params`, `$oob_path`, `$splits_oob`, the blueprint), and `prune_components()`' caller still has the forest it passed.
+  To get the forest back, fit with `keep_forest = TRUE`, or with `prune = FALSE` and prune with `prune_components()`. With `prune = FALSE` the argument has no effect.
+  On California housing (16,512 rows, 8 threads) the forest is 0.6 GB of memory, which is free when `rpf()` returns, and the model 0.19 GB; the model without its forest is plain R data, so `saveRDS()` and `readRDS()` give a model that predicts (6 s, 113 MB), and `rpf_marshal()` takes no time and gives a blob of the model's size, against 13 s and 1.15 GB with the forest.
+  Models saved with their forest by an earlier version (`rpf_marshal()`) still load, print and predict, and keep their forest.
+
 ## Renamed arguments
 
 * Four arguments of `rpf()` and the split structures have clearer names; the prefix gives the unit (`n_` a count, `share_` a share in (0, 1], `max_` a cap):

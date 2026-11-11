@@ -39,7 +39,10 @@ With it, the in-bag counts of the bootstrap samples are stored too, so that
 A pruned forest from \code{\link[=prune_components]{prune_components()}} or \code{\link[=rpf]{rpf()}} (class \code{rpf_pruned}) is marshaled
 the same way: its forest as above, and the pruning (rule, coefficients,
 components, the table of the choice, the stored kept components, the display's coarsened components) as it is. The
-restored model predicts as before, from its stored components, so it needs no training data for that.
+restored model predicts as before, from its stored components, so it needs no training data for that. A pruned
+model without its forest (the default of \code{\link[=rpf]{rpf()}} and \code{\link[=prune_components]{prune_components()}}, \code{keep_forest = FALSE}) is plain R data:
+\code{\link[=saveRDS]{saveRDS()}} stores it as it is, and its blob is the model without the caches of its built indices
+(\code{include_data} has nothing to include).
 }
 \examples{
 fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)

@@ -14,7 +14,10 @@
 #' A pruned forest from [prune_components()] or [rpf()] (class `rpf_pruned`) is marshaled
 #' the same way: its forest as above, and the pruning (rule, coefficients,
 #' components, the table of the choice, the stored kept components, the display's coarsened components) as it is. The
-#' restored model predicts as before, from its stored components, so it needs no training data for that.
+#' restored model predicts as before, from its stored components, so it needs no training data for that. A pruned
+#' model without its forest (the default of [rpf()] and [prune_components()], `keep_forest = FALSE`) is plain R data:
+#' [saveRDS()] stores it as it is, and its blob is the model without the caches of its built indices
+#' (`include_data` has nothing to include).
 #'
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
 #'   [prune_components()].
@@ -33,10 +36,14 @@
 #' restored <- rpf_unmarshal(readRDS(tmp))
 #' all.equal(predict(fit, mtcars), predict(restored, mtcars))
 rpf_marshal <- function(x, include_data = FALSE) {
+  checkmate::assert_flag(include_data)
   if (inherits(x, "rpf_pruned")) {
     # the forest as for an rpf; the pruning is plain R data
     out <- unclass(x)
-    out$fit <- rpf_marshal(x$fit, include_data = include_data)
+    # without its forest (keep_forest = FALSE), `fit` is the forest's description: plain R data, kept as it is
+    if (rpf_has_forest(x)) {
+      out$fit <- rpf_marshal(x$fit, include_data = include_data)
+    }
     # the built store and the display's built indices are rebuilt from the stored forms when needed
     out$cache <- NULL
     if (!is.null(out$display)) {
@@ -84,7 +91,9 @@ rpf_marshal <- function(x, include_data = FALSE) {
 rpf_unmarshal <- function(blob) {
   if (inherits(blob, "rpf_pruned_marshaled")) {
     out <- unclass(blob)
-    out$fit <- rpf_unmarshal(blob$fit)
+    if (inherits(blob$fit, "rpf_marshaled")) {
+      out$fit <- rpf_unmarshal(blob$fit)
+    }
     if (!is.null(out$store)) {
       out$cache <- new.env(parent = emptyenv())
     }
@@ -161,20 +170,39 @@ rpf_unmarshal <- function(blob) {
 #' Check whether an rpf object's C++ forest is still alive
 #'
 #' The C++ forest does not survive [saveRDS()]; an `rpf` object restored via
-#' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable.
+#' [readRDS()] without [rpf_marshal()]/[rpf_unmarshal()] is unusable. A pruned model without its forest
+#' (`keep_forest = FALSE`, the default) has no C++ forest and is always valid; the `fit` of such a model is not (it
+#' has no forest to use).
 #' @param x `[rpf | rpf_pruned]`: A fitted [`rpf`] model, or a pruned one from
 #'   [prune_components()], possibly restored from disk.
-#' @return `TRUE` if the underlying model can be used, `FALSE` otherwise.
+#' @return `TRUE` if the underlying model can be used, `FALSE` otherwise (also for the `fit` of a pruned model
+#'   without its forest).
 #' @export
 rpf_is_valid <- function(x) {
   if (inherits(x, "rpf_pruned")) {
+    # without its forest a pruned model is plain R data: it survives saveRDS() as it is
+    if (!rpf_has_forest(x)) {
+      return(TRUE)
+    }
     x <- x$fit
   }
   checkmate::assert_class(x, "rpf")
-  !inherits(try(x$fit$is_purified(), silent = TRUE), "try-error")
+  rpf_has_forest(x) && !inherits(try(x$fit$is_purified(), silent = TRUE), "try-error")
 }
 
+# Every use of a forest goes through here: the one error for the `fit` of a pruned model without its forest, and the
+# one for a forest whose C++ object did not survive serialization
 check_rpf_alive <- function(x, call = rlang::caller_env()) {
+  if (!rpf_has_forest(x)) {
+    cli::cli_abort(
+      c(
+        "The forest of this pruned model was not kept: {.fn rpf} and {.fn prune_components} keep it only with {.code keep_forest = TRUE}.",
+        "i" = "Prune with {.code keep_forest = TRUE} to prune again, purify, or predict with the forest.",
+        "i" = "The pruned model itself predicts without it."
+      ),
+      call = call
+    )
+  }
   if (!rpf_is_valid(x)) {
     cli::cli_abort(
       c(

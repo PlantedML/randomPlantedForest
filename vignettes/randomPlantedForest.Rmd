@@ -84,6 +84,8 @@ Prediction works as usual:
 predict(model, new_data = head(sim))
 ```
 
+The pruned model holds its kept components, not the forest it was pruned from, which is much larger: what it does above needs no forest.
+To prune the same forest again with other settings, keep it with `keep_forest = TRUE` (it is then in `model$fit`), or fit with `prune = FALSE` and call `prune_components()`.
 `prune = FALSE` returns the forest itself, with all its components, as earlier versions did.
 `max_interaction` is the central choice of the method: lower values give a more constrained model, `max_interaction = 0` allows interactions of any order.
 `n_families` sets the number of tree families, and `n_splits = <number>` fixes the number of splits instead of choosing it.
@@ -298,7 +300,14 @@ all.equal(
 )
 ```
 
-Pruned models are saved the same way: `rpf_marshal(model)`.
+A pruned model, the default of `rpf()`, has no C++ forest unless it was fitted with `keep_forest = TRUE`: it is plain R data, and `saveRDS()` stores it as it is.
+
+```{r saveRDS-pruned}
+saveRDS(model, tmp)
+all.equal(predict(readRDS(tmp), head(sim)), predict(model, head(sim)))
+```
+
+A pruned model with its forest (`keep_forest = TRUE`) is saved like the forest: `rpf_marshal(model)`.
 Alternatively, a [`bundle`](https://rstudio.github.io/bundle/) method wrapping the same mechanism is available via `bundle::bundle()` and `bundle::unbundle()`.
 
 ```{r cleanup, include = FALSE}

@@ -130,7 +130,7 @@ test_that("min_leaf_rows above half the rows leaves every family without a split
 test_that("rpf()'s default call (splits chosen out of bag): a family without a split predicts its rows' fit", {
   # The adaptive fit rebuilds the forest from the families' records at the chosen number of splits; a family without
   # a split there gets its rows' fit, as a fit with that number of splits gives it. Checked on the forest itself
-  # (`$fit`) and on the pruned model.
+  # (`$fit`, kept with keep_forest = TRUE) and on the pruned model.
   dat <- no_split_data()
   constant <- dat
   constant[c("x1", "x2")] <- 1
@@ -150,21 +150,21 @@ test_that("rpf()'s default call (splits chosen out of bag): a family without a s
     }
   }
   set.seed(1)
-  check_reg(rpf(y ~ x1 + x2, data = constant), "constant predictors")
+  check_reg(rpf(y ~ x1 + x2, data = constant, keep_forest = TRUE), "constant predictors")
   for (outcome in c("cl", "cl3")) {
     for (loss in c("exponential", "logit")) {
       set.seed(1)
-      fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = constant, loss = loss)
+      fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = constant, loss = loss, keep_forest = TRUE)
       check_cls(fit, constant[[outcome]], paste(outcome, loss))
     }
   }
 
   # min_leaf_rows above half the rows: no family can split
   set.seed(1)
-  check_reg(rpf(y ~ x1 + x2, data = dat, min_leaf_rows = 51), "min_leaf_rows")
+  check_reg(rpf(y ~ x1 + x2, data = dat, min_leaf_rows = 51, keep_forest = TRUE), "min_leaf_rows")
   for (outcome in c("cl", "cl3")) {
     set.seed(1)
-    fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = dat, min_leaf_rows = 51)
+    fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = dat, min_leaf_rows = 51, keep_forest = TRUE)
     check_cls(fit, dat[[outcome]], paste(outcome, "min_leaf_rows"))
   }
 })
