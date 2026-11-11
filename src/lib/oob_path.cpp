@@ -293,6 +293,45 @@ struct RandomPlantedForest::AloneFit {
   size_t B = 0, N = 0;
   AdaptiveStats stats;
 
+  // The stopper's OOB sums, kept up to date instead of every family's predictions at every checkpoint until the
+  // stop is decided. Per parity h of the family index and checkpoint c: the sum of the families' predictions there
+  // (N * V, score column v at [v * N + i]; empty until the first family is added), added in family order as fit()
+  // adds the OOB path: next_[h][c] is the next family to add. A family's predictions at a checkpoint are added, and
+  // freed, as soon as it has delivered them (it paused or finished: Family::reached) and every earlier family of its
+  // parity has been added there. flushed[b]: family b's checkpoints added so far (a prefix: an earlier checkpoint is
+  // delivered no later than a later one).
+  std::vector<std::vector<double>> sum_[2];
+  std::vector<size_t> next_[2];
+  std::vector<size_t> flushed;
+
+  // Add what can be added (under the lock, after count(): a family's predictions are counted before they are freed)
+  void flush()
+  {
+    for (size_t c = consumed; c < cp.size(); ++c)
+      for (size_t h = 0; h < 2; ++h) {
+        size_t &b = next_[h][c];
+        while (b < B) {
+          Family &F = fam[b];
+          if (c >= F.reached || c >= F.snaps.size())
+            break;
+          std::vector<double> &pr = F.snaps[c];
+          if (pr.size() != F.rows.size() * V)
+            break; // (not there: nothing is added out of order)
+          if (!F.rows.empty()) {
+            std::vector<double> &sum = sum_[h][c];
+            if (sum.empty())
+              sum.assign(N * V, 0.0);
+            for (size_t i = 0; i < F.rows.size(); ++i)
+              for (size_t v = 0; v < V; ++v)
+                sum[v * N + (size_t)F.rows[i]] += pr[i * V + v];
+          }
+          std::vector<double>().swap(pr);
+          flushed[b] = c + 1;
+          b += 2;
+        }
+      }
+  }
+
   // Add family n's predictions at checkpoints [counted[n], to) to the estimate (under the lock)
   void count(size_t n, const std::vector<int> &rows, const std::vector<std::vector<double>> &snaps, size_t to)
   {
@@ -582,7 +621,7 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     // pause: the predictions so far go to the family's record (the stopper reads them there), the bound is estimated
     // again, and the thread gives up its permit until the bound rises past it (or the fit ends)
     F.snaps.resize(std::max(F.snaps.size(), trk.csnaps.size()));
-    for (size_t j = A.consumed; j < trk.csnaps.size(); ++j)
+    for (size_t j = std::max(A.consumed, A.flushed[n]); j < trk.csnaps.size(); ++j)
       if (!trk.csnaps[j].empty())
         F.snaps[j] = std::move(trk.csnaps[j]);
     if (F.rows.empty())
@@ -597,6 +636,7 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     ++A.permits;
     --A.running;
     A.count(n, F.rows, F.snaps, F.reached);
+    A.flush();
     A.after_count();
     A.wake();
     lk.unlock();
@@ -649,7 +689,7 @@ void RandomPlantedForest::alone_finish(size_t n)
   f.state = 2;
   f.rows = std::move(t.rows);
   f.snaps.resize(std::max(f.snaps.size(), t.csnaps.size()));
-  for (size_t j = A.consumed; j < t.csnaps.size(); ++j)
+  for (size_t j = std::max(A.consumed, A.flushed[n]); j < t.csnaps.size(); ++j)
     if (!t.csnaps[j].empty())
       f.snaps[j] = std::move(t.csnaps[j]);
   f.rec = std::move(t.rec);
@@ -662,6 +702,7 @@ void RandomPlantedForest::alone_finish(size_t n)
   f.reached = t.next;
   A.stats.splits_grown += f.reached ? (double)path_checkpoints_[f.reached - 1] : 0.0;
   A.count(n, f.rows, f.snaps, f.reached);
+  A.flush();
   A.after_count();
   A.wake();
 }
@@ -901,6 +942,11 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
   for (auto *v : {&A.m0, &A.m1})
     v->assign(C, {});
   A.n_counted.assign(C, 0);
+  for (size_t h = 0; h < 2; ++h) {
+    A.sum_[h].assign(C, {});
+    A.next_[h].assign(C, h);
+  }
+  A.flushed.assign(B, 0);
   A.bound = C;
   A.threads.clear();
   A.threads.resize(B);
@@ -935,6 +981,8 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
       std::vector<std::vector<double>>().swap(*v);
     for (auto *v : {&A.m0, &A.m1})
       std::vector<std::vector<int>>().swap(*v);
+    for (size_t h = 0; h < 2; ++h)
+      std::vector<std::vector<double>>().swap(A.sum_[h]);
     A.forest = nullptr;
     A.queue.clear();
     for (auto &t : path_family_)
@@ -992,16 +1040,21 @@ void RandomPlantedForest::fit_alone(const std::vector<Leaf> &initial_leaves)
       // every family's predictions at checkpoint c, summed over the families of even and of odd index in family order
       // (as fit() sums the OOB path; score column v at [v * N + i])
       path.checkpoints.assign(1, path_checkpoints_[c]);
-      path.sum0.assign(N * V, 0.0);
-      path.sum1.assign(N * V, 0.0);
-      for (size_t b = 0; b < B; ++b) {
-        const AloneFit::Family &F = A.fam[b];
-        const std::vector<double> &p = F.snaps[c];
-        std::vector<double> &sum = b % 2 ? path.sum1 : path.sum0;
-        for (size_t i = 0; i < F.rows.size(); ++i)
-          for (size_t v = 0; v < V; ++v)
-            sum[v * N + (size_t)F.rows[i]] += p[i * V + v];
+      {
+        // every family has delivered checkpoint c: its sums are complete (AloneFit::flush())
+        std::lock_guard<std::mutex> lk(A.m);
+        A.flush();
+        if (A.next_[0][c] < B || A.next_[1][c] < B)
+          throw std::logic_error("Adaptive fit: a family's predictions are missing at a checkpoint.");
+        path.sum0 = std::move(A.sum_[0][c]);
+        path.sum1 = std::move(A.sum_[1][c]);
+        std::vector<double>().swap(A.sum_[0][c]);
+        std::vector<double>().swap(A.sum_[1][c]);
       }
+      if (path.sum0.empty())
+        path.sum0.assign(N * V, 0.0);
+      if (path.sum1.empty())
+        path.sum1.assign(N * V, 0.0);
       const int sel = A.stopper(c, path);
       A.stats.seconds_stopper += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
       for (auto &F : A.fam)

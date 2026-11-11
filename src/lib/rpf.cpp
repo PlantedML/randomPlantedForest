@@ -575,25 +575,11 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
   // {j} tree to begin with; leaves / hist draw (tree, leaf, feature) entries, the null tree's leaf to begin with.
   std::vector<ResultingTreeCandidate> possible_trees;
   std::vector<SplitCandidate> possible_splits;
-  // The pool's (tree, leaf, feature) entries in a hash set, for the duplicate check. Entries are never removed, so the
-  // set and the pool hold the same entries.
-  struct EntryKey {
-    const DecisionTree *t;
-    size_t li;
-    int dim;
-    bool operator==(const EntryKey &o) const { return t == o.t && li == o.li && dim == o.dim; }
-  };
-  struct EntryHash {
-    size_t operator()(const EntryKey &e) const
-    {
-      size_t h = std::hash<const void *>()(e.t);
-      h ^= std::hash<size_t>()(e.li) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-      h ^= std::hash<int>()(e.dim) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-      return h;
-    }
-  };
-  std::unordered_set<EntryKey, EntryHash> pool_entries;
-  // Add per-leaf candidate entries for all dimensions, respecting max_interaction and dedup
+  // A leaf's entries are added once, when the leaf gets its index (add_leaf_candidates()): every feature the tree may
+  // still split in. A split in a feature of its own tree overwrites the split leaf with the larger half, which keeps
+  // the index and so the entries (the same tree, hence the same features); only the appended half is new. So the pool
+  // never gets an entry twice and needs no record of its entries.
+  // Add a new leaf's candidate entries for all dimensions, respecting max_interaction and the constraints
   auto add_leaf_candidates = [&](const std::shared_ptr<DecisionTree> &T, size_t li) {
     if (!T)
       return;
@@ -612,8 +598,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
         if (!dims_allowed(res_dims))
           continue;
       }
-      if (pool_entries.insert(EntryKey{T.get(), li, feature_dim}).second)
-        possible_splits.emplace_back(feature_dim, T, li);
+      possible_splits.emplace_back(feature_dim, T, li);
     }
   };
   if (leaf_pool) {
@@ -819,8 +804,7 @@ void RandomPlantedForest::create_tree_family(std::vector<Leaf> initial_leaves, s
       curr_split.tree_index->leaves.push_back(std::move(leaf_s));
       size_t idx_s = curr_split.tree_index->leaves.size() - 1;
       if (leaf_pool) {
-        add_leaf_candidates(curr_split.tree_index, idx_b);
-        add_leaf_candidates(curr_split.tree_index, idx_s);
+        add_leaf_candidates(curr_split.tree_index, idx_s); // (idx_b keeps the split leaf's entries)
       } else if (mode == 1 || mode == 2) {
         update_leaf_weight(curr_family, *curr_split.tree_index, idx_b, false, samples_X);
         update_leaf_weight(curr_family, *curr_split.tree_index, idx_s, true, samples_X);
