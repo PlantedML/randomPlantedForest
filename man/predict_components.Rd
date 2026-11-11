@@ -49,8 +49,9 @@ interaction term, representing the functional decomposition of the prediction.
 All components together with the intercept sum up
 to the prediction.
 For multiclass classification, the number of output columns is multiplied by
-the number of \code{target_levels}: the levels of the outcome, or for \code{loss = "logit"}
-all levels but the first (the reference level).
+the number of \code{target_levels}, the levels of the outcome: one column per component and level, named
+\verb{<component>__class:<level>}. With \code{loss = "logit"} or \code{"exponential"} a component's columns sum to 0 across the
+levels, as the scores of \code{\link[=predict.rpf]{predict()}} with \code{type = "link"} do.
 \item \code{intercept} (\code{numeric}): Expected value of the prediction.
 For multiclass classification, one value per target level, named by \code{target_levels}.
 \item \code{x} (\code{\link[data.table:data.table]{data.table}}): The predictors selected by \code{predictors}, as the forest

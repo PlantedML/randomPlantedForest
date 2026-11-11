@@ -165,7 +165,8 @@ test_that("components + intercept = predict per class; probabilities valid; clas
         expect_identical(m$criterion, if (loss %in% c("L1", "L2")) "brier" else "logloss")
       }
       pc <- predict_components(shown, d$x)
-      V <- length(shown$intercept)
+      # one column per class and component (V = K for multiclass, logit too)
+      V <- length(pc$intercept)
       expect_identical(ncol(pc$m), V * length(shown$beta))
       if (V > 1) {
         expect_identical(pc$target_levels, names(pc$intercept))

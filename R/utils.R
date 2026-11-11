@@ -440,14 +440,53 @@ fit_predictor_names <- function(object) {
   colnames(preprocess_predictors_predict(object, ptype))
 }
 
-# Outcome levels represented by columns of the C++ prediction matrix.
-# Multiclass logit uses reference-class encoding: the first level has no column.
+# Outcome levels represented by columns of the C++ prediction matrix (the fit's score columns).
+# Multiclass logit uses reference-class encoding: the first level has no column. What the user sees has one column
+# per level (reported_scores()).
 model_outcome_levels <- function(object) {
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
   if (object$params$loss == "logit" && length(outcome_levels) > 2) {
     outcome_levels <- outcome_levels[-1]
   }
   outcome_levels
+}
+
+# Whether the fit's score columns are against a reference level (multiclass logit: K - 1 columns, the first level's
+# score 0), which every output reports as one centred score per level
+scores_against_reference <- function(object) {
+  identical(object$params$loss, "logit") && length(levels(object$blueprint$ptypes$outcomes[[1]])) > 2
+}
+
+# The scores as reported, from the fit's score columns S (n x V; or `blocks` blocks of V columns side by side, one
+# per component): multiclass logit's K - 1 columns per block become K, the first level's score 0 joined and the K
+# scores centred across the classes, so that they sum to 0 (the layout of multiclass exponential). The softmax of
+# the K scores is that of the fit's (0, S), so probabilities do not change; centring is linear, so components and
+# intercepts centred one by one add up to the centred prediction. Other fits: S unchanged.
+reported_scores <- function(object, S, blocks = 1L) {
+  if (!scores_against_reference(object)) {
+    return(S)
+  }
+  S <- as.matrix(S)
+  dimnames(S) <- NULL
+  if (blocks == 0L) {
+    return(S)
+  }
+  V <- ncol(S) %/% blocks
+  K <- V + 1L
+  # each block's mean of its K scores (the reference's 0 and its V columns), the columns added in order (the same
+  # arithmetic for one block as for many, so that one component at a time equals all in one pass)
+  first <- seq(1L, by = V, length.out = blocks)
+  sums <- S[, first, drop = FALSE]
+  for (v in seq_len(V - 1L)) {
+    sums <- sums + S[, first + v, drop = FALSE]
+  }
+  mean_of <- sums / K
+  block <- rep(seq_len(blocks), each = V)
+  out <- matrix(0, nrow(S), blocks * K)
+  ref <- (seq_len(blocks) - 1L) * K + 1L
+  out[, ref] <- -mean_of
+  out[, -ref] <- S - mean_of[, block, drop = FALSE]
+  out
 }
 
 #' Get remainders where max_interaction requested in `predict_components` is smaller than

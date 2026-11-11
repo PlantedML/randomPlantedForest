@@ -61,12 +61,13 @@ test_that("multiclass boxes have one value column per class", {
   expect_contains(names(boxes), paste0("value_", levels(iris$Species)))
   expect_false("value" %in% names(boxes))
 
-  # logit models the levels after the first, the reference
+  # logit too: one value per level, summing to 0 across the levels
   set.seed(1)
   logit <- rpf_050(Species ~ ., data = iris, n_families = 1, n_splits = 5, loss = "logit")
   boxes <- rpf_boxes(logit)
   values <- grep("^value", names(boxes), value = TRUE)
-  expect_identical(values, paste0("value_", levels(iris$Species)[-1]))
+  expect_identical(values, paste0("value_", levels(iris$Species)))
+  expect_lt(max(abs(rowSums(boxes[values]))), 1e-12)
 })
 
 test_that("box plots draw one panel per tree up to max_interaction", {
@@ -115,9 +116,10 @@ test_that("plot() selects the class for multiclass fits only", {
   expect_s3_class(plot(fit_multi, type = "boxes", class = "virginica"), "patchwork")
   expect_s3_class(plot(fit_multi, class = "virginica"), "ggplot")
   expect_error(plot(fit_multi, class = "rose"))
-  # logit: the reference level has no values of its own
+  # logit: every level has values, the first too
   fit_logit <- rpf_050(Species ~ Sepal.Length + Petal.Length, data = iris, n_families = 1, n_splits = 5, loss = "logit")
-  expect_error(plot(fit_logit, class = "setosa"))
+  expect_s3_class(plot(fit_logit, class = "setosa"), "ggplot")
+  expect_error(plot(fit_logit, class = "rose"))
   expect_error(plot(fit_reg, class = "virginica"), "multiclass")
 })
 

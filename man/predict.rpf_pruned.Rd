@@ -18,7 +18,8 @@
 \item{new_data}{\verb{[data.frame | matrix]}: New observations to predict.}
 
 \item{type}{\verb{[character(1)]}: As in \code{\link[=predict.rpf]{predict.rpf()}}: \code{"numeric"} for regression (the default); for classification
-\code{"prob"} (the default), \code{"class"}, or \code{"numeric"} / \code{"link"} (the scores \code{alpha + sum(beta_S * f_S(x))}).}
+\code{"prob"} (the default), \code{"class"}, or \code{"numeric"} / \code{"link"} (the scores \code{alpha + sum(beta_S * f_S(x))}; with
+\code{loss = "logit"} or \code{"exponential"} and more than two classes one per class, summing to 0 across the classes).}
 
 \item{nthreads}{\verb{[integer(1) | NULL: NULL]}: Number of threads. \code{NULL} uses the \code{nthreads} the forest was fitted
 with.}

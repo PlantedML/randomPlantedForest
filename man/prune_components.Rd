@@ -79,7 +79,9 @@ An object of class \code{rpf_pruned}, a list with elements:
 and \code{splits_oob}), without the forest (\code{fit$fit} is \code{NULL}), so that a use of the forest from it is an error that
 says so. With \code{keep_forest = TRUE}, \code{object} as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
-\item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}); for classification one per score column.
+\item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}); for classification one per score column of the
+forest (\code{K - 1} for multiclass \code{loss = "logit"}, against the first level; with \code{"exponential"} and rule \code{"R"}
+the first is 0). \code{\link[=predict_components]{predict_components()}} and \link[=print.rpf_pruned]{print()} report them as one per class, centred.
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
 \code{"oob"}, \code{intercept} and \code{beta} are fitted on the out-of-bag components (see Details).
 \item \code{sets}: the predictor sets of the kept components, as column indices.
@@ -278,15 +280,16 @@ peaked at 2.3 GB of physical footprint (4.1 GB of resident memory, RSS) at order
 order 8 (all predictors), most of it the 31 coarsened components the display keeps; there \code{\link[=purify]{purify()}} alone needs
 more than 12 GB of RSS. \code{nthreads} speeds up the fits and the purification.
 
-\strong{Classification.} A classification forest is pruned the same way, with its score columns: one for a binary
-outcome, one per class otherwise (\code{K - 1} for \code{loss = "logit"}, whose first level is the reference). Every component
-then has a column per score column, and:
+\strong{Classification.} A classification forest is pruned the same way, with its scores: one for a binary outcome, one
+per class otherwise. Every component then has a column per class, and:
 \itemize{
-\item A component's share sums its variance over the score columns, centred across the classes (\code{"logit"}: with the
-reference level's score 0 joined; \code{"exponential"}: the part all classes share does not count), over the same sum
-for the prediction. One kept list serves all classes.
-\item \code{"R"} fits one coefficient per kept component, shared by the classes, and one intercept per score column
-(\code{"exponential"} with more than two classes: the first is 0), out of bag as for regression.
+\item A component's share sums its variance over the classes' scores, centred across the classes (as
+\code{\link[=predict.rpf]{predict()}} reports them with \code{type = "link"}: the part all classes share does not count), over the
+same sum for the prediction. One kept list serves all classes. (Internally \code{loss = "logit"} fits \code{K - 1} scores
+against the first level; centred, the shares, the criterion and the model do not depend on which level is first.)
+\item \code{"R"} fits one coefficient per kept component, shared by the classes, and one intercept per class (up to a
+constant shared by the classes, which the probabilities ignore; they are reported summing to 0), out of bag as for
+regression.
 \item The criterion is the forest's loss's own: for \code{loss = "L1"} or \code{"L2"} the squared error of the raw scores summed
 over the columns (the Brier score; least squares for \code{"R"}), for \code{"logit"} and \code{"exponential"} the log-loss of the
 probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \code{"R"}, by Newton's method from rule
@@ -297,7 +300,8 @@ probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \
 \item The display coarsens a component with one form (\code{C}, \code{q}, cuts) for all score columns, chosen by the variance
 kept of the centred columns; its stored form is one per score column.
 \item \code{\link[=predict.rpf_pruned]{predict()}} takes \code{type} as \code{\link[=predict.rpf]{predict.rpf()}} does, and \code{\link[=predict_components]{predict_components()}} has one column
-per component and score column, named as for the forest.
+per component and class, named as for the forest (\verb{<component>__class:<level>}); with \code{"logit"} or
+\code{"exponential"} each component's columns, and the intercepts, sum to 0 across the classes.
 }
 }
 \examples{
