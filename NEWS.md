@@ -153,6 +153,8 @@
 
 ## Bug fixes
 
+* `prune_components()` (and so `rpf()` with pruning) left the value of a tree family that made no split out of the pruned model's intercept, so that rule `"D"` at `tau = 0` was not the forest where a family had found no split. The intercept now includes it, as `purify()`'s does.
+
 * `split_structure = "tree_then_leaf"` samples leaves in proportion to their available thresholds, as documented.
   After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly.
   Leaves with tied values were then drawn too often, and draws were wasted on leaves that cannot be split.

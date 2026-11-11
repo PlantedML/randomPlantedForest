@@ -13,7 +13,7 @@
 
 // The value of the family's null tree: 0, unless the family made no split, when its one leaf holds the family's
 // fit (fit_null_leaf()). The intercept starts from it.
-static std::vector<double> null_tree_value(const TreeFamily &family, size_t value_size)
+std::vector<double> rpf_null_tree_value(const TreeFamily &family, size_t value_size)
 {
   std::vector<double> value(value_size, 0);
   auto null_tree = family.find(std::set<int>{0});
@@ -68,7 +68,7 @@ void RandomPlantedForest::purify_fast_exact_family(
     lim_list[d - 1] = bounds;
   }
 
-  acc.intercept = null_tree_value(curr_family, value_size);
+  acc.intercept = rpf_null_tree_value(curr_family, value_size);
 
   // Precompute tot(U) with half-open domain [front, back)
   std::map<std::set<int>, double, utils::setComp> tot_cache;
@@ -874,7 +874,8 @@ void RandomPlantedForest::purify_3_family(TreeFamily &curr_family, int maxp_inte
   // ------------- create new trees -------------
   grids.insert(grids.begin(), grid::NDGrid());
   values.insert(
-      values.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, null_tree_value(curr_family, value_size))
+      values.begin(),
+      utils::Matrix<std::vector<double>>(std::vector<int>{1}, rpf_null_tree_value(curr_family, value_size))
   );
   values_old.insert(
       values_old.begin(), utils::Matrix<std::vector<double>>(std::vector<int>{1}, std::vector<double>(value_size, 0))

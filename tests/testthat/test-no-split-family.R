@@ -168,3 +168,17 @@ test_that("rpf()'s default call (splits chosen out of bag): a family without a s
     check_cls(fit, dat[[outcome]], paste(outcome, "min_leaf_rows"))
   }
 })
+
+test_that("the pruned model's intercept includes the families that made no split", {
+  # one row differs in the only predictor: the families whose bootstrap sample misses it cannot split
+  set.seed(1)
+  n <- 60
+  d <- data.frame(x1 = c(1, rep(0, n - 1)), y = rnorm(n, 5))
+  fit <- rpf(y ~ x1, data = d, n_families = 20, n_splits = 3, prune = FALSE, max_interaction = 1)
+  families <- fit$fit$get_model()
+  no_split <- vapply(families, function(f) identical(as.integer(unlist(f$variables)), 0L), logical(1))
+  expect_true(any(no_split) && !all(no_split))
+  # rule D at tau = 0 is the forest
+  forest <- prune_components(fit, d, rule = "D", tau = 0, max_panels = Inf)
+  expect_equal(predict(forest, d)$.pred, predict(fit, d)$.pred, tolerance = 1e-12)
+})

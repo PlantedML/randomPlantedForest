@@ -240,6 +240,10 @@ namespace rpf_cnt {
 class SubsetCounter;
 }
 
+// The value of a family's null tree, whose one leaf holds all rows: what the family adds to the intercept before its
+// other trees are purified. (lib/purify.cpp)
+std::vector<double> rpf_null_tree_value(const TreeFamily &family, size_t value_size);
+
 // Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index;
 // after_batch(start, batch) runs on the calling thread after each batch. An exception in fn is rethrown on the calling
 // thread. (lib/purify.cpp)
