@@ -9,10 +9,10 @@ xdat <- data.frame(
   x4 = cut(runif(100), 2, labels = 1:2)
 )
 
-test_that("Default: exponential with 'prob'", {
+test_that("Default: logit with 'prob'", {
   classif_fit <- rpf_050(yfact ~ ., data = xdat)
 
-  expect_identical(classif_fit$params$loss, "exponential")
+  expect_identical(classif_fit$params$loss, "logit")
 
   classif_pred <- predict(classif_fit, xdat)
   classif_pred_prob <- predict(classif_fit, new_data = xdat, type = "prob")

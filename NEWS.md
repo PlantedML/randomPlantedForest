@@ -10,7 +10,7 @@
   - The split candidates of `"leaf"` are drawn by the fast draw (`options(randomPlantedForest.exact_draw = FALSE)`, now the default): the same distribution as the exact draw, with other random numbers, so the same seed gives another forest. It is about 2.5 times as fast on larger data.
   - `max_interaction = 3` (was 2). Order 3 had 15% lower test error than order 2 on simulated data and 1.5% on California housing; no limit (order p) was worse on California housing and 11 to 41 times slower.
   - `n_families = 200` (was 50): more families had lower test error at every order (2% per doubling) and sparser pruned models.
-  The loss is unchanged: `"L2"` for regression and `"exponential"` for classification (with more than two classes the multiclass exponential loss SAMME, see Bug fixes).
+  The loss is `"L2"` for regression and, as below, now `"logit"` for classification.
   So every default fit changes, regression and classification, and `rpf()` returns an `rpf_pruned` object instead of an `rpf` unless `prune = FALSE`.
   To fit a regression forest as before, give master's settings and the exact draw:
   ```r
@@ -31,6 +31,11 @@
   The exponential loss's step is exact by itself, so `exact_step` does not change its fits.
   The split search scores a candidate from sums over its two sides built as regression builds them (along the leaf's sorted rows, or per bin), so classification fits are faster: at 1 thread on 10,000 rows (100 splits, 20 tree families) a binary fit takes 3.8 s instead of 7.9 s with the exponential loss and 3.6 s instead of 9.7 s with logit (regression: 2.7 s), a three-class fit 5.2 s instead of 7.1 s and 5.1 s instead of 11.5 s.
   Classification fits with `"logit"` or `"exponential"` change; `"L1"` and `"L2"` fits and regression are unchanged, and a model saved before still loads, prints and predicts.
+
+* The default classification loss is now `"logit"` (`loss = NULL`), with two classes and with more; it was `"exponential"` (with more than two classes SAMME).
+  So every default classification fit changes; `loss = "exponential"` gives the previous default, which stays available and unchanged.
+  On 8 public data sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5 repeated 75 / 25 splits each), the test log-loss of `"logit"` was lower than or tied with that of `"exponential"` on every set: a tie on the binary sets (+0.0004 on average) and 0.053 lower with 3 or more classes (lower on 2 of the 4 sets, tied on the others).
+  With many classes `"exponential"` can need many more splits: on Dry Bean (7 classes, 2,000 rows) the out-of-bag choice was 1,345 to 4,525 splits (310 to 990 s per fit), where `"logit"` chose 22 on average.
 
 ## Renamed arguments
 
@@ -90,7 +95,7 @@
   The choice is still the lowest error among the splits grown, so the plateau stop changes the forest only where the lowest error would have come later.
   On recorded paths it chose the same `n_splits` as the stop on a new minimum alone on all 44 synthetic regression sets, 4 splits of California housing and 24 classification fits (logit and exponential loss, binary and three classes), and grew 10% (regression) to 29% (classification) fewer splits.
   The families grow only to about the plateau stop (on 33 of these fits, 4 threads): the adaptive fit took 19% less time with logit, 4% less with the exponential loss, 11% less on 8 synthetic regression sets, and the same time on California housing, where the families waiting for the stop do not fit in the pause budget and grow on to the estimate of the stop on a new minimum, as a regrowth from their seed would cost more.
-  A three-class fit on 100 rows with `loss = "logit"` and otherwise the defaults chooses 119 splits instead of 238 and takes 2.5 s instead of 8.7 s at 1 thread; with the default loss (exponential) it chooses 11 splits either way and stops growing at 15 instead of 21 (both measured with all changes of this version).
+  A three-class fit on 100 rows with `loss = "logit"` and otherwise the defaults chooses 119 splits instead of 238 and takes 2.5 s instead of 8.7 s at 1 thread; with `loss = "exponential"` (then the default) it chooses 11 splits either way and stops growing at 15 instead of 21 (both measured with all changes of this version).
 * `rpf(prune = TRUE)` returns the pruned model instead of the forest (regression and classification): the forest is pruned by `prune_components()` with its defaults on the training rows, including the display at `max_panels` (a new argument of `rpf()`, 10 by default, `Inf` for no coarsening).
   The result equals `prune_components(rpf(..., prune = FALSE), data)` bit for bit from the same random number state, for the formula, x/y and recipe interfaces.
   With `n_splits = NULL`, one call chooses the number of splits out of bag, prunes and returns the model to show.
@@ -179,7 +184,7 @@
 * `predict()` after `purify(maxp_interaction = k)` with `k` below the fit's `max_interaction` returns the forest's prediction.
   Previously it returned the intercept plus the components up to order `k`, leaving out the higher orders.
   `predict_components()` now returns their sum as `remainder`, so that its result sums to the prediction, and `rpf_marshal()` keeps the purification's cap.
-* `loss = "exponential"`, the default for classification, is with more than two classes the multiclass exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split criterion, the leaf step and the weights all come from the one loss `exp(-y.f / K)`.
+* `loss = "exponential"` is with more than two classes the multiclass exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split criterion, the leaf step and the weights all come from the one loss `exp(-y.f / K)`.
   Each row has one weight, `exp(-g)` with `g` its class's score, and a leaf moves the scores by `log(V_k) - mean_j log(V_j)`, with `V` its class weight sums plus those of its pseudo-row (see the classification losses under Breaking changes); `predict()` takes the softmax of the scores as before.
   Previously each class had its own one-vs-rest weights, and its step was `log(p_k / p_0)` with `p_0 = 1 - sum_k p_k` mixing shares under the different weights; it is 0 at the start and was clamped to `epsilon`, so every class's score rose by a common `log(1 / epsilon)` that the softmax ignores but the weights did not.
   The weights then no longer matched the probabilities `predict()` gives (by factors up to 10^10 in small tests).

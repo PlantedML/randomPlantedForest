@@ -93,7 +93,15 @@ test_that("the leaf index gives the scan's predictions bitwise (classification)"
   f <- x$x1 + x$x2 * x$x3
   yb <- factor(ifelse(f + rnorm(n, sd = 0.2) > 0.75, "a", "b"))
   set.seed(6)
-  fit <- rpf_050(x, yb, max_interaction = 3, n_families = 4, n_splits = 150, delete_leaves = FALSE)
+  fit <- rpf_050(
+    x,
+    yb,
+    max_interaction = 3,
+    n_families = 4,
+    n_splits = 150,
+    delete_leaves = FALSE,
+    loss = "exponential"
+  )
   expect_gt(max_tree_leaves(fit), 64)
   check(fit, "exponential, 1000 rows")
 })

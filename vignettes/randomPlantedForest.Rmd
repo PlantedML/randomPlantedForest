@@ -234,7 +234,7 @@ predict(rpfit_sex, head(penguins), type = "class")
 ```
 
 A classification model goes through the same steps as a regression model: the number of splits is chosen out of bag and the components are pruned, both by the log-loss of the predicted probabilities.
-With the default `loss = "exponential"` (or `"logit"`), `type = "link"` additionally gives raw predictions on the log-odds scale.
+With the default `loss = "logit"` (or `"exponential"`), `type = "link"` additionally gives raw predictions on the log-odds scale.
 
 ### Multiclass
 
@@ -247,9 +247,9 @@ predict(rpfit_species, head(penguins), type = "prob")
 predict(rpfit_species, head(penguins), type = "class")
 ```
 
-The default loss for classification is `"exponential"`, which gives proper probability estimates (with more than two classes it is the multiclass exponential loss SAMME).
-`"logit"` (the multinomial log-likelihood) gives similar results after pruning, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
-Note that with `loss = "logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
+The default loss for classification is `"logit"` (the multinomial log-likelihood), which gives proper probability estimates.
+`"exponential"` (with more than two classes the multiclass exponential loss SAMME) gives them too, while `"L1"` and `"L2"` fit class indicators directly and do not yield proper probabilities.
+Note that with `"logit"`, multiclass models are fit on a reference-class (log-odds) scale, so link predictions and components have one column less than there are classes: see `?predict.rpf` for details.
 
 ## Using `recipes`
 
