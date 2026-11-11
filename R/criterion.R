@@ -221,8 +221,12 @@ crit_sum_comp <- function(F, ki, V) {
 # the deviance below 1e-10, after 50 iterations, or where the deviance no longer falls (finite on separable data).
 # With more coefficients than fitted scores the steps are minimum-norm steps, computed in the row space of the design
 # (see below); the rows are then separable, so the result is where the iterations end, not a maximum.
+# stop_separated (log-loss): stop as soon as the coefficients separate the rows, that is, give every row's class a
+# probability above one half (a loss below log(2)). Scaling such coefficients up raises the likelihood without bound,
+# so it has no maximum, and a likelihood with a maximum never gets there: some row always has a loss of log(2) or
+# more. The result then also has `separated`, and coefficients that mean nothing if it is TRUE.
 # Returns list(alpha = V values, beta = length(ki) values).
-crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
+crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL, stop_separated = FALSE) {
   V <- crit$V
   n <- length(idx)
   k <- length(ki)
@@ -260,7 +264,8 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     G
   }
   eta <- scores
-  dev <- function(th) sum(crit_logloss(crit, eta(th), cls)$e)
+  losses <- function(th) crit_logloss(crit, eta(th), cls)$e
+  dev <- function(th) sum(losses(th))
   # the indicator of the class among the free score columns (logit's first level: none)
   Yc <- matrix(0, n, V)
   col <- if (crit$link == "softmax_ref") {
@@ -298,7 +303,11 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     th <- numeric(n * V)
   }
   pr <- length(th)
+  separated <- stop_separated && max(losses(th)) < log(2)
   for (it in seq_len(50)) {
+    if (separated) {
+      break
+    }
     P <- crit_logloss(crit, eta(th), cls)$P
     R <- P - Yc
     grad <- numeric(pr)
@@ -323,7 +332,8 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     improved <- FALSE
     for (h in seq_len(30)) {
       th_new <- th - t * step
-      d_new <- dev(th_new)
+      e_new <- losses(th_new)
+      d_new <- sum(e_new)
       if (is.finite(d_new) && d_new <= d_old) {
         improved <- TRUE
         break
@@ -336,6 +346,7 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
     rel <- (d_old - d_new) / max(abs(d_old), 1e-300)
     th <- th_new
     d_old <- d_new
+    separated <- stop_separated && max(e_new) < log(2)
     if (rel < 1e-10) {
       break
     }
@@ -345,12 +356,16 @@ crit_fit_R <- function(crit, F, ki, idx, start_alpha = NULL) {
   }
   alpha <- numeric(V)
   alpha[free_a] <- th[seq_len(na)]
+  if (stop_separated) {
+    return(list(alpha = alpha, beta = th[na + seq_len(k)], separated = separated))
+  }
   list(alpha = alpha, beta = th[na + seq_len(k)])
 }
 
 # Whether rule R's likelihood fit of k components on n rows (crit_fit_R(), log-loss) has more coefficients than fitted
 # scores. Its rows can then be separated (given any scores, unless rows coincide), so the likelihood has no maximum:
-# the out-of-bag choice does not score such a candidate (prune_oob_score_crit()).
+# the choice does not score such a candidate, without fitting it (prune_oob_score_crit(), prune_cv()); with fewer
+# coefficients it finds a separation while fitting (crit_fit_R(stop_separated = TRUE)).
 crit_fit_R_wide <- function(crit, k, n) {
   n_alpha <- crit$V - (crit$link == "softmax")
   crit$type == "logloss" && n_alpha + k > n * crit$V

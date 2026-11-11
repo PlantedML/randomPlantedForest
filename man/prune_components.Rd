@@ -292,12 +292,13 @@ probabilities that \code{predict(type = "prob")} makes (maximum likelihood for \
 \code{oob_loss}, \code{se_loss}, \code{oob_loss_raw} and \code{se_loss_raw} (the mean criterion) instead of the RMSE columns, and
 \code{cv_loss} and \code{se_loss} for CV; \code{select = "1se"} uses the SE of the mean criterion. A binary forest with
 \code{"L1"} or \code{"L2"} has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
-\item With the log-loss, \code{"R"} is not scored for a \code{tau} that keeps more components than the rows its coefficients are
-fitted on (with the intercepts: more coefficients than fitted scores). Such rows can be separated perfectly, so
-the likelihood has no maximum, and a fit would only end where its iterations stop. The candidate's losses in the
-table are \code{NA} and it is not chosen; \code{"D"} is scored for every \code{tau}. A forest on many predictors has thousands of
-components, so this is usually the case at \code{tau = 0} when there are fewer rows than that. A given \code{"R"} and \code{tau}
-(no choice) is fitted as given.
+\item With the log-loss, \code{"R"} is not scored for a \code{tau} at which its likelihood has no maximum, so that a fit would
+only end where its iterations stop: where it keeps more components than the rows its coefficients are fitted on
+(with the intercepts: more coefficients than fitted scores), and where a fit separates its rows, giving every
+row's class a probability above one half (scaling such coefficients up raises the likelihood without bound).
+The candidate's losses in the table are \code{NA} and it is not chosen; \code{"D"} is scored for every \code{tau}. A forest on
+many predictors has thousands of components, so this is usual at \code{tau = 0}. A given \code{"R"} and \code{tau} (no choice)
+is fitted as given.
 \item The display coarsens a component with one form (\code{C}, \code{q}, cuts) for all score columns, chosen by the variance
 kept of the centred columns; its stored form is one per score column.
 \item \code{\link[=predict.rpf_pruned]{predict()}} takes \code{type} as \code{\link[=predict.rpf]{predict.rpf()}} does, and \code{\link[=predict_components]{predict_components()}} has one column

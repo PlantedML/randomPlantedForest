@@ -600,9 +600,9 @@ test_that("the choice does not score rule R under the log-loss with more coeffic
   expect_false(oob$min[r0] || oob$one_se[r0])
   expect_identical(sum(oob$min), 1L)
   expect_identical(sum(oob$one_se), 1L)
-  # D is scored for every tau, and R where it has fewer coefficients than half the rows
+  # D is scored for every tau, and R where it keeps few components
   expect_true(all(is.finite(oob$oob_loss[oob$rule == "D"])))
-  expect_true(all(is.finite(oob$oob_loss[oob$rule == "R" & oob$n_kept < n / 2])))
+  expect_true(all(is.finite(oob$oob_loss[oob$rule == "R" & oob$n_kept <= 2])))
   expect_true(is.finite(oob$oob_loss[oob$one_se]))
   # a given R and tau is fitted as given
   given <- prune_components(fit, x, y, rule = "R", tau = 0, max_panels = Inf)
@@ -625,6 +625,34 @@ test_that("the choice does not score rule R under the log-loss with more coeffic
   o2 <- prune_components(fit2, x, y, seed = 1, max_panels = Inf)$oob
   expect_gt(o2$n_kept[o2$rule == "R" & o2$tau == 0], n)
   expect_false(anyNA(o2))
+})
+
+test_that("rule R's likelihood fit stops where it separates its rows, and only there", {
+  ns <- cp_ns()
+  crit <- function(cls) {
+    structure(
+      list(type = "logloss", link = "sigmoid", V = 1L, K = 2L, cls = cls, centre = "none", n = length(cls)),
+      class = "rpf_crit"
+    )
+  }
+  # the classes apart on one component, which starts on the wrong side of zero for a third of the rows
+  x <- matrix(c(seq(-1, -0.1, length.out = 50), seq(0.1, 1, length.out = 50)) + 0.5, ncol = 1)
+  cs <- crit(rep(1:2, each = 50))
+  s <- ns$crit_fit_R(cs, x, 1L, 1:100, start_alpha = 0, stop_separated = TRUE)
+  expect_true(s$separated)
+  expect_identical(s$alpha + x[, 1] * s$beta > 0, cs$cls == 2L)
+  # without the stop: the iterations go on (larger coefficients, the same sides)
+  g <- ns$crit_fit_R(cs, x, 1L, 1:100, start_alpha = 0)
+  expect_named(g, c("alpha", "beta"))
+  expect_gt(abs(g$beta), abs(s$beta))
+  # overlapping classes have a maximum: never stopped, and the same fit bit for bit
+  set.seed(8)
+  z <- matrix(rnorm(200), ncol = 1)
+  co <- crit(1L + (z[, 1] + rnorm(200) > 0))
+  a <- ns$crit_fit_R(co, z, 1L, 1:200, start_alpha = 0)
+  b <- ns$crit_fit_R(co, z, 1L, 1:200, start_alpha = 0, stop_separated = TRUE)
+  expect_false(b$separated)
+  expect_identical(b[c("alpha", "beta")], a)
 })
 
 test_that("rule R's likelihood fit with more coefficients than rows takes minimum-norm steps", {

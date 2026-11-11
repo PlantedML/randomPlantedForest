@@ -269,6 +269,9 @@
   Such rows can be separated perfectly, so the likelihood has no maximum: each fold's fit ran its 50 iterations, each on a Hessian of as many rows and columns as fitted scores, and ended at a loss several times the other candidates'.
   The candidate's losses in the table are now `NA` and it is not chosen, which removes most of the pruning time on data with many predictors and a thousand rows or more, or with three or more classes.
   A given `"R"` and `tau` (no choice) is fitted as before.
+* Likewise, `prune_components()` no longer scores rule `"R"` under the log-loss for a threshold at which a fold's fit separates its rows, that is, gives every row's class a probability above one half.
+  Scaling such coefficients up raises the likelihood without bound, so it has no maximum (and a likelihood with a maximum never gets there), yet the fit ran its 50 iterations, each forming a Hessian of as many rows and columns as coefficients, and ended at a loss far above the other candidates'.
+  The fit now stops at the separation, and the candidate's losses are `NA`: on 3,600 rows and 30 predictors, where the first threshold keeps 960 components, the pruning of a classification forest takes 3 s instead of 48 s.
 * The display of a pruned model that keeps many components of three or more predictors is much faster, with bitwise the same models.
   It asked for the panel forms two components at a time, and each such call read the whole forest; a first pruning that keeps every component of a forest on 60 predictors has ten thousand of them.
   Now one call covers them all, finds each component's own cut points from the trees of one of its predictors instead of from every tree, and passes over the tree families only for the components it coarsens, still two at a time.

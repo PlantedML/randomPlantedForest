@@ -148,12 +148,13 @@
 #'   `oob_loss`, `se_loss`, `oob_loss_raw` and `se_loss_raw` (the mean criterion) instead of the RMSE columns, and
 #'   `cv_loss` and `se_loss` for CV; `select = "1se"` uses the SE of the mean criterion. A binary forest with
 #'   `"L1"` or `"L2"` has one 0/1 column and is pruned as a regression forest of that response, with the RMSE columns.
-#' - With the log-loss, `"R"` is not scored for a `tau` that keeps more components than the rows its coefficients are
-#'   fitted on (with the intercepts: more coefficients than fitted scores). Such rows can be separated perfectly, so
-#'   the likelihood has no maximum, and a fit would only end where its iterations stop. The candidate's losses in the
-#'   table are `NA` and it is not chosen; `"D"` is scored for every `tau`. A forest on many predictors has thousands of
-#'   components, so this is usually the case at `tau = 0` when there are fewer rows than that. A given `"R"` and `tau`
-#'   (no choice) is fitted as given.
+#' - With the log-loss, `"R"` is not scored for a `tau` at which its likelihood has no maximum, so that a fit would
+#'   only end where its iterations stop: where it keeps more components than the rows its coefficients are fitted on
+#'   (with the intercepts: more coefficients than fitted scores), and where a fit separates its rows, giving every
+#'   row's class a probability above one half (scaling such coefficients up raises the likelihood without bound).
+#'   The candidate's losses in the table are `NA` and it is not chosen; `"D"` is scored for every `tau`. A forest on
+#'   many predictors has thousands of components, so this is usual at `tau = 0`. A given `"R"` and `tau` (no choice)
+#'   is fitted as given.
 #' - The display coarsens a component with one form (`C`, `q`, cuts) for all score columns, chosen by the variance
 #'   kept of the centred columns; its stored form is one per score column.
 #' - [`predict()`][predict.rpf_pruned] takes `type` as [predict.rpf()] does, and [predict_components()] has one column
@@ -846,16 +847,20 @@ prune_lstsq_qr <- function(X, y) {
 # families, columns as names(dec$share), y = their outcome)) on the out-of-bag components instead. y_own: the outcome,
 # or a classification criterion (then crit_fit_R(): one beta per component shared by the classes, one alpha per score
 # column; D keeps the forest's intercepts).
-prune_fit_rule <- function(rule, tau, dec, y_own, oob = NULL) {
+prune_fit_rule <- function(rule, tau, dec, y_own, oob = NULL, stop_separated = FALSE) {
   kept <- names(dec$share)[dec$share >= tau]
   if (inherits(y_own, "rpf_crit") && rule == "R") {
     ki <- match(kept, names(dec$share))
     coef <- if (is.null(oob)) {
-      crit_fit_R(y_own, dec$own, ki, seq_len(y_own$n), start_alpha = dec$intercept)
+      crit_fit_R(y_own, dec$own, ki, seq_len(y_own$n), start_alpha = dec$intercept, stop_separated = stop_separated)
     } else {
-      crit_fit_R(oob$y, oob$F, ki, seq_len(oob$y$n), start_alpha = dec$intercept)
+      crit_fit_R(oob$y, oob$F, ki, seq_len(oob$y$n), start_alpha = dec$intercept, stop_separated = stop_separated)
     }
-    return(list(alpha = coef$alpha, beta = stats::setNames(coef$beta, kept)))
+    rf <- list(alpha = coef$alpha, beta = stats::setNames(coef$beta, kept))
+    if (stop_separated) {
+      rf$separated <- isTRUE(coef$separated)
+    }
+    return(rf)
   }
   if (rule == "D") {
     return(list(alpha = dec$intercept, beta = stats::setNames(rep(1, length(kept)), kept)))
@@ -932,10 +937,11 @@ prune_cv <- function(object, tr, cand, fold_id, seed, nthreads, verbose) {
       if (is.null(cache[[key]])) {
         # rule R under the log-loss with more coefficients than the fold's fit has scores: not scored
         wide <- cand$rule[i] == "R" && !is.null(crit) && crit_fit_R_wide(crit, length(kept), sum(!ho))
-        cache[[key]] <- if (wide) {
+        rf <- if (!wide) prune_fit_rule(cand$rule[i], cand$tau[i], dec, y_own, stop_separated = TRUE)
+        # (or its fit separates the fold's rows)
+        cache[[key]] <- if (wide || isTRUE(rf$separated)) {
           NA_real_
         } else {
-          rf <- prune_fit_rule(cand$rule[i], cand$tau[i], dec, y_own)
           if (is.null(crit)) {
             sum((prune_predict_dec(rf, dec$other) - y_ho)^2)
           } else {
@@ -1012,13 +1018,13 @@ prune_choose <- function(rmse, se_mse, cand, left_out = NULL) {
 }
 
 # prune_choose() among the candidates that were scored. One not scored (NA: rule R under the log-loss where it has
-# more coefficients than fitted scores, crit_fit_R_wide()) is not chosen.
+# more coefficients than fitted scores, crit_fit_R_wide(), or a fit of it separates its rows) is not chosen.
 prune_choose_scored <- function(rmse, se, cand, left_out = NULL, call = rlang::caller_env()) {
   scored <- !is.na(rmse)
   if (!any(scored)) {
     cli::cli_abort(
       c(
-        "Rule {.val R} cannot be fitted for any {.arg tau}: each keeps more components than there are training rows.",
+        "Rule {.val R} cannot be fitted for any {.arg tau}: each keeps so many components that they separate the training rows.",
         "i" = "Give larger thresholds {.arg tau}, or rule {.val D}."
       ),
       call = call
@@ -1366,18 +1372,27 @@ prune_oob_score_crit <- function(o, dec, feature_names, crit, cand, fold_id, n_t
           G <- G0 <- G1 <- matrix(0, n_use, V)
           for (k in fids) {
             te <- fid == k
-            coef <- crit_fit_R(cu, F_oob, ki, which(!te), start_alpha = dec$intercept)
+            coef <- crit_fit_R(cu, F_oob, ki, which(!te), start_alpha = dec$intercept, stop_separated = TRUE)
+            if (isTRUE(coef$separated)) {
+              # a fold's fit separates its rows: no maximum of the likelihood either, so not scored
+              G <- NULL
+              break
+            }
             sub <- function(Fm) Fm[te, , drop = FALSE]
             G[te, ] <- crit_predict_R(coef, sub(F_oob), ki, V)
             G0[te, ] <- crit_predict_R(coef, sub(F0), ki, V)
             G1[te, ] <- crit_predict_R(coef, sub(F1), ki, V)
           }
         }
-        r <- crit_rows(crit, rows, G, G0, G1, m0, m1, n_trees, impute = TRUE)
-        cache[[key]] <- list(
-          sse = vapply(fids, function(k) sum(r$e[fid == k]), numeric(1)),
-          sse_corr = vapply(fids, function(k) sum(r$corr[fid == k]), numeric(1))
-        )
+        cache[[key]] <- if (is.null(G)) {
+          list(sse = rep(NA_real_, length(fids)), sse_corr = rep(NA_real_, length(fids)))
+        } else {
+          r <- crit_rows(crit, rows, G, G0, G1, m0, m1, n_trees, impute = TRUE)
+          list(
+            sse = vapply(fids, function(k) sum(r$e[fid == k]), numeric(1)),
+            sse_corr = vapply(fids, function(k) sum(r$corr[fid == k]), numeric(1))
+          )
+        }
       }
     }
     sse[i, ] <- cache[[key]]$sse
