@@ -27,7 +27,7 @@ tune_splits_oob <- function(
   score_y = NULL,
   call = rlang::caller_env()
 ) {
-  pause_gb <- getOption("randomPlantedForest.adaptive_pause_gb", 1)
+  pause_gb <- getOption("randomPlantedForest.adaptive_pause_gb", 0.25)
   if (!checkmate::test_number(pause_gb, lower = 0, finite = TRUE)) {
     cli::cli_abort(
       "{.code options(randomPlantedForest.adaptive_pause_gb)} must be a number of GB, at least 0.",

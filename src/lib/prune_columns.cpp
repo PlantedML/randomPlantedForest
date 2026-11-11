@@ -48,7 +48,8 @@ void RandomPlantedForest::family_columns(
     size_t n,
     const rpf_cnt::SubsetCounter &counter,
     std::map<std::vector<int>, std::vector<double>> &out,
-    std::vector<double> &intercept
+    std::vector<double> &intercept,
+    FamilyCounts *counts
 ) const
 {
   if (maxp_interaction <= 0 || maxp_interaction > feature_size)
@@ -108,7 +109,11 @@ void RandomPlantedForest::family_columns(
   kd_cache.reserve(1u << 15);
 
   std::vector<double> G; // per j (2^|T|): n x VS
+  if (counts)
+    counts->assign(curr_family.size(), std::vector<int32_t>());
+  size_t tree_no = 0;
   for (const auto &kv : curr_family) {
+    const size_t ti = tree_no++;
     const std::set<int> &T = kv.first;
     if (T == std::set<int>{0})
       continue;
@@ -125,6 +130,13 @@ void RandomPlantedForest::family_columns(
     std::vector<rpf_kd::RangeConstraint> rc_by_pos(tdim), cons;
     std::vector<char> rc_ok(tdim, 0);
     std::vector<int> rc_lo_idx(tdim, -1), rc_hi_idx(tdim, -1), key;
+    // the counts kept for the later passes (-1: not counted): 2^|T| integers a leaf, so only for trees of up to
+    // purify_counts_max_order dimensions (a tree of higher order is counted again by each pass, as before)
+    int32_t *keep = nullptr;
+    if (counts && tdim <= purify_counts_max_order && (size_t)sample_size <= (size_t)INT32_MAX) {
+      (*counts)[ti].assign(L * nm, -1);
+      keep = (*counts)[ti].data();
+    }
     // tot(T \ j) per j, once per tree
     std::vector<double> totm(nm, 0.0);
     for (size_t jmask = 0; jmask < nm; ++jmask) {
@@ -194,6 +206,8 @@ void RandomPlantedForest::family_columns(
             kd_cache.emplace(key, cnt);
           }
         }
+        if (keep)
+          keep[l * nm + jmask] = (int32_t)cnt;
         for (int v = 0; v < VS; ++v)
           C[(l * nm + jmask) * VS + v] = ((double)cnt / totU) * leaf.value[v];
       }
@@ -402,6 +416,8 @@ ComponentColumns RandomPlantedForest::purify_columns(int maxp_interaction, int n
     std::vector<double> intercept;
   };
   std::vector<Slot> slots(threads_to_use);
+  // the leaves' range counts are kept for the passes restricted to some components (purify_counts_)
+  purify_counts_.assign(B, FamilyCounts());
   // the families' intercepts summed through purify_mode2()'s binary counter, so that the intercept is the store's
   std::vector<std::pair<int, std::vector<double>>> istack;
 
@@ -412,7 +428,16 @@ ComponentColumns RandomPlantedForest::purify_columns(int maxp_interaction, int n
         Slot &sl = slots[f % threads_to_use];
         sl = Slot();
         this->family_columns(
-            this->tree_families[f], maxp_interaction, pf.cuts, cells.data(), stride, n, counter, sl.vals, sl.intercept
+            this->tree_families[f],
+            maxp_interaction,
+            pf.cuts,
+            cells.data(),
+            stride,
+            n,
+            counter,
+            sl.vals,
+            sl.intercept,
+            &this->purify_counts_[f]
         );
       },
       [&](size_t start, size_t batch) {

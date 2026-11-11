@@ -86,7 +86,7 @@
 * `rpf(n_splits = NULL)` chooses the number of splits out of bag while the forest grows (regression and classification).
   The forest's corrected out-of-bag error is followed at four checkpoints per doubling of the splits, growing stops once its lowest value is one doubling back (at most 25,600 splits), and the forest at the lowest error is returned: the forest that `rpf()` with that many `n_splits` and the same seed gives.
   On 52 data sets this chose the same `n_splits` as the lowest error along a fixed budget of 3,200 splits on 50, and a later, lower minimum on the other two, while growing 0.72 of the splits.
-  The tree families grow one at a time, `nthreads` together, and keep only their out-of-bag predictions and a 40-byte record per split, from which the chosen forest is rebuilt without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (1 GB) bounds the memory of families waiting for the stop.
+  The tree families grow one at a time, `nthreads` together, and keep only their out-of-bag predictions and a 40-byte record per split, from which the chosen forest is rebuilt without a refit; `options(randomPlantedForest.adaptive_pause_gb)` (0.25 GB) bounds the memory of families waiting for the stop.
   `print()` shows the chosen `n_splits` and where growing stopped.
   It is the new default (see Breaking changes).
   A corrected out-of-bag error at or below 0 at a checkpoint (a correction that overshot; never observed) is not chosen unless all are.
@@ -240,6 +240,19 @@
 * Classification with `loss = "logit"` fits another 1.2x to 1.8x faster, with bitwise the same fits.
   The terms of the loss under the current weights do not depend on the candidate split, so each observation's terms are now computed once and refreshed only when its weights change, and the terms of classes the observation is not in (which are zero) are skipped: a candidate takes one exponential per logit column and one logarithm per observation of the leaf, instead of two exponentials and two logarithms per column plus two logarithms.
   With 4,000 rows, 300 splits, 200 tree families and `max_interaction = 3` (1 thread), a binary fit takes 74 s instead of 95 s and a three-class fit 91 s instead of 129 s; with 300 rows, 8.8 s → 6.2 s (binary) and 22.5 s → 13.6 s (three classes).
+* Growing with `split_structure = "leaf"` (the default) is 2 to 5.5 times as fast, with bitwise the same fits.
+  A leaf's rows are put in order by each row's integer rank in the predictor (ranked once per tree family) with a radix sort, instead of a comparison sort of the values, and the leaf keeps that order with the first position of each distinct value, so a candidate split no longer passes over the leaf's values; the thresholds are drawn without allocating memory.
+  With the default call at 8 threads, growing takes 38 s instead of 78 s on California housing (16,512 rows) and 6.2 s instead of 34.6 s on 20,000 simulated rows with 10 predictors.
+  Classification gains less: on 10,000 simulated rows with 10 predictors growing takes 5.0 s instead of 11.2 s with two classes and 9.2 s instead of 15.4 s with three (`loss = "logit"`; the exponential loss alike).
+* Pruning (`prune_components()`, and so the default call) is about 1.7 times as fast on larger data, with bitwise the same models.
+  The numbers of training rows in the leaves' boxes, counted in the pass over the tree families, are kept for the later passes (the display's coarsening, its out-of-bag sums, the store of the kept components) instead of being counted again, for trees of up to 4 predictors; and the index of the components' rectangles finds its cuts without sorting.
+  On California housing (the default call, 8 threads) pruning takes 23 s instead of 39 s; at `max_interaction = 8` (50 tree families) it takes 240 s instead of 270 s, with no more memory.
+* Choosing the number of splits out of bag (`n_splits = NULL`, the default) needs about half the memory while growing, in the same time and with the same fits.
+  Each tree family's out-of-bag predictions are added to the checkpoints' sums as the family delivers them, instead of being kept until the stop is decided; the pool of split candidates keeps no record of its entries; and `options(randomPlantedForest.adaptive_pause_gb)`, the memory of the families waiting for the stop, defaults to 0.25 GB instead of 1 GB.
+  With the default call at 8 threads, growing's peak physical footprint falls from 2.2 GB to 1.1 GB on California housing (16,512 rows; pruning, at about 2 GB, is now the call's peak there), and from 2.0 GB to 0.8 GB on 20,000 simulated rows with 10 predictors, where the call's peak resident memory (RSS) falls from 2.6 GB to 1.5 GB.
+  On 80,000 simulated rows the smaller pause budget alone lowers the call's peak footprint from 2.9 GB to 2.0 GB (RSS 4.9 GB to 4.0 GB), in 41.7 s instead of 42.0 s.
+* `rpf_marshal()` of a large forest is several times as fast: the forest's lists of trees and leaves are allocated at their final lengths instead of grown by one element at a time, which copied each list for every element.
+  On a California housing forest of 50 tree families and 274,759 leaves, `rpf_marshal()` takes 0.25 s instead of 1.16 s; the blob is the same.
 
 # randomPlantedForest 0.5.0
 

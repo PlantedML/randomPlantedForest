@@ -361,6 +361,8 @@ prune_run <- function(
   call = rlang::caller_env()
 ) {
   n <- length(tr$y)
+  # the leaves' range counts that the pass over the families keeps for the later passes are dropped at the end
+  on.exit(object$fit$drop_purify_counts(), add = TRUE)
   # the shares, R's coefficients and the out-of-bag rows are those of the training rows
   prune_check_training_rows(object, tr, call = call)
   cand <- expand.grid(tau = sort(tau), rule = rule, stringsAsFactors = FALSE)[, c("rule", "tau")]

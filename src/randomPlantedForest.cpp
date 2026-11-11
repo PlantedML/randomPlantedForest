@@ -38,6 +38,7 @@ template <class T> void expose_methods(Rcpp::class_<T> &cls)
       .method("purify_oob", &T::purify_oob)
       .method("purify_columns", &T::purify_columns)
       .method("store_components", &T::store_components)
+      .method("drop_purify_counts", &T::drop_purify_counts)
       // the out-of-bag path and the adaptive fit
       .method("set_oob_path", &T::set_oob_path)
       .method("oob_path", &T::oob_path)

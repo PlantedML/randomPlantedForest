@@ -109,28 +109,29 @@ make_cpf(const std::string &loss, const NumericVector &parameters, bool fitting,
 
 List model_to_list(const std::vector<FamilyExport> &model, int feature_size)
 {
-  List out;
-  for (const FamilyExport &family : model) {
-    List variables, family_values, family_intervals;
-    for (const TreeExport &tree : family) {
-      variables.push_back(IntegerVector(tree.variables.begin(), tree.variables.end()));
-      List tree_values, tree_intervals;
+  // the lists are allocated at their final lengths: Rcpp's push_back() copies the whole list for every element
+  List out(model.size());
+  for (size_t f = 0; f < model.size(); ++f) {
+    const FamilyExport &family = model[f];
+    List variables(family.size()), family_values(family.size()), family_intervals(family.size());
+    for (size_t t = 0; t < family.size(); ++t) {
+      const TreeExport &tree = family[t];
+      variables[t] = IntegerVector(tree.variables.begin(), tree.variables.end());
+      List tree_values(tree.values.size()), tree_intervals(tree.values.size());
       for (size_t k = 0; k < tree.values.size(); ++k) {
-        tree_values.push_back(NumericVector(tree.values[k].begin(), tree.values[k].end()));
+        tree_values[k] = NumericVector(tree.values[k].begin(), tree.values[k].end());
         NumericMatrix leaf_intervals(2, feature_size);
         for (int l = 0; l < feature_size; ++l) {
           leaf_intervals(0, l) = tree.intervals[k][l].first;
           leaf_intervals(1, l) = tree.intervals[k][l].second;
         }
-        tree_intervals.push_back(leaf_intervals);
+        tree_intervals[k] = leaf_intervals;
       }
-      family_values.push_back(tree_values);
-      family_intervals.push_back(tree_intervals);
+      family_values[t] = tree_values;
+      family_intervals[t] = tree_intervals;
     }
-    out.push_back(
-        List::create(
-            Named("variables") = variables, Named("values") = family_values, Named("intervals") = family_intervals
-        )
+    out[f] = List::create(
+        Named("variables") = variables, Named("values") = family_values, Named("intervals") = family_intervals
     );
   }
   return out;
