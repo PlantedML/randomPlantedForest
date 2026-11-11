@@ -18,7 +18,8 @@ prune_components(
   fold_id = NULL,
   seed = NULL,
   nthreads = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  keep_forest = FALSE
 )
 }
 \arguments{
@@ -65,11 +66,18 @@ fold fits) and for the fold fits. \code{NULL} uses the \code{nthreads} \code{obj
 on it.}
 
 \item{verbose}{\verb{[logical(1): FALSE]}: Report the progress of the choice.}
+
+\item{keep_forest}{\verb{[logical(1): FALSE]}: Whether the pruned model keeps the forest \code{object} in \code{fit}. By default
+it keeps only the forest's description (you still have \code{object}): the model predicts from the components it
+keeps and is plain R data, which \code{\link[=saveRDS]{saveRDS()}} stores as it is. \code{TRUE} keeps the forest, as \code{\link[=rpf]{rpf()}}'s
+\code{keep_forest}.}
 }
 \value{
 An object of class \code{rpf_pruned}, a list with elements:
 \itemize{
-\item \code{fit}: \code{object}, as it was (not purified by the pruning).
+\item \code{fit}: the description of \code{object} (its blueprint, \code{mode}, \code{params}, and with \code{n_splits = NULL} its \code{oob_path}
+and \code{splits_oob}), without the forest (\code{fit$fit} is \code{NULL}), so that a use of the forest from it is an error that
+says so. With \code{keep_forest = TRUE}, \code{object} as it was (not purified by the pruning).
 \item \code{rule}, \code{tau}: the chosen rule and threshold.
 \item \code{intercept}: \code{alpha} (the forest's intercept \code{f_0} for \code{"D"}); for classification one per score column.
 \item \code{beta}: named vector of the coefficients of the kept components (all 1 for \code{"D"}). For \code{"R"} with \code{select_by}
@@ -122,7 +130,8 @@ full resolution.
 \strong{Purification}), and \code{cache}, an environment holding them built for prediction.
 }
 
-Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it, and \code{\link[=rpf_marshal]{rpf_marshal()}} to save it.
+Use \code{\link[=predict.rpf_pruned]{predict()}} and \code{\link[=predict_components]{predict_components()}} on it. Without its forest, save it with
+\code{\link[=saveRDS]{saveRDS()}}; with it, with \code{\link[=rpf_marshal]{rpf_marshal()}} (which works either way).
 }
 \description{
 Drops the small components of a forest's functional decomposition and, optionally, refits one coefficient per

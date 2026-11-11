@@ -43,18 +43,20 @@ test_that("the default call is the explicit call it stands for", {
       share_candidates = 0.1,
       max_interaction = 3,
       n_families = 200,
+      # the forests are compared too (keep_forest changes no fit: test-keep-forest.R)
+      keep_forest = TRUE,
       ...
     )
   }
   set.seed(5)
-  reg <- rpf(y ~ x1 + x2 + x3, data = d)
+  reg <- rpf(y ~ x1 + x2 + x3, data = d, keep_forest = TRUE)
   expect_s3_class(reg, "rpf_pruned")
   expect_false(reg$fit$params$exact_draw)
   expect_identical(def_parts(reg, d), def_parts(explicit(y ~ x1 + x2 + x3), d))
   for (y in c("cl", "cl3")) {
     f <- stats::as.formula(paste(y, "~ x1 + x2 + x3"))
     set.seed(5)
-    m <- rpf(f, data = d)
+    m <- rpf(f, data = d, keep_forest = TRUE)
     expect_identical(m$fit$params$loss, "logit")
     expect_identical(def_parts(m, d, "prob"), def_parts(explicit(f, loss = "logit", exact_step = TRUE), d, "prob"))
   }

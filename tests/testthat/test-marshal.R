@@ -338,7 +338,7 @@ prune_marshal_fit <- function(n = 300) {
 test_that("a pruned forest survives the round trip and predicts the same", {
   d <- prune_marshal_fit()
   for (rule in c("D", "R")) {
-    pr <- prune_components(d$fit, d$x, d$y, rule = rule, tau = c(0, 0.01), folds = 3, seed = 1)
+    pr <- prune_components(d$fit, d$x, d$y, rule = rule, tau = c(0, 0.01), folds = 3, seed = 1, keep_forest = TRUE)
     blob <- rpf_marshal(pr)
     expect_s3_class(blob, "rpf_pruned_marshaled")
     expect_s3_class(blob$fit, "rpf_marshaled")
@@ -381,7 +381,7 @@ test_that("a pruned forest survives the round trip and predicts the same", {
 
 test_that("a pruned forest marshaled with its data can be pruned again", {
   d <- prune_marshal_fit()
-  pr <- prune_components(d$fit, d$x, d$y, rule = "R", tau = 0.01)
+  pr <- prune_components(d$fit, d$x, d$y, rule = "R", tau = 0.01, keep_forest = TRUE)
   blob <- rpf_marshal(pr, include_data = TRUE)
   expect_false(is.null(blob$fit$fit_state$data))
   restored <- rpf_unmarshal(blob)
@@ -403,7 +403,7 @@ test_that("a pruned forest marshaled with its data can be pruned again", {
 
 test_that("a pruned forest restored without marshal gives an actionable error", {
   d <- prune_marshal_fit(n = 100)
-  pr <- prune_components(d$fit, d$x, d$y, rule = "D", tau = 0.01)
+  pr <- prune_components(d$fit, d$x, d$y, rule = "D", tau = 0.01, keep_forest = TRUE)
   tmp <- tempfile(fileext = ".rds")
   saveRDS(pr, tmp)
   zombie <- readRDS(tmp)

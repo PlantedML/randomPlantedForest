@@ -28,6 +28,7 @@ rpf(x, ...)
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -56,6 +57,7 @@ rpf(x, ...)
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -84,6 +86,7 @@ rpf(x, ...)
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -112,6 +115,7 @@ rpf(x, ...)
   exact_step = TRUE,
   prune = NULL,
   max_panels = 10,
+  keep_forest = FALSE,
   tune = FALSE,
   purify = FALSE,
   nthreads = 1,
@@ -238,6 +242,16 @@ a component is coarsened to at most \code{max_panels} heat maps and the model is
 pruned again (the \code{max_panels} of \code{\link[=prune_components]{prune_components()}}). A whole number of
 at least 1, or \code{Inf} for no coarsening.}
 
+\item{keep_forest}{\verb{[logical(1): FALSE]}: Used only when pruning: whether
+the pruned model keeps the forest it was pruned from, in \verb{$fit}. By
+default it does not: the model predicts from the components it keeps, so
+the forest's memory is free when \code{rpf()} returns, and the model is plain R
+data that \code{\link[=saveRDS]{saveRDS()}} stores as it is. \code{TRUE} keeps the forest, for
+pruning it again with other settings (\code{\link[=prune_components]{prune_components()}} on \verb{$fit}),
+\code{\link[=purify]{purify()}}, or its own predictions; such a model is saved with
+\code{\link[=rpf_marshal]{rpf_marshal()}}. With \code{prune = FALSE} it has no effect: the result is the
+forest. See "Pruning" in Details.}
+
 \item{tune}{\verb{[logical(1) | character(1) | rpf_tune_control: FALSE]}: Whether
 to tune the greediness (\code{n_try_split_points}, \code{share_candidates}) and
 \code{min_leaf_rows} out of bag (not with \code{deterministic = TRUE}, at least 10
@@ -257,8 +271,9 @@ settings, call \code{\link[=purify]{purify()}} after fitting instead. Not used w
 \link[=predict.rpf]{predict()} and \code{\link[=purify]{purify()}}.}
 
 \item{export_forest}{\verb{[logical(1): FALSE]}: Whether to store the flattened forest in
-the returned object as \verb{$forest} (with \code{prune = TRUE}, in the forest:
-\verb{$fit$forest}). If \code{FALSE}, it is \code{NULL}, which saves memory.}
+the returned object as \verb{$forest} (with \code{prune = TRUE} and
+\code{keep_forest = TRUE}, in the forest: \verb{$fit$forest}; a pruned model without
+its forest has neither). If \code{FALSE}, it is \code{NULL}, which saves memory.}
 
 \item{deterministic}{\verb{[logical(1): FALSE]}: Whether to fit without randomness: no
 bootstrap, the first \code{max_candidates} possible splits as candidates
@@ -301,10 +316,12 @@ the checkpoints grown, and \verb{$splits_oob} a list with the chosen \code{n_spl
 (whether it stopped at the cap while the error was still falling, neither
 stop rule reached).
 When pruning (the default), an object of class \code{rpf_pruned} (see
-\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} is the forest (not purified),
-with the elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
+\code{\link[=prune_components]{prune_components()}}), whose element \code{fit} describes the forest with the
+elements above: the pruned model's OOB path is \verb{$fit$oob_path}, and
 with \code{n_splits = NULL} the chosen number of splits \verb{$fit$params$splits} and
-the stop \verb{$fit$splits_oob}.
+the stop \verb{$fit$splits_oob}. Without \code{keep_forest}, \code{fit} holds no forest
+(\verb{$fit$fit} is \code{NULL}); with \code{keep_forest = TRUE} it is the forest (not
+purified).
 With \code{tune}, the \code{rpf_pruned} model of the chosen forest, with an element
 \code{tune}: \code{search}, the search table (one row per forest grown, in the order
 grown: \code{step}, \code{n_try_split_points}, \code{share_candidates}, \code{min_leaf_rows},
@@ -340,7 +357,8 @@ defaults (\code{prune = NULL}): the sparse rule, chosen out of bag;
 
 The result, of class \code{rpf_pruned}, has methods for
 \code{\link[=predict.rpf_pruned]{predict()}}, \code{\link[=predict_components]{predict_components()}} and \code{print()}.
-\code{prune = FALSE} returns the forest (class \code{rpf}) instead, and
+It holds the kept components, not the forest (\code{keep_forest = TRUE} keeps the
+forest too). \code{prune = FALSE} returns the forest (class \code{rpf}) instead, and
 \verb{n_splits = <number>} fits a fixed number of splits.
 \subsection{Choosing parameters}{
 
@@ -643,6 +661,16 @@ number state, for every interface. For other settings of the pruning (\code{rule
 number of splits out of bag, prunes and returns the model to show. Pruning
 needs out-of-bag rows, so with \code{deterministic = TRUE} \code{prune = NULL} means
 \code{FALSE} and \code{prune = TRUE} is an error.
+
+The pruned model does not keep the forest (\code{keep_forest = FALSE}): it
+predicts, prints and shows its components from what it stores, the same,
+bit for bit, as with the forest, and is a fraction of the forest's size
+(California housing: about 0.2 GB against 0.6 GB for the forest of 200
+families). What needs the forest is then an error that says so: pruning
+again, \code{\link[=purify]{purify()}}, the forest's own \code{\link[=predict.rpf]{predict()}},
+\code{\link[=predict_components]{predict_components()}} and \link[=plot.rpf]{plot()}. With \code{keep_forest = TRUE}
+the forest is in \verb{$fit}, so that \code{prune_components(model$fit, data, ...)}
+prunes it again.
 }
 
 \subsection{Classification}{

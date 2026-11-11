@@ -188,9 +188,15 @@
 #'   fold fits) and for the fold fits. `NULL` uses the `nthreads` `object` was fitted with. The result does not depend
 #'   on it.
 #' @param verbose `[logical(1): FALSE]`: Report the progress of the choice.
+#' @param keep_forest `[logical(1): FALSE]`: Whether the pruned model keeps the forest `object` in `fit`. By default
+#'   it keeps only the forest's description (you still have `object`): the model predicts from the components it
+#'   keeps and is plain R data, which [saveRDS()] stores as it is. `TRUE` keeps the forest, as [rpf()]'s
+#'   `keep_forest`.
 #'
 #' @return An object of class `rpf_pruned`, a list with elements:
-#' - `fit`: `object`, as it was (not purified by the pruning).
+#' - `fit`: the description of `object` (its blueprint, `mode`, `params`, and with `n_splits = NULL` its `oob_path`
+#'   and `splits_oob`), without the forest (`fit$fit` is `NULL`), so that a use of the forest from it is an error that
+#'   says so. With `keep_forest = TRUE`, `object` as it was (not purified by the pruning).
 #' - `rule`, `tau`: the chosen rule and threshold.
 #' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for classification one per score column.
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
@@ -242,7 +248,8 @@
 #' - `store`: the pieces of the kept components that are not coarsened, from which the model predicts (see
 #'   **Purification**), and `cache`, an environment holding them built for prediction.
 #'
-#' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it, and [rpf_marshal()] to save it.
+#' Use [`predict()`][predict.rpf_pruned] and [predict_components()] on it. Without its forest, save it with
+#' [saveRDS()]; with it, with [rpf_marshal()] (which works either way).
 #'
 #' @seealso [predict.rpf_pruned()], [predict_components()], [purify()]; [rpf()] with `prune = TRUE` fits and prunes in one
 #'   call.
@@ -293,10 +300,19 @@ prune_components <- function(
   fold_id = NULL,
   seed = NULL,
   nthreads = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  keep_forest = FALSE
 ) {
   rlang::check_dots_empty()
   default_select_by <- missing(select_by)
+  if (inherits(object, "rpf_pruned")) {
+    cli::cli_abort(
+      c(
+        "{.arg object} is a pruned model; {.fn prune_components} prunes a forest.",
+        "i" = "To prune again, pass its forest {.code object$fit}, which a model holds if pruned with {.code keep_forest = TRUE}."
+      )
+    )
+  }
   checkmate::assert_class(object, "rpf")
   check_rpf_alive(object)
   if (missing(data) || is.null(data)) {
@@ -318,8 +334,9 @@ prune_components <- function(
   checkmate::assert_int(nthreads, lower = 1, null.ok = TRUE)
   nthreads <- as.integer(nthreads %||% object$params$nthreads)
   checkmate::assert_flag(verbose)
+  checkmate::assert_flag(keep_forest)
 
-  prune_run(
+  res <- prune_run(
     object,
     prune_training_data(object, data, y),
     max_panels = max_panels,
@@ -334,6 +351,27 @@ prune_components <- function(
     nthreads = nthreads,
     verbose = verbose
   )
+  # the caller keeps `object`, and with it the forest
+  if (keep_forest) res else pruned_drop_forest(res)
+}
+
+# The pruned model `x` without its forest (keep_forest = FALSE): `x$fit` keeps the forest's description (blueprint,
+# mode, factor levels, params, the split choice and its OOB path), which predict(), print() and the rest use, but
+# neither the C++ forest (`x$fit$fit` is NULL) nor its R list (export_forest). Everything that needs the forest
+# errors through check_rpf_alive().
+pruned_drop_forest <- function(x) {
+  x$fit$fit <- NULL
+  x$fit$forest <- NULL
+  x
+}
+
+# Whether the rpf object, or the pruned model's `fit`, has its forest (FALSE: pruned with keep_forest = FALSE)
+rpf_has_forest <- function(x) {
+  if (inherits(x, "rpf_pruned")) {
+    x <- x$fit
+  }
+  # exact: a list without `fit` would partially match another element
+  !is.null(x[["fit", exact = TRUE]])
 }
 
 # The pruning of prune_components() on the checked arguments: `tr` holds the training rows (prune_training_data()),
@@ -1349,7 +1387,10 @@ pruned_V <- function(object) {
 # column: V per component, named as predict_components() names them, <component>__class:<level>)
 prune_kept_matrix <- function(object, new_data, nthreads = 0L, call = rlang::caller_env()) {
   fit <- object$fit
-  check_rpf_alive(fit, call = call)
+  # without its forest the model is plain R data: nothing to check (the stored pieces are rebuilt as needed)
+  if (rpf_has_forest(fit)) {
+    check_rpf_alive(fit, call = call)
+  }
   processed <- hardhat::forge(new_data, fit$blueprint)
   check_no_missing(processed$predictors, "{.arg new_data}", call = call)
   X <- preprocess_predictors_predict(fit, processed$predictors)

@@ -44,12 +44,20 @@ rp_both <- function(fit_call, data, y = NULL, max_panels = 3) {
   a <- fit_call(prune = TRUE)
   seed_a <- .Random.seed
   set.seed(7)
-  b <- prune_components(fit_call(prune = FALSE), data, y, max_panels = max_panels)
+  b <- prune_components(fit_call(prune = FALSE), data, y, max_panels = max_panels, keep_forest = TRUE)
   expect_identical(.Random.seed, seed_a)
   list(a = a, b = b)
 }
 
-rp_args <- list(max_interaction = 3, n_families = 12, n_try_split_points = 5, share_candidates = 0.5, max_panels = 3)
+# with the forest, which the tests compare too (no effect with prune = FALSE)
+rp_args <- list(
+  max_interaction = 3,
+  n_families = 12,
+  n_try_split_points = 5,
+  share_candidates = 0.5,
+  max_panels = 3,
+  keep_forest = TRUE
+)
 
 test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): formula and x/y", {
   d <- rp_data()
@@ -95,7 +103,17 @@ test_that("rpf(prune = TRUE) equals prune_components(rpf(prune = FALSE), data): 
 test_that("max_panels = Inf: no display; purify is not used with prune = TRUE", {
   d <- rp_data(n = 250, seed = 3)
   fit_call <- function(prune, ...) {
-    rpf(y ~ ., data = d, max_interaction = 3, n_families = 12, n_splits = 60, max_panels = Inf, prune = prune, ...)
+    rpf(
+      y ~ .,
+      data = d,
+      max_interaction = 3,
+      n_families = 12,
+      n_splits = 60,
+      max_panels = Inf,
+      prune = prune,
+      keep_forest = TRUE,
+      ...
+    )
   }
   f <- rp_both(fit_call, d, max_panels = Inf)
   expect_same_pruned(f$a, f$b, d)
