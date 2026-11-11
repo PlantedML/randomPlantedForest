@@ -1,10 +1,15 @@
-#' Print an rpf
+#' Print a Random Planted Forest
+#'
+#' Shows a forest (class `rpf`, from [rpf()] with `prune = FALSE`): the kind of model and its formula, the number of
+#' tree families and of splits (with how the splits were chosen), the predictors and the interaction order, whether
+#' the forest is purified, the settings of the split search and the number of threads. A pruned model, the default of
+#' [rpf()], is printed by [print.rpf_pruned()].
 #'
 #' @param x `[rpf]`: A fitted [`rpf`] model.
 #' @param ... Further arguments passed to or from other methods.
 #'
 #' @return Invisibly: `x`.
-#' @seealso [`rpf`].
+#' @seealso [rpf()], [print.rpf_pruned()].
 #' @export
 #'
 #' @examples
@@ -153,10 +158,12 @@ print_params <- function(params) {
 
 #' Compact printing of forest structures
 #'
-#' These methods are provided to avoid flooding the console with long nested lists containing tree structures.
+#' The flattened forest that [rpf()] stores with `export_forest = TRUE` (as `$forest`) is a long nested list of
+#' trees. These methods print a one-line summary instead of the whole list.
 #'
 #' @param x `[rpf_forest]`: Flattened forest, as in `$forest` of an [`rpf`].
 #' @param ... Further arguments passed to or from other methods.
+#' @return Invisibly: `x` (`object` for `str()`).
 #' @seealso [`rpf`]
 #' @export
 #' @examples

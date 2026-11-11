@@ -1,4 +1,11 @@
-#' Random Planted Forest Predictions
+#' Predict with a Random Planted Forest
+#'
+#' Predictions of a forest (class `rpf`, from [rpf()] with `prune = FALSE`) for new data: the mean of its tree
+#' families' predictions. For classification, `type` chooses probabilities, classes or the raw scores. A pruned model,
+#' the default of [rpf()], has its own method, [predict.rpf_pruned()], with the same arguments.
+#'
+#' `new_data` is prepared as the training data were: by the formula or recipe of the fit, and with factor levels coded
+#' as in the fit (see "Factor predictors" in [rpf()]). Missing values are an error.
 #'
 #' @param object `[rpf]`: A fitted [`rpf`] model.
 #' @param new_data `[data.frame | matrix]`: New observations to predict.
@@ -11,8 +18,12 @@
 #' For `type = "prob"`, these are truncated to ensure this property.
 #'
 #' For classification, `type = "link"` is an alias for `type = "numeric"`.
-#' If `loss` is `"logit"` or `"exponential"`, the raw predictions have the
-#' additional interpretation similar to the linear predictor in a [`glm`].
+#' If `loss` is `"logit"` or `"exponential"`, the raw predictions are the
+#' scores on the link scale, like the linear predictor of a [`glm`]: with two
+#' classes one score, the log-odds of the second class; with more, one score
+#' per class (`"exponential"`, summing to 0) or per class but the first
+#' (`"logit"`, whose first class has score 0). The probabilities of
+#' `type = "prob"` are their softmax (see "Classification losses" in [rpf()]).
 #' If `loss` is `"L1"` or `"L2"`, the link is the identity.
 #' @param nthreads `[integer(1) | NULL: NULL]`: Number of threads. `NULL` uses the `nthreads`
 #'   the forest was fitted with, capped at the available cores.
@@ -34,13 +45,21 @@
 #' first level; they are reported with the first level's score 0 joined and
 #' centred across the `K` classes, which leaves the probabilities as they are.)
 #'
+#' @seealso [predict.rpf_pruned()] for the pruned model, [predict_components()] for the prediction as a sum of
+#'   components.
 #' @export
 #' @importFrom hardhat forge validate_prediction_size
 #'
 #' @examples
-#' # Regression with L2 loss
-#' rpfit <- rpf(y = mtcars$mpg, x = mtcars[, c("cyl", "wt")], prune = FALSE)
-#' predict(rpfit, mtcars[, c("cyl", "wt")])
+#' # Regression: a tibble with the column .pred
+#' rpfit <- rpf(mpg ~ cyl + wt, data = mtcars, n_families = 20, prune = FALSE)
+#' predict(rpfit, mtcars[1:3, ])
+#'
+#' # Classification: probabilities by default, or classes, or the raw scores
+#' rpfit <- rpf(Species ~ ., data = iris, n_families = 20, prune = FALSE)
+#' predict(rpfit, iris[c(1, 51, 101), ])
+#' predict(rpfit, iris[c(1, 51, 101), ], type = "class")
+#' predict(rpfit, iris[c(1, 51, 101), ], type = "link")
 predict.rpf <- function(
   object,
   new_data,

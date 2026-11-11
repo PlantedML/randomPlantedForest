@@ -6,44 +6,79 @@ template:
 development:
   mode: auto
 
+navbar:
+  structure:
+    left: [intro, articles, reference, news]
+    right: [search, github, lightswitch]
+  components:
+    news:
+      text: News
+      href: news/index.html
+
+articles:
+- title: Understanding the model
+  navbar: Understanding the model
+  desc: What a fitted model is made of, and how the forest behind it is grown.
+  contents:
+  - articles/reading-the-model
+  - articles/growing
+
+- title: Fitting
+  navbar: Fitting
+  desc: The choices `rpf()` makes for you, how it makes them, and how to change them.
+  contents:
+  - articles/number-of-splits-and-tuning
+  - articles/pruning
+  - articles/classification
+
+- title: In practice
+  navbar: In practice
+  desc: Large data, saving models, and other frameworks.
+  contents:
+  - articles/speed-and-memory
+
 reference:
-- title: Model fitting and prediction
-  desc: >
-    Modeling fundamentals for creation and prediction from Random Planted
-    Forest models.
+- title: Fitting and prediction
+  desc: Fit a model, predict with it, and print it.
 - contents:
   - rpf
+  - predict.rpf_pruned
   - predict.rpf
-  - oob_path_checkpoints
+  - print.rpf_pruned
+  - print.rpf
 
-- title: Tuning
-  desc: Tuning the greediness and the leaf size out of bag
+- title: Reading the model
+  desc: The components that add up to the prediction, and the purification that makes them unique.
 - contents:
+  - predict_components
+  - purify
+
+- title: Pruning
+  desc: Leave out the small components, by a rule chosen out of bag or by cross-validation.
+- contents:
+  - prune_components
+
+- title: The number of splits and tuning
+  desc: The out-of-bag error along the splits, and the search over the greediness and the leaf size.
+- contents:
+  - oob_path_checkpoints
   - tune_control
   - greediness_ladder
 
-- title: Functional decomposition
-  desc: Enabling and utilizing functional decomposition
+- title: Looking inside a tree family
+  desc: Draw the trees of one family, or get its leaves as boxes.
 - contents:
-    - purify
-    - predict_components
+  - plot.rpf
+  - rpf_boxes
 
-- title: Pruning
-  desc: Dropping small components, chosen by cross-validation or out of bag
+- title: Saving and restoring
+  desc: Models hold a C++ object, which needs marshalling to survive `saveRDS()` or a worker process.
 - contents:
-  - prune_components
-  - predict.rpf_pruned
-
-- title: Visualization
-  desc: Inspecting the trees of a forest
-- contents:
-    - plot.rpf
-    - rpf_boxes
-- text: -------
-- title: Utility functions
-- contents:
-  - starts_with("print.")
-  - starts_with("str.")
   - rpf_marshal
   - rpf_is_valid
   - bundle.rpf
+
+- title: Utilities
+  desc: Compact printing of the flattened forest (`export_forest = TRUE`).
+- contents:
+  - print.rpf_forest

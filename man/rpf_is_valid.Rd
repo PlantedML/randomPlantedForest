@@ -2,7 +2,7 @@
 % Please edit documentation in R/marshal.R
 \name{rpf_is_valid}
 \alias{rpf_is_valid}
-\title{Check whether an rpf object's C++ forest is still alive}
+\title{Check whether a model's C++ forest is still alive}
 \usage{
 rpf_is_valid(x)
 }
@@ -15,8 +15,25 @@ rpf_is_valid(x)
 without its forest).
 }
 \description{
-The C++ forest does not survive \code{\link[=saveRDS]{saveRDS()}}; an \code{rpf} object restored via
-\code{\link[=readRDS]{readRDS()}} without \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}} is unusable. A pruned model without its forest
+The C++ forest does not survive \code{\link[=saveRDS]{saveRDS()}}; an \code{rpf} object, or an \code{rpf_pruned} one fitted with
+\code{keep_forest = TRUE}, restored via \code{\link[=readRDS]{readRDS()}} without \code{\link[=rpf_marshal]{rpf_marshal()}}/\code{\link[=rpf_unmarshal]{rpf_unmarshal()}} is unusable, and
+\code{\link[=predict.rpf]{predict()}} on it is an error that says so. A pruned model without its forest
 (\code{keep_forest = FALSE}, the default) has no C++ forest and is always valid; the \code{fit} of such a model is not (it
 has no forest to use).
+}
+\examples{
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
+tmp <- tempfile(fileext = ".rds")
+
+# saveRDS() alone loses the C++ forest
+saveRDS(fit, tmp)
+rpf_is_valid(readRDS(tmp))
+
+# rpf_marshal() keeps it
+saveRDS(rpf_marshal(fit), tmp)
+rpf_is_valid(rpf_unmarshal(readRDS(tmp)))
+unlink(tmp)
+}
+\seealso{
+\code{\link[=rpf_marshal]{rpf_marshal()}} to save a model so that it can be restored.
 }

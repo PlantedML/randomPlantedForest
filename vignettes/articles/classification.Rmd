@@ -1,0 +1,159 @@
+---
+title: "Classification"
+description: >
+  Binary and multiclass outcomes, probabilities and classes, the components on
+  the scale of the scores, and the losses.
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 3.5,
+  out.width = "100%"
+)
+```
+
+For a factor outcome (binary or multi-class with more than two classes), `rpf()` fits a classification model.
+It takes the same steps as for regression, with the same defaults: the number of splits is chosen out of bag, the components are pruned, and three-way components are simplified such that each can be shown as the sum of at most 10 heat maps.
+The model predicts scores, and every score is a sum of components, as the prediction of a regression model is.
+With the losses `"logit"` (the default) and `"exponential"`, the scores are on the log-odds scale: with two classes there is one score, the log-odds of the second class, and with more classes there is one score per class, and the scores sum to 0.
+With `"L1"` and `"L2"` the scores are not log-odds but fitted 0/1 class indicators.
+The losses are described in "The losses" below.
+
+```{r setup, message = FALSE}
+library(randomPlantedForest)
+library(glex)
+
+penguins <- na.omit(palmerpenguins::penguins)
+```
+
+## Two classes
+
+```{r binary}
+set.seed(1)
+by_sex <- rpf(sex ~ ., data = penguins, nthreads = 2)
+by_sex
+```
+
+`predict()` returns probabilities by default, classes with `type = "class"`, and the scores with `type = "link"`:
+
+```{r binary-predict}
+predict(by_sex, head(penguins))
+predict(by_sex, head(penguins), type = "class")
+predict(by_sex, head(penguins), type = "link")
+```
+
+## The components, on the scale of the scores
+
+The components add up to the scores, not to the probabilities:
+
+```{r binary-components}
+comp <- predict_components(by_sex, penguins)
+head(comp$m)
+all.equal(comp$intercept + rowSums(comp$m), predict(by_sex, penguins, type = "link")$.pred)
+```
+
+With two classes there is one score, the log-odds of the second level of the outcome (here `male`): a positive contribution moves a penguin towards `male`, a negative one towards `female`.
+glex draws them as for regression:
+
+```{r binary-plot, fig.alt = "The body mass component of the sex model as a step curve on the scale of the scores."}
+plot(comp, "body_mass_g")
+```
+
+## Three or more classes
+
+With more classes, the model has one score per class, and the scores sum to 0.
+The difference of two classes' scores is the log-odds of one class against the other.
+Every component has one column per class:
+
+```{r multiclass}
+set.seed(1)
+by_species <- rpf(species ~ ., data = penguins, nthreads = 2)
+by_species
+predict(by_species, penguins[c(1, 200, 300), ])
+```
+
+```{r multiclass-components}
+comp3 <- predict_components(by_species, penguins)
+comp3$target_levels
+names(comp3$m)[1:6]
+comp3$intercept
+```
+
+The columns are named `<component>__class:<level>`, one for each of `Adelie`, `Chinstrap` and `Gentoo`.
+A positive contribution moves a penguin towards that class, a negative one away from it, and no class is singled out as a reference.
+A component is kept or dropped for all classes together: its size is its variance summed over the classes' scores, centred across the classes.
+glex draws one panel per score:
+
+```{r multiclass-plot, fig.alt = "The bill length component of the species model, one panel for each class."}
+plot(comp3, "bill_length_mm")
+```
+
+## How the choices are scored
+
+Every out-of-bag choice, of the number of splits and of the pruning, is scored by the loss's own criterion, corrected for the number of out-of-bag families as for regression:
+
+- for the losses that give probabilities, the log-loss of the probabilities `predict(type = "prob")` returns;
+- for `loss = "L1"` and `"L2"`, which fit class indicators directly, the squared error of the scores summed over the classes (the Brier score).
+
+## The losses
+
+`loss` chooses how the families fit the classes:
+
+- `"logit"` (the default) and `"exponential"` fit scores on the link scale, and `predict(type = "prob")` returns their softmax, so the probabilities are proper.
+  With two classes there is one score, the log-odds of the second class.
+  With more, both have one score per class, summing to 0, so the link predictions and the components have one column per class. `"logit"` is the multinomial log-likelihood and `"exponential"` the multiclass exponential loss SAMME.
+- `"L1"` and `"L2"` fit 0/1 class indicators directly, as regression would; their scores are not probabilities, and `type = "prob"` truncates them to [0, 1].
+
+### A step, and the pseudo-row
+
+Every split moves the scores of the rows of each of its two new leaves by one step.
+For `"exponential"` and `"logit"`, the step minimises the leaf's *penalised* loss: the loss of its rows plus that of one imaginary row, the pseudo-row, split evenly over the classes and placed at the score the leaf has now.
+The pseudo-row says "stay where you are", so it pulls every step towards no change, and more so the fewer rows the leaf has.
+
+Two things follow:
+
+- **A pure leaf stops at a finite level.**
+  If all rows of a leaf have one class, the loss of its rows alone falls forever as its score grows, and an unpenalised step would push the score to infinity.
+  The pseudo-row, which holds a share of the other classes, stops it: with two classes a pure leaf of `n` rows goes to about `log(2n + 1)` and then stays there.
+- **A pure split or a repeat gains nothing.**
+  A split is scored by what its two leaves' steps gain over the step the parent leaf would make by itself, and each new leaf pays for its own pseudo-row.
+  Splitting a pure leaf cannot separate anything, and repeating a split whose leaves are already at their best level cannot improve them, so both score no gain and are not made.
+  A round in which no candidate gains makes no split (it still counts towards `n_splits`).
+
+The table shows the score of a point in a pure region as one tree family grows: the two classes are separated by `x1 > 0.5`, and `x2` is noise.
+
+```{r pure-region}
+set.seed(1)
+n <- 200
+sep <- data.frame(x1 = runif(n), x2 = runif(n))
+sep$y <- factor(ifelse(sep$x1 > 0.5, "b", "a"))
+
+rounds <- c(5, 10, 30, 100, 300)
+score_after <- function(loss, k) {
+  set.seed(3)
+  f <- rpf(y ~ ., data = sep, loss = loss, n_families = 1, n_splits = k, prune = FALSE)
+  c(score = predict(f, data.frame(x1 = 0.9, x2 = 0.5), type = "link")$.pred,
+    leaves = nrow(rpf_boxes(f)) - 1)
+}
+pure <- data.frame(
+  rounds = rounds,
+  t(sapply(rounds, function(k) score_after("exponential", k))),
+  t(sapply(rounds, function(k) score_after("logit", k)))
+)
+names(pure) <- c("rounds", "exponential score", "exponential leaves", "logit score", "logit leaves")
+pure
+```
+
+The score stays at its level from the first rounds on, and the family soon stops adding leaves: no candidate gains any more.
+So a fixed, large `n_splits` does not make the model overconfident.
+
+### `exact_step`
+
+`"exponential"`'s step has a closed form, so it is exact.
+`"logit"` scores the candidates by the second-order (Newton) gain of its penalised loss.
+With `exact_step = TRUE` (the default), the chosen split's two leaves then get the exact minimisers, by Newton's method on their rows; `exact_step = FALSE` keeps the one Newton step, which is a little faster.
+The search is the same either way, and `exact_step` does not change `"exponential"` fits.
+
