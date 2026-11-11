@@ -376,7 +376,7 @@ preprocess_outcome <- function(processed, loss, call = rlang::caller_env()) {
 
   if (is_factor) {
     mode <- "classification"
-    loss <- loss %||% "exponential"
+    loss <- loss %||% "logit"
 
     if (is_binary) {
       # Binary case: Convert to 0, 1 integer

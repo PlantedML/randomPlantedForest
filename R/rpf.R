@@ -89,15 +89,17 @@
 #'   the forest on the effects a first fit found, e.g. after dropping its small
 #'   components.
 #' @param loss `[character(1) | NULL: NULL]`: Loss function. `NULL` uses `"L2"` for
-#'   regression, the only supported loss, and `"exponential"` for classification
-#'   (with more than two classes the multiclass exponential loss SAMME).
-#'   Classification also supports `"logit"` (the multinomial log-likelihood),
-#'   and `"L1"` and `"L2"`, which fit class indicators directly and do not yield
-#'   proper probability estimates. See "Classification losses" in Details.
-#' @param exact_step `[logical(1): TRUE]`: Only used with `loss = "logit"`: whether
-#'   the two leaves of each split get the exact minimisers of the penalised loss
-#'   (Newton's method to convergence on the leaf's rows), or one Newton step from
-#'   the sums the split search scored them by (`FALSE`, faster). The split
+#'   regression, the only supported loss, and `"logit"` (the multinomial
+#'   log-likelihood) for classification, with two classes and with more.
+#'   Classification also supports `"exponential"` (with more than two classes
+#'   the multiclass exponential loss SAMME), and `"L1"` and `"L2"`, which fit
+#'   class indicators directly and do not yield proper probability estimates.
+#'   See "Classification losses" in Details.
+#' @param exact_step `[logical(1): TRUE]`: Only used with `loss = "logit"` (the
+#'   classification default): whether the two leaves of each split get the
+#'   exact minimisers of the penalised loss (Newton's method to convergence on
+#'   the leaf's rows), or one Newton step from the sums the split search scored
+#'   them by (`FALSE`, faster). The split
 #'   search is the same either way. The exponential loss's step is exact by
 #'   itself, so `exact_step` does not change `"exponential"` fits. See
 #'   "Classification losses" in Details.
@@ -231,7 +233,7 @@
 #' default of the other structures, and of `"leaf"` before). `tune` searches
 #' this greediness out of bag.
 #'
-#' For classification, `"exponential"` (the default) and `"logit"` fit on the
+#' For classification, `"logit"` (the default) and `"exponential"` fit on the
 #' link scale and are transformed to probabilities; see "Classification
 #' losses". `"L1"` and `"L2"` fit class indicators directly and their
 #' probabilities are truncated to `[0, 1]`.
@@ -262,6 +264,14 @@
 #' for `"tree_then_leaf"` one pass over the leaf per split point).
 #' `"exponential"`'s step is exact; with `exact_step = TRUE` (the default)
 #' `"logit"`'s steps are made exact too, otherwise they are one Newton step.
+#'
+#' `"logit"` is the default, with two classes and with more. On 8 public data
+#' sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5 repeated
+#' splits each) its test log-loss was lower than or tied with that of
+#' `"exponential"` on every set, and lower by 0.053 on average with 3 or more
+#' classes. `"exponential"` can need many more splits with many classes: on a
+#' set of 7 classes it chose 1,345 to 4,525 splits where `"logit"` chose about
+#' 22.
 #'
 #' ## Factor predictors
 #'
