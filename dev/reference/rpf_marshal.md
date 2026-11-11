@@ -88,4 +88,5 @@ saveRDS(blob, tmp)
 restored <- rpf_unmarshal(readRDS(tmp))
 all.equal(predict(fit, mtcars), predict(restored, mtcars))
 #> [1] TRUE
+unlink(tmp)
 ```

@@ -66,4 +66,5 @@ predict(restored, mtcars)
 #>  9  22.7
 #> 10  18.6
 #> # ℹ 22 more rows
+unlink(tmp)
 ```

@@ -202,42 +202,37 @@ class against the other. Every component has one column per class:</p>
 <span><span class="va">by_species</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rpf.html">rpf</a></span><span class="op">(</span><span class="va">species</span> <span class="op">~</span> <span class="va">.</span>, data <span class="op">=</span> <span class="va">penguins</span>, nthreads <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">by_species</span></span>
 <span><span class="co">#&gt; ── Random Planted Forest model ─────────────────────────────────────────────────</span></span>
-<span><span class="co">#&gt; Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 7 components.</span></span>
-<span><span class="co">#&gt; Intercept per class: Adelie  1.207020, Chinstrap -0.836373, Gentoo -0.370647</span></span>
+<span><span class="co">#&gt; Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 2 components.</span></span>
+<span><span class="co">#&gt; Intercept per class: Adelie   9.01628, Chinstrap -12.59247, Gentoo   3.57619</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Components (largest first), importance = share of the variance of the scores (centred across the classes) on the training rows:</span></span>
-<span><span class="co">#&gt;  component             importance</span></span>
-<span><span class="co">#&gt;  bill_length_mm        21%       </span></span>
-<span><span class="co">#&gt;  island                17%       </span></span>
-<span><span class="co">#&gt;  bill_depth_mm         6%        </span></span>
-<span><span class="co">#&gt;  flipper_length_mm     5.6%      </span></span>
-<span><span class="co">#&gt;  body_mass_g           2%        </span></span>
-<span><span class="co">#&gt;  sex                   1.2%      </span></span>
-<span><span class="co">#&gt;  bill_length_mm:island 0.33%     </span></span>
+<span><span class="co">#&gt;  component      importance</span></span>
+<span><span class="co">#&gt;  island         95%       </span></span>
+<span><span class="co">#&gt;  bill_length_mm 4.1%      </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; How it was chosen:</span></span>
 <span><span class="co">#&gt;   The forest: 200 tree families of 30 splits (chosen out of bag; growing stopped at 42).</span></span>
-<span><span class="co">#&gt;   From the forest's 60 nonzero components (purified): those with a share of at least 0.3% of the forest's Var(prediction), as they are (rule D).</span></span>
+<span><span class="co">#&gt;   From the forest's 60 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).</span></span>
 <span><span class="co">#&gt;   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.</span></span>
-<span><span class="co">#&gt;   Left out: 53 components, shares together 0.24% (largest bill_depth_mm:bill_length_mm, 0.052%).</span></span>
+<span><span class="co">#&gt;   Left out: 58 components, shares together 14% (largest bill_depth_mm, 5.6%).</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">by_species</span>, <span class="va">penguins</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">200</span>, <span class="fl">300</span><span class="op">)</span>, <span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 3</span></span></span>
 <span><span class="co">#&gt;   .pred_Adelie .pred_Chinstrap .pred_Gentoo</span></span>
 <span><span class="co">#&gt;          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>     1.000          0.000<span style="text-decoration: underline;">085</span>9     0.000<span style="text-decoration: underline;">100</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>     0.000<span style="text-decoration: underline;">132</span>       0.000<span style="text-decoration: underline;">493</span>      0.999   </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>     0.018<span style="text-decoration: underline;">1</span>         0.982         0.000<span style="text-decoration: underline;">134</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span>     1.000          1.65 <span style="color: #949494;">e</span><span style="color: #BB0000;">-20</span>     2.36<span style="color: #949494;">e</span><span style="color: #BB0000;">- 4</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span>     0.006<span style="text-decoration: underline;">12</span>        5.04 <span style="color: #949494;">e</span><span style="color: #BB0000;">-17</span>     9.94<span style="color: #949494;">e</span><span style="color: #BB0000;">- 1</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span>     0.000<span style="text-decoration: underline;">245</span>       1.000<span style="color: #949494;">e</span>+ 0     1.88<span style="color: #949494;">e</span><span style="color: #BB0000;">-10</span></span></span></code></pre></div>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">comp3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_components.html">predict_components</a></span><span class="op">(</span><span class="va">by_species</span>, <span class="va">penguins</span><span class="op">)</span></span>
 <span><span class="va">comp3</span><span class="op">$</span><span class="va">target_levels</span></span>
 <span><span class="co">#&gt; [1] "Adelie"    "Chinstrap" "Gentoo"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">comp3</span><span class="op">$</span><span class="va">m</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "bill_length_mm__class:Adelie"    "bill_length_mm__class:Chinstrap"</span></span>
-<span><span class="co">#&gt; [3] "bill_length_mm__class:Gentoo"    "bill_depth_mm__class:Adelie"    </span></span>
-<span><span class="co">#&gt; [5] "bill_depth_mm__class:Chinstrap"  "bill_depth_mm__class:Gentoo"</span></span>
+<span><span class="co">#&gt; [3] "bill_length_mm__class:Gentoo"    "island__class:Adelie"           </span></span>
+<span><span class="co">#&gt; [5] "island__class:Chinstrap"         "island__class:Gentoo"</span></span>
 <span><span class="va">comp3</span><span class="op">$</span><span class="va">intercept</span></span>
 <span><span class="co">#&gt;     Adelie  Chinstrap     Gentoo </span></span>
-<span><span class="co">#&gt;  1.2070200 -0.8363733 -0.3706467</span></span></code></pre></div>
+<span><span class="co">#&gt;   9.016282 -12.592471   3.576189</span></span></code></pre></div>
 <p>The columns are named
 <code>&lt;component&gt;__class:&lt;level&gt;</code>, one for each of
 <code>Adelie</code>, <code>Chinstrap</code> and <code>Gentoo</code>. A
