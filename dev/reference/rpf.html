@@ -295,18 +295,20 @@ components.</p></dd>
 
 <dt id="arg-loss">loss<a class="anchor" aria-label="anchor" href="#arg-loss"></a></dt>
 <dd><p><code>[character(1) | NULL: NULL]</code>: Loss function. <code>NULL</code> uses <code>"L2"</code> for
-regression, the only supported loss, and <code>"exponential"</code> for classification
-(with more than two classes the multiclass exponential loss SAMME).
-Classification also supports <code>"logit"</code> (the multinomial log-likelihood),
-and <code>"L1"</code> and <code>"L2"</code>, which fit class indicators directly and do not yield
-proper probability estimates. See "Classification losses" in Details.</p></dd>
+regression, the only supported loss, and <code>"logit"</code> (the multinomial
+log-likelihood) for classification, with two classes and with more.
+Classification also supports <code>"exponential"</code> (with more than two classes
+the multiclass exponential loss SAMME), and <code>"L1"</code> and <code>"L2"</code>, which fit
+class indicators directly and do not yield proper probability estimates.
+See "Classification losses" in Details.</p></dd>
 
 
 <dt id="arg-exact-step">exact_step<a class="anchor" aria-label="anchor" href="#arg-exact-step"></a></dt>
-<dd><p><code>[logical(1): TRUE]</code>: Only used with <code>loss = "logit"</code>: whether
-the two leaves of each split get the exact minimisers of the penalised loss
-(Newton's method to convergence on the leaf's rows), or one Newton step from
-the sums the split search scored them by (<code>FALSE</code>, faster). The split
+<dd><p><code>[logical(1): TRUE]</code>: Only used with <code>loss = "logit"</code> (the
+classification default): whether the two leaves of each split get the
+exact minimisers of the penalised loss (Newton's method to convergence on
+the leaf's rows), or one Newton step from the sums the split search scored
+them by (<code>FALSE</code>, faster). The split
 search is the same either way. The exponential loss's step is exact by
 itself, so <code>exact_step</code> does not change <code>"exponential"</code> fits. See
 "Classification losses" in Details.</p></dd>
@@ -471,7 +473,7 @@ better: 3 split points per candidate and 10% of the possible splits per
 round (the default) had 5.7% to 6.8% lower test error than 10 and 40% (the
 default of the other structures, and of <code>"leaf"</code> before). <code>tune</code> searches
 this greediness out of bag.</p>
-<p>For classification, <code>"exponential"</code> (the default) and <code>"logit"</code> fit on the
+<p>For classification, <code>"logit"</code> (the default) and <code>"exponential"</code> fit on the
 link scale and are transformed to probabilities; see "Classification
 losses". <code>"L1"</code> and <code>"L2"</code> fit class indicators directly and their
 probabilities are truncated to <code>[0, 1]</code>.</p>
@@ -504,6 +506,13 @@ sorted rows, so that a split point costs the same whatever the leaf's size;
 for <code>"tree_then_leaf"</code> one pass over the leaf per split point).
 <code>"exponential"</code>'s step is exact; with <code>exact_step = TRUE</code> (the default)
 <code>"logit"</code>'s steps are made exact too, otherwise they are one Newton step.</p>
+<p><code>"logit"</code> is the default, with two classes and with more. On 8 public data
+sets (4 binary, 4 with 3 to 7 classes; the default pipeline, 5 repeated
+splits each) its test log-loss was lower than or tied with that of
+<code>"exponential"</code> on every set, and lower by 0.053 on average with 3 or more
+classes. <code>"exponential"</code> can need many more splits with many classes: on a
+set of 7 classes it chose 1,345 to 4,525 splits where <code>"logit"</code> chose about
+22.</p>
 </div>
 
 <div class="section">
@@ -842,9 +851,9 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 3 × 3</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .pred_setosa .pred_versicolor .pred_virginica</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>      0.990            0.009<span style="text-decoration: underline;">49</span>        0.000<span style="text-decoration: underline;">659</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>      0.002<span style="text-decoration: underline;">96</span>          0.976          0.021<span style="text-decoration: underline;">4</span>  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>      0.001<span style="text-decoration: underline;">51</span>          0.001<span style="text-decoration: underline;">89</span>        0.997   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     0.992            0.008<span style="text-decoration: underline;">26</span>         0.000<span style="text-decoration: underline;">191</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>     0.002<span style="text-decoration: underline;">07</span>          0.984           0.014<span style="text-decoration: underline;">0</span>  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     0.000<span style="text-decoration: underline;">134</span>         0.000<span style="text-decoration: underline;">840</span>        0.999   </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The forest instead of the pruned model, with x and y, pairwise interactions</span></span></span>
 <span class="r-in"><span><span class="co"># and a fixed number of splits</span></span></span>
@@ -922,8 +931,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1                  3            0.100             1       84        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1                  1            0.025             1      100        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.074         TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.062        FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.112         TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.082        FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   chosen_step2 chosen_step3 final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           NA           NA  TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           NA           NA FALSE</span>

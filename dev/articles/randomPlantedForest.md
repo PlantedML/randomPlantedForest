@@ -360,12 +360,12 @@ predict(rpfit_sex, head(penguins), type = "prob")
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1        0.135      0.865
-#> 2        0.587      0.413
-#> 3        0.773      0.227
-#> 4        0.657      0.343
-#> 5        0.129      0.871
-#> 6        0.872      0.128
+#> 1        0.181      0.819
+#> 2        0.623      0.377
+#> 3        0.792      0.208
+#> 4        0.669      0.331
+#> 5        0.156      0.844
+#> 6        0.873      0.127
 predict(rpfit_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -381,7 +381,7 @@ predict(rpfit_sex, head(penguins), type = "class")
 A classification model goes through the same steps as a regression
 model: the number of splits is chosen out of bag and the components are
 pruned, both by the log-loss of the predicted probabilities. With the
-default `loss = "exponential"` (or `"logit"`), `type = "link"`
+default `loss = "logit"` (or `"exponential"`), `type = "link"`
 additionally gives raw predictions on the log-odds scale.
 
 ### Multiclass
@@ -397,12 +397,12 @@ predict(rpfit_species, head(penguins), type = "prob")
 #> # A tibble: 6 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1        1.000        5.73e-11     6.17e-11
-#> 2        1.000        3.44e-10     1.86e- 8
-#> 3        1.000        1.94e-10     1.07e- 9
-#> 4        1.000        5.18e-11     4.37e-11
-#> 5        1.000        5.66e-11     2.30e-11
-#> 6        1.000        1.30e-10     1.29e- 9
+#> 1        1.000       0.0000529    0.0000891
+#> 2        0.998       0.000448     0.00134  
+#> 3        0.998       0.000729     0.000900 
+#> 4        0.999       0.000290     0.000330 
+#> 5        1.000       0.0000594    0.0000774
+#> 6        0.999       0.000351     0.000704
 predict(rpfit_species, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -415,14 +415,14 @@ predict(rpfit_species, head(penguins), type = "class")
 #> 6 Adelie
 ```
 
-The default loss for classification is `"exponential"`, which gives
-proper probability estimates (with more than two classes it is the
-multiclass exponential loss SAMME). `"logit"` (the multinomial
-log-likelihood) gives similar results after pruning, while `"L1"` and
-`"L2"` fit class indicators directly and do not yield proper
-probabilities. Note that with `loss = "logit"`, multiclass models are
-fit on a reference-class (log-odds) scale, so link predictions and
-components have one column less than there are classes: see
+The default loss for classification is `"logit"` (the multinomial
+log-likelihood), which gives proper probability estimates.
+`"exponential"` (with more than two classes the multiclass exponential
+loss SAMME) gives them too, while `"L1"` and `"L2"` fit class indicators
+directly and do not yield proper probabilities. Note that with
+`"logit"`, multiclass models are fit on a reference-class (log-odds)
+scale, so link predictions and components have one column less than
+there are classes: see
 [`?predict.rpf`](https://plantedml.com/randomPlantedForest/dev/reference/predict.rpf.md)
 for details.
 

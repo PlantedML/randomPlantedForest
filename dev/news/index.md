@@ -32,10 +32,9 @@
     (order p) was worse on California housing and 11 to 41 times slower.
   - `n_families = 200` (was 50): more families had lower test error at
     every order (2% per doubling) and sparser pruned models. The loss is
-    unchanged: `"L2"` for regression and `"exponential"` for
-    classification (with more than two classes the multiclass
-    exponential loss SAMME, see Bug fixes). So every default fit
-    changes, regression and classification, and
+    `"L2"` for regression and, as below, now `"logit"` for
+    classification. So every default fit changes, regression and
+    classification, and
     [`rpf()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf.md)
     returns an `rpf_pruned` object instead of an `rpf` unless
     `prune = FALSE`. To fit a regression forest as before, give master’s
@@ -106,6 +105,20 @@
   s and 5.1 s instead of 11.5 s. Classification fits with `"logit"` or
   `"exponential"` change; `"L1"` and `"L2"` fits and regression are
   unchanged, and a model saved before still loads, prints and predicts.
+
+- The default classification loss is now `"logit"` (`loss = NULL`), with
+  two classes and with more; it was `"exponential"` (with more than two
+  classes SAMME). So every default classification fit changes;
+  `loss = "exponential"` gives the previous default, which stays
+  available and unchanged. On 8 public data sets (4 binary, 4 with 3 to
+  7 classes; the default pipeline, 5 repeated 75 / 25 splits each), the
+  test log-loss of `"logit"` was lower than or tied with that of
+  `"exponential"` on every set: a tie on the binary sets (+0.0004 on
+  average) and 0.053 lower with 3 or more classes (lower on 2 of the 4
+  sets, tied on the others). With many classes `"exponential"` can need
+  many more splits: on Dry Bean (7 classes, 2,000 rows) the out-of-bag
+  choice was 1,345 to 4,525 splits (310 to 990 s per fit), where
+  `"logit"` chose 22 on average.
 
 ### Renamed arguments
 
@@ -290,9 +303,10 @@
   on to the estimate of the stop on a new minimum, as a regrowth from
   their seed would cost more. A three-class fit on 100 rows with
   `loss = "logit"` and otherwise the defaults chooses 119 splits instead
-  of 238 and takes 2.5 s instead of 8.7 s at 1 thread; with the default
-  loss (exponential) it chooses 11 splits either way and stops growing
-  at 15 instead of 21 (both measured with all changes of this version).
+  of 238 and takes 2.5 s instead of 8.7 s at 1 thread; with
+  `loss = "exponential"` (then the default) it chooses 11 splits either
+  way and stops growing at 15 instead of 21 (both measured with all
+  changes of this version).
 - `rpf(prune = TRUE)` returns the pruned model instead of the forest
   (regression and classification): the forest is pruned by
   [`prune_components()`](https://plantedml.com/randomPlantedForest/dev/reference/prune_components.md)
@@ -522,16 +536,16 @@
   prediction, and
   [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/dev/reference/rpf_marshal.md)
   keeps the purification’s cap.
-- `loss = "exponential"`, the default for classification, is with more
-  than two classes the multiclass exponential loss SAMME (Zhu, Zou,
-  Rosset and Hastie, 2009): the split criterion, the leaf step and the
-  weights all come from the one loss `exp(-y.f / K)`. Each row has one
-  weight, `exp(-g)` with `g` its class’s score, and a leaf moves the
-  scores by `log(V_k) - mean_j log(V_j)`, with `V` its class weight sums
-  plus those of its pseudo-row (see the classification losses under
-  Breaking changes); [`predict()`](https://rdrr.io/r/stats/predict.html)
-  takes the softmax of the scores as before. Previously each class had
-  its own one-vs-rest weights, and its step was `log(p_k / p_0)` with
+- `loss = "exponential"` is with more than two classes the multiclass
+  exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split
+  criterion, the leaf step and the weights all come from the one loss
+  `exp(-y.f / K)`. Each row has one weight, `exp(-g)` with `g` its
+  class’s score, and a leaf moves the scores by
+  `log(V_k) - mean_j log(V_j)`, with `V` its class weight sums plus
+  those of its pseudo-row (see the classification losses under Breaking
+  changes); [`predict()`](https://rdrr.io/r/stats/predict.html) takes
+  the softmax of the scores as before. Previously each class had its own
+  one-vs-rest weights, and its step was `log(p_k / p_0)` with
   `p_0 = 1 - sum_k p_k` mixing shares under the different weights; it is
   0 at the start and was clamped to `epsilon`, so every class’s score
   rose by a common `log(1 / epsilon)` that the softmax ignores but the
