@@ -22,7 +22,7 @@ Interactions of order three or higher are simplified such that they can
 be displayed as the sum of a limited number (`max_panels`) of heat maps;
 often without loss in accuracy.
 
-<img src="man/figures/README-lead-figure-1.png" alt="The four components of a fitted model: three curves and one heat map, with the true functions drawn over the curves." width="100%" />
+<img src="man/figures/README-lead-figure-1.png" alt="The four components of a fitted model: three curves and one heat map, with the true functions drawn over the curves." width="50%" />
 
 The figure shows a model fitted to simulated data,
 $$y = 1 + \sin(\pi x_1) + 2(x_2^2 - 1/3) + x_3/2 + 2x_1x_2 + \text{noise},$$
