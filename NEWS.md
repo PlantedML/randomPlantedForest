@@ -259,6 +259,8 @@
   Each tree family's out-of-bag predictions are added to the checkpoints' sums as the family delivers them, instead of being kept until the stop is decided; the pool of split candidates keeps no record of its entries; and `options(randomPlantedForest.adaptive_pause_gb)`, the memory of the families waiting for the stop, defaults to 0.25 GB instead of 1 GB.
 * `rpf_marshal()` of a large forest is several times as fast: the forest's lists of trees and leaves are allocated at their final lengths instead of grown by one element at a time, which copied each list for every element.
   The blob is the same.
+* Pruning a forest with more components than training rows (few rows, many predictors) is faster, with bitwise the same models.
+  Rule `"R"`'s least squares for a threshold that keeps more components than rows computed a pivoted QR decomposition first, which such a fit can never use.
 
 # randomPlantedForest 0.5.0
 

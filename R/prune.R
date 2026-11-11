@@ -821,6 +821,10 @@ prune_lstsq <- function(X, y) {
 # The same least squares, faster for wide X: a pivoted QR (LAPACK) where X has full numerical rank (|R_kk| above
 # 1e-10 |R_11|), there equal to the minimum-norm solution up to rounding; prune_lstsq() otherwise
 prune_lstsq_qr <- function(X, y) {
+  # more columns than rows is never full rank: no QR to find that out
+  if (ncol(X) > nrow(X)) {
+    return(prune_lstsq(X, y))
+  }
   q <- qr(X, LAPACK = TRUE)
   d <- abs(diag(q$qr))
   if (length(d) < ncol(X) || !all(is.finite(d)) || min(d) <= 1e-10 * max(d)) {
