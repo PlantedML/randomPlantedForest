@@ -138,14 +138,14 @@
 #' order 8 (all predictors), most of it the 31 coarsened components the display keeps; there [purify()] alone needs
 #' more than 12 GB of RSS. `nthreads` speeds up the fits and the purification.
 #'
-#' **Classification.** A classification forest is pruned the same way, with its score columns: one for a binary
-#' outcome, one per class otherwise (`K - 1` for `loss = "logit"`, whose first level is the reference). Every component
-#' then has a column per score column, and:
-#' - A component's share sums its variance over the score columns, centred across the classes (`"logit"`: with the
-#'   reference level's score 0 joined; `"exponential"`: the part all classes share does not count), over the same sum
-#'   for the prediction. One kept list serves all classes.
-#' - `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per score column
-#'   (`"exponential"` with more than two classes: the first is 0), out of bag as for regression.
+#' **Classification.** A classification forest is pruned the same way, with its scores: one for a binary outcome, one
+#' per class otherwise. Every component then has a column per class, and:
+#' - A component's share sums its variance over the classes' scores, centred across the classes (as
+#'   [`predict()`][predict.rpf] reports them with `type = "link"`: the part all classes share does not count), over the
+#'   same sum for the prediction. One kept list serves all classes. (Internally `loss = "logit"` fits `K - 1` scores
+#'   against the first level; centred, the shares, the criterion and the model do not depend on which level is first.)
+#' - `"R"` fits one coefficient per kept component, shared by the classes, and one intercept per class (up to a
+#'   constant shared by the classes, which the probabilities ignore), out of bag as for regression.
 #' - The criterion is the forest's loss's own: for `loss = "L1"` or `"L2"` the squared error of the raw scores summed
 #'   over the columns (the Brier score; least squares for `"R"`), for `"logit"` and `"exponential"` the log-loss of the
 #'   probabilities that `predict(type = "prob")` makes (maximum likelihood for `"R"`, by Newton's method from rule
@@ -156,7 +156,8 @@
 #' - The display coarsens a component with one form (`C`, `q`, cuts) for all score columns, chosen by the variance
 #'   kept of the centred columns; its stored form is one per score column.
 #' - [`predict()`][predict.rpf_pruned] takes `type` as [predict.rpf()] does, and [predict_components()] has one column
-#'   per component and score column, named as for the forest.
+#'   per component and class, named as for the forest (`<component>__class:<level>`); with `"logit"` or
+#'   `"exponential"` each component's columns, and the intercepts, sum to 0 across the classes.
 #'
 #' @param object `[rpf]`: A fitted [`rpf`] model (regression or classification).
 #' @param data `[data.frame | matrix]`: The training data of `object`, in the order of the fit: the predictors as
@@ -198,7 +199,9 @@
 #'   and `splits_oob`), without the forest (`fit$fit` is `NULL`), so that a use of the forest from it is an error that
 #'   says so. With `keep_forest = TRUE`, `object` as it was (not purified by the pruning).
 #' - `rule`, `tau`: the chosen rule and threshold.
-#' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for classification one per score column.
+#' - `intercept`: `alpha` (the forest's intercept `f_0` for `"D"`); for classification one per score column of the
+#'   forest (`K - 1` for multiclass `loss = "logit"`, against the first level; [predict_components()] and
+#'   [print()][print.rpf_pruned()] report them as one per class, centred).
 #' - `beta`: named vector of the coefficients of the kept components (all 1 for `"D"`). For `"R"` with `select_by`
 #'   `"oob"`, `intercept` and `beta` are fitted on the out-of-bag components (see Details).
 #' - `sets`: the predictor sets of the kept components, as column indices.
@@ -1519,24 +1522,29 @@ predict_components.rpf_pruned <- function(object, new_data, max_interaction = NU
   use <- vapply(feats, function(f) length(f) <= max_interaction && all(f %in% predictors), logical(1))
   usec <- rep(use, each = V)
 
+  m <- M[, usec, drop = FALSE]
   ret <- list(
-    m = data.table::as.data.table(M[, usec, drop = FALSE]),
+    m = data.table::as.data.table(m),
     intercept = object$intercept,
     # a copy: setDT() would fail on a matrix and turn the caller's data.frame into a data.table
     x = data.table::as.data.table(new_data)[, predictors, with = FALSE]
   )
-  # multiclass: per score column, as predict_components() of the forest names them
+  # multiclass: one column per class, as predict_components() of the forest names them (multiclass logit: its V =
+  # K - 1 score columns centred, reported_scores())
   if (V > 1L) {
-    lev <- model_outcome_levels(object$fit)
-    ret$intercept <- stats::setNames(object$intercept, lev)
+    lev <- levels(object$fit$blueprint$ptypes$outcomes[[1]])
+    m <- reported_scores(object$fit, m, sum(use))
+    colnames(m) <- paste0(rep(names(object$beta)[use], each = length(lev)), "__class:", rep(lev, times = sum(use)))
+    ret$m <- data.table::as.data.table(m)
+    ret$intercept <- stats::setNames(as.numeric(reported_scores(object$fit, matrix(object$intercept, 1))), lev)
     ret$target_levels <- lev
   }
   if (!all(use)) {
     ret$remainder <- if (V == 1L) {
       rowSums(M[, !usec, drop = FALSE])
     } else {
-      R <- pruned_scores(list(intercept = rep(0, V)), M[, !usec, drop = FALSE])
-      colnames(R) <- model_outcome_levels(object$fit)
+      R <- reported_scores(object$fit, pruned_scores(list(intercept = rep(0, V)), M[, !usec, drop = FALSE]))
+      colnames(R) <- levels(object$fit$blueprint$ptypes$outcomes[[1]])
       data.table::as.data.table(R)
     }
   }
@@ -1597,7 +1605,7 @@ format.rpf_pruned <- function(x, n_show = 20, ...) {
     if (V > 1L) {
       sprintf(
         "Intercept per class: %s",
-        paste(model_outcome_levels(x$fit), format(x$intercept, digits = 6), collapse = ", ")
+        paste(lev, format(as.numeric(reported_scores(x$fit, matrix(x$intercept, 1))), digits = 6), collapse = ", ")
       )
     } else {
       sprintf("Intercept: %s", format(x$intercept, digits = 6))

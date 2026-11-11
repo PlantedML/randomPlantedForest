@@ -34,9 +34,7 @@ the \code{tree} column of \code{\link[=rpf_boxes]{rpf_boxes()}}, e.g. \code{c("x
 all trees up to \code{max_interaction}.}
 
 \item{class}{\verb{[character(1) | NULL: NULL]}: For multiclass classification,
-the outcome level whose values to plot. \code{NULL} uses the first level (for
-\code{loss = "logit"}, the first level after the reference level, which has no
-values of its own).}
+the outcome level whose values to plot. \code{NULL} uses the first level.}
 
 \item{factor_levels}{\verb{[logical(1): TRUE]}: Label factors with their
 levels instead of integer codes. Levels are in the order used in the fit:

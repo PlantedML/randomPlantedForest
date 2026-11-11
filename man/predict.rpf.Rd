@@ -44,9 +44,13 @@ For classification: A \code{\link[tibble:tibble]{tbl}} with one column \verb{.pr
 for each level in \code{y} containing class probabilities if \code{type = "prob"}.
 For \code{type = "class"}, one column \code{.pred_class} with class predictions is returned.
 For \code{type = "numeric"} or \code{"link"}, raw predictions are returned: one column
-\code{.pred} for binary outcomes, and one column \verb{.pred_<level>} per level for
-multiclass outcomes. With \code{loss = "logit"}, the first level is the reference
-class and has no column, so \code{K - 1} columns are returned for \code{K} levels.
+\code{.pred} for binary outcomes (the log-odds of the second level with
+\code{loss = "logit"} or \code{"exponential"}), and one column \verb{.pred_<level>} per level
+for multiclass outcomes. With \code{loss = "logit"} or \code{"exponential"}, these are
+one score per class that sum to 0 across the classes, and the probabilities
+are their softmax. (The multiclass logit loss fits \code{K - 1} scores against the
+first level; they are reported with the first level's score 0 joined and
+centred across the \code{K} classes, which leaves the probabilities as they are.)
 }
 \description{
 Random Planted Forest Predictions

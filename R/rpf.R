@@ -254,11 +254,19 @@
 #' ## Classification losses
 #'
 #' `"exponential"` and `"logit"` fit scores on the link scale: with two classes
-#' one score, the log-odds of the second class; with more, `"logit"` one score
-#' per class but the first (whose score is 0) and `"exponential"` one score per
-#' class, summing to 0 (the multiclass exponential loss SAMME of Zhu, Zou,
-#' Rosset and Hastie, 2009, whose row weight is `exp(-g)`, `g` the score of its
-#' class). The probabilities are the softmax of the scores.
+#' one score, the log-odds of the second class; with more, one score per class,
+#' summing to 0 across the classes. The probabilities are the softmax of the
+#' scores. `"exponential"` with more than two classes is the multiclass
+#' exponential loss SAMME of Zhu, Zou, Rosset and Hastie (2009), whose row
+#' weight is `exp(-g)`, `g` the score of its class. `"logit"` is the
+#' multinomial logit; it fits `K - 1` scores against the first level (whose
+#' score is 0), which [`predict()`][predict.rpf] (`type = "link"`),
+#' [predict_components()], [rpf_boxes()] and the pruned model report with the
+#' first level's 0 joined and centred across the `K` classes, so both losses
+#' report the same layout. In exact arithmetic the fit and its pruned model do
+#' not depend on which level is first; in floating point, candidate splits
+#' that tie exactly (as duplicated bootstrap rows make) can be broken
+#' differently.
 #'
 #' Every split moves the scores of the rows of each new leaf by one step, which
 #' minimises the leaf's penalised loss: the loss of its rows, plus that of one
@@ -520,8 +528,7 @@
 #'
 #' A classification forest goes through the same steps (the OOB path,
 #' `n_splits = NULL`, `prune`, `max_panels` and `tune`) with its score columns:
-#' one for a binary outcome, one per class otherwise (`K - 1` for
-#' `loss = "logit"`: the first level is the reference). Every out-of-bag choice
+#' one for a binary outcome, one per class otherwise. Every out-of-bag choice
 #' is scored by the loss's own criterion, corrected for the OOB family count as
 #' above:
 #' - `loss = "L1"` or `"L2"`: the squared error of the raw scores summed over
@@ -531,7 +538,7 @@
 #' - `loss = "logit"` or `"exponential"`: the log-loss of the probabilities
 #'   that `predict(type = "prob")` returns. The correction is its second-order
 #'   form, `(1 / m_i - 1 / n_families) * d' H d / (2 * (1 / m_even + 1 / m_odd))`
-#'   with `d = g_even - g_odd` and `H = diag(p) - p p'` over the free score
+#'   with `d = g_even - g_odd` and `H = diag(p) - p p'` over the score
 #'   columns (for the squared error `H = 2 I`, the correction above).
 #'
 #' The pruning keeps or drops a component for all classes, sizes it by its

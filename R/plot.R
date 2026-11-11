@@ -29,8 +29,9 @@
 #'   * `order`: The number of variables of the tree, `0` for the intercept.
 #'   * `box`: The index of the box within its tree.
 #'   * `value`: The value of the box. For multiclass classification, one
-#'     column `value_<class>` per outcome level instead (for `loss = "logit"`,
-#'     per level but the first, the reference, whose score is 0).
+#'     column `value_<class>` per outcome level instead (for `loss = "logit"`
+#'     and `"exponential"`, they sum to 0 across the levels, as the scores of
+#'     [`predict()`][predict.rpf] with `type = "link"` do).
 #'   * `<variable>_lower`, `<variable>_upper` for every predictor: The bounds of
 #'     the box, `NA` for variables the tree does not use.
 #'
@@ -70,10 +71,8 @@ rpf_boxes <- function(x, family = 1L, ...) {
     out$value <- values[, 1]
   } else {
     outcome_levels <- levels(x$blueprint$ptypes$outcomes[[1]])
-    # logit models the K - 1 levels after the first (the reference) against it
-    if (identical(x$params$loss, "logit")) {
-      outcome_levels <- outcome_levels[-1]
-    }
+    # one value per level (multiclass logit: its K - 1 values against the first level centred, reported_scores())
+    values <- reported_scores(x, values)
     colnames(values) <- paste0("value_", outcome_levels)
     out <- cbind(out, values)
   }
@@ -195,9 +194,7 @@ grid_boxes <- function(family) {
 #'   the `tree` column of [rpf_boxes()], e.g. `c("x1", "x1:x2")`. `NULL` draws
 #'   all trees up to `max_interaction`.
 #' @param class `[character(1) | NULL: NULL]`: For multiclass classification,
-#'   the outcome level whose values to plot. `NULL` uses the first level (for
-#'   `loss = "logit"`, the first level after the reference level, which has no
-#'   values of its own).
+#'   the outcome level whose values to plot. `NULL` uses the first level.
 #' @param factor_levels `[logical(1): TRUE]`: Label factors with their
 #'   levels instead of integer codes. Levels are in the order used in the fit:
 #'   ordered by the outcome, or in their own order with `keep_level_order` (see

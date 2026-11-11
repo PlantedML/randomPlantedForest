@@ -26,9 +26,13 @@
 #' for each level in `y` containing class probabilities if `type = "prob"`.
 #' For `type = "class"`, one column `.pred_class` with class predictions is returned.
 #' For `type = "numeric"` or `"link"`, raw predictions are returned: one column
-#' `.pred` for binary outcomes, and one column `.pred_<level>` per level for
-#' multiclass outcomes. With `loss = "logit"`, the first level is the reference
-#' class and has no column, so `K - 1` columns are returned for `K` levels.
+#' `.pred` for binary outcomes (the log-odds of the second level with
+#' `loss = "logit"` or `"exponential"`), and one column `.pred_<level>` per level
+#' for multiclass outcomes. With `loss = "logit"` or `"exponential"`, these are
+#' one score per class that sum to 0 across the classes, and the probabilities
+#' are their softmax. (The multiclass logit loss fits `K - 1` scores against the
+#' first level; they are reported with the first level's score 0 joined and
+#' centred across the `K` classes, which leaves the probabilities as they are.)
 #'
 #' @export
 #' @importFrom hardhat forge validate_prediction_size
@@ -117,8 +121,8 @@ predict_rpf_numeric_raw <- function(object, pred) {
   } else {
     # multiclass case for 'link' type: get prediction matrix, clean up
     # via spruce_prob, but no transformation
-    # Multiclass logit: one logit per non-reference level
-    out <- hardhat::spruce_prob(model_outcome_levels(object), pred)
+    # One score per level (multiclass logit: its K - 1 scores centred with the reference's 0, reported_scores())
+    out <- hardhat::spruce_prob(levels(object$blueprint$ptypes$outcomes[[1]]), reported_scores(object, pred))
   }
 
   out

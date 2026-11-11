@@ -43,8 +43,9 @@
 #' All components together with the intercept sum up
 #' to the prediction.
 #' For multiclass classification, the number of output columns is multiplied by
-#' the number of `target_levels`: the levels of the outcome, or for `loss = "logit"`
-#' all levels but the first (the reference level).
+#' the number of `target_levels`, the levels of the outcome: one column per component and level, named
+#' `<component>__class:<level>`. With `loss = "logit"` or `"exponential"` a component's columns sum to 0 across the
+#' levels, as the scores of [`predict()`][predict.rpf] with `type = "link"` do.
 #' - `intercept` (`numeric`): Expected value of the prediction.
 #' For multiclass classification, one value per target level, named by `target_levels`.
 #' - `x` ([`data.table`][data.table::data.table]): The predictors selected by `predictors`, as the forest
@@ -162,13 +163,12 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
     x = new_data_dt[, predictors, with = FALSE]
   )
 
-  # Get outcome levels for multiclass handling
-  # (model levels: multiclass logit has no column for the reference level)
+  # Get outcome levels for multiclass handling (one column per level: multiclass logit's scores centred as
+  # predict(type = "link") reports them)
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
-  model_levels <- model_outcome_levels(object)
   if (length(outcome_levels) > 2) {
-    ret$intercept <- stats::setNames(intercept[1, ], model_levels)
-    ret$target_levels <- model_levels
+    ret$intercept <- stats::setNames(intercept[1, ], outcome_levels)
+    ret$target_levels <- outcome_levels
   }
 
   # If m leaves out components of the forest (max_interaction here is smaller than that of the model fit,
@@ -181,7 +181,7 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
   if ((left_out || object$fit$is_purify_capped()) && nrow(new_data_matrix) == 0) {
     # zero rows: a remainder with zero rows, as predict() cannot run on them
     ret$remainder <- if (length(outcome_levels) > 2) {
-      data.table::as.data.table(stats::setNames(rep(list(numeric(0)), length(model_levels)), model_levels))
+      data.table::as.data.table(stats::setNames(rep(list(numeric(0)), length(outcome_levels)), outcome_levels))
     } else {
       numeric(0)
     }
@@ -190,7 +190,7 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
 
     # handling differs if multiclass
     if (length(outcome_levels) > 2) {
-      ret$remainder <- calc_remainders_multiclass(all_components, model_levels, pred, intercept)
+      ret$remainder <- calc_remainders_multiclass(all_components, outcome_levels, pred, intercept)
     } else {
       # regression and binary classif: straight forward.
       ret$remainder <- pred[[1]] - ret$intercept - rowSums(all_components)
@@ -209,21 +209,21 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
 #'
 #' @noRd
 #' @keywords internal
-#' @return A n x `length(sets)` `matrix()` (times the number of model levels for multiclass), named as
+#' @return A n x `length(sets)` `matrix()` (times the number of outcome levels for multiclass), named as
 #'   `.predict_single_component()` names its columns.
 .predict_components <- function(object, new_data, sets) {
   idx <- lapply(sets, function(s) sort.int(match(s, colnames(new_data))))
   out_names <- vapply(sets, function(s) paste0(sort(s), collapse = ":"), character(1))
-  if (length(levels(object$blueprint$ptypes$outcomes[[1]])) > 2) {
-    # (model levels: multiclass logit has no column for the reference level)
-    model_levels <- model_outcome_levels(object)
-    out_names <- paste0(rep(out_names, each = length(model_levels)), "__class:", model_levels)
+  outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
+  if (length(outcome_levels) > 2) {
+    out_names <- paste0(rep(out_names, each = length(outcome_levels)), "__class:", outcome_levels)
   }
   if (nrow(new_data) == 0) {
     # the C++ code needs at least one row
     ret <- matrix(numeric(0), nrow = 0, ncol = length(out_names))
   } else {
-    ret <- object$fit$predict_components_matrix(new_data, idx, 0L)
+    # one column per level (multiclass logit: its K - 1 score columns per set centred, reported_scores())
+    ret <- reported_scores(object, object$fit$predict_components_matrix(new_data, idx, 0L), length(sets))
   }
   colnames(ret) <- out_names
   ret
@@ -287,15 +287,15 @@ predict_components.rpf <- function(object, new_data, max_interaction = NULL, pre
   # new_data must be a matrix and may only contain columns required for components, in the original order
   # components must be integer indices and refer to the column position in the original training data
   ret <- object$fit$predict_matrix(new_data[first, , drop = FALSE], components, 0L)
-  ret <- ret[match(key, first), , drop = FALSE]
+  # one column per level (multiclass logit: its K - 1 score columns centred, reported_scores())
+  ret <- reported_scores(object, ret[match(key, first), , drop = FALSE])
 
   # Get outcome levels for multiclass handling
   outcome_levels <- levels(object$blueprint$ptypes$outcomes[[1]])
 
   if (length(outcome_levels) > 2) {
     # Multiclass needs disambiguation with one column for each predicted class
-    # (model levels: multiclass logit has no column for the reference level)
-    colnames(ret) <- paste0(out_names, "__class:", model_outcome_levels(object))
+    colnames(ret) <- paste0(out_names, "__class:", outcome_levels)
   } else {
     # Regression and binary classif: Single-column component
     colnames(ret) <- out_names

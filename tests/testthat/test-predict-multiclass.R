@@ -151,10 +151,10 @@ test_that("logit: Numeric/link prediction", {
   classif_pred_lnk <- predict(classif_fit, new_data = xdat, type = "link")
 
   expect_identical(classif_pred, classif_pred_lnk)
-  # Reference-class encoding: raw predictions are K-1 logits relative to the
-  # first factor level, so the reference level has no link column
-  expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact) - 1))
-  expect_named(classif_pred, paste0(".pred_", levels(xdat$yfact)[-1]))
+  # one score per level, summing to 0 across the levels (as exponential)
+  expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
+  expect_named(classif_pred, paste0(".pred_", levels(xdat$yfact)))
+  expect_lt(max(abs(rowSums(classif_pred))), 1e-12)
 })
 
 test_that("logit: prob is consistent with link", {
@@ -163,8 +163,7 @@ test_that("logit: prob is consistent with link", {
   pred_link <- as.matrix(predict(classif_fit, new_data = xdat, type = "link"))
   pred_prob <- as.matrix(predict(classif_fit, new_data = xdat, type = "prob"))
 
-  denom <- 1 + rowSums(exp(pred_link))
-  expected <- cbind(1 / denom, exp(pred_link) / denom)
+  expected <- exp(pred_link) / rowSums(exp(pred_link))
 
   expect_equal(unname(pred_prob), unname(expected))
   expect_equal(rowSums(pred_prob), rep(1, nrow(xdat)))
@@ -212,13 +211,14 @@ test_that("exponential: Numeric/link prediction", {
   expect_equal(dim(classif_pred), c(nrow(xdat), nlevels(xdat$yfact)))
 })
 
-test_that("logit: predict_components uses non-reference levels", {
+test_that("logit: predict_components has every level", {
   classif_fit <- rpf_050(yfact ~ ., data = xdat, loss = "logit", max_interaction = 2)
 
   components <- predict_components(classif_fit, xdat, max_interaction = 1)
 
-  expect_identical(components$target_levels, levels(xdat$yfact)[-1])
-  expect_named(components$remainder, levels(xdat$yfact)[-1])
+  expect_identical(components$target_levels, levels(xdat$yfact))
+  expect_named(components$intercept, levels(xdat$yfact))
+  expect_named(components$remainder, levels(xdat$yfact))
 })
 
 # Classif and prob agree with each other ----------------------------------

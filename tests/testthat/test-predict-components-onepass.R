@@ -73,9 +73,9 @@ test_that("one pass equals one component at a time for multiclass, with 1 and 2 
     single <- single_components(fit, dat[, 1:5])
     expect_identical(colnames(pc1$m), colnames(single))
     expect_identical(unname(as.matrix(pc1$m)), unname(single))
-    # logit: one column per level but the reference level
+    # one column per level (logit's scores centred across the levels)
     expect_equal(ncol(pc1$m), length(pc1$target_levels) * sum(choose(5, 1:2)))
-    expect_identical(pc1$target_levels, if (loss == "logit") c("b", "c") else c("a", "b", "c"))
+    expect_identical(pc1$target_levels, c("a", "b", "c"))
 
     big <- dat[rep(seq_len(nrow(dat)), 20), 1:5] # several chunks of rows
     X <- preprocess_predictors_predict(fit, hardhat::forge(big, fit$blueprint)$predictors)

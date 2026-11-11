@@ -43,6 +43,13 @@
   To get the forest back, fit with `keep_forest = TRUE`, or with `prune = FALSE` and prune with `prune_components()`. With `prune = FALSE` the argument has no effect.
   On California housing (16,512 rows, 8 threads) the forest is 0.6 GB of memory, which is free when `rpf()` returns, and the model 0.19 GB; the model without its forest is plain R data, so `saveRDS()` and `readRDS()` give a model that predicts (6 s, 113 MB), and `rpf_marshal()` takes no time and gives a blob of the model's size, against 13 s and 1.15 GB with the forest.
   Models saved with their forest by an earlier version (`rpf_marshal()`) still load, print and predict, and keep their forest.
+* With three or more classes, `loss = "logit"` now reports one score per class, summing to 0 across the classes, as `"exponential"` does: `predict(type = "link")` (and `"numeric"`) has a column `.pred_<level>` for every level, `predict_components()` a column `<component>__class:<level>` for every component and level, and one intercept and one remainder column per level (`target_levels` lists all levels), and `rpf_boxes()` a column `value_<level>` for every level; the same for pruned models, whose `print()` shows one intercept per level.
+  Before, the first level was the reference class and had no column (`K - 1` columns for `K` levels).
+  The new scores are the old ones with the first level's score 0 joined and centred across the `K` classes, so a class's score is now its log-odds against the geometric mean of all classes' probabilities, not against the first class.
+  The fit, its probabilities and classes, the out-of-bag choices and the pruned model (which components are kept, and their coefficients) do not change, and a model saved before loads and predicts the same probabilities; only what is reported changes.
+  `plot(class = NULL)` now draws the first level, which has values of its own.
+  To get the old scores back, subtract the first level's column from every column and drop it.
+  Two classes are unchanged: one score, the log-odds of the second level.
 
 ## Renamed arguments
 

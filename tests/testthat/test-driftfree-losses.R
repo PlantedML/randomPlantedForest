@@ -390,7 +390,12 @@ test_that("classification fits made before these losses load, print and predict"
     expect_no_match(out, "delta|epsilon")
   }
   r <- rpf_unmarshal(fx$logit3)
-  expect_equal(predict(r, fx$new_data, type = "link"), fx$pred$logit3_link, tolerance = 1e-12)
+  # its link as saved then (K - 1 scores against the first level) is reported now with the first level's 0 joined and
+  # centred across the classes
+  old <- cbind(0, as.matrix(fx$pred$logit3_link))
+  link <- predict(r, fx$new_data, type = "link")
+  expect_named(link, paste0(".pred_", levels(r$blueprint$ptypes$outcomes[[1]])))
+  expect_equal(unname(as.matrix(link)), unname(old - rowMeans(old)), tolerance = 1e-12)
   expect_match(paste(format(r), collapse = "\n"), "loss: logit")
   # with its data, it can be purified, and its components add up to its predictions
   purify(r)
