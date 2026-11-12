@@ -1,21 +1,35 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://plantedml.com/randomPlantedForest/404.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/LICENSE.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/classification.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/growing.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/articles/index.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/number-of-splits-and-tuning.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/pruning.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/reading-the-model.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/articles/speed-and-memory.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/authors.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/news/index.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/bundle.rpf.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/greediness_ladder.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/index.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/oob_path_checkpoints.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/plot.rpf.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/predict.rpf.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/predict.rpf_pruned.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/predict_components.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/print.rpf.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/print.rpf_pruned.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/prune_components.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/purify.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/randomPlantedForest-package.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/rpf.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/rpf_boxes.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/rpf_is_valid.html</loc></url>
 <url><loc>https://plantedml.com/randomPlantedForest/reference/rpf_marshal.html</loc></url>
+<url><loc>https://plantedml.com/randomPlantedForest/reference/tune_control.html</loc></url>
 </urlset>
 

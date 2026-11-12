@@ -1,4 +1,4 @@
-# Bundle an rpf model
+# Bundle a Random Planted Forest
 
 Method for
 [`bundle::bundle()`](https://rstudio.github.io/bundle/reference/bundle.html)
@@ -7,12 +7,18 @@ wrapping
 so rpf models work with the standard tidymodels serialization workflow.
 Training data is not included; see
 [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
-for the implications.
+for the implications. Pruned forests from
+[`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
+or [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+are bundled the same way.
 
 ## Usage
 
 ``` r
 # S3 method for class 'rpf'
+bundle(x, ...)
+
+# S3 method for class 'rpf_pruned'
 bundle(x, ...)
 ```
 
@@ -20,9 +26,10 @@ bundle(x, ...)
 
 - x:
 
-  `[rpf]`: A fitted
+  `[rpf | rpf_pruned]`: A fitted
   [`rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
-  model.
+  model, or a pruned one from
+  [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md).
 
 - ...:
 
@@ -30,14 +37,15 @@ bundle(x, ...)
 
 ## Value
 
-An object of class `bundled_rpf` for `bundle()`, or the restored
-[rpf](https://plantedml.com/randomPlantedForest/reference/rpf.md) object
-for `unbundle()`.
+An object of class `bundled_rpf` (`bundled_rpf_pruned`) for `bundle()`,
+or the restored
+[rpf](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+(`rpf_pruned`) object for `unbundle()`.
 
 ## Examples
 
 ``` r
-fit <- rpf(mpg ~ wt + cyl, data = mtcars, ntrees = 10)
+fit <- rpf(mpg ~ wt + cyl, data = mtcars, n_families = 10, prune = FALSE)
 b <- bundle::bundle(fit)
 tmp <- tempfile(fileext = ".rds")
 saveRDS(b, tmp)
@@ -46,15 +54,16 @@ predict(restored, mtcars)
 #> # A tibble: 32 × 1
 #>    .pred
 #>    <dbl>
-#>  1  20.4
-#>  2  20.1
-#>  3  23.8
-#>  4  20.5
-#>  5  18.1
-#>  6  18.3
-#>  7  14.7
-#>  8  24.2
-#>  9  22.4
-#> 10  18.7
+#>  1  20.7
+#>  2  20.6
+#>  3  23.3
+#>  4  20.2
+#>  5  16.5
+#>  6  18.2
+#>  7  15.8
+#>  8  23.7
+#>  9  22.7
+#> 10  18.6
 #> # ℹ 22 more rows
+unlink(tmp)
 ```

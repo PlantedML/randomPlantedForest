@@ -2,36 +2,83 @@
 
 `randomPlantedForest` implements Random Planted Forest ([Hiabu, Mammen &
 Meyer](https://arxiv.org/abs/2012.14563)), a tree ensemble whose
-predictions you can read off directly, without post-hoc explanation
-methods.
+predictions you can read off directly. The explanation is exact and is
+not a post-hoc approximation.
 
-Like a random forest, it averages many tree-based models grown on
-bootstrap samples. Unlike a random forest, each of these models is a sum
-of trees that each split on a fixed set of predictors, and
-`max_interaction` bounds how many predictors that can be. With
-`max_interaction = 1` the forest is an additive model; with `2` it adds
-pairwise interactions, and so on. As a result, the fitted model
-decomposes exactly into an intercept, main effects and interactions up
-to that order:
+The fitted model is a short sum of main effects and interactions.
+Interactions of order three or higher are simplified such that they can
+be displayed as the sum of a limited number (`max_panels`) of heat maps;
+often without loss in accuracy.
 
+![The four components of a fitted model: three curves and one heat map,
+with the true functions drawn over the
+curves.](reference/figures/README-lead-figure-1.png)
+
+The figure shows a model fitted to simulated data,
 ``` math
-\hat m(x) = \hat m_0 + \sum_k \hat m_k(x_k) + \sum_{k < l} \hat m_{kl}(x_k, x_l) + \dots
+y = 1 + \sin(\pi x_1) + 2(x_2^2 - 1/3) + x_3/2 + 2x_1x_2 + \text{noise},
+```
+with a fourth predictor `x4` that has no effect. The model found the
+four true components and nothing else, in one call:
+
+``` r
+
+model <- rpf(y ~ ., data = sim)
 ```
 
-Each component can be inspected and plotted on its own, and together
-they sum to the prediction.
+## Why use it
+
+- **Interpretability & Accuracy** A random planted forest can be fully
+  visualized and provides state-of-the-art accuracy. By default the fit
+  prunes irrelevant terms such that the fit is easier to comprehend and
+  only keeps relevant terms.
+
+- **No tuning needed** While some parameters can be changed, random
+  planted forest works very well in its default settings and needs no
+  tuning.
+
+- **Instead of a GAM or GA²M.**
+
+  - You do not specify the interactions: the forest finds which pairs
+    and triples matter.
+  - Smoothness is not assumed.
+
+- **When it does not fit.**
+
+  - Outcomes driven by interactions of many predictors (images, text)
+  - Data too large (if memory or computational time is an issue one can
+    reduce the number of families `n_families` and the maximal order of
+    interaction `max_interaction`; usually at the cost of some accuracy)
+  - Complex data (work in progress): e.g. time series, dependent rows,
+    survival data etc.
+
+### Benchmark: WIP
+
+A comparison of accuracy and fitting time with random forests, boosting
+and GAMs on public data sets will be added here.
+
+## What the default does
+
+A plain `rpf(y ~ ., data)` takes three steps, each with its own switch:
+
+1.  **Grow** 200 tree families of up to three-way interactions, choosing
+    the number of splits out of bag while they grow (`n_splits = NULL`).
+2.  **Prune** the forest’s components to those that matter, with the
+    rule and threshold chosen out of bag (`prune = TRUE`).
+3.  **Simplify**: every kept three-way component is coarsened such that
+    it can be visualized as the sum of at most 10 heat maps, and the
+    model is pruned again (`max_panels = 10`).
 
 ## Installation
 
-Install the development version from
-[r-universe](https://plantedml.r-universe.dev/packages) with
+From [r-universe](https://plantedml.r-universe.dev/randomPlantedForest):
 
 ``` r
 
 install.packages("randomPlantedForest", repos = "https://plantedml.r-universe.dev")
 ```
 
-or from [GitHub](https://github.com/PlantedML/randomPlantedForest) with
+or from [GitHub](https://github.com/PlantedML/randomPlantedForest):
 
 ``` r
 
@@ -39,127 +86,232 @@ or from [GitHub](https://github.com/PlantedML/randomPlantedForest) with
 pak::pak("PlantedML/randomPlantedForest")
 ```
 
-## Example
+## Regression
 
-[`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
-takes a formula, x/y data or a
-[recipe](https://recipes.tidymodels.org/), and
-[`predict()`](https://rdrr.io/r/stats/predict.html) returns a tibble as
-in tidymodels:
+Ozone in New York, from daily temperature, wind and sunlight:
 
 ``` r
 
 library(randomPlantedForest)
 
-mtcars$cyl <- factor(mtcars$cyl)
-rpfit <- rpf(mpg ~ cyl + wt + hp, data = mtcars, ntrees = 25, max_interaction = 2)
-rpfit
-#> ── Regression Random Planted Forest ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-#> Formula: `mpg ~ cyl + wt + hp`
-#> 25 tree families with 30 splits each on 3 predictors, interactions to degree 2.
-#> ℹ Forest is not purified.
+air <- na.omit(airquality)
+set.seed(1)
+ozone <- rpf(Ozone ~ ., data = air)
+ozone
+#> ── Random Planted Forest model ─────────────────────────────────────────────────
+#> Regression. Prediction = intercept + the sum of 4 components.
+#> Intercept: 47.1412
 #> 
-#> ── Tree growing 
-#>    split_structure: leaves
-#>          split_try: 10
-#>              t_try: 0.4
-#>     max_candidates: 50
-#>   split_decay_rate: 0.1
-#>      delete_leaves: TRUE
+#> Components (largest first), importance = share of the variance of the prediction on the training rows:
+#>  component importance
+#>  Temp      41%       
+#>  Wind      32%       
+#>  Temp:Wind 13%       
+#>  Solar.R   3.1%      
 #> 
-#> ℹ Fit using 1 thread, also the default for `predict()` and `purify()`.
+#> How it was chosen:
+#>   The forest: 200 tree families of 35 splits (chosen out of bag; growing stopped at 35).
+#>   From the forest's 25 nonzero components (purified): those with a share of at least 1% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.
+#>   Left out: 21 components, shares together 2.9% (largest Month, 0.83%).
+```
 
-head(predict(rpfit, new_data = mtcars))
-#> # A tibble: 6 × 1
+[`predict()`](https://rdrr.io/r/stats/predict.html) returns a tibble,
+and
+[`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+the components, which add up to it:
+
+``` r
+
+predict(ozone, head(air, 3))
+#> # A tibble: 3 × 1
 #>   .pred
 #>   <dbl>
-#> 1  21.4
-#> 2  21.0
-#> 3  24.4
-#> 4  20.9
-#> 5  17.7
-#> 6  19.1
+#> 1  31.0
+#> 2  22.8
+#> 3  17.4
+head(predict_components(ozone, head(air, 3))$m)
+#>      Solar.R        Wind      Temp Temp:Wind
+#>        <num>       <num>     <num>     <num>
+#> 1:  2.062333   1.8646920 -16.29678 -3.804457
+#> 2: -3.976785   0.9708856 -15.70053 -5.606435
+#> 3: -1.213864 -10.5361640 -15.41624 -2.609963
 ```
 
-[`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
-returns the decomposition: one column per main effect and interaction,
-plus the intercept.
+## Classification
 
 ``` r
 
-components <- predict_components(rpfit, new_data = mtcars)
-head(components$m)
-#>          cyl         wt         hp     cyl:wt      cyl:hp        hp:wt
-#>        <num>      <num>      <num>      <num>       <num>        <num>
-#> 1: 2.8275105  0.2569457  0.2970626  0.3448129  0.06873138  0.006002504
-#> 2: 2.8275105 -0.2438784  0.2970626  0.3929089  0.06873138  0.076817727
-#> 3: 4.8022694  1.7754646  1.3572422 -0.4610986 -0.41379471 -0.231709254
-#> 4: 2.8275105 -0.4727413  0.2970626  0.3538112  0.06873138  0.256989969
-#> 5: 0.7661282 -1.0143147 -0.3952336  0.4528133  0.02336632  0.241715900
-#> 6: 2.8275105 -1.1525180  0.5397470 -0.4590129 -0.03247695 -0.199217461
+penguins <- na.omit(palmerpenguins::penguins)
+set.seed(1)
+by_sex <- rpf(sex ~ ., data = penguins)
+predict(by_sex, head(penguins, 3))
+#> # A tibble: 3 × 2
+#>   .pred_female .pred_male
+#>          <dbl>      <dbl>
+#> 1        0.161      0.839
+#> 2        0.541      0.459
+#> 3        0.774      0.226
 ```
 
-The [glex](https://plantedml.com/glex/) package plots these components:
+## Learn more
 
-``` r
+- [Get
+  started](https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html):
+  fit, print, predict, read the components.
+- [Reading the
+  model](https://plantedml.com/randomPlantedForest/articles/reading-the-model.html),
+  [How the forest is
+  grown](https://plantedml.com/randomPlantedForest/articles/growing.html).
+- [The number of splits and further
+  tuning](https://plantedml.com/randomPlantedForest/articles/number-of-splits-and-tuning.html),
+  [Pruning to a sparse
+  model](https://plantedml.com/randomPlantedForest/articles/pruning.html),
+  [Classification](https://plantedml.com/randomPlantedForest/articles/classification.html).
+- [Speed, memory and saving
+  models](https://plantedml.com/randomPlantedForest/articles/speed-and-memory.html).
+- The [glex](https://plantedml.com/glex/) package plots the components
+  and computes other explanations from them.
 
-library(glex)
-library(ggplot2)
-library(patchwork)
+## Citation
 
-(autoplot(components, "wt") + autoplot(components, "hp")) /
-  (autoplot(components, "cyl") + autoplot(components, c("wt", "hp")))
-```
+Hiabu, M., Mammen, E., & Meyer, J. T. (2020). Random Planted Forest: a
+directly interpretable tree ensemble. arXiv preprint arXiv:2012.14563.
+<https://doi.org/10.48550/arXiv.2012.14563>
 
-![](reference/figures/README-effects-1.png)
-
-The [Get
-started](https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.html)
-guide covers classification, recipes, saving models and more on
-interpreting components, and the [Bikesharing
-decomposition](https://plantedml.com/glex/articles/Bikesharing-Decomposition-rpf.html)
-article works through a larger example.
+`citation("randomPlantedForest")` gives the BibTeX entry.
 
 # Package index
 
-## Model fitting and prediction
+## Fitting and prediction
 
-Modeling fundamentals for creation and prediction from Random Planted
-Forest models.
+Fit a model, predict with it, and print it.
 
 - [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   : Random Planted Forest
+- [`predict(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/reference/predict.rpf_pruned.md)
+  : Predictions of a pruned Random Planted Forest
 - [`predict(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/predict.rpf.md)
-  : Random Planted Forest Predictions
+  : Predict with a Random Planted Forest
+- [`print(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_pruned.md)
+  : Print a pruned Random Planted Forest
+- [`print(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf.md)
+  : Print a Random Planted Forest
 
-## Functional decomposition
+## Reading the model
 
-Enabling and utilizing functional decomposition
+The components that add up to the prediction, and the purification that
+makes them unique.
 
+- [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
+  : The components of a Random Planted Forest's prediction
 - [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   [`is_purified()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   : Purify a Random Planted Forest
-- [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
-  : Extract predicted components from a Random Planted Forest
 
-## Utility functions
+## Pruning
 
-- [`print(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf.md)
-  : Print an rpf
-- [`print(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
-  [`str(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
-  : Compact printing of forest structures
+Leave out the small components, by a rule chosen out of bag or by
+cross-validation.
+
+- [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
+  : Prune the components of a Random Planted Forest
+
+## The number of splits and tuning
+
+The out-of-bag error along the splits, and the search over the
+greediness and the leaf size.
+
+- [`oob_path_checkpoints()`](https://plantedml.com/randomPlantedForest/reference/oob_path_checkpoints.md)
+  : Checkpoints of the out-of-bag path
+- [`tune_control()`](https://plantedml.com/randomPlantedForest/reference/tune_control.md)
+  : Settings of the out-of-bag tuning
+- [`greediness_ladder()`](https://plantedml.com/randomPlantedForest/reference/greediness_ladder.md)
+  : The greediness ladder of the out-of-bag tuning
+
+## Looking inside a tree family
+
+Draw the trees of one family, or get its leaves as boxes.
+
+- [`plot(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/plot.rpf.md)
+  : Plot a tree family
+- [`rpf_boxes()`](https://plantedml.com/randomPlantedForest/reference/rpf_boxes.md)
+  : Extract the boxes of a tree family
+
+## Saving and restoring
+
+Models hold a C++ object, which needs marshalling to survive
+[`saveRDS()`](https://rdrr.io/r/base/readRDS.html) or a worker process.
+
 - [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   [`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   : Serialize and restore Random Planted Forests
 - [`rpf_is_valid()`](https://plantedml.com/randomPlantedForest/reference/rpf_is_valid.md)
-  : Check whether an rpf object's C++ forest is still alive
+  : Check whether a model's C++ forest is still alive
 - [`bundle(`*`<rpf>`*`)`](https://plantedml.com/randomPlantedForest/reference/bundle.rpf.md)
-  : Bundle an rpf model
+  [`bundle(`*`<rpf_pruned>`*`)`](https://plantedml.com/randomPlantedForest/reference/bundle.rpf.md)
+  : Bundle a Random Planted Forest
+
+## Utilities
+
+Compact printing of the flattened forest (`export_forest = TRUE`).
+
+- [`print(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
+  [`str(`*`<rpf_forest>`*`)`](https://plantedml.com/randomPlantedForest/reference/print.rpf_forest.md)
+  : Compact printing of forest structures
 
 # Articles
 
-### All vignettes
+### Understanding the model
 
-- [Getting Started with
-  randomPlantedForest](https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.md):
+What a fitted model is made of, and how the forest behind it is grown.
+
+- [Reading the
+  model](https://plantedml.com/randomPlantedForest/articles/reading-the-model.md):
+
+  The components of a fitted model, what the printed summary says line
+  by line, importance, plots with glex, and how a component of three
+  predictors is shown.
+
+- [How the forest is
+  grown](https://plantedml.com/randomPlantedForest/articles/growing.md):
+
+  Tree families, max_interaction, how a split grows a family, the split
+  structures, candidates and aging, shown on one small family and
+  checked on data where the truth is known.
+
+### Fitting
+
+The choices
+[`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+makes for you, how it makes them, and how to change them.
+
+- [The number of splits and further
+  tuning](https://plantedml.com/randomPlantedForest/articles/number-of-splits-and-tuning.md):
+
+  How rpf() chooses the number of splits out of bag while the forest
+  grows, when it stops, how to fix the number yourself, and what
+  rpf(tune = ) searches.
+
+- [Pruning to a sparse
+  model](https://plantedml.com/randomPlantedForest/articles/pruning.md):
+
+  Why rpf() prunes the forest’s components, what it leaves out, the
+  rules and the threshold, choosing them out of bag or by
+  cross-validation, the display of three-way components, and prune =
+  FALSE.
+
+- [Classification](https://plantedml.com/randomPlantedForest/articles/classification.md):
+
+  Binary and multiclass outcomes, probabilities and classes, the
+  components on the scale of the scores, and the losses.
+
+### In practice
+
+Large data, saving models, and other frameworks.
+
+- [Speed, memory and saving
+  models](https://plantedml.com/randomPlantedForest/articles/speed-and-memory.md):
+
+  Threads, what the time and memory grow with, saving and restoring
+  models, and using rpf() with tidymodels and mlr3.

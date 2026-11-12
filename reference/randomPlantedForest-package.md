@@ -1,13 +1,14 @@
 # randomPlantedForest: Random Planted Forest: A Directly Interpretable Tree Ensemble
 
-Implements Random Planted Forest (Hiabu, Mammen and Meyer, 2020)
+Implements Random Planted Forest, a directly interpretable tree ensemble
+for regression and classification introduced by Hiabu, Mammen and Meyer
+(2020)
 [doi:10.48550/arXiv.2012.14563](https://doi.org/10.48550/arXiv.2012.14563)
-, a directly interpretable tree ensemble for regression and
-classification. Trees are restricted to a maximum number of interacting
-predictors, so the fitted model decomposes exactly into main effects and
-low-order interactions, a functional ANOVA decomposition that can be
-extracted for interpretation. Fitting and prediction are multithreaded,
-and fitted models can be serialized.
+. Trees are restricted to a maximum number of interacting predictors, so
+the fitted model decomposes exactly into main effects and low-order
+interactions, a functional ANOVA decomposition that can be extracted for
+interpretation. Fitting and prediction can use several threads, and
+fitted models can be serialized.
 
 ## See also
 
@@ -22,12 +23,12 @@ Useful links:
 
 ## Author
 
-**Maintainer**: Lukas Burk <burk@leibniz-bips.de>
+**Maintainer**: Lukas Burk <cran@lukasburk.de>
 ([ORCID](https://orcid.org/0000-0001-7528-3795))
 
 Authors:
 
-- Lukas Burk <burk@leibniz-bips.de>
+- Lukas Burk <cran@lukasburk.de>
   ([ORCID](https://orcid.org/0000-0001-7528-3795))
 
 - Joseph Theo Meyer
