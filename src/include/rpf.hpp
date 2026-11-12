@@ -547,6 +547,8 @@ protected:
   // `k` splits are done: snapshot the predictions if k is the next checkpoint. Returns whether the family grows on
   // (always, except in an adaptive fit)
   bool path_step(PathTracker &trk, int k) const;
+  // The tracked predictions for a checkpoint: a family without a split so far at its null leaf's fit
+  std::vector<double> path_snapshot(const PathTracker &trk) const;
   // Family n is grown: its last snapshot, then add its snapshots to the sums and free its tracker
   void path_merge(size_t n);
   // The adaptive fit (oob_path.cpp; set_adaptive()): its state, while it runs and (the records) until the rebuild

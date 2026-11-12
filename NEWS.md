@@ -155,6 +155,10 @@
 
 * `prune_components()` (and so `rpf()` with pruning) left the value of a tree family that made no split out of the pruned model's intercept, so that rule `"D"` at `tau = 0` was not the forest where a family had found no split. The intercept now includes it, as `purify()`'s does.
 
+* The out-of-bag path (`oob_path`, and the out-of-bag choice of `n_splits`) counted a tree family that had made no split at the score 0 its rows start from, instead of at the fit of its rows that the family predicts (the mean for regression and the L1 / L2 losses, the log-odds of its sample for `"logit"` and `"exponential"`, so a probability of 1/2 instead).
+  It now counts such a family at its fit.
+  Families without a split are common only with a rare class and few rows, where they made the out-of-bag log-loss of few splits too high, so that the out-of-bag choice of `n_splits` could take far more splits than it should.
+
 * `split_structure = "tree_then_leaf"` samples leaves in proportion to their available thresholds, as documented.
   After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly.
   Leaves with tied values were then drawn too often, and draws were wasted on leaves that cannot be split.

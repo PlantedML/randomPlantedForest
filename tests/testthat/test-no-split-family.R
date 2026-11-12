@@ -182,3 +182,56 @@ test_that("the pruned model's intercept includes the families that made no split
   forest <- prune_components(fit, d, rule = "D", tau = 0, max_panels = Inf)
   expect_equal(predict(forest, d)$.pred, predict(fit, d)$.pred, tolerance = 1e-12)
 })
+
+test_that("the OOB path tracks a family without a split at its rows' fit, not at 0", {
+  dat <- no_split_data()
+  # 100 rows: no threshold keeps 51 rows on each side, so no family splits
+  path_fit <- function(y, n_families, ...) {
+    set.seed(2)
+    rpf(
+      stats::as.formula(paste(y, "~ x1 + x2")),
+      data = dat,
+      n_families = n_families,
+      n_splits = 5,
+      min_leaf_rows = 51,
+      prune = FALSE,
+      oob_path = c(1, 5),
+      ...
+    )
+  }
+  cases <- list(
+    list(y = "y"),
+    list(y = "cl", loss = "L2"),
+    list(y = "cl", loss = "logit"),
+    list(y = "cl3", loss = "logit"),
+    list(y = "cl", loss = "exponential"),
+    list(y = "cl3", loss = "exponential")
+  )
+  for (case in cases) {
+    label <- paste(case, collapse = " ")
+    # one family: every OOB row is at the family's fit, at every checkpoint
+    fit <- do.call(path_fit, c(list(case$y, 1), case[-1]))
+    families <- fit$fit$get_model()
+    expect_true(all(vapply(families, function(f) length(f$variables) == 1, TRUE)), label = label)
+    null_value <- families[[1]]$values[[1]][[1]]
+    V <- length(null_value)
+    path <- fit$fit$oob_path()
+    ok <- path$count[, 1] + path$count[, 2] > 0
+    expect_true(any(ok), label = label)
+    for (c in 1:2) {
+      cols <- (c - 1) * V + seq_len(V)
+      g <- path$sum0[ok, cols, drop = FALSE] + path$sum1[ok, cols, drop = FALSE]
+      expect_equal(g, matrix(null_value, sum(ok), V, byrow = TRUE), tolerance = 1e-12, label = label)
+    }
+  }
+
+  # regression: the OOB error is that of the families' bootstrap means (at 0 it was the mean of y, about 10.5)
+  fit <- path_fit("y", 10)
+  expect_lt(max(fit$oob_path$oob_rmse_raw), 2 * stats::sd(dat$y))
+  # the adaptive fit tracks them the same way: its first checkpoint's raw criterion is that of the families' fits
+  # (at the score 0 it was log(2))
+  set.seed(2)
+  ad <- rpf(cl ~ x1 + x2, data = dat, loss = "logit", n_families = 10, min_leaf_rows = 51, prune = FALSE)
+  p <- mean(dat$cl == "b")
+  expect_lt(ad$oob_path$oob_loss_raw[1], -(p * log(p) + (1 - p) * log(1 - p)) + 0.05)
+})
