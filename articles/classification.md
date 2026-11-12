@@ -130,26 +130,31 @@ set.seed(1)
 by_species <- rpf(species ~ ., data = penguins, nthreads = 2)
 by_species
 #> ── Random Planted Forest model ─────────────────────────────────────────────────
-#> Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 2 components.
-#> Intercept per class: Adelie   9.01628, Chinstrap -12.59247, Gentoo   3.57619
+#> Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 7 components.
+#> Intercept per class: Adelie  1.207020, Chinstrap -0.836373, Gentoo -0.370647
 #> 
 #> Components (largest first), importance = share of the variance of the scores (centred across the classes) on the training rows:
-#>  component      importance
-#>  island         95%       
-#>  bill_length_mm 4.1%      
+#>  component             importance
+#>  bill_length_mm        21%       
+#>  island                17%       
+#>  bill_depth_mm         6%        
+#>  flipper_length_mm     5.6%      
+#>  body_mass_g           2%        
+#>  sex                   1.2%      
+#>  bill_length_mm:island 0.33%     
 #> 
 #> How it was chosen:
 #>   The forest: 200 tree families of 30 splits (chosen out of bag; growing stopped at 42).
-#>   From the forest's 60 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
+#>   From the forest's 60 nonzero components (purified): those with a share of at least 0.3% of the forest's Var(prediction), as they are (rule D).
 #>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.
-#>   Left out: 58 components, shares together 14% (largest bill_depth_mm, 5.6%).
+#>   Left out: 53 components, shares together 0.24% (largest bill_depth_mm:bill_length_mm, 0.052%).
 predict(by_species, penguins[c(1, 200, 300), ])
 #> # A tibble: 3 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1     1.000          1.65 e-20     2.36e- 4
-#> 2     0.00612        5.04 e-17     9.94e- 1
-#> 3     0.000245       1.000e+ 0     1.88e-10
+#> 1     1.000          0.0000859     0.000100
+#> 2     0.000132       0.000493      0.999   
+#> 3     0.0181         0.982         0.000134
 ```
 
 ``` r
@@ -159,11 +164,11 @@ comp3$target_levels
 #> [1] "Adelie"    "Chinstrap" "Gentoo"
 names(comp3$m)[1:6]
 #> [1] "bill_length_mm__class:Adelie"    "bill_length_mm__class:Chinstrap"
-#> [3] "bill_length_mm__class:Gentoo"    "island__class:Adelie"           
-#> [5] "island__class:Chinstrap"         "island__class:Gentoo"
+#> [3] "bill_length_mm__class:Gentoo"    "bill_depth_mm__class:Adelie"    
+#> [5] "bill_depth_mm__class:Chinstrap"  "bill_depth_mm__class:Gentoo"
 comp3$intercept
 #>     Adelie  Chinstrap     Gentoo 
-#>   9.016282 -12.592471   3.576189
+#>  1.2070200 -0.8363733 -0.3706467
 ```
 
 The columns are named `<component>__class:<level>`, one for each of

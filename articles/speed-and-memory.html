@@ -11,7 +11,7 @@
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
-<meta property="og:title" content="Speed, memory and saving models">
+<script src="../extra.js"></script><meta property="og:title" content="Speed, memory and saving models">
 <meta name="description" content="Threads, what the time and memory grow with, saving and restoring models, and using rpf() with tidymodels and mlr3.">
 <meta property="og:description" content="Threads, what the time and memory grow with, saving and restoring models, and using rpf() with tidymodels and mlr3.">
 </head>
@@ -116,7 +116,7 @@ seed, the forest is the same at any number of threads.</p>
 <span><span class="va">two</span> <span class="op">&lt;-</span> <span class="fu">time_fit</span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>one_thread <span class="op">=</span> <span class="va">one</span><span class="op">$</span><span class="va">seconds</span>, two_threads <span class="op">=</span> <span class="va">two</span><span class="op">$</span><span class="va">seconds</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  one_thread two_threads </span></span>
-<span><span class="co">#&gt;       9.022       5.075</span></span>
+<span><span class="co">#&gt;       7.513       4.229</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">one</span><span class="op">$</span><span class="va">model</span>, <span class="va">train</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">two</span><span class="op">$</span><span class="va">model</span>, <span class="va">train</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <p>The times are those of the machine that built this page.</p>
@@ -159,9 +159,9 @@ above:</p>
 <span><span class="op">}</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">sizes</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      rows splits seconds</span></span>
-<span><span class="co">#&gt; [1,]  250    200     1.9</span></span>
-<span><span class="co">#&gt; [2,]  500    238     2.8</span></span>
-<span><span class="co">#&gt; [3,] 1000    336     5.1</span></span></code></pre></div>
+<span><span class="co">#&gt; [1,]  250    200     1.6</span></span>
+<span><span class="co">#&gt; [2,]  500    238     2.4</span></span>
+<span><span class="co">#&gt; [3,] 1000    336     4.3</span></span></code></pre></div>
 <p>Ways to make a fit faster, at some cost in accuracy or in what the
 model can show:</p>
 <ul>

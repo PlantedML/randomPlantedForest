@@ -1,5 +1,13 @@
 # Articles
 
+### Get started
+
+- [Getting Started with
+  randomPlantedForest](https://plantedml.com/randomPlantedForest/articles/randomPlantedForest.md):
+
+  A first model, its predictions and components, classification, and the
+  settings you may want.
+
 ### Understanding the model
 
 What a fitted model is made of, and how the forest behind it is grown.
