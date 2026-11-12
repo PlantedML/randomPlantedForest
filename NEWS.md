@@ -153,6 +153,10 @@
 
 ## Bug fixes
 
+* `predict(type = "prob")` of three or more classes with `loss = "logit"` no longer gives `NaN` where a score exceeds about 709, the largest `x` for which `exp(x)` is finite.
+  Such a row's probabilities are computed with its largest score taken out; the other rows are unchanged.
+  A pruned model can have such scores: rule `"R"`'s refit runs to very large coefficients where its components separate the classes.
+
 * `split_structure = "tree_then_leaf"` samples leaves in proportion to their available thresholds, as documented.
   After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly.
   Leaves with tied values were then drawn too often, and draws were wasted on leaves that cannot be split.

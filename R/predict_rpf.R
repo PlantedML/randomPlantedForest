@@ -185,6 +185,16 @@ predict_rpf_prob_raw <- function(object, pred_raw) {
       exp_raw <- exp(pred_raw)
       denom <- 1 + rowSums(exp_raw)
       pred_prob <- cbind(1 / denom, exp_raw / denom)
+      # A row whose scores overflow exp() (above about 709) would give Inf / Inf: the same probabilities with the
+      # row's largest score m taken out, p_ref = exp(-m) / d and p_k = exp(W_k - m) / d, d = exp(-m) + sum(exp(W - m))
+      big <- which(is.infinite(denom))
+      if (length(big)) {
+        W <- pred_raw[big, , drop = FALSE]
+        m <- apply(W, 1, max)
+        E <- exp(W - m)
+        d <- exp(-m) + rowSums(E)
+        pred_prob[big, ] <- cbind(exp(-m) / d, E / d)
+      }
     } else if (object$params$loss == "exponential") {
       # softmax for multi-class
       pred_prob <- softmax(pred_raw)
