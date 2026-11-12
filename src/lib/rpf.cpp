@@ -173,6 +173,29 @@ void RandomPlantedForest::set_training_data(const Matrix2D &samples_Y, const Mat
   drop_purify_counts(); // (counts of the earlier rows)
 }
 
+void RandomPlantedForest::shift_level(const std::vector<double> &c)
+{
+  if (c.size() != value_size)
+    throw std::invalid_argument("The level needs one value per score column.");
+  for (double v : c)
+    if (!std::isfinite(v))
+      throw std::invalid_argument("The level must be finite.");
+  for (auto &family : tree_families) {
+    auto null_tree = family.find(std::set<int>{0});
+    if (null_tree == family.end() || null_tree->second->leaves.empty())
+      throw std::logic_error("A tree family has no null leaf.");
+    std::vector<double> &value = null_tree->second->leaves[0].value;
+    if (value.size() != value_size)
+      throw std::logic_error("A null leaf has the wrong number of values.");
+    for (size_t k = 0; k < value_size; ++k)
+      value[k] += c[k];
+  }
+  purified = false;
+  purify_capped = false;
+  rect_forest_.reset();
+  purify_cap = 0;
+}
+
 void RandomPlantedForest::set_model(const std::vector<FamilyExport> &model)
 {
   tree_families = std::vector<TreeFamily>(model.size());

@@ -180,6 +180,8 @@ test_that("logit, 3 classes: the Newton step is the full K x K one; exact_step r
 })
 
 test_that("one split from the scores 0: the leaves get the exact minimisers, or one Newton step", {
+  # the leaves' steps, before the level (test-classif-level.R)
+  rlang::local_options(randomPlantedForest.level = FALSE)
   set.seed(4)
   n <- 200
   x <- data.frame(x1 = runif(n))
@@ -222,6 +224,8 @@ test_that("one split from the scores 0: the leaves get the exact minimisers, or 
 })
 
 test_that("separable classes: one split each, then no candidate gains and the fit stays as it is", {
+  # the leaves' steps, before the level (test-classif-level.R)
+  rlang::local_options(randomPlantedForest.level = FALSE)
   n <- 120
   x <- data.frame(x1 = seq(0.005, 0.995, length.out = n))
   y <- factor(ifelse(x$x1 < 0.3 | x$x1 >= 0.7, "a", "b"))
@@ -289,6 +293,8 @@ test_that("the logit forest does not depend on which class is the reference", {
 })
 
 test_that("the running sums choose the splits of the per-candidate pass, in every split structure", {
+  # a refit through the C++ object (set_parameters()) gets no level: compared without it
+  rlang::local_options(randomPlantedForest.level = FALSE)
   # The searches score a split point from the sums of the rows' terms along the leaf's sorted rows (or per bin, or by
   # one pass per try); set_parameters("scan", 0) (internal) scores every try by a pass over its leaf's rows instead.
   # The leaves' steps come from the winner's rows either way, so on data without ties (no bootstrap: deterministic;
@@ -326,6 +332,8 @@ test_that("the running sums choose the splits of the per-candidate pass, in ever
 })
 
 test_that("logit keeps its rows' terms or computes them: the same fit", {
+  # a refit through the C++ object (set_parameters()) gets no level: compared without it
+  rlang::local_options(randomPlantedForest.level = FALSE)
   set.seed(8)
   n <- 200
   x <- data.frame(x1 = runif(n), x2 = runif(n))

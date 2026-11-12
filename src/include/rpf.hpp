@@ -240,6 +240,10 @@ namespace rpf_cnt {
 class SubsetCounter;
 }
 
+// The value of a family's null tree, whose one leaf holds all rows: what the family adds to the intercept before its
+// other trees are purified. (lib/purify.cpp)
+std::vector<double> rpf_null_tree_value(const TreeFamily &family, size_t value_size);
+
 // Runs fn(family index) for n_families families, at most threads_to_use at a time, in batches of increasing index;
 // after_batch(start, batch) runs on the calling thread after each batch. An exception in fn is rethrown on the calling
 // thread. (lib/purify.cpp)
@@ -285,6 +289,10 @@ public:
   );
   // Store training data without fitting and without recomputing bounds.
   void set_training_data(const Matrix2D &samples_Y, const Matrix2D &samples_X);
+  // Add c (value_size values, one per score column) to every family's null leaf: the forest's score moves by c
+  // everywhere, as part of its intercept (predict, purify, the pruning's components and get_model() see it). The
+  // classification level (R: classif_level()) is set so. An earlier purification is dropped.
+  void shift_level(const std::vector<double> &c);
   const Matrix2D &get_X() const { return X; }
   const Matrix2D &get_Y() const { return Y; }
   const std::vector<double> &get_lower_bounds() const { return lower_bounds; }
@@ -543,6 +551,8 @@ protected:
   // `k` splits are done: snapshot the predictions if k is the next checkpoint. Returns whether the family grows on
   // (always, except in an adaptive fit)
   bool path_step(PathTracker &trk, int k) const;
+  // The tracked predictions for a checkpoint: a family without a split so far at its null leaf's fit
+  std::vector<double> path_snapshot(const PathTracker &trk) const;
   // Family n is grown: its last snapshot, then add its snapshots to the sums and free its tracker
   void path_merge(size_t n);
   // The adaptive fit (oob_path.cpp; set_adaptive()): its state, while it runs and (the records) until the rebuild

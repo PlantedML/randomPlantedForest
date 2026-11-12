@@ -73,7 +73,8 @@ void RandomPlantedForest::family_columns(
     bounds.erase(std::unique(bounds.begin(), bounds.end()), bounds.end());
     lim_list[d - 1] = bounds;
   }
-  intercept.assign(VS, 0.0);
+  // the null tree's value (a family without a split), as purify_fast_exact_family()
+  intercept = rpf_null_tree_value(curr_family, value_size);
   std::map<std::set<int>, double, utils::setComp> tot_cache;
   auto get_tot_for_U = [&](const std::set<int> &U) -> double {
     auto it = tot_cache.find(U);

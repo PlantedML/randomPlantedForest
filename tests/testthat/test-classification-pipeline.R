@@ -390,6 +390,8 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
 })
 
 test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
+  # the curve described above is the one without the classification level (a levelled forest has its own)
+  rlang::local_options(randomPlantedForest.level = FALSE)
   skip_on_cran()
   # A family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so
   # on a long, flat out-of-bag curve each grows to about the stop (before that fix, the estimate from part of the
@@ -400,7 +402,7 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
   # curves: there the bounds are checked at their stops
   d <- cp_data(300)
   old <- options(randomPlantedForest.exact_draw = TRUE, randomPlantedForest.adaptive_tolerance = 0)
-  on.exit(options(old))
+  on.exit(options(old), add = TRUE)
   set.seed(8)
   f <- rpf(
     d$x,
@@ -454,6 +456,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
 })
 
 test_that("the OOB path of a classification forest: prefix property, n_splits = NULL = the fixed fit", {
+  # the path's sums are the families' predictions before the level, which a fit adds after its last split
+  rlang::local_options(randomPlantedForest.level = FALSE)
   skip_on_cran()
   d <- cp_data(300)
   tot <- function(f) {

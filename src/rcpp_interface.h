@@ -193,6 +193,7 @@ public:
   {
     core.set_training_data(to_matrix2d(samples_Y), to_matrix2d(samples_X));
   }
+  void shift_level(const Rcpp::NumericVector &c) { core.shift_level(Rcpp::as<std::vector<double>>(c)); }
   Rcpp::List get_data()
   {
     return Rcpp::List::create(

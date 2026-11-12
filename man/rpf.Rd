@@ -439,6 +439,30 @@ three or more classes. \code{"exponential"} can need many more splits with many
 classes.
 }
 
+\subsection{The level of the classification losses}{
+
+\code{"logit"} and \code{"exponential"} average their tree families on the score
+scale. Where the families disagree, the probability of their mean score is
+not the mean of their probabilities: for a rare class (probability below
+1/2, where the probability is convex in the score) it is lower, the more so
+the more splits the families make. So the forest would predict a rare class
+too rarely. After the fit the forest's score therefore gets one constant per
+score column, its level, which is part of its intercept: the
+maximum-likelihood intercept of the log-loss given the forest's out-of-bag
+scores, so that the mean out-of-bag probability of every class is its
+frequency in the training rows (corrected, as the out-of-bag criterion is,
+for an out-of-bag mean averaging fewer families than the forest). With
+\code{deterministic = TRUE}, which has no out-of-bag rows, the forest's own
+predictions of the training rows are balanced instead. The out-of-bag choice
+of \code{n_splits} scores every number of splits at its own level, and the
+pruning starts from the forest with its level. \verb{$level} holds it (one value
+per score column) and \code{print()} shows it.
+\code{options(randomPlantedForest.level = FALSE)} fits without it. The setting
+is stored in the fit's \verb{$params$level}, and refits (the pruning's
+cross-validation) follow it; a fit without the setting is refitted without
+a level.
+}
+
 \subsection{Factor predictors}{
 
 Factor predictors, and character predictors, which are converted to

@@ -287,6 +287,29 @@
 #' three or more classes. `"exponential"` can need many more splits with many
 #' classes.
 #'
+#' ## The level of the classification losses
+#'
+#' `"logit"` and `"exponential"` average their tree families on the score
+#' scale. Where the families disagree, the probability of their mean score is
+#' not the mean of their probabilities: for a rare class (probability below
+#' 1/2, where the probability is convex in the score) it is lower, the more so
+#' the more splits the families make. So the forest would predict a rare class
+#' too rarely. After the fit the forest's score therefore gets one constant per
+#' score column, its level, which is part of its intercept: the
+#' maximum-likelihood intercept of the log-loss given the forest's out-of-bag
+#' scores, so that the mean out-of-bag probability of every class is its
+#' frequency in the training rows (corrected, as the out-of-bag criterion is,
+#' for an out-of-bag mean averaging fewer families than the forest). With
+#' `deterministic = TRUE`, which has no out-of-bag rows, the forest's own
+#' predictions of the training rows are balanced instead. The out-of-bag choice
+#' of `n_splits` scores every number of splits at its own level, and the
+#' pruning starts from the forest with its level. `$level` holds it (one value
+#' per score column) and `print()` shows it.
+#' `options(randomPlantedForest.level = FALSE)` fits without it. The setting
+#' is stored in the fit's `$params$level`, and refits (the pruning's
+#' cross-validation) follow it; a fit without the setting is refitted without
+#' a level.
+#'
 #' ## Factor predictors
 #'
 #' Factor predictors, and character predictors, which are converted to
@@ -1082,6 +1105,10 @@ rpf_bridge <- function(
     # logit's steps (exponential's are exact anyway), and the losses' pseudo-rows, by an option for studies only
     params$exact_step <- exact_step
     params$prior_rows <- rpf_prior_rows(call = call)
+    # the level of loss = "logit" and "exponential" (classif_level()), by the option randomPlantedForest.level
+    if (loss %in% c("logit", "exponential")) {
+      params$level <- rpf_level(call = call)
+    }
   }
 
   # a pruned model without its forest holds no R list of it either (export_forest)
@@ -1107,8 +1134,13 @@ rpf_bridge <- function(
 # `checkpoints` those of rpf(oob_path = ) (fixed splits) or NULL. The OOB error is the regression one or the
 # classification criterion (oob_score_y()).
 rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoints, export_forest, call) {
-  score_y <- if (adaptive || !is.null(checkpoints)) {
+  level <- level_on(params, outcomes$mode)
+  score_y <- if (adaptive || !is.null(checkpoints) || level) {
     oob_score_y(outcomes$mode, params$loss, processed$outcomes[[1]])
+  }
+  # with the classification level every checkpoint of the OOB path is scored at its own level (oob_path_point_crit())
+  if (level) {
+    score_y$level <- TRUE
   }
   if (adaptive) {
     chosen <- tune_splits_oob(
@@ -1129,6 +1161,9 @@ rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoin
       params = params,
       oob_path = checkpoints
     )
+    if (level) {
+      chosen <- list(level = classif_level_fixed(fit, params, score_y, predictors$predictors_matrix))
+    }
   }
 
   # Optionally export a compact R list representation of the forest.
@@ -1146,11 +1181,25 @@ rpf_fit <- function(processed, outcomes, predictors, params, adaptive, checkpoin
     params = params,
     forest = forest
   )
+  # the level the forest got (classif_level()), one value per score column
+  if (level) {
+    res$level <- as.numeric(chosen$level)
+  }
   if (adaptive) {
     res$oob_path <- chosen$path
     res$splits_oob <- list(n_splits = chosen$splits, stopped_at = chosen$stopped_at, capped = chosen$capped)
   } else if (!is.null(checkpoints)) {
-    res$oob_path <- oob_path_table(fit$oob_path(), score_y, params$ntrees, call = call)
+    path <- fit$oob_path()
+    # (with the level the fit also tracks its last split: only the checkpoints asked for are reported)
+    keep <- which(path$checkpoints %in% checkpoints)
+    if (length(keep) < length(path$checkpoints)) {
+      V <- ncol(path$sum0) %/% length(path$checkpoints)
+      cols <- as.integer(outer(seq_len(V), (keep - 1L) * V, "+"))
+      path$checkpoints <- path$checkpoints[keep]
+      path$sum0 <- path$sum0[, cols, drop = FALSE]
+      path$sum1 <- path$sum1[, cols, drop = FALSE]
+    }
+    res$oob_path <- oob_path_table(path, score_y, params$ntrees, call = call)
   }
   res
 }
@@ -1200,6 +1249,20 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
     )
   }
   exact_draw
+}
+
+# The level of loss = "logit" and "exponential" (classif_level()): the option randomPlantedForest.level (TRUE, the
+# default: on; FALSE: off). Stored in the fit's params, so that a refit (the pruning's cross-validation) and a saved
+# fit keep it; a fit without params$level gets no level (level_on()).
+rpf_level <- function(call = rlang::caller_env()) {
+  level <- getOption("randomPlantedForest.level", TRUE)
+  if (!rlang::is_bool(level)) {
+    cli::cli_abort(
+      "The option {.code randomPlantedForest.level} must be {.code TRUE} or {.code FALSE}.",
+      call = call
+    )
+  }
+  level
 }
 
 # The pseudo-rows a of the logit and exponential losses (1): the undocumented
@@ -1261,11 +1324,22 @@ rpf_param_vector <- function(params, mode) {
 # `oob_path`: NULL, or the checkpoints of the OOB path (see check_oob_path())
 # `adaptive`: NULL, or the adaptive fit's checkpoints, stopper, patience, tolerance, floor and pause_gb (see
 # tune_splits_oob())
+# With the classification level (level_on()) the forest gets its level after this (classif_level_fixed(), or for the
+# adaptive fit from the stopper, tune_splits_oob()), so the C++ fit does not purify it (classif_level_finish() does),
+# and a fit with fixed splits also tracks its OOB path at its last split, from which the level is computed.
 rpf_impl <- function(Y, X, mode = c("regression", "classification"), params, oob_path = NULL, adaptive = NULL) {
   # Final input validation, should be superfluous
   checkmate::assert_matrix(X, mode = "numeric", any.missing = FALSE)
   mode <- match.arg(mode)
-  pars <- rpf_param_vector(params, mode)
+  level <- level_on(params, mode)
+  if (level) {
+    pars <- rpf_param_vector(utils::modifyList(params, list(purify = FALSE)), mode)
+    if (is.null(adaptive) && !isTRUE(params$deterministic)) {
+      oob_path <- sort(unique(c(oob_path, as.integer(params$splits))))
+    }
+  } else {
+    pars <- rpf_param_vector(params, mode)
+  }
   # allowed feature sets as 1-based column indices (NULL: no constraint, the constructors without them)
   constraints <- if (!is.null(params$interaction_constraints)) {
     lapply(params$interaction_constraints, match, table = colnames(X))

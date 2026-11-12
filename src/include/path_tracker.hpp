@@ -37,6 +37,7 @@ struct RandomPlantedForest::PathTracker {
   std::map<std::set<int>, int32_t> dims_id; /**< the split trees' dims, numbered as they first occur */
   std::vector<std::set<int>> dims_list;
   std::vector<double> null_value; /**< the fit of the null leaf if the family makes no split (path_start()) */
+  bool has_split = false;         /**< it has made a split (path_split()) */
 };
 
 #endif // RPF_PATH_TRACKER_HPP

@@ -59,6 +59,8 @@ leaf_list <- function(fit) {
 }
 
 test_that("the prefix property: the k-split forest is the first k splits of a longer fit", {
+  # the growth, before the level a classification fit adds after its last split
+  rlang::local_options(randomPlantedForest.level = FALSE)
   # With delete_leaves = FALSE a split only appends leaves, so every tree of the k-split forest must be the first
   # leaves of that tree in the longer fit: every structure, regression and classification.
   d <- path_sim()

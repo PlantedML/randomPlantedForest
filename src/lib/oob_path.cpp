@@ -54,9 +54,10 @@ RandomPlantedForest::path_start(size_t n, TreeFamily *fam, const std::vector<std
   if (path_checkpoints_.empty())
     return nullptr;
   auto t = std::make_shared<PathTracker>();
-  // the adaptive fit rebuilds the families from their records: one without a split at the chosen checkpoint gets the
-  // fit of its null leaf, as fit_null_leaf() gives it to a family that made no split (from the same rows and Y)
-  if (alone_ && Y && fam) {
+  // the fit of the null leaf, as fit_null_leaf() gives it to a family that made no split (from the same rows and Y):
+  // the path tracks a family without a split at it (path_snapshot()), and the adaptive fit's rebuild gives it to a
+  // family without a split at the chosen checkpoint
+  if (Y && fam) {
     auto null_tree = fam->find(std::set<int>{0});
     if (null_tree != fam->end() && !null_tree->second->leaves.empty() &&
         !null_tree->second->leaves[0].individuals.empty())
@@ -81,6 +82,7 @@ void RandomPlantedForest::path_split(
     PathTracker &trk, const Split &split, const std::vector<double> *inc_s, const std::vector<double> *inc_b
 ) const
 {
+  trk.has_split = true;
   const std::vector<double> &Ms = inc_s ? *inc_s : split.M_s, &Mb = inc_b ? *inc_b : split.M_b;
   const DecisionTree &T = *split.tree_index;
   auto &lists = trk.in_leaf[T.split_dims];
@@ -127,12 +129,28 @@ void RandomPlantedForest::path_split(
   }
 }
 
+// The family's predictions at its OOB rows now, for a checkpoint. A family that has made no split predicts its null
+// leaf's fit (fit_null_leaf(): the fit of its rows, e.g. their mean, or logit's log-odds of its sample), not the 0
+// its rows start from: the path holds what a forest with so many splits predicts. A family with a split: the tracked
+// predictions (its null leaf stays at 0).
+std::vector<double> RandomPlantedForest::path_snapshot(const PathTracker &trk) const
+{
+  if (trk.has_split || trk.null_value.size() != value_size)
+    return trk.pred;
+  std::vector<double> out(trk.pred.size());
+  for (size_t p = 0; p < trk.rows.size(); ++p)
+    for (size_t v = 0; v < value_size; ++v)
+      out[p * value_size + v] = trk.null_value[v];
+  return out;
+}
+
 bool RandomPlantedForest::path_step(PathTracker &trk, int k) const
 {
   if (alone_)
     return alone_step(trk, (size_t)k);
   if (trk.next < path_checkpoints_.size() && path_checkpoints_[trk.next] == k) {
-    trk.snaps.insert(trk.snaps.end(), trk.pred.begin(), trk.pred.end());
+    const std::vector<double> now = path_snapshot(trk);
+    trk.snaps.insert(trk.snaps.end(), now.begin(), now.end());
     ++trk.next;
   }
   return true;
@@ -570,7 +588,7 @@ bool RandomPlantedForest::alone_step(PathTracker &trk, size_t k) const
     if (trk.next >= C || (size_t)path_checkpoints_[trk.next] != k)
       return !A.cancel;
     const size_t c = trk.next++;
-    trk.csnaps.push_back(trk.pred);
+    trk.csnaps.push_back(path_snapshot(trk));
     trk.rec_at.push_back((uint32_t)trk.rec.size());
     if (A.cancel)
       return false;

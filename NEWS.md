@@ -69,6 +69,13 @@
 
 ## New features
 
+* Classification forests with `loss = "logit"` or `"exponential"` get a level: after the fit, one constant per score column, the maximum-likelihood intercept of the log-loss given the forest's out-of-bag scores, so that every class's mean out-of-bag probability is its frequency in the training rows.
+  It is stored in every tree family's null leaf, so it is part of the intercept of the forest, of its purification and of its pruned model; `$level` holds it and `print()` shows it (`?rpf`, "The level of the classification losses").
+  The families are averaged on the score scale, and where they disagree the probability of their mean score is below the mean of their probabilities for a class rarer than 1/2, so the forest predicted a rare class too rarely, the more so the more splits it made.
+  With the level the forest predicts each class about as often as it occurs, at any number of splits.
+  The out-of-bag choice of `n_splits` scores every number of splits at its own level, and the pruning starts from the forest with its level.
+  This changes every fit with these losses, binary and multiclass; `options(randomPlantedForest.level = FALSE)` fits without the level.
+
 * `rpf()` gains `keep_level_order`, to keep the level order of factor predictors instead of ordering their levels by the outcome.
   `TRUE` keeps it for every factor, ordered or not, and a character vector for the named factors only; splits then separate neighbouring levels in the order of `levels()`.
   The default, `FALSE`, orders every factor by the outcome as before, and fits are unchanged.
@@ -152,6 +159,12 @@
   How the components were chosen (the forest's families and splits, given or chosen out of bag, the rule and threshold, what was left out, the heat-map forms) follows under "How it was chosen". No choice or fit changes.
 
 ## Bug fixes
+
+* `prune_components()` (and so `rpf()` with pruning) left the value of a tree family that made no split out of the pruned model's intercept, so that rule `"D"` at `tau = 0` was not the forest where a family had found no split. The intercept now includes it, as `purify()`'s does.
+
+* The out-of-bag path (`oob_path`, and the out-of-bag choice of `n_splits`) counted a tree family that had made no split at the score 0 its rows start from, instead of at the fit of its rows that the family predicts (the mean for regression and the L1 / L2 losses, the log-odds of its sample for `"logit"` and `"exponential"`, so a probability of 1/2 instead).
+  It now counts such a family at its fit.
+  Families without a split are common only with a rare class and few rows, where they made the out-of-bag log-loss of few splits too high, so that the out-of-bag choice of `n_splits` could take far more splits than it should.
 
 * `split_structure = "tree_then_leaf"` samples leaves in proportion to their available thresholds, as documented.
   After a split, the sampling weights of new leaves counted rows instead of distinct values, and the cached prefix sums were built incorrectly.

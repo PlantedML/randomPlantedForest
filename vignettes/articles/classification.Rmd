@@ -124,8 +124,10 @@ Two things follow:
   A round in which no candidate gains makes no split (it still counts towards `n_splits`).
 
 The table shows the score of a point in a pure region as one tree family grows: the two classes are separated by `x1 > 0.5`, and `x2` is noise.
+The fits leave out the forest's level (below), so that the table shows the steps alone.
 
 ```{r pure-region}
+old <- options(randomPlantedForest.level = FALSE)
 set.seed(1)
 n <- 200
 sep <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -144,6 +146,7 @@ pure <- data.frame(
   t(sapply(rounds, function(k) score_after("logit", k)))
 )
 names(pure) <- c("rounds", "exponential score", "exponential leaves", "logit score", "logit leaves")
+options(old)
 pure
 ```
 
@@ -157,3 +160,10 @@ So a fixed, large `n_splits` does not make the model overconfident.
 With `exact_step = TRUE` (the default), the chosen split's two leaves then get the exact minimisers, by Newton's method on their rows; `exact_step = FALSE` keeps the one Newton step, which is a little faster.
 The search is the same either way, and `exact_step` does not change `"exponential"` fits.
 
+### The level
+
+The tree families are averaged on the score scale.
+Where they disagree, the probability of their mean score is not the mean of their probabilities: for a class rarer than 1/2 it is lower, and the more splits the families make, the more they disagree.
+So after the fit, a forest with `"logit"` or `"exponential"` gets one constant per score column, its level: the intercept that makes every class's mean out-of-bag probability equal to its frequency in the training rows (the maximum-likelihood intercept given the forest's out-of-bag scores).
+The level is part of the forest's intercept, so the components and the purified forest include it, and the pruning starts from the forest with it.
+`$level` holds it, `print()` shows it, and `options(randomPlantedForest.level = FALSE)` fits without it.

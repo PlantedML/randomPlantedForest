@@ -80,6 +80,8 @@ test_that("binary exponential: the weight is exp(-y g / 2) of the predicted scor
 })
 
 test_that("the exponential's first leaf step is log(n_k + a / K) - mean_j log(n_j + a / K), a = 1 pseudo-row", {
+  # the leaves' steps, before the level (test-classif-level.R)
+  rlang::local_options(randomPlantedForest.level = FALSE)
   d <- samme_data(3)
   set.seed(1)
   m <- rpf(

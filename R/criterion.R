@@ -118,6 +118,247 @@ crit_subset <- function(crit, idx) {
   crit
 }
 
+# The classification level. The tree families are averaged on the score (logit) scale, and the mean of their
+# probabilities lies above the probability of their mean score where the probability is convex in the score (a rare
+# class: Jensen), more so the more the families disagree, i.e. with more splits. So a forest predicts a rare class too
+# rarely. Its level is the constant c (one value per score column) that the forest's score gets after the fit (the C++
+# shift_level(), in every family's null leaf, so part of the intercept): the maximum-likelihood intercept of the
+# log-loss given the forest's out-of-bag scores, whose equations are the balance property
+#   sum_i p_k(c + g_i) - Delta_ik = n_k   (every free class k: the mean probability is the class's frequency)
+# over the rows `idx` with an out-of-bag family, g the OOB mean scores (G; the half means G0, G1, half counts m0, m1),
+# B the families. Delta is the second-order term of the OOB correction (criterion.R, above): an OOB mean of m families
+# scatters more than the forest's mean of B, which moves its expected probability by
+#   Delta_k = (1/m - 1/B) / 2 * sum_uv d2 p_k / dg_u dg_v V_uv = (1/m - 1/B) / 2 * w p_k ((d_k - p'd)^2 - (p'd^2 - (p'd)^2))
+# with V = w d d' the across-family covariance from the halves (d over all K classes, the reference class's 0); rows
+# without both halves get none. Solved by Newton's method from c = 0 with the Jacobian of the first term,
+# sum_i diag(p_i) - p_i p_i' (positive definite), halving the step while the residual's norm does not fall; it stops at
+# a largest residual below 1e-10 of a row (usually after 3 to 5 steps). Free classes: binary the second class;
+# multiclass logit the K - 1 classes after the first (the reference, score 0); multiclass exponential (K scores, the
+# softmax) the classes after the first, the first's score then fixed at 0, and c is centred at the end (the softmax
+# ignores what all classes share; SAMME's scores are centred). 0 where a free class or the reference class has no
+# out-of-bag row (no finite level). Returns V values, with the attribute `iterations`.
+#
+# Its arithmetic is plain double arithmetic in a fixed order (level_colsums(), level_rowsums(), level_solve()), so the
+# level's bits depend on its inputs and on exp() and log() only: no BLAS or LAPACK, whose crossprod() and solve() round
+# differently by library (OpenBLAS's triangular solve multiplies by the pivot's reciprocal where the reference BLAS
+# divides by it), and no sum(), colSums() or rowSums(), which add in long double (80 bits on x86_64, 64 on arm64 macOS).
+# Then the stopping test and the step halving take the same branches on every machine too.
+classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
+  G <- as.matrix(G)
+  V <- crit$V
+  n <- nrow(G)
+  cls <- crit$cls[idx]
+  K <- crit$K
+  zero <- structure(numeric(V), iterations = 0L)
+  if (crit$type != "logloss" || n == 0) {
+    return(zero)
+  }
+  n_k <- tabulate(cls, K)
+  if (any(n_k == 0)) {
+    return(zero)
+  }
+  # the free classes and their score columns (exponential's softmax: the first score fixed)
+  free <- seq_len(K)[-1]
+  free_col <- if (crit$link == "softmax") free else free - 1L
+  D <- as.matrix(G0) - as.matrix(G1)
+  m <- m0 + m1
+  both <- m0 > 0 & m1 > 0
+  coef <- (1 / m - 1 / B) * 0.5 / (1 / pmax(m0, 1) + 1 / pmax(m1, 1))
+  coef[!both] <- 0
+  # the full probabilities (n x K) and the score differences of the halves over all K classes (reference 0)
+  full <- function(M) {
+    if (crit$link == "softmax") M else cbind(0, M)
+  }
+  Df <- full(D)
+  probs <- function(cv) {
+    Gc <- G + rep(cv, each = n)
+    if (crit$link == "sigmoid") {
+      p <- stats::plogis(Gc[, 1])
+      return(cbind(1 - p, p))
+    }
+    Gf <- full(Gc)
+    # log-sum-exp of the rows (crit_lse()), the sum in a fixed order
+    mx <- apply(Gf, 1, max)
+    exp(Gf - (mx + log(level_rowsums(exp(Gf - mx)))))
+  }
+  resid <- function(Pf) {
+    pd <- level_rowsums(Pf * Df)
+    vp <- level_rowsums(Pf * Df^2) - pd^2
+    Delta <- coef * Pf * ((Df - pd)^2 - vp)
+    n_k[free] - level_colsums(Pf[, free, drop = FALSE] - Delta[, free, drop = FALSE])
+  }
+  # the Jacobian sum_i diag(p_i) - p_i p_i' of the free classes' probabilities P: entry (u, v) sums p_u (1[u = v] - p_v)
+  jacobian <- function(P) {
+    nf <- ncol(P)
+    uv <- which(upper.tri(diag(nf), diag = TRUE), arr.ind = TRUE)
+    terms <- vapply(
+      seq_len(nrow(uv)),
+      function(j) {
+        u <- uv[j, 1]
+        v <- uv[j, 2]
+        P[, u] * (as.numeric(u == v) - P[, v])
+      },
+      numeric(nrow(P))
+    )
+    s <- level_colsums(matrix(terms, nrow(P)))
+    J <- matrix(0, nf, nf)
+    J[uv] <- s
+    J[uv[, 2:1, drop = FALSE]] <- s
+    J
+  }
+  cv <- numeric(V)
+  Pf <- probs(cv)
+  r <- resid(Pf)
+  it <- 0L
+  while (max(abs(r)) > 1e-10 * n && it < 50L) {
+    it <- it + 1L
+    step <- level_solve(jacobian(Pf[, free, drop = FALSE]), r)
+    if (is.null(step) || !all(is.finite(step))) {
+      break
+    }
+    t <- 1
+    improved <- FALSE
+    for (h in seq_len(30)) {
+      cv_new <- cv
+      cv_new[free_col] <- cv[free_col] + t * step
+      Pf_new <- probs(cv_new)
+      r_new <- resid(Pf_new)
+      if (all(is.finite(r_new)) && level_sum(r_new^2) < level_sum(r^2)) {
+        improved <- TRUE
+        break
+      }
+      t <- t / 2
+    }
+    if (!improved) {
+      break
+    }
+    cv <- cv_new
+    Pf <- Pf_new
+    r <- r_new
+  }
+  if (!all(is.finite(cv))) {
+    return(zero)
+  }
+  if (crit$link == "softmax") {
+    cv <- cv - level_sum(cv) / length(cv)
+  }
+  structure(cv, iterations = it)
+}
+
+# The level's sums (classif_level()), in double arithmetic in a fixed order, the same on every machine. Column sums
+# of an n x k matrix: pairwise, the first half of the rows plus the second half (the odd row out kept last) until one
+# row is left.
+level_colsums <- function(M) {
+  M <- as.matrix(M)
+  if (nrow(M) == 0L) {
+    return(numeric(ncol(M)))
+  }
+  while (nrow(M) > 1L) {
+    h <- nrow(M) %/% 2L
+    top <- M[seq_len(h), , drop = FALSE] + M[h + seq_len(h), , drop = FALSE]
+    M <- if (nrow(M) %% 2L == 1L) rbind(top, M[nrow(M), , drop = FALSE]) else top
+  }
+  M[1, ]
+}
+
+# The sum of a vector (level_colsums())
+level_sum <- function(x) {
+  level_colsums(matrix(as.numeric(x), ncol = 1L))
+}
+
+# Row sums of an n x k matrix: the columns added from the first
+level_rowsums <- function(M) {
+  s <- M[, 1]
+  for (j in seq_len(ncol(M))[-1]) {
+    s <- s + M[, j]
+  }
+  s
+}
+
+# The solution of J x = r for the level's Newton step (J the k x k Jacobian, positive definite): Gaussian elimination
+# with the diagonal as pivots in their order, in double arithmetic. NULL if a pivot is not positive and finite (J
+# numerically singular), as solve() fails.
+level_solve <- function(J, r) {
+  k <- length(r)
+  A <- J
+  b <- as.numeric(r)
+  for (p in seq_len(k)) {
+    if (!is.finite(A[p, p]) || A[p, p] <= 0) {
+      return(NULL)
+    }
+    for (i in seq_len(k - p) + p) {
+      l <- A[i, p] / A[p, p]
+      for (j in seq_len(k - p) + p) {
+        A[i, j] <- A[i, j] - l * A[p, j]
+      }
+      b[i] <- b[i] - l * b[p]
+    }
+  }
+  x <- numeric(k)
+  for (i in rev(seq_len(k))) {
+    s <- b[i]
+    for (j in seq_len(k - i) + i) {
+      s <- s - A[i, j] * x[j]
+    }
+    x[i] <- s / A[i, i]
+  }
+  x
+}
+
+# Whether a fit with these params gets the classification level (classif_level()): rpf()'s option
+# randomPlantedForest.level (TRUE by default) is stored in params$level; a forest fitted before the level existed has
+# no params$level and none. Classification with loss = "logit" or "exponential".
+level_on <- function(params, mode) {
+  mode == "classification" && isTRUE(params$level) && isTRUE(params$loss %in% c("logit", "exponential"))
+}
+
+# The level of the fitted forest `fit` (the C++ object, before shift_level()) with the classification criterion
+# `crit` of its training rows: from its OOB path's last checkpoint, at its last split (the fit tracks it,
+# rpf_impl()); for a forest without out-of-bag rows (deterministic) the balance on its own predictions of the
+# training rows X. B: the families.
+classif_fit_level <- function(fit, crit, X, B, deterministic) {
+  in_sample <- function() {
+    G <- matrix(fit$predict_matrix(X, 0, 0L), ncol = crit$V)
+    n <- nrow(G)
+    classif_level(crit, seq_len(n), G, G, G, rep(1L, n), rep(0L, n), 1)
+  }
+  if (deterministic) {
+    return(in_sample())
+  }
+  path <- fit$oob_path()
+  m0 <- path$count[, 1]
+  m1 <- path$count[, 2]
+  ok <- m0 + m1 > 0
+  if (!any(ok)) {
+    return(in_sample())
+  }
+  V <- crit$V
+  cols <- (length(path$checkpoints) - 1L) * V + seq_len(V)
+  s0 <- path$sum0[ok, cols, drop = FALSE]
+  s1 <- path$sum1[ok, cols, drop = FALSE]
+  m0 <- m0[ok]
+  m1 <- m1[ok]
+  classif_level(crit, which(ok), (s0 + s1) / (m0 + m1), s0 / pmax(m0, 1), s1 / pmax(m1, 1), m0, m1, B)
+}
+
+# The level of a forest with fixed splits, after its fit (rpf_impl() tracked its OOB path at its last split):
+# classif_fit_level(), then classif_level_finish(). Returns the level.
+classif_level_fixed <- function(fit, params, crit, X) {
+  level <- classif_fit_level(fit, crit, X, params$ntrees, isTRUE(params$deterministic))
+  classif_level_finish(fit, params, level)
+  level
+}
+
+# A forest after its fit with the level: shift_level(), then the purification that rpf(purify = TRUE) asked for (the
+# C++ fit does not purify such a forest itself, as the level comes after it; rpf_impl())
+classif_level_finish <- function(fit, params, level) {
+  fit$shift_level(as.numeric(level))
+  if (isTRUE(params$purify)) {
+    fit$purify_threads(0L, 0L, 2L)
+  }
+  invisible(fit)
+}
+
 # Log-sum-exp of the rows of the score columns G (n x V), with the reference score 0 joined if `ref`
 crit_lse <- function(G, ref) {
   mx <- apply(G, 1, max)
