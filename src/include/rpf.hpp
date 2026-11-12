@@ -289,6 +289,10 @@ public:
   );
   // Store training data without fitting and without recomputing bounds.
   void set_training_data(const Matrix2D &samples_Y, const Matrix2D &samples_X);
+  // Add c (value_size values, one per score column) to every family's null leaf: the forest's score moves by c
+  // everywhere, as part of its intercept (predict, purify, the pruning's components and get_model() see it). The
+  // classification level (R: classif_level()) is set so. An earlier purification is dropped.
+  void shift_level(const std::vector<double> &c);
   const Matrix2D &get_X() const { return X; }
   const Matrix2D &get_Y() const { return Y; }
   const std::vector<double> &get_lower_bounds() const { return lower_bounds; }

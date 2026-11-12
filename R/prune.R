@@ -885,6 +885,10 @@ prune_refit <- function(object, predictors, y, rows, seed, nthreads) {
     mode = object$mode,
     params = params
   )
+  # (a forest with the classification level gets its own, on these rows)
+  if (level_on(params, object$mode)) {
+    classif_level_fixed(fit, params, oob_criterion(object$mode, params$loss, y[rows]), pre$predictors_matrix)
+  }
   new_rpf(
     fit = fit,
     blueprint = object$blueprint,

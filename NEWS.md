@@ -69,6 +69,13 @@
 
 ## New features
 
+* Classification forests with `loss = "logit"` or `"exponential"` get a level: after the fit, one constant per score column, the maximum-likelihood intercept of the log-loss given the forest's out-of-bag scores, so that every class's mean out-of-bag probability is its frequency in the training rows.
+  It is stored in every tree family's null leaf, so it is part of the intercept of the forest, of its purification and of its pruned model; `$level` holds it and `print()` shows it (`?rpf`, "The level of the classification losses").
+  The families are averaged on the score scale, and where they disagree the probability of their mean score is below the mean of their probabilities for a class rarer than 1/2, so the forest predicted a rare class too rarely, the more so the more splits it made.
+  With the level the forest predicts each class about as often as it occurs, at any number of splits.
+  The out-of-bag choice of `n_splits` scores every number of splits at its own level, and the pruning starts from the forest with its level.
+  This changes every fit with these losses, binary and multiclass; `options(randomPlantedForest.level = FALSE)` fits without the level.
+
 * `rpf()` gains `keep_level_order`, to keep the level order of factor predictors instead of ordering their levels by the outcome.
   `TRUE` keeps it for every factor, ordered or not, and a character vector for the named factors only; splits then separate neighbouring levels in the order of `levels()`.
   The default, `FALSE`, orders every factor by the outcome as before, and fits are unchanged.

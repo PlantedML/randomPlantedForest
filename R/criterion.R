@@ -118,6 +118,162 @@ crit_subset <- function(crit, idx) {
   crit
 }
 
+# The classification level. The tree families are averaged on the score (logit) scale, and the mean of their
+# probabilities lies above the probability of their mean score where the probability is convex in the score (a rare
+# class: Jensen), more so the more the families disagree, i.e. with more splits. So a forest predicts a rare class too
+# rarely. Its level is the constant c (one value per score column) that the forest's score gets after the fit (the C++
+# shift_level(), in every family's null leaf, so part of the intercept): the maximum-likelihood intercept of the
+# log-loss given the forest's out-of-bag scores, whose equations are the balance property
+#   sum_i p_k(c + g_i) - Delta_ik = n_k   (every free class k: the mean probability is the class's frequency)
+# over the rows `idx` with an out-of-bag family, g the OOB mean scores (G; the half means G0, G1, half counts m0, m1),
+# B the families. Delta is the second-order term of the OOB correction (criterion.R, above): an OOB mean of m families
+# scatters more than the forest's mean of B, which moves its expected probability by
+#   Delta_k = (1/m - 1/B) / 2 * sum_uv d2 p_k / dg_u dg_v V_uv = (1/m - 1/B) / 2 * w p_k ((d_k - p'd)^2 - (p'd^2 - (p'd)^2))
+# with V = w d d' the across-family covariance from the halves (d over all K classes, the reference class's 0); rows
+# without both halves get none. Solved by Newton's method from c = 0 with the Jacobian of the first term,
+# sum_i diag(p_i) - p_i p_i' (positive definite), halving the step while the residual's norm does not fall; it stops at
+# a largest residual below 1e-10 of a row (usually after 3 to 5 steps). Free classes: binary the second class;
+# multiclass logit the K - 1 classes after the first (the reference, score 0); multiclass exponential (K scores, the
+# softmax) the classes after the first, the first's score then fixed at 0, and c is centred at the end (the softmax
+# ignores what all classes share; SAMME's scores are centred). 0 where a free class or the reference class has no
+# out-of-bag row (no finite level). Returns V values, with the attribute `iterations`.
+classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
+  G <- as.matrix(G)
+  V <- crit$V
+  n <- nrow(G)
+  cls <- crit$cls[idx]
+  K <- crit$K
+  zero <- structure(numeric(V), iterations = 0L)
+  if (crit$type != "logloss" || n == 0) {
+    return(zero)
+  }
+  n_k <- tabulate(cls, K)
+  if (any(n_k == 0)) {
+    return(zero)
+  }
+  # the free classes and their score columns (exponential's softmax: the first score fixed)
+  free <- seq_len(K)[-1]
+  free_col <- if (crit$link == "softmax") free else free - 1L
+  D <- as.matrix(G0) - as.matrix(G1)
+  m <- m0 + m1
+  both <- m0 > 0 & m1 > 0
+  coef <- (1 / m - 1 / B) * 0.5 / (1 / pmax(m0, 1) + 1 / pmax(m1, 1))
+  coef[!both] <- 0
+  # the full probabilities (n x K) and the score differences of the halves over all K classes (reference 0)
+  full <- function(M) {
+    if (crit$link == "softmax") M else cbind(0, M)
+  }
+  Df <- full(D)
+  probs <- function(cv) {
+    Gc <- G + rep(cv, each = n)
+    if (crit$link == "sigmoid") {
+      p <- stats::plogis(Gc[, 1])
+      return(cbind(1 - p, p))
+    }
+    Gf <- full(Gc)
+    exp(Gf - crit_lse(Gf, FALSE))
+  }
+  resid <- function(Pf) {
+    pd <- rowSums(Pf * Df)
+    vp <- rowSums(Pf * Df^2) - pd^2
+    Delta <- coef * Pf * ((Df - pd)^2 - vp)
+    n_k[free] - colSums(Pf[, free, drop = FALSE] - Delta[, free, drop = FALSE])
+  }
+  cv <- numeric(V)
+  Pf <- probs(cv)
+  r <- resid(Pf)
+  it <- 0L
+  while (max(abs(r)) > 1e-10 * n && it < 50L) {
+    it <- it + 1L
+    P <- Pf[, free, drop = FALSE]
+    J <- diag(colSums(P), length(free)) - crossprod(P)
+    step <- tryCatch(solve(J, r), error = function(e) NULL)
+    if (is.null(step) || !all(is.finite(step))) {
+      break
+    }
+    t <- 1
+    improved <- FALSE
+    for (h in seq_len(30)) {
+      cv_new <- cv
+      cv_new[free_col] <- cv[free_col] + t * step
+      Pf_new <- probs(cv_new)
+      r_new <- resid(Pf_new)
+      if (all(is.finite(r_new)) && sum(r_new^2) < sum(r^2)) {
+        improved <- TRUE
+        break
+      }
+      t <- t / 2
+    }
+    if (!improved) {
+      break
+    }
+    cv <- cv_new
+    Pf <- Pf_new
+    r <- r_new
+  }
+  if (!all(is.finite(cv))) {
+    return(zero)
+  }
+  if (crit$link == "softmax") {
+    cv <- cv - mean(cv)
+  }
+  structure(cv, iterations = it)
+}
+
+# Whether a fit with these params gets the classification level (classif_level()): rpf()'s option
+# randomPlantedForest.level (TRUE by default) is stored in params$level; a forest fitted before the level existed has
+# no params$level and none. Classification with loss = "logit" or "exponential".
+level_on <- function(params, mode) {
+  mode == "classification" && isTRUE(params$level) && isTRUE(params$loss %in% c("logit", "exponential"))
+}
+
+# The level of the fitted forest `fit` (the C++ object, before shift_level()) with the classification criterion
+# `crit` of its training rows: from its OOB path's last checkpoint, at its last split (the fit tracks it,
+# rpf_impl()); for a forest without out-of-bag rows (deterministic) the balance on its own predictions of the
+# training rows X. B: the families.
+classif_fit_level <- function(fit, crit, X, B, deterministic) {
+  in_sample <- function() {
+    G <- matrix(fit$predict_matrix(X, 0, 0L), ncol = crit$V)
+    n <- nrow(G)
+    classif_level(crit, seq_len(n), G, G, G, rep(1L, n), rep(0L, n), 1)
+  }
+  if (deterministic) {
+    return(in_sample())
+  }
+  path <- fit$oob_path()
+  m0 <- path$count[, 1]
+  m1 <- path$count[, 2]
+  ok <- m0 + m1 > 0
+  if (!any(ok)) {
+    return(in_sample())
+  }
+  V <- crit$V
+  cols <- (length(path$checkpoints) - 1L) * V + seq_len(V)
+  s0 <- path$sum0[ok, cols, drop = FALSE]
+  s1 <- path$sum1[ok, cols, drop = FALSE]
+  m0 <- m0[ok]
+  m1 <- m1[ok]
+  classif_level(crit, which(ok), (s0 + s1) / (m0 + m1), s0 / pmax(m0, 1), s1 / pmax(m1, 1), m0, m1, B)
+}
+
+# The level of a forest with fixed splits, after its fit (rpf_impl() tracked its OOB path at its last split):
+# classif_fit_level(), then classif_level_finish(). Returns the level.
+classif_level_fixed <- function(fit, params, crit, X) {
+  level <- classif_fit_level(fit, crit, X, params$ntrees, isTRUE(params$deterministic))
+  classif_level_finish(fit, params, level)
+  level
+}
+
+# A forest after its fit with the level: shift_level(), then the purification that rpf(purify = TRUE) asked for (the
+# C++ fit does not purify such a forest itself, as the level comes after it; rpf_impl())
+classif_level_finish <- function(fit, params, level) {
+  fit$shift_level(as.numeric(level))
+  if (isTRUE(params$purify)) {
+    fit$purify_threads(0L, 0L, 2L)
+  }
+  invisible(fit)
+}
+
 # Log-sum-exp of the rows of the score columns G (n x V), with the reference score 0 joined if `ref`
 crit_lse <- function(G, ref) {
   mx <- apply(G, 1, max)

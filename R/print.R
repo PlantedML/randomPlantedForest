@@ -136,7 +136,21 @@ format.rpf <- function(x, ...) {
         if (identical(params$loss, "logit") && !is.null(params$exact_step)) "exact_step",
         if (params$loss %in% c("logit", "exponential") && !is.null(params$prior_rows)) "prior_rows"
       )
-      print_params(params[loss_params])
+      # the level (classif_level()), on the score scale; multiclass per class, centred as the scores are reported
+      level <- NULL
+      if (!is.null(x$level)) {
+        lev <- x$level
+        if (length(lev) > 1) {
+          if (identical(params$loss, "logit")) {
+            lev <- c(0, lev)
+          }
+          lev <- stats::setNames(lev - mean(lev), levels(x$blueprint$ptypes$outcomes[[1]]))
+          level <- list(level = paste0(names(lev), " ", sprintf("%+.3f", lev), collapse = ", "))
+        } else {
+          level <- list(level = sprintf("%+.3f", lev))
+        }
+      }
+      print_params(c(params[loss_params], level))
     }
 
     cli::cli_text("")

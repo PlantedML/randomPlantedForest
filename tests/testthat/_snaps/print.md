@@ -60,6 +60,7 @@
       -- Loss 
               loss: logit
         exact_step: TRUE
+             level: setosa -0.279, versicolor +0.086, virginica +0.193
       
       i Fit using 1 thread, also the default for `predict()` and `purify()`.
 

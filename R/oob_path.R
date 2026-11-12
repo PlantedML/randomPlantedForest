@@ -90,7 +90,7 @@ oob_path_point <- function(s0, s1, count, y, ntrees, rows = FALSE) {
 # oob_path_point() for a classification criterion `crit` (oob_score_y()): the mean corrected and plain criterion over
 # the rows with an OOB family and their standard errors, from s0 / s1 (n x V: the sums of the families of even / odd
 # index) and count. Rows whose OOB families are all even or all odd are not corrected (as for regression). rows: as
-# for oob_path_point().
+# for oob_path_point(). With the classification level the point has the attribute `level`, the forest's level there.
 oob_path_point_crit <- function(s0, s1, count, crit, ntrees, rows = FALSE) {
   m0 <- count[, 1]
   m1 <- count[, 2]
@@ -99,18 +99,23 @@ oob_path_point_crit <- function(s0, s1, count, crit, ntrees, rows = FALSE) {
   n_ok <- sum(ok)
   s0 <- s0[ok, , drop = FALSE]
   s1 <- s1[ok, , drop = FALSE]
-  r <- crit_rows(
-    crit,
-    which(ok),
-    (s0 + s1) / m[ok],
-    s0 / pmax(m0[ok], 1),
-    s1 / pmax(m1[ok], 1),
-    m0[ok],
-    m1[ok],
-    ntrees,
-    impute = FALSE
-  )
+  G <- (s0 + s1) / m[ok]
+  G0 <- s0 / pmax(m0[ok], 1)
+  G1 <- s1 / pmax(m1[ok], 1)
+  # with the classification level (crit$level, rpf_fit()) the forest is scored at its level here (classif_level()):
+  # the forest with these splits is returned with it
+  level <- NULL
+  if (isTRUE(crit$level)) {
+    level <- classif_level(crit, which(ok), G, G0, G1, m0[ok], m1[ok], ntrees)
+    shift <- rep(as.numeric(level), each = n_ok)
+    G <- G + shift
+    G0 <- G0 + shift
+    G1 <- G1 + shift
+  }
+  r <- crit_rows(crit, which(ok), G, G0, G1, m0[ok], m1[ok], ntrees, impute = FALSE)
   point <- c(mean(r$corr), mean(r$e), stats::sd(r$corr) / sqrt(n_ok), stats::sd(r$e) / sqrt(n_ok))
+  # (the level, for the adaptive fit's forest)
+  attr(point, "level") <- level
   if (rows) list(point = point, rows = r$corr) else point
 }
 

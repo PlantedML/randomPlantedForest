@@ -65,6 +65,11 @@ tune_splits_oob <- function(
     )
   }
   res <- st$result()
+  # with the classification level the forest gets its level at the chosen checkpoint, as the fit with that many splits
+  # gets it (rpf_impl())
+  if (!is.null(res$level)) {
+    classif_level_finish(fit, params, res$level)
+  }
   if (res$capped) {
     cli::cli_warn(
       c(
@@ -85,7 +90,8 @@ tune_splits_oob <- function(
 # the lowest error) to stop: once the patience or the plateau and the floor allow it, or at the last checkpoint. The
 # error is the corrected OOB mean squared error, or the mean corrected criterion. result() gives the chosen number of
 # splits, the OOB path's table of the checkpoints grown (as oob_path_table() makes it), where growing stopped, and
-# whether it stopped at the cap with the error still falling (neither the patience nor the plateau reached).
+# whether it stopped at the cap with the error still falling (neither the patience nor the plateau reached), and with
+# the classification level (a criterion with `level`) the level at the chosen checkpoint (otherwise NULL).
 #
 # The plateau (tolerance > 0, from checkpoint patience + 1 on): with b the lowest error up to c and a the lowest up to
 # c - patience (the first of ties, as oob_select()), the gain e[a] - e[b] over the last `patience` checkpoints is at
@@ -107,6 +113,8 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, tolerance = 0, fl
   st$no_oob <- FALSE
   st$points <- matrix(NA_real_, C, 4)
   st$rows <- vector("list", C)
+  # (the classification level: the forest's level at each checkpoint, classif_level())
+  st$levels <- vector("list", C)
   st$step <- function(c, path) {
     if (c != st$c + 1L) {
       cli::cli_abort("The adaptive fit's checkpoints came out of order.", .internal = TRUE)
@@ -129,6 +137,9 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, tolerance = 0, fl
     if (plateau) {
       st$rows[[c]] <- pt$rows
       pt <- pt$point
+    }
+    if (!is.null(attr(pt, "level"))) {
+      st$levels[[c]] <- attr(pt, "level")
     }
     st$points[c, ] <- pt
     e <- st$points[seq_len(c), 1]
@@ -161,7 +172,8 @@ oob_stopper <- function(y, ntrees, checkpoints, patience = 4L, tolerance = 0, fl
       splits = as.integer(checkpoints[st$sel]),
       path = oob_path_frame(checkpoints[g], st$points[g, , drop = FALSE], st$n_rows, crit),
       stopped_at = as.integer(checkpoints[st$c]),
-      capped = st$capped
+      capped = st$capped,
+      level = st$levels[[st$sel]]
     )
   }
   st
