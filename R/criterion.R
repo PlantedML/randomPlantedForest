@@ -137,6 +137,12 @@ crit_subset <- function(crit, idx) {
 # softmax) the classes after the first, the first's score then fixed at 0, and c is centred at the end (the softmax
 # ignores what all classes share; SAMME's scores are centred). 0 where a free class or the reference class has no
 # out-of-bag row (no finite level). Returns V values, with the attribute `iterations`.
+#
+# Its arithmetic is plain double arithmetic in a fixed order (level_colsums(), level_rowsums(), level_solve()), so the
+# level's bits depend on its inputs and on exp() and log() only: no BLAS or LAPACK, whose crossprod() and solve() round
+# differently by library (OpenBLAS's triangular solve multiplies by the pivot's reciprocal where the reference BLAS
+# divides by it), and no sum(), colSums() or rowSums(), which add in long double (80 bits on x86_64, 64 on arm64 macOS).
+# Then the stopping test and the step halving take the same branches on every machine too.
 classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
   G <- as.matrix(G)
   V <- crit$V
@@ -171,13 +177,34 @@ classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
       return(cbind(1 - p, p))
     }
     Gf <- full(Gc)
-    exp(Gf - crit_lse(Gf, FALSE))
+    # log-sum-exp of the rows (crit_lse()), the sum in a fixed order
+    mx <- apply(Gf, 1, max)
+    exp(Gf - (mx + log(level_rowsums(exp(Gf - mx)))))
   }
   resid <- function(Pf) {
-    pd <- rowSums(Pf * Df)
-    vp <- rowSums(Pf * Df^2) - pd^2
+    pd <- level_rowsums(Pf * Df)
+    vp <- level_rowsums(Pf * Df^2) - pd^2
     Delta <- coef * Pf * ((Df - pd)^2 - vp)
-    n_k[free] - colSums(Pf[, free, drop = FALSE] - Delta[, free, drop = FALSE])
+    n_k[free] - level_colsums(Pf[, free, drop = FALSE] - Delta[, free, drop = FALSE])
+  }
+  # the Jacobian sum_i diag(p_i) - p_i p_i' of the free classes' probabilities P: entry (u, v) sums p_u (1[u = v] - p_v)
+  jacobian <- function(P) {
+    nf <- ncol(P)
+    uv <- which(upper.tri(diag(nf), diag = TRUE), arr.ind = TRUE)
+    terms <- vapply(
+      seq_len(nrow(uv)),
+      function(j) {
+        u <- uv[j, 1]
+        v <- uv[j, 2]
+        P[, u] * (as.numeric(u == v) - P[, v])
+      },
+      numeric(nrow(P))
+    )
+    s <- level_colsums(matrix(terms, nrow(P)))
+    J <- matrix(0, nf, nf)
+    J[uv] <- s
+    J[uv[, 2:1, drop = FALSE]] <- s
+    J
   }
   cv <- numeric(V)
   Pf <- probs(cv)
@@ -185,9 +212,7 @@ classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
   it <- 0L
   while (max(abs(r)) > 1e-10 * n && it < 50L) {
     it <- it + 1L
-    P <- Pf[, free, drop = FALSE]
-    J <- diag(colSums(P), length(free)) - crossprod(P)
-    step <- tryCatch(solve(J, r), error = function(e) NULL)
+    step <- level_solve(jacobian(Pf[, free, drop = FALSE]), r)
     if (is.null(step) || !all(is.finite(step))) {
       break
     }
@@ -198,7 +223,7 @@ classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
       cv_new[free_col] <- cv[free_col] + t * step
       Pf_new <- probs(cv_new)
       r_new <- resid(Pf_new)
-      if (all(is.finite(r_new)) && sum(r_new^2) < sum(r^2)) {
+      if (all(is.finite(r_new)) && level_sum(r_new^2) < level_sum(r^2)) {
         improved <- TRUE
         break
       }
@@ -215,9 +240,69 @@ classif_level <- function(crit, idx, G, G0, G1, m0, m1, B) {
     return(zero)
   }
   if (crit$link == "softmax") {
-    cv <- cv - mean(cv)
+    cv <- cv - level_sum(cv) / length(cv)
   }
   structure(cv, iterations = it)
+}
+
+# The level's sums (classif_level()), in double arithmetic in a fixed order, the same on every machine. Column sums
+# of an n x k matrix: pairwise, the first half of the rows plus the second half (the odd row out kept last) until one
+# row is left.
+level_colsums <- function(M) {
+  M <- as.matrix(M)
+  if (nrow(M) == 0L) {
+    return(numeric(ncol(M)))
+  }
+  while (nrow(M) > 1L) {
+    h <- nrow(M) %/% 2L
+    top <- M[seq_len(h), , drop = FALSE] + M[h + seq_len(h), , drop = FALSE]
+    M <- if (nrow(M) %% 2L == 1L) rbind(top, M[nrow(M), , drop = FALSE]) else top
+  }
+  M[1, ]
+}
+
+# The sum of a vector (level_colsums())
+level_sum <- function(x) {
+  level_colsums(matrix(as.numeric(x), ncol = 1L))
+}
+
+# Row sums of an n x k matrix: the columns added from the first
+level_rowsums <- function(M) {
+  s <- M[, 1]
+  for (j in seq_len(ncol(M))[-1]) {
+    s <- s + M[, j]
+  }
+  s
+}
+
+# The solution of J x = r for the level's Newton step (J the k x k Jacobian, positive definite): Gaussian elimination
+# with the diagonal as pivots in their order, in double arithmetic. NULL if a pivot is not positive and finite (J
+# numerically singular), as solve() fails.
+level_solve <- function(J, r) {
+  k <- length(r)
+  A <- J
+  b <- as.numeric(r)
+  for (p in seq_len(k)) {
+    if (!is.finite(A[p, p]) || A[p, p] <= 0) {
+      return(NULL)
+    }
+    for (i in seq_len(k - p) + p) {
+      l <- A[i, p] / A[p, p]
+      for (j in seq_len(k - p) + p) {
+        A[i, j] <- A[i, j] - l * A[p, j]
+      }
+      b[i] <- b[i] - l * b[p]
+    }
+  }
+  x <- numeric(k)
+  for (i in rev(seq_len(k))) {
+    s <- b[i]
+    for (j in seq_len(k - i) + i) {
+      s <- s - A[i, j] * x[j]
+    }
+    x[i] <- s / A[i, i]
+  }
+  x
 }
 
 # Whether a fit with these params gets the classification level (classif_level()): rpf()'s option
