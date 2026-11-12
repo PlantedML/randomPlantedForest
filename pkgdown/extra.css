@@ -7,3 +7,120 @@
     hyphens: none;
   }
 }
+
+/* The articles as a book (see extra.js): section numbers, the chapter panel,
+   previous / next chapter. Colours come from Bootstrap's variables, so light
+   and dark mode both work. */
+.section-number {
+  margin-right: 0.5em;
+  color: var(--bs-secondary-color);
+  font-variant-numeric: tabular-nums;
+}
+.book-panel h2 { margin-top: 1.5rem; font-size: 1.25rem; }
+.book-panel ol { list-style: none; margin: 0; padding: 0; }
+.book-panel .book-part {
+  margin: 0.9rem 0 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+.book-panel .book-row { display: flex; align-items: flex-start; }
+.book-panel a {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.5em;
+  padding: 0.25rem 0.5rem;
+  margin-bottom: 2px;
+  border-radius: var(--bs-border-radius);
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.3;
+}
+.book-panel a:hover, .book-panel a:focus {
+  background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+.book-panel .book-num {
+  flex: 0 0 auto;
+  min-width: 1.2em;
+  color: var(--bs-secondary-color);
+  font-variant-numeric: tabular-nums;
+}
+.book-panel .book-chapter.current > .book-row > a {
+  font-weight: 600;
+  color: var(--bs-link-color);
+  background-color: rgba(var(--bs-primary-rgb), 0.08);
+}
+.book-panel code { font-size: 0.9em; padding: 0; background: none; color: inherit; }
+.book-panel .book-sections { margin-left: 0.75rem; font-size: 0.9em; }
+.book-panel .book-sections .book-sections { margin-left: 1rem; }
+.book-panel .book-sections .book-num { min-width: 2em; }
+.book-panel .book-sections .book-sections .book-num { min-width: 2.8em; }
+.book-panel .book-sections a.active {
+  background-color: rgba(var(--bs-body-color-rgb), 0.1);
+  font-weight: 600;
+}
+.book-panel .book-unfold {
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-top: 0.1rem;
+  border: 0;
+  border-radius: var(--bs-border-radius);
+  background: none;
+  color: var(--bs-secondary-color);
+}
+.book-panel .book-unfold::before {
+  content: "";
+  display: inline-block;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  padding: 2.5px;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.book-panel .book-unfold[aria-expanded="true"]::before { transform: rotate(45deg); }
+.book-panel .book-unfold:hover { background-color: rgba(var(--bs-primary-rgb), 0.1); }
+
+/* Wide screens: the panel stays in view in the sidebar. */
+@media (min-width: 768px) {
+  .book-panel-side {
+    position: sticky;
+    top: 56px;
+    max-height: calc(100vh - 56px - 1rem);
+    overflow-y: auto;
+  }
+  .book-panel-phone { display: none; }
+}
+/* Phones: a collapsed "Chapters" box below the title, no sidebar. */
+@media (max-width: 767.98px) {
+  .row > aside.book-aside { display: none; }
+  .book-panel-phone {
+    margin: 0 0 1.5rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: rgba(var(--bs-body-color-rgb), 0.04);
+  }
+  .book-panel-phone > summary { padding: 0.5rem 0.75rem; font-weight: 600; }
+  .book-panel-phone .book-panel { padding: 0 0.5rem 0.5rem; }
+  .book-panel-phone .book-panel h2 { display: none; }
+}
+
+.book-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 3rem 0 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+.book-pager a {
+  display: flex;
+  flex-direction: column;
+  max-width: 48%;
+  text-decoration: none;
+}
+.book-pager .book-pager-next { margin-left: auto; text-align: right; }
+.book-pager-label { font-size: 0.85em; color: var(--bs-secondary-color); }
+.book-pager-title { font-weight: 600; }

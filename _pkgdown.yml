@@ -15,7 +15,17 @@ navbar:
       text: News
       href: news/index.html
 
+# The articles are read as a book: chapter 1 is Get started, then the articles
+# below in this order, grouped into parts by `navbar`. The chapter panel, the
+# numbers and the previous / next links follow this list (pkgdown/extra.js).
+# A new chapter is one line in `contents`; a new part is one more entry with
+# `title`, `navbar`, `desc` and `contents`.
 articles:
+- title: Get started
+  navbar: ~
+  contents:
+  - randomPlantedForest
+
 - title: Understanding the model
   navbar: Understanding the model
   desc: What a fitted model is made of, and how the forest behind it is grown.

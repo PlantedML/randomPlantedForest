@@ -1,5 +1,8 @@
 ---
 title: "Getting Started with randomPlantedForest"
+description: >
+  A first model, its predictions and components, classification, and the
+  settings you may want.
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Getting Started with randomPlantedForest}
