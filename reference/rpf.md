@@ -543,6 +543,30 @@ log-loss is usually as low as that of `"exponential"` or lower, more so
 with three or more classes. `"exponential"` can need many more splits
 with many classes.
 
+### The level of the classification losses
+
+`"logit"` and `"exponential"` average their tree families on the score
+scale. Where the families disagree, the probability of their mean score
+is not the mean of their probabilities: for a rare class (probability
+below 1/2, where the probability is convex in the score) it is lower,
+the more so the more splits the families make. So the forest would
+predict a rare class too rarely. After the fit the forest's score
+therefore gets one constant per score column, its level, which is part
+of its intercept: the maximum-likelihood intercept of the log-loss given
+the forest's out-of-bag scores, so that the mean out-of-bag probability
+of every class is its frequency in the training rows (corrected, as the
+out-of-bag criterion is, for an out-of-bag mean averaging fewer families
+than the forest). With `deterministic = TRUE`, which has no out-of-bag
+rows, the forest's own predictions of the training rows are balanced
+instead. The out-of-bag choice of `n_splits` scores every number of
+splits at its own level, and the pruning starts from the forest with its
+level. `$level` holds it (one value per score column) and
+[`print()`](https://rdrr.io/r/base/print.html) shows it.
+`options(randomPlantedForest.level = FALSE)` fits without it. The
+setting is stored in the fit's `$params$level`, and refits (the
+pruning's cross-validation) follow it; a fit without the setting is
+refitted without a level.
+
 ### Factor predictors
 
 Factor predictors, and character predictors, which are converted to
@@ -923,9 +947,9 @@ predict(model, iris[c(1, 51, 101), ], type = "prob")
 #> # A tibble: 3 × 3
 #>   .pred_setosa .pred_versicolor .pred_virginica
 #>          <dbl>            <dbl>           <dbl>
-#> 1     0.992            0.00826         0.000191
-#> 2     0.00207          0.984           0.0140  
-#> 3     0.000134         0.000840        0.999   
+#> 1     0.989            0.0112          0.000280
+#> 2     0.00295          0.985           0.0119  
+#> 3     0.000219         0.000688        0.999   
 
 # The forest instead of the pruned model, with x and y, pairwise interactions
 # and a fixed number of splits
@@ -1003,8 +1027,8 @@ tuned$tune$search
 #> 1    1                  3            0.100             1       84        168
 #> 2    1                  1            0.025             1      100        168
 #>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1
-#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.064         TRUE
-#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.047        FALSE
+#> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.085         TRUE
+#> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.062        FALSE
 #>   chosen_step2 chosen_step3 final
 #> 1           NA           NA  TRUE
 #> 2           NA           NA FALSE

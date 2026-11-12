@@ -211,6 +211,26 @@
 
 ### New features
 
+- Classification forests with `loss = "logit"` or `"exponential"` get a
+  level: after the fit, one constant per score column, the
+  maximum-likelihood intercept of the log-loss given the forest’s
+  out-of-bag scores, so that every class’s mean out-of-bag probability
+  is its frequency in the training rows. It is stored in every tree
+  family’s null leaf, so it is part of the intercept of the forest, of
+  its purification and of its pruned model; `$level` holds it and
+  [`print()`](https://rdrr.io/r/base/print.html) shows it
+  ([`?rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md),
+  “The level of the classification losses”). The families are averaged
+  on the score scale, and where they disagree the probability of their
+  mean score is below the mean of their probabilities for a class rarer
+  than 1/2, so the forest predicted a rare class too rarely, the more so
+  the more splits it made. With the level the forest predicts each class
+  about as often as it occurs, at any number of splits. The out-of-bag
+  choice of `n_splits` scores every number of splits at its own level,
+  and the pruning starts from the forest with its level. This changes
+  every fit with these losses, binary and multiclass;
+  `options(randomPlantedForest.level = FALSE)` fits without the level.
+
 - [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   gains `keep_level_order`, to keep the level order of factor predictors
   instead of ordering their levels by the outcome. `TRUE` keeps it for
@@ -227,6 +247,7 @@
   factors that keep their order. The details of
   [`?rpf`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   describe how factor predictors are coded.
+
 - [`plot()`](https://rdrr.io/r/graphics/plot.default.html) draws the
   trees of one tree family to illustrate how a Random Planted Forest
   predicts. `type = "tree"` draws a split diagram in the style of Figure
@@ -237,6 +258,7 @@
   returns the leaves as a data frame. Requires `ggplot2`, and
   `patchwork` for `type = "boxes"`. The “Getting started” vignette uses
   it to show how a tree family is built and what purification does.
+
 - [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
   prunes the purified components of a forest (regression or
   classification; see the classification entry below). A component is
@@ -287,6 +309,7 @@
   [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md),
   [`rpf_unmarshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   and `bundle()`.
+
 - `rpf(oob_path = TRUE)` gives the out-of-bag error along the splits
   from one fit, in `$oob_path` (for classification the loss’s criterion,
   see below). With the same seed, the forest with `k` splits is exactly
@@ -301,6 +324,7 @@
   among the values of a cross-validation grid usually does as well as
   5-fold cross-validation over that grid. The fitted forest is the same
   as without `oob_path`, which is off by default.
+
 - `rpf(n_splits = NULL)` chooses the number of splits out of bag while
   the forest grows (regression and classification). The forest’s
   corrected out-of-bag error is followed at four checkpoints per
@@ -336,6 +360,7 @@
   often takes less time; where the families waiting for the stop do not
   fit in the pause budget, they grow on to the estimate of the stop on a
   new minimum, as a regrowth from their seed would cost more.
+
 - `rpf(prune = TRUE)` returns the pruned model instead of the forest
   (regression and classification): the forest is pruned by
   [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
@@ -350,6 +375,7 @@
   with `deterministic = TRUE`, and `purify` is not used with it. It is
   the new default (`prune = NULL`, see Breaking changes);
   `prune = FALSE` returns the forest as before.
+
 - [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   gains `min_leaf_rows`, the minimum number of rows on each side of
   every split, so in every leaf. Every split structure takes it, in
@@ -362,6 +388,7 @@
   them. Binary predictors are split whenever both sides keep enough
   rows. The default `min_leaf_rows = 1` fits the same models as before,
   bit for bit.
+
 - Classification with `split_structure = "leaf"` (the default) takes the
   fast draw of split candidates
   (`options(randomPlantedForest.exact_draw = FALSE)`) as regression
@@ -371,6 +398,7 @@
   regression fit, bit for bit, with either option. With
   `min_leaf_rows = 1` and the exact draw (the default before this
   version) classification fits are unchanged, bit for bit.
+
 - `rpf(tune = TRUE)` tunes out of bag in one call (regression and
   classification): the greediness of the split search
   (`n_try_split_points` and `share_candidates`, on the ladder of the new
@@ -391,6 +419,7 @@
   cross-validation over the same settings, or better, at a small
   fraction of its cost; the quick preset gets most of the gain. The
   default stays `tune = FALSE`.
+
 - Classification forests go through the same pipeline as regression
   forests: `rpf(oob_path = )`, `rpf(n_splits = NULL)`,
   [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
@@ -417,6 +446,7 @@
   `loss = "L2"`, every choice is that of the regression pipeline on the
   0/1 response, bit for bit. With the new defaults (see Breaking
   changes) a classification fit takes all these steps.
+
 - `options(randomPlantedForest.exact_draw = FALSE)` draws the split
   candidates of regression with `split_structure = "leaf"` from a tree
   of weights kept up to date between rounds, instead of one random
@@ -427,6 +457,7 @@
   candidates under `min_leaf_rows`, but with other random numbers, so
   the same seed gives another forest. `TRUE` (the default before this
   version) fits the same models as before, bit for bit.
+
 - [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   gains `interaction_constraints`, a list of feature sets that restricts
   which interactions the forest may form, as in xgboost: a tree on the
@@ -437,6 +468,7 @@
   `split_structure`, in regression and classification, and
   [`print()`](https://rdrr.io/r/base/print.html) shows them. The default
   `NULL` leaves fits unchanged.
+
 - [`print()`](https://rdrr.io/r/base/print.html) of a pruned model shows
   the final model: its intercept and its components, largest first, each
   with its importance, its share of the variance of the model’s
@@ -453,6 +485,27 @@
 
 ### Bug fixes
 
+- [`prune_components()`](https://plantedml.com/randomPlantedForest/reference/prune_components.md)
+  (and so
+  [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
+  with pruning) left the value of a tree family that made no split out
+  of the pruned model’s intercept, so that rule `"D"` at `tau = 0` was
+  not the forest where a family had found no split. The intercept now
+  includes it, as
+  [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)’s
+  does.
+
+- The out-of-bag path (`oob_path`, and the out-of-bag choice of
+  `n_splits`) counted a tree family that had made no split at the score
+  0 its rows start from, instead of at the fit of its rows that the
+  family predicts (the mean for regression and the L1 / L2 losses, the
+  log-odds of its sample for `"logit"` and `"exponential"`, so a
+  probability of 1/2 instead). It now counts such a family at its fit.
+  Families without a split are common only with a rare class and few
+  rows, where they made the out-of-bag log-loss of few splits too high,
+  so that the out-of-bag choice of `n_splits` could take far more splits
+  than it should.
+
 - `split_structure = "tree_then_leaf"` samples leaves in proportion to
   their available thresholds, as documented. After a split, the sampling
   weights of new leaves counted rows instead of distinct values, and the
@@ -463,6 +516,7 @@
   first `max_candidates`, as the other split structures do. Fitted
   models change for regression with
   `split_structure = "tree_then_leaf"`, random and deterministic.
+
 - `split_structure = "target_tree_then_leaf"` with
   `deterministic = TRUE` evaluates thresholds evenly spread over all
   (predictor, leaf, threshold) triples of a candidate. Previously it
@@ -470,12 +524,14 @@
   variance unexplained. Fitted models change for regression with
   `split_structure = "target_tree_then_leaf"` and `deterministic = TRUE`
   only.
+
 - `split_structure = "tree_then_all_leaves"` with `deterministic = TRUE`
   evaluates `n_try_split_points` thresholds evenly spread over each
   leaf, as `"tree_then_leaf"` does. Previously it tried the 1st to 9th
   smallest values of each leaf. Fitted models change for regression with
   `split_structure = "tree_then_all_leaves"` and `deterministic = TRUE`
   only.
+
 - Classification’s split structures were never completed to match
   regression’s. They now use the same candidate pool, the same sampling
   of candidates, leaves and thresholds, and the same aging; only the
@@ -489,13 +545,16 @@
   The fixes above for `"tree_then_leaf"` sampling and for
   `deterministic = TRUE` apply to classification too. Classification
   fits change for every `split_structure` and every loss.
+
 - The internal loss `"exponential_2"` no longer crashes.
+
 - Splits can separate the largest value of a predictor within a leaf.
   Previously every split structure except `"leaf"` for regression
   excluded that split, so binary predictors were never split on, and
   classification could not learn from them at all. Fitted models change
   for classification and for regression with `split_structure` other
   than `"leaf"`.
+
 - A tree family that makes no split predicts the mean outcome of its
   bootstrap sample, and for classification its rows’ fit (with
   `loss = "logit"` or `"exponential"` the class shares smoothed by the
@@ -506,6 +565,7 @@
   [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   puts that value into the intercept. Fitted models change only where a
   family made no split.
+
 - The same holds when `n_splits = NULL` (the default) chooses the number
   of splits out of bag: a family without a split up to the chosen number
   predicts its rows’ fit instead of 0, as a fit with that `n_splits`
@@ -514,13 +574,16 @@
   families with a split, fits are unchanged. The pruned model also no
   longer fails for classification when no component has any variance
   (for example, constant predictors).
+
 - Errors while fitting or purifying with `nthreads > 1` are reported as
   R errors. Previously an error in a worker thread terminated the R
   session.
+
 - `predict(type = "link")` works for classification forests with
   `loss = "L1"` or `"L2"`. It returns the raw predictions, as
   `type = "numeric"` does (the link is the identity). Previously it
   stopped with an error about the size of `pred`.
+
 - [`rpf()`](https://plantedml.com/randomPlantedForest/reference/rpf.md)
   stops with a clear error on inputs that gave wrong fits without a
   warning or failed later: an infinite outcome, `t_try = 0`, predictor
@@ -538,7 +601,9 @@
   [`predict()`](https://rdrr.io/r/stats/predict.html) failed.
   [`predict()`](https://rdrr.io/r/stats/predict.html) on zero rows
   returns zero rows instead of an error.
+
 - The C++ code compiles without warnings under `-Wall -pedantic`.
+
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   returns one intercept per target level for multiclass classification,
   named by `target_levels`
@@ -546,10 +611,12 @@
   Previously only the first level’s intercept was returned, so
   components plus intercept did not sum to the prediction for other
   levels.
+
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   accepts a matrix as `new_data`, like
   [`predict()`](https://rdrr.io/r/stats/predict.html) does. It no longer
   turns the caller’s data.frame into a data.table by reference.
+
 - [`predict()`](https://rdrr.io/r/stats/predict.html) after
   `purify(maxp_interaction = k)` with `k` below the fit’s
   `max_interaction` returns the forest’s prediction. Previously it
@@ -560,6 +627,7 @@
   prediction, and
   [`rpf_marshal()`](https://plantedml.com/randomPlantedForest/reference/rpf_marshal.md)
   keeps the purification’s cap.
+
 - `loss = "exponential"` is with more than two classes the multiclass
   exponential loss SAMME (Zhu, Zou, Rosset and Hastie, 2009): the split
   criterion, the leaf step and the weights all come from the one loss
@@ -580,27 +648,33 @@
   of logit, often with far fewer splits chosen and a faster fit. Fitted
   models change for `loss = "exponential"` with more than two classes
   only; binary fits are unchanged.
+
 - [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   with `mode = 2` no longer drops training rows that lie on a leaf’s
   lower bound. Purified components and the intercept now equal those of
   `mode = 1`.
+
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   returns a `remainder` whenever `m` leaves out components of the
   forest, also when `predictors` leaves out some of the fit’s predictors
   at the fit’s `max_interaction`. Previously the intercept and `m` then
   did not sum to the prediction.
+
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   takes the components’ predictors from the forest’s own columns, in
   their order. A formula with terms such as `log(x1)`, `I(x1^2)` or
   `. - x3` no longer makes it fail, and with factor predictors the
   components come in the order of the fit’s columns, which has the
   factors last.
+
 - [`predict_components()`](https://plantedml.com/randomPlantedForest/reference/predict_components.md)
   on a `new_data` with zero rows returns zero rows with the right
   columns, instead of failing with “Feature vector is empty.”.
+
 - [`print()`](https://rdrr.io/r/base/print.html) counts the forest’s own
   predictor columns: with formula terms such as `log(x1)` or `. - x3` it
   showed the number of raw columns the formula reads.
+
 - [`purify()`](https://plantedml.com/randomPlantedForest/reference/purify.md)
   on a forest purified with `maxp_interaction = k` purifies it again
   when asked for more orders (all orders by default). Previously it

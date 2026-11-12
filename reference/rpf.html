@@ -552,6 +552,32 @@ classes.</p>
 </div>
 
 <div class="section">
+<h3 id="the-level-of-the-classification-losses">The level of the classification losses<a class="anchor" aria-label="anchor" href="#the-level-of-the-classification-losses"></a></h3>
+
+
+<p><code>"logit"</code> and <code>"exponential"</code> average their tree families on the score
+scale. Where the families disagree, the probability of their mean score is
+not the mean of their probabilities: for a rare class (probability below
+1/2, where the probability is convex in the score) it is lower, the more so
+the more splits the families make. So the forest would predict a rare class
+too rarely. After the fit the forest's score therefore gets one constant per
+score column, its level, which is part of its intercept: the
+maximum-likelihood intercept of the log-loss given the forest's out-of-bag
+scores, so that the mean out-of-bag probability of every class is its
+frequency in the training rows (corrected, as the out-of-bag criterion is,
+for an out-of-bag mean averaging fewer families than the forest). With
+<code>deterministic = TRUE</code>, which has no out-of-bag rows, the forest's own
+predictions of the training rows are balanced instead. The out-of-bag choice
+of <code>n_splits</code> scores every number of splits at its own level, and the
+pruning starts from the forest with its level. <code>$level</code> holds it (one value
+per score column) and <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows it.
+<code>options(randomPlantedForest.level = FALSE)</code> fits without it. The setting
+is stored in the fit's <code>$params$level</code>, and refits (the pruning's
+cross-validation) follow it; a fit without the setting is refitted without
+a level.</p>
+</div>
+
+<div class="section">
 <h3 id="factor-predictors">Factor predictors<a class="anchor" aria-label="anchor" href="#factor-predictors"></a></h3>
 
 
@@ -890,9 +916,9 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 3 × 3</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .pred_setosa .pred_versicolor .pred_virginica</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>            <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     0.992            0.008<span style="text-decoration: underline;">26</span>         0.000<span style="text-decoration: underline;">191</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>     0.002<span style="text-decoration: underline;">07</span>          0.984           0.014<span style="text-decoration: underline;">0</span>  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     0.000<span style="text-decoration: underline;">134</span>         0.000<span style="text-decoration: underline;">840</span>        0.999   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span>     0.989            0.011<span style="text-decoration: underline;">2</span>          0.000<span style="text-decoration: underline;">280</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span>     0.002<span style="text-decoration: underline;">95</span>          0.985           0.011<span style="text-decoration: underline;">9</span>  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span>     0.000<span style="text-decoration: underline;">219</span>         0.000<span style="text-decoration: underline;">688</span>        0.999   </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The forest instead of the pruned model, with x and y, pairwise interactions</span></span></span>
 <span class="r-in"><span><span class="co"># and a fixed number of splits</span></span></span>
@@ -970,8 +996,8 @@ attributes in decision trees. Data Mining and Knowledge Discovery 3:197–217.
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    1                  3            0.100             1       84        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2    1                  1            0.025             1      100        168</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   capped oob_rmse_forest rule tau n_kept  oob_rmse seconds chosen_step1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.064         TRUE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.047        FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  FALSE       0.4025576    R 0.1      2 0.3393394   0.085         TRUE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  FALSE       0.4066480    R 0.1      2 0.3657293   0.062        FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   chosen_step2 chosen_step3 final</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           NA           NA  TRUE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           NA           NA FALSE</span>

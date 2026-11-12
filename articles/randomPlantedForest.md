@@ -206,9 +206,9 @@ predict(by_species, penguins[c(1, 200, 300), ])
 #> # A tibble: 3 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1     1.000          0.0000606    0.0000942
-#> 2     0.000232       0.00105      0.999    
-#> 3     0.0150         0.985        0.000234
+#> 1     1.000          0.0000794    0.0000782
+#> 2     0.000279       0.00165      0.998    
+#> 3     0.0115         0.988        0.000149
 predict(by_species, penguins[c(1, 200, 300), ], type = "class")
 #> # A tibble: 3 × 1
 #>   .pred_class

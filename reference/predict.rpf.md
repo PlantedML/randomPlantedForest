@@ -122,9 +122,9 @@ predict(rpfit, iris[c(1, 51, 101), ])
 #> # A tibble: 3 × 3
 #>   .pred_setosa .pred_versicolor .pred_virginica
 #>          <dbl>            <dbl>           <dbl>
-#> 1      0.996            0.00275        0.000944
-#> 2      0.0125           0.965          0.0226  
-#> 3      0.00316          0.00630        0.991   
+#> 1     0.990             0.00654         0.00314
+#> 2     0.00521           0.963           0.0315 
+#> 3     0.000948          0.00452         0.995  
 predict(rpfit, iris[c(1, 51, 101), ], type = "class")
 #> # A tibble: 3 × 1
 #>   .pred_class
@@ -136,7 +136,7 @@ predict(rpfit, iris[c(1, 51, 101), ], type = "link")
 #> # A tibble: 3 × 3
 #>   .pred_setosa .pred_versicolor .pred_virginica
 #>          <dbl>            <dbl>           <dbl>
-#> 1         4.28            -1.61           -2.68
-#> 2        -1.65             2.70           -1.05
-#> 3        -2.15            -1.46            3.60
+#> 1         3.59            -1.43          -2.16 
+#> 2        -2.34             2.88          -0.541
+#> 3        -2.84            -1.28           4.12 
 ```

@@ -31,7 +31,7 @@ by_sex <- rpf(sex ~ ., data = penguins, nthreads = 2)
 by_sex
 #> ── Random Planted Forest model ─────────────────────────────────────────────────
 #> Classification (logit loss), 2 classes: female, male. Scores = intercept + the sum of 4 components.
-#> Intercept: 0.0588925
+#> Intercept: 0.0746385
 #> 
 #> Components (largest first), importance = share of the variance of the prediction on the training rows:
 #>  component      importance
@@ -57,12 +57,12 @@ predict(by_sex, head(penguins))
 #> # A tibble: 6 × 2
 #>   .pred_female .pred_male
 #>          <dbl>      <dbl>
-#> 1        0.154      0.846
-#> 2        0.555      0.445
-#> 3        0.771      0.229
-#> 4        0.634      0.366
-#> 5        0.122      0.878
-#> 6        0.832      0.168
+#> 1        0.152      0.848
+#> 2        0.551      0.449
+#> 3        0.768      0.232
+#> 4        0.630      0.370
+#> 5        0.121      0.879
+#> 6        0.830      0.170
 predict(by_sex, head(penguins), type = "class")
 #> # A tibble: 6 × 1
 #>   .pred_class
@@ -77,12 +77,12 @@ predict(by_sex, head(penguins), type = "link")
 #> # A tibble: 6 × 1
 #>    .pred
 #>    <dbl>
-#> 1  1.71 
-#> 2 -0.221
-#> 3 -1.21 
-#> 4 -0.548
-#> 5  1.97 
-#> 6 -1.60
+#> 1  1.72 
+#> 2 -0.205
+#> 3 -1.20 
+#> 4 -0.532
+#> 5  1.99 
+#> 6 -1.58
 ```
 
 ## The components, on the scale of the scores
@@ -130,31 +130,26 @@ set.seed(1)
 by_species <- rpf(species ~ ., data = penguins, nthreads = 2)
 by_species
 #> ── Random Planted Forest model ─────────────────────────────────────────────────
-#> Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 7 components.
-#> Intercept per class: Adelie  1.207020, Chinstrap -0.836373, Gentoo -0.370647
+#> Classification (logit loss), 3 classes: Adelie, Chinstrap, Gentoo. Scores = intercept + the sum of 2 components.
+#> Intercept per class: Adelie   9.01628, Chinstrap -12.59247, Gentoo   3.57619
 #> 
 #> Components (largest first), importance = share of the variance of the scores (centred across the classes) on the training rows:
-#>  component             importance
-#>  bill_length_mm        21%       
-#>  island                17%       
-#>  bill_depth_mm         6%        
-#>  flipper_length_mm     5.6%      
-#>  body_mass_g           2%        
-#>  sex                   1.2%      
-#>  bill_length_mm:island 0.33%     
+#>  component      importance
+#>  island         95%       
+#>  bill_length_mm 4.1%      
 #> 
 #> How it was chosen:
 #>   The forest: 200 tree families of 30 splits (chosen out of bag; growing stopped at 42).
-#>   From the forest's 60 nonzero components (purified): those with a share of at least 0.3% of the forest's Var(prediction), as they are (rule D).
+#>   From the forest's 60 nonzero components (purified): those with a share of at least 10% of the forest's Var(prediction), each with one coefficient, fitted out of bag (rule R).
 #>   Rule and threshold chosen by out-of-bag error (1-SE rule; 5 folds, seed 682372961) among 16 candidates.
-#>   Left out: 53 components, shares together 0.24% (largest bill_depth_mm:bill_length_mm, 0.052%).
+#>   Left out: 58 components, shares together 14% (largest bill_depth_mm, 5.6%).
 predict(by_species, penguins[c(1, 200, 300), ])
 #> # A tibble: 3 × 3
 #>   .pred_Adelie .pred_Chinstrap .pred_Gentoo
 #>          <dbl>           <dbl>        <dbl>
-#> 1     1.000          0.0000859     0.000100
-#> 2     0.000132       0.000493      0.999   
-#> 3     0.0181         0.982         0.000134
+#> 1     1.000          1.65 e-20     2.36e- 4
+#> 2     0.00612        5.04 e-17     9.94e- 1
+#> 3     0.000245       1.000e+ 0     1.88e-10
 ```
 
 ``` r
@@ -164,11 +159,11 @@ comp3$target_levels
 #> [1] "Adelie"    "Chinstrap" "Gentoo"
 names(comp3$m)[1:6]
 #> [1] "bill_length_mm__class:Adelie"    "bill_length_mm__class:Chinstrap"
-#> [3] "bill_length_mm__class:Gentoo"    "bill_depth_mm__class:Adelie"    
-#> [5] "bill_depth_mm__class:Chinstrap"  "bill_depth_mm__class:Gentoo"
+#> [3] "bill_length_mm__class:Gentoo"    "island__class:Adelie"           
+#> [5] "island__class:Chinstrap"         "island__class:Gentoo"
 comp3$intercept
 #>     Adelie  Chinstrap     Gentoo 
-#>  1.2070200 -0.8363733 -0.3706467
+#>   9.016282 -12.592471   3.576189
 ```
 
 The columns are named `<component>__class:<level>`, one for each of
@@ -240,9 +235,12 @@ Two things follow:
 
 The table shows the score of a point in a pure region as one tree family
 grows: the two classes are separated by `x1 > 0.5`, and `x2` is noise.
+The fits leave out the forest’s level (below), so that the table shows
+the steps alone.
 
 ``` r
 
+old <- options(randomPlantedForest.level = FALSE)
 set.seed(1)
 n <- 200
 sep <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -261,6 +259,7 @@ pure <- data.frame(
   t(sapply(rounds, function(k) score_after("logit", k)))
 )
 names(pure) <- c("rounds", "exponential score", "exponential leaves", "logit score", "logit leaves")
+options(old)
 pure
 #>   rounds exponential score exponential leaves logit score logit leaves
 #> 1      5          1.036092                  2    1.036092            2
@@ -283,3 +282,19 @@ leaves then get the exact minimisers, by Newton’s method on their rows;
 `exact_step = FALSE` keeps the one Newton step, which is a little
 faster. The search is the same either way, and `exact_step` does not
 change `"exponential"` fits.
+
+### The level
+
+The tree families are averaged on the score scale. Where they disagree,
+the probability of their mean score is not the mean of their
+probabilities: for a class rarer than 1/2 it is lower, and the more
+splits the families make, the more they disagree. So after the fit, a
+forest with `"logit"` or `"exponential"` gets one constant per score
+column, its level: the intercept that makes every class’s mean
+out-of-bag probability equal to its frequency in the training rows (the
+maximum-likelihood intercept given the forest’s out-of-bag scores). The
+level is part of the forest’s intercept, so the components and the
+purified forest include it, and the pruning starts from the forest with
+it. `$level` holds it, [`print()`](https://rdrr.io/r/base/print.html)
+shows it, and `options(randomPlantedForest.level = FALSE)` fits without
+it.
