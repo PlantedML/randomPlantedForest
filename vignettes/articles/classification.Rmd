@@ -127,7 +127,6 @@ The table shows the score of a point in a pure region as one tree family grows: 
 The fits leave out the forest's level (below), so that the table shows the steps alone.
 
 ```{r pure-region}
-old <- options(randomPlantedForest.level = FALSE)
 set.seed(1)
 n <- 200
 sep <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -136,7 +135,7 @@ sep$y <- factor(ifelse(sep$x1 > 0.5, "b", "a"))
 rounds <- c(5, 10, 30, 100, 300)
 score_after <- function(loss, k) {
   set.seed(3)
-  f <- rpf(y ~ ., data = sep, loss = loss, n_families = 1, n_splits = k, prune = FALSE)
+  f <- rpf(y ~ ., data = sep, loss = loss, n_families = 1, n_splits = k, prune = FALSE, level = FALSE)
   c(score = predict(f, data.frame(x1 = 0.9, x2 = 0.5), type = "link")$.pred,
     leaves = nrow(rpf_boxes(f)) - 1)
 }
@@ -146,7 +145,6 @@ pure <- data.frame(
   t(sapply(rounds, function(k) score_after("logit", k)))
 )
 names(pure) <- c("rounds", "exponential score", "exponential leaves", "logit score", "logit leaves")
-options(old)
 pure
 ```
 
@@ -166,4 +164,6 @@ The tree families are averaged on the score scale.
 Where they disagree, the probability of their mean score is not the mean of their probabilities: for a class rarer than 1/2 it is lower, and the more splits the families make, the more they disagree.
 So after the fit, a forest with `"logit"` or `"exponential"` gets one constant per score column, its level: the intercept that makes every class's mean out-of-bag probability equal to its frequency in the training rows (the maximum-likelihood intercept given the forest's out-of-bag scores).
 The level is part of the forest's intercept, so the components and the purified forest include it, and the pruning starts from the forest with it.
-`$level` holds it, `print()` shows it, and `options(randomPlantedForest.level = FALSE)` fits without it.
+`$level` holds it, `print()` shows it, and `rpf(..., level = FALSE)` fits without it.
+The setting is stored with the fit, so the refits of the pruning's cross-validation and of `tune` follow it.
+The losses `"L1"` and `"L2"` have no level and ignore the argument.
