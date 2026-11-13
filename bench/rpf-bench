@@ -24,4 +24,12 @@ if (!file.exists("bench/cli.R")) {
   cat("Run from the repository root (bench/cli.R must be visible).\n", file = stderr())
   quit(save = "no", status = 1L)
 }
-Rapp::run("bench/cli.R", commandArgs(TRUE))
+# Expected errors print one message. RPF_BENCH_DEBUG=1 keeps R's own handling with backtraces.
+if (nzchar(Sys.getenv("RPF_BENCH_DEBUG"))) {
+  Rapp::run("bench/cli.R", commandArgs(TRUE))
+} else {
+  tryCatch(Rapp::run("bench/cli.R", commandArgs(TRUE)), error = function(e) {
+    message("Error: ", conditionMessage(e))
+    quit(save = "no", status = 1L)
+  })
+}

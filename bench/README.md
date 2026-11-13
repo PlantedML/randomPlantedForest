@@ -22,10 +22,12 @@ A ref is a branch, tag or commit, or `WORKTREE` for the working tree with uncomm
 A ref that is not a local branch is looked up on `origin`, so `dev` works without a local checkout.
 Refs with identical package files are measured once.
 Without `--refs` the run compares `WORKTREE` with `dev`.
-`--baseline` (default `dev`) sets the ref the others are compared against.
+`--baseline` (default `dev`) sets the ref the others are compared against and must be one of the refs.
 
 The quick tier runs 16 cells on simulated data and takes a few minutes per ref.
 Narrow it down with `--ops`, `--tasks`, `--sizes` and `--max-cells`, see `rig run bench/rpf-bench run --help`.
+An unknown value in any of them stops the run before anything is installed.
+`--dry-run` prints the selected cells and refs and exits.
 
 Each ref is installed once into `bench/lib/<id>` (compiling rpf takes one to two minutes) and reused afterwards.
 A run refuses to start when package files have uncommitted changes, unless `WORKTREE` is one of the refs.
@@ -33,11 +35,12 @@ A run refuses to start when package files have uncommitted changes, unless `WORK
 ## The full tier on the BIPS cluster
 
 ```sh
-rig run bench/rpf-bench -t full -c slurm run
+rig run bench/rpf-bench run -t full -b slurm
 # once the jobs are done:
 rig run bench/rpf-bench collect
-# for jobs that ran out of memory or time:
+# for jobs that ran out of memory or time, list them, then submit:
 rig run bench/rpf-bench resubmit --mem-factor 2
+rig run bench/rpf-bench resubmit --mem-factor 2 --yes
 ```
 
 Each cell is one Slurm job, which measures all refs one after another so that comparisons never cross nodes.

@@ -70,7 +70,8 @@ bench_metric <- function() {
     warning(
       "Memory is not measured: accurate measurement needs cgroup v2 on Linux ",
       "(a Slurm job, or a local run started through systemd-run).",
-      call. = FALSE
+      call. = FALSE,
+      immediate. = TRUE
     )
   }
   m

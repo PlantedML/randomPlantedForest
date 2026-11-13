@@ -356,6 +356,29 @@ test_that("every cell names a known op", {
   expect_equal(unique(bench_select_cells(quick, sizes = 1000)$n), 1000)
 })
 
+test_that("choices are matched exactly, never partially", {
+  expect_error(bench_cells("ful"), "Unknown tier 'ful'. Use one of quick, full.", fixed = TRUE)
+  expect_error(bench_make_registry(tempfile("reg"), "slrum"), "Unknown backend 'slrum'", fixed = TRUE)
+})
+
+test_that("a filter value that selects nothing is an error naming the allowed ones", {
+  quick <- bench_cells("quick")
+  expect_error(
+    bench_select_cells(quick, ops = c("predict", "fit_fixd")),
+    "Unknown op 'fit_fixd'. Use one or more of",
+    fixed = TRUE
+  )
+  expect_error(bench_select_cells(quick, tasks = "regression"), "Unknown task 'regression'", fixed = TRUE)
+  expect_error(bench_select_cells(quick, sizes = "5k"), "Unknown size '5k'", fixed = TRUE)
+  expect_error(bench_select_cells(quick, sizes = "123"), "Unknown size '123'", fixed = TRUE)
+  expect_error(bench_select_cells(quick, max_cells = 0L), "--max-cells", fixed = TRUE)
+})
+
+test_that("the baseline must be one of the refs and survives deduplication", {
+  expect_error(bench_order_refs(c("a", "b"), "dev"), "Baseline 'dev' is not among the refs (a, b)", fixed = TRUE)
+  expect_equal(bench_order_refs(c("WORKTREE", "dev"), "dev"), c("dev", "WORKTREE"))
+})
+
 ## ---- one cell across refs ---------------------------------------------------------------
 
 two_refs <- function() {
@@ -497,9 +520,12 @@ test_that("the report says when memory was not measured", {
   expect_match(rep, "Memory was not measured (no cgroup v2 or RSS).", all = FALSE, fixed = TRUE)
 })
 
-test_that("a baseline that was not measured falls back to the first ref", {
-  d <- bench_deltas(fake_rows(refs = c("a", "b")), baseline = "dev")
-  expect_equal(d$baseline, "a")
+test_that("a baseline that was not measured is an error, not replaced", {
+  expect_error(
+    bench_deltas(fake_rows(refs = c("a", "b")), baseline = "dev"),
+    "Baseline 'dev' was not measured. Use one of a, b.",
+    fixed = TRUE
+  )
 })
 
 test_that("results and history are written as plain tables", {
@@ -649,7 +675,7 @@ test_that("I3: collect reports jobs without results and keeps them out of the hi
   expect_equal(nrow(missing), 1L)
   expect_equal(missing$op, "missing_op")
   dir <- tempfile("results")
-  paths <- bench_write_results(rows, dir)
+  paths <- bench_write_results(rows, dir, baseline = "HEAD")
   expect_match(paste(readLines(paths[2]), collapse = "\n"), "Missing", fixed = TRUE)
   hist <- tempfile(fileext = ".csv")
   expect_message(bench_history_append(rows, anchors = refs$a$spec, path = hist), "incomplete")
@@ -666,7 +692,10 @@ test_that("I5: resubmit doubles each job's own memory", {
   before <- vapply(batchtools::getJobResources(1:2, reg = reg)$resources, `[[`, numeric(1), "memory")
   expect_false(before[1] == before[2])
   # expired and failed ids come unsorted in practice
-  suppressMessages(bench_resubmit(reg, ids = c(2L, 1L), mem_factor = 2))
+  expect_message(bench_resubmit(reg, ids = c(2L, 1L), mem_factor = 2), "--yes")
+  after <- vapply(batchtools::getJobResources(1:2, reg = reg)$resources, `[[`, numeric(1), "memory")
+  expect_equal(after, before)
+  suppressMessages(bench_resubmit(reg, ids = c(2L, 1L), mem_factor = 2, yes = TRUE))
   after <- vapply(batchtools::getJobResources(1:2, reg = reg)$resources, `[[`, numeric(1), "memory")
   expect_equal(after, 2 * before)
 })

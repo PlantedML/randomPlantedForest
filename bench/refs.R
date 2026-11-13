@@ -63,6 +63,21 @@ bench_ref_id <- function(spec, repo = ".") {
   substr(rlang::hash(sort(.bench_ref_blobs(spec, repo))), 1, 12)
 }
 
+# Baseline first, so that deduplication keeps its name.
+bench_order_refs <- function(specs, baseline) {
+  if (!baseline %in% specs) {
+    stop(
+      sprintf(
+        "Baseline '%s' is not among the refs (%s). Add it to --refs or choose one of them with --baseline.",
+        baseline,
+        paste(specs, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  c(baseline, setdiff(specs, baseline))
+}
+
 bench_resolve_refs <- function(specs, repo = ".") {
   ids <- vapply(specs, bench_ref_id, character(1), repo = repo)
   dup <- duplicated(ids)

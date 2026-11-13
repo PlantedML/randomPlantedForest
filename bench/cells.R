@@ -93,8 +93,27 @@ BENCH_CELL_COLS <- c(
   )
 }
 
-bench_cells <- function(tier = c("quick", "full")) {
-  tier <- match.arg(tier)
+# Exact match against the allowed values, so a typo stops the run instead of
+# being completed (match.arg) or ignored.
+bench_check_choice <- function(x, allowed, what, several = FALSE) {
+  bad <- setdiff(x, allowed)
+  if (length(bad)) {
+    stop(
+      sprintf(
+        "Unknown %s '%s'. Use %s %s.",
+        what,
+        bad[1],
+        if (several) "one or more of" else "one of",
+        paste(allowed, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(x)
+}
+
+bench_cells <- function(tier = "quick") {
+  bench_check_choice(tier, c("quick", "full"), "tier")
   cells <- switch(tier, quick = .bench_cells_quick(), full = .bench_cells_full())
   # purify() works in place, see bench_ops()
   cells$iters[cells$op == "purify"] <- 1L
@@ -107,13 +126,19 @@ bench_cells <- function(tier = c("quick", "full")) {
 bench_select_cells <- function(cells, ops = NA, tasks = NA, sizes = NA, max_cells = NA) {
   keep <- rep(TRUE, nrow(cells))
   if (!all(is.na(ops))) {
+    bench_check_choice(ops, unique(cells$op), "op", several = TRUE)
     keep <- keep & cells$op %in% ops
   }
   if (!all(is.na(tasks))) {
+    bench_check_choice(tasks, unique(cells$task), "task", several = TRUE)
     keep <- keep & cells$task %in% tasks
   }
   if (!all(is.na(sizes))) {
+    bench_check_choice(as.character(sizes), as.character(sort(unique(cells$n))), "size", several = TRUE)
     keep <- keep & cells$n %in% as.integer(sizes)
+  }
+  if (!is.na(max_cells) && max_cells < 1L) {
+    stop("--max-cells must be at least 1, not ", max_cells, ".", call. = FALSE)
   }
   cells <- cells[keep, , drop = FALSE]
   if (!is.na(max_cells)) {

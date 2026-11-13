@@ -3,11 +3,11 @@
 BENCH_SOURCES <- c("refs.R", "measure.R", "ops.R", "cells.R", "run-cell.R", "collate.R")
 BENCH_WALLTIME <- 28800L # seconds
 
-bench_make_registry <- function(dir, cluster = c("local", "slurm")) {
-  cluster <- match.arg(cluster)
+bench_make_registry <- function(dir, backend = "local") {
+  bench_check_choice(backend, c("local", "slurm"), "backend")
   dir.create(dirname(dir), recursive = TRUE, showWarnings = FALSE)
   srcs <- file.path(BENCH_DIR, BENCH_SOURCES)
-  if (cluster == "slurm") {
+  if (backend == "slurm") {
     # The site config (/etc/xdg/batchtools/config.R) supplies the template.
     reg <- batchtools::makeRegistry(file.dir = dir, source = srcs, packages = character(), make.default = FALSE)
     if (is.null(reg$cluster.functions) || identical(reg$cluster.functions$name, "Interactive")) {
@@ -36,8 +36,8 @@ bench_make_registry <- function(dir, cluster = c("local", "slurm")) {
 
 # A Slurm job decides on its node: the submit host has neither a job cgroup nor
 # a scope, so its choice would be "none" for every job.
-bench_job_metric <- function(cluster) {
-  if (cluster == "local") bench_metric() else NULL
+bench_job_metric <- function(backend) {
+  if (backend == "local") bench_metric() else NULL
 }
 
 # Every dataset once, before any job starts, so concurrent jobs never read a
@@ -127,7 +127,8 @@ bench_collect <- function(reg) {
 }
 
 # Expired jobs (walltime or memory kill) and failed ones, with more memory.
-bench_resubmit <- function(reg, mem_factor = 2, ids = NULL) {
+# Without yes, only lists what it would submit.
+bench_resubmit <- function(reg, mem_factor = 2, ids = NULL, yes = FALSE) {
   ids <- ids %||% union(batchtools::findExpired(reg = reg)$job.id, batchtools::findErrors(reg = reg)$job.id)
   if (!length(ids)) {
     message("Nothing to resubmit.")
@@ -135,6 +136,15 @@ bench_resubmit <- function(reg, mem_factor = 2, ids = NULL) {
   }
   # sorted by job id, whatever the order of ids
   res <- batchtools::getJobResources(ids = ids, reg = reg)
+  if (!yes) {
+    mem <- vapply(res$resources, `[[`, numeric(1), "memory")
+    message(paste(
+      sprintf("Job %d: memory %d -> %d MB", res$job.id, as.integer(mem), as.integer(mem * mem_factor)),
+      collapse = "\n"
+    ))
+    message("Nothing submitted. Run again with --yes to resubmit these ", length(ids), " job(s).")
+    return(invisible(integer()))
+  }
   for (k in seq_len(nrow(res))) {
     r <- res$resources[[k]]
     r$memory <- as.integer(r$memory * mem_factor)
@@ -147,11 +157,20 @@ bench_resubmit <- function(reg, mem_factor = 2, ids = NULL) {
 # The newest registry under bench/registry unless one is named.
 bench_registry_dir <- function(registry = NA) {
   if (!is.na(registry)) {
+    if (!dir.exists(registry)) {
+      stop(
+        "Registry ",
+        registry,
+        " does not exist. Leave out --registry to use the newest under bench/registry.",
+        call. = FALSE
+      )
+    }
     return(registry)
   }
   dirs <- sort(list.dirs("bench/registry", recursive = FALSE), decreasing = TRUE)
   if (!length(dirs)) {
-    stop("No registry under bench/registry.", call. = FALSE)
+    stop("No registry under bench/registry. Start one with `run`.", call. = FALSE)
   }
+  message("Registry: ", dirs[1])
   dirs[1]
 }

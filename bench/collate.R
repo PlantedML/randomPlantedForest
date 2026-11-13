@@ -17,7 +17,14 @@ BENCH_MEM_THRESHOLD <- 3 # percent
 }
 
 .bench_baseline <- function(rows, baseline) {
-  if (baseline %in% rows$ref) baseline else rows$ref[1]
+  refs <- unique(rows$ref)
+  if (!baseline %in% refs) {
+    stop(
+      sprintf("Baseline '%s' was not measured. Use one of %s.", baseline, paste(refs, collapse = ", ")),
+      call. = FALSE
+    )
+  }
+  baseline
 }
 
 bench_deltas <- function(rows, baseline = "dev") {
