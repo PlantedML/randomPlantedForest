@@ -391,7 +391,6 @@ test_that("the log-loss Hessian is the numerical one; logit's centred shares do 
 
 test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-class logit)", {
   # the curve described above is the one without the classification level (a levelled forest has its own)
-  rlang::local_options(randomPlantedForest.level = FALSE)
   skip_on_cran()
   # A family pauses at most one doubling past the first family's estimate and grows on when the stop comes later, so
   # on a long, flat out-of-bag curve each grows to about the stop (before that fix, the estimate from part of the
@@ -412,7 +411,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     n_families = 10,
     n_try_split_points = 1,
     share_candidates = 0.025,
-    prune = FALSE
+    prune = FALSE,
+    level = FALSE
   )
   st <- f$fit$adaptive_stats()
   stop_f <- f$splits_oob$stopped_at
@@ -429,7 +429,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     n_try_split_points = 1,
     share_candidates = 0.025,
     n_splits = f$params$splits,
-    prune = FALSE
+    prune = FALSE,
+    level = FALSE
   )
   expect_identical(f$fit$get_model(), g$fit$get_model())
   # the plateau stop (the default tolerance): the families grow only about as far as its stop
@@ -443,7 +444,8 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
     n_families = 10,
     n_try_split_points = 1,
     share_candidates = 0.025,
-    prune = FALSE
+    prune = FALSE,
+    level = FALSE
   )
   expect_lte(p$splits_oob$n_splits, p$splits_oob$stopped_at)
   expect_lte(p$fit$adaptive_stats()$splits_grown, 1.2 * 10 * p$splits_oob$stopped_at)
@@ -457,7 +459,6 @@ test_that("n_splits = NULL does not over-grow on a flat out-of-bag curve (three-
 
 test_that("the OOB path of a classification forest: prefix property, n_splits = NULL = the fixed fit", {
   # the path's sums are the families' predictions before the level, which a fit adds after its last split
-  rlang::local_options(randomPlantedForest.level = FALSE)
   skip_on_cran()
   d <- cp_data(300)
   tot <- function(f) {
@@ -483,7 +484,8 @@ test_that("the OOB path of a classification forest: prefix property, n_splits = 
           n_families = 6,
           n_splits = 60,
           oob_path = TRUE,
-          split_structure = s
+          split_structure = s,
+          level = FALSE
         )
         if (loss != "L2" || nlevels(y) > 2) {
           expect_identical(attr(big$oob_path, "criterion"), if (loss == "L2") "brier" else "logloss")
@@ -501,7 +503,8 @@ test_that("the OOB path of a classification forest: prefix property, n_splits = 
           max_interaction = 3,
           n_families = 6,
           n_splits = p$checkpoints[c3],
-          split_structure = s
+          split_structure = s,
+          level = FALSE
         )
         cols <- (c3 - 1) * V + seq_len(V)
         expect_equal(
@@ -511,16 +514,42 @@ test_that("the OOB path of a classification forest: prefix property, n_splits = 
         )
         # the forest is the fit without the path
         set.seed(5)
-        plain <- rpf_050(d$x, y, loss = loss, max_interaction = 3, n_families = 6, n_splits = 60, split_structure = s)
+        plain <- rpf_050(
+          d$x,
+          y,
+          loss = loss,
+          max_interaction = 3,
+          n_families = 6,
+          n_splits = 60,
+          split_structure = s,
+          level = FALSE
+        )
         expect_identical(big$fit$get_model(), plain$fit$get_model())
       }
       set.seed(9)
-      tu <- rpf_050(d$x, y, loss = loss, max_interaction = 3, n_families = 8, n_splits = NULL, nthreads = 2)
+      tu <- rpf_050(
+        d$x,
+        y,
+        loss = loss,
+        max_interaction = 3,
+        n_families = 8,
+        n_splits = NULL,
+        nthreads = 2,
+        level = FALSE
+      )
       expect_s4_class(tu$fit, "Rcpp_ClassificationRPF")
       expect_identical(tu$splits_oob$n_splits, tu$params$splits)
       expect_output(print(tu), "chosen out of bag")
       set.seed(9)
-      fx <- rpf_050(d$x, y, loss = loss, max_interaction = 3, n_families = 8, n_splits = tu$params$splits)
+      fx <- rpf_050(
+        d$x,
+        y,
+        loss = loss,
+        max_interaction = 3,
+        n_families = 8,
+        n_splits = tu$params$splits,
+        level = FALSE
+      )
       expect_identical(tu$fit$get_model(), fx$fit$get_model())
       expect_identical(predict(tu, d$x, type = "numeric"), predict(fx, d$x, type = "numeric"))
     }

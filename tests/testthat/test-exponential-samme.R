@@ -81,7 +81,6 @@ test_that("binary exponential: the weight is exp(-y g / 2) of the predicted scor
 
 test_that("the exponential's first leaf step is log(n_k + a / K) - mean_j log(n_j + a / K), a = 1 pseudo-row", {
   # the leaves' steps, before the level (test-classif-level.R)
-  rlang::local_options(randomPlantedForest.level = FALSE)
   d <- samme_data(3)
   set.seed(1)
   m <- rpf(
@@ -94,7 +93,8 @@ test_that("the exponential's first leaf step is log(n_k + a / K) - mean_j log(n_
     n_try_split_points = 3,
     share_candidates = 1,
     deterministic = TRUE,
-    prune = FALSE
+    prune = FALSE,
+    level = FALSE
   )
   g <- as.matrix(predict(m, d, type = "link"))
   # the one split leaves two leaves, all weights 1 and scores 0 before it: each leaf's step from its class counts n_k
@@ -119,7 +119,8 @@ test_that("the exponential's first leaf step is log(n_k + a / K) - mean_j log(n_
     n_try_split_points = 3,
     share_candidates = 1,
     deterministic = TRUE,
-    prune = FALSE
+    prune = FALSE,
+    level = FALSE
   )
   g <- predict(m, d2, type = "link")[[1]]
   for (s in unique(round(g, 12))) {
