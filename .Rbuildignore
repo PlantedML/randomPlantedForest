@@ -29,3 +29,4 @@
 ^README\.html$
 ^\.clang-format$
 ^cran-comments\.md$
+^bench$

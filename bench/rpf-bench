@@ -1,0 +1,35 @@
+#!/usr/bin/env -S rig run
+# /// script
+# [dependencies]
+# R = ">= 4.4"
+# Rapp = "*"
+# callr = "*"
+# ps = "*"
+# batchtools = "*"
+# rlang = "*"
+# Rcpp = "*"
+# checkmate = "*"
+# cli = "*"
+# "data.table" = "*"
+# hardhat = "*"
+# testthat = "*"
+# ///
+# Launcher: rig provides the shared library declared above (rpf's Imports and
+# LinkingTo included, so each ref library holds rpf alone), Rapp parses the
+# command line of bench/cli.R. Run from the repository root:
+#
+#   rig run bench/rpf-bench --help
+
+if (!file.exists("bench/cli.R")) {
+  cat("Run from the repository root (bench/cli.R must be visible).\n", file = stderr())
+  quit(save = "no", status = 1L)
+}
+# Expected errors print one message. RPF_BENCH_DEBUG=1 keeps R's own handling with backtraces.
+if (nzchar(Sys.getenv("RPF_BENCH_DEBUG"))) {
+  Rapp::run("bench/cli.R", commandArgs(TRUE))
+} else {
+  tryCatch(Rapp::run("bench/cli.R", commandArgs(TRUE)), error = function(e) {
+    message("Error: ", conditionMessage(e))
+    quit(save = "no", status = 1L)
+  })
+}
