@@ -700,6 +700,20 @@ test_that("I5: resubmit doubles each job's own memory", {
   expect_equal(after, 2 * before)
 })
 
+test_that("resubmit scales walltime on its own, and refuses to change nothing", {
+  refs <- two_refs()
+  reg <- bench_make_registry(tempfile("reg"), "local")
+  suppressMessages(bench_submit(reg, fake_cell("missing_op"), refs, ops = fake_ops, metric = "none"))
+  res <- function(what) batchtools::getJobResources(1L, reg = reg)$resources[[1]][[what]]
+  mem <- res("memory")
+  wall <- res("walltime")
+  expect_message(bench_resubmit(reg, ids = 1L, walltime_factor = 3), "walltime 8 -> 24 h", fixed = TRUE)
+  suppressMessages(bench_resubmit(reg, ids = 1L, walltime_factor = 3, yes = TRUE))
+  expect_equal(res("walltime"), 3 * wall)
+  expect_equal(res("memory"), mem)
+  expect_error(bench_resubmit(reg, ids = 1L), "--mem-factor or --walltime-factor", fixed = TRUE)
+})
+
 test_that("I6: an unusable systemd-run is detected, not trusted", {
   bin <- tempfile("bin")
   dir.create(bin)

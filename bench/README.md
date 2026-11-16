@@ -38,7 +38,7 @@ A run refuses to start when package files have uncommitted changes, unless `WORK
 rig run bench/rpf-bench run -t full -b slurm
 # once the jobs are done:
 rig run bench/rpf-bench collect
-# for jobs that ran out of memory or time, list them, then submit:
+# for jobs that ran out of memory (or time: --walltime-factor), list them, then submit:
 rig run bench/rpf-bench resubmit --mem-factor 2
 rig run bench/rpf-bench resubmit --mem-factor 2 --yes
 ```

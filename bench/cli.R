@@ -139,19 +139,23 @@ switch(
 
   #| title: Resubmit expired or failed jobs with more memory
   #| description: |
-  #|   Lists the jobs and their new memory request. Submits only with --yes.
+  #|   Lists the jobs and their new memory and walltime. Submits only with --yes.
+  #|   Slurm's sacct tells which limit a job hit (TIMEOUT or OUT_OF_MEMORY).
   resubmit = {
     #| description: "Registry directory. Default: the newest under bench/registry."
     registry <- ""
 
     #| description: "Multiply the memory request by this factor."
-    mem_factor <- 2
+    mem_factor <- 1
 
-    #| description: "Submit. Without it, only list the jobs and their new memory."
+    #| description: "Multiply the walltime request by this factor."
+    walltime_factor <- 1
+
+    #| description: "Submit. Without it, only list the jobs and their new resources."
     yes <- FALSE
 
     reg <- batchtools::loadRegistry(bench_registry_dir(if (nzchar(registry)) registry else NA), writeable = TRUE)
-    bench_resubmit(reg, mem_factor = mem_factor, yes = yes)
+    bench_resubmit(reg, mem_factor = mem_factor, walltime_factor = walltime_factor, yes = yes)
   },
 
   #| title: Run the suite's own tests

@@ -126,9 +126,15 @@ bench_collect <- function(reg) {
   out
 }
 
-# Expired jobs (walltime or memory kill) and failed ones, with more memory.
-# Without yes, only lists what it would submit.
-bench_resubmit <- function(reg, mem_factor = 2, ids = NULL, yes = FALSE) {
+# Expired jobs (walltime or memory kill) and failed ones, with more memory or
+# time. Without yes, only lists what it would submit.
+bench_resubmit <- function(reg, mem_factor = 1, walltime_factor = 1, ids = NULL, yes = FALSE) {
+  if (mem_factor == 1 && walltime_factor == 1) {
+    stop(
+      "A resubmit with the same resources fails the same way. Pass --mem-factor or --walltime-factor.",
+      call. = FALSE
+    )
+  }
   ids <- ids %||% union(batchtools::findExpired(reg = reg)$job.id, batchtools::findErrors(reg = reg)$job.id)
   if (!length(ids)) {
     message("Nothing to resubmit.")
@@ -136,21 +142,39 @@ bench_resubmit <- function(reg, mem_factor = 2, ids = NULL, yes = FALSE) {
   }
   # sorted by job id, whatever the order of ids
   res <- batchtools::getJobResources(ids = ids, reg = reg)
+  scaled <- lapply(res$resources, function(r) {
+    r$memory <- as.integer(r$memory * mem_factor)
+    r$walltime <- as.integer(r$walltime * walltime_factor)
+    r
+  })
   if (!yes) {
-    mem <- vapply(res$resources, `[[`, numeric(1), "memory")
+    old <- function(what) vapply(res$resources, `[[`, numeric(1), what)
+    new <- function(what) vapply(scaled, `[[`, numeric(1), what)
     message(paste(
-      sprintf("Job %d: memory %d -> %d MB", res$job.id, as.integer(mem), as.integer(mem * mem_factor)),
+      sprintf(
+        "Job %d: memory %d -> %d MB, walltime %g -> %g h",
+        res$job.id,
+        as.integer(old("memory")),
+        as.integer(new("memory")),
+        old("walltime") / 3600,
+        new("walltime") / 3600
+      ),
       collapse = "\n"
     ))
     message("Nothing submitted. Run again with --yes to resubmit these ", length(ids), " job(s).")
     return(invisible(integer()))
   }
-  for (k in seq_len(nrow(res))) {
-    r <- res$resources[[k]]
-    r$memory <- as.integer(r$memory * mem_factor)
-    batchtools::submitJobs(ids = data.frame(job.id = res$job.id[k]), resources = r, reg = reg)
+  for (k in seq_along(scaled)) {
+    batchtools::submitJobs(ids = data.frame(job.id = res$job.id[k]), resources = scaled[[k]], reg = reg)
   }
-  message(length(ids), " job(s) resubmitted with ", mem_factor, " times the memory.")
+  message(
+    length(ids),
+    " job(s) resubmitted with ",
+    mem_factor,
+    " times the memory and ",
+    walltime_factor,
+    " times the walltime."
+  )
   invisible(ids)
 }
 
