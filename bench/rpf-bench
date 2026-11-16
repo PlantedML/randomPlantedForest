@@ -13,6 +13,9 @@
 # "data.table" = "*"
 # hardhat = "*"
 # testthat = "*"
+# ggplot2 = "*"
+# knitr = "*"
+# rmarkdown = "*"
 # ///
 # Launcher: rig provides the shared library declared above (rpf's Imports and
 # LinkingTo included, so each ref library holds rpf alone), Rapp parses the

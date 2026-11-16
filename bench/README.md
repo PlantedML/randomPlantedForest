@@ -52,6 +52,15 @@ Jobs run the R that submitted them and find rig's library through `R_LIBS`, whic
 `run` (locally) and `collect` write `bench/results/report.md` and the raw rows as CSV.
 `rig run bench/rpf-bench report` prints the newest report again.
 
+```sh
+rig run bench/rpf-bench report --format html --baseline v0.5.0
+```
+
+renders `bench/report.qmd` with Quarto into a single page under `bench/results/`: the text report, one tab per op with boxplots of every timed call and every round's memory per cell and ref, and scaling over the number of rows.
+It needs Quarto on the `PATH` (on the BIPS cluster: `module load quarto`).
+`--rows` picks another rows file, for example one copied from the cluster.
+Results collected before the raw values were kept show only median, minimum and maximum, drawn as crosses without a box.
+
 - Time verdicts: `faster` or `slower` from a change of 10% in the median time, `inconclusive` below that.
 - Memory verdicts: `more` or `less` from a change of 3% in peak memory above the level after setup, `same` below that.
 - Memory `below resolution`: the operation used less than 1 MB beyond the level after setup. This is common for `predict`, `purify` and `predict_components`: their setup fits a forest, and they reuse memory the allocator kept from that fit. Very short operations can also fall between two samples (every 5 ms). Their memory is not measurable this way.

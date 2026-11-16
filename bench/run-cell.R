@@ -16,6 +16,8 @@ bench_schema <- function() {
     "time_median",
     "time_min",
     "time_max",
+    "times",
+    "peak_deltas_mb",
     "digest",
     "skipped",
     "error",
@@ -115,6 +117,13 @@ bench_run_cell <- function(cell, refs, data_dir, ops = bench_ops(), metric = ben
         time_median = if (length(times)) stats::median(times) else NA_real_,
         time_min = if (length(times)) min(times) else NA_real_,
         time_max = if (length(times)) max(times) else NA_real_,
+        # every timed call and every round, for plots: ";"-separated
+        times = if (length(times)) paste(signif(times, 6), collapse = ";") else NA_character_,
+        peak_deltas_mb = if (length(ms)) {
+          paste(signif(vapply(ms, function(m) m$peak_mb - m$floor_mb, numeric(1)), 6), collapse = ";")
+        } else {
+          NA_character_
+        },
         digest = if (length(ms)) ms[[length(ms)]]$digest else NA_character_,
         skipped = if (supported[i]) {
           NA_character_

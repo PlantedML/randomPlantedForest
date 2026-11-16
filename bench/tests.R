@@ -434,6 +434,13 @@ test_that("a cell gives one row per ref with the schema's columns", {
   expect_true(all(is.na(rows$skipped)))
 })
 
+test_that("a cell keeps every timed call and every round's memory", {
+  rows <- bench_run_cell(fake_cell("any"), two_refs(), tempfile("data"), ops = fake_ops, metric = "none")
+  # 2 rounds x 2 timed calls, 2 rounds
+  expect_equal(lengths(strsplit(rows$times, ";")), c(4L, 4L))
+  expect_equal(lengths(strsplit(rows$peak_deltas_mb, ";")), c(2L, 2L))
+})
+
 test_that("a ref without the op's arguments is skipped with a reason", {
   refs <- two_refs()
   rows <- bench_run_cell(fake_cell("new"), refs, tempfile("data"), ops = fake_ops, metric = "none")
@@ -786,4 +793,61 @@ test_that("rows from different R minor versions are flagged", {
 test_that("ref libraries are kept per R minor version", {
   ref <- fake_ref()
   expect_equal(basename(dirname(ref$lib)), paste0("R-", getRversion()$major, ".", getRversion()$minor))
+})
+
+## ---- plots and the HTML report -----------------------------------------------------------
+
+test_that("raw values become one row each, summaries stand in for old results", {
+  rows <- fake_rows()
+  rows$times <- c("1;1.1;0.9", NA)
+  rows$peak_deltas_mb <- c("100;101", NA)
+  rows$time_min <- c(0.9, 1.1)
+  rows$time_max <- c(1.1, 1.3)
+  long <- bench_long(rows, "time")
+  expect_equal(long$value[long$ref == "dev"], c(1, 1.1, 0.9))
+  expect_true(all(long$raw[long$ref == "dev"]))
+  # no raw times: median, min and max, marked as such
+  expect_equal(sort(long$value[long$ref == "pr"]), c(1.1, 1.2, 1.3))
+  expect_false(any(long$raw[long$ref == "pr"]))
+  mem <- bench_long(rows, "memory")
+  expect_equal(mem$value[mem$ref == "dev"], c(100, 101))
+  expect_equal(mem$value[mem$ref == "pr"], 100)
+  # results written before the raw columns existed
+  old <- fake_rows()
+  expect_equal(nrow(bench_long(old, "time")), 2L)
+})
+
+test_that("plots build for every op and for scaling", {
+  rows <- rbind(fake_rows(), fake_rows())
+  rows$n[3:4] <- 5000L
+  rows$times <- c("1;1.1", "1.2;1.3", "4;4.2", "5;5.1")
+  for (what in c("time", "memory")) {
+    expect_s3_class(ggplot2::ggplot_build(bench_plot_cells(rows, what)), "ggplot_built")
+    expect_s3_class(ggplot2::ggplot_build(bench_plot_scaling(rows, what)), "ggplot_built")
+  }
+  # a setting measured at one size has no line to draw
+  single <- fake_rows(refs = c("dev", "pr"))
+  single$op <- "predict"
+  scaling <- bench_plot_scaling(rbind(rows, single), "time")
+  expect_false("predict" %in% scaling$data$op)
+  # boxes only from raw values, summaries stay points
+  rows$times[1:2] <- NA
+  boxes <- ggplot2::layer_data(bench_plot_cells(rows, "time"), 1L)
+  expect_equal(nrow(boxes), 2L)
+})
+
+test_that("the report format is checked before anything is rendered", {
+  expect_error(bench_render_report("x.csv", format = "pdf"), "Unknown format 'pdf'. Use one of md, html.", fixed = TRUE)
+})
+
+test_that("the HTML report renders from a rows file", {
+  skip_if(!nzchar(Sys.which("quarto")), "quarto not on PATH")
+  rows <- rbind(fake_rows(), fake_rows())
+  rows$n[3:4] <- 5000L
+  rows$times <- c("1;1.1", "1.2;1.3", "4;4.2", "5;5.1")
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(rows, csv, row.names = FALSE)
+  out <- suppressMessages(bench_render_report(csv, baseline = "dev", format = "html", dir = tempfile("html")))
+  expect_true(file.exists(out))
+  expect_match(paste(readLines(out, warn = FALSE), collapse = "\n"), "fit_fixed", fixed = TRUE)
 })

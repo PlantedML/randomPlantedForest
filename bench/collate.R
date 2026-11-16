@@ -194,3 +194,49 @@ bench_history_append <- function(rows, anchors, path = "bench/history.csv") {
   utils::write.csv(all, path, row.names = FALSE)
   invisible(path)
 }
+
+# The report for a rows file: Markdown on stdout, or a self-contained HTML
+# page rendered by Quarto with this R and library. Returns the HTML path.
+bench_render_report <- function(rows_csv, baseline = "dev", format = "md", dir = "bench/results") {
+  bench_check_choice(format, c("md", "html"), "format")
+  if (!file.exists(rows_csv)) {
+    stop("Rows file ", rows_csv, " does not exist.", call. = FALSE)
+  }
+  if (format == "md") {
+    cat(bench_report(utils::read.csv(rows_csv, stringsAsFactors = FALSE), baseline), sep = "\n")
+    return(invisible(NULL))
+  }
+  if (!nzchar(Sys.which("quarto"))) {
+    stop("Quarto is not on the PATH. Install it, or on the BIPS cluster run `module load quarto` first.", call. = FALSE)
+  }
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  out <- paste0("report-", sub("^rows-", "", sub("\\.csv$", ".html", basename(rows_csv))))
+  root <- normalizePath(".")
+  # render a copy, so concurrent renders and the intermediate files stay out of bench/
+  work <- tempfile("render")
+  dir.create(work)
+  file.copy("bench/report.qmd", work)
+  # Quarto's knitr runs in this R, whose R_LIBS point to rig's library
+  old <- Sys.getenv("QUARTO_R", unset = NA)
+  Sys.setenv(QUARTO_R = R.home("bin"))
+  on.exit(if (is.na(old)) Sys.unsetenv("QUARTO_R") else Sys.setenv(QUARTO_R = old), add = TRUE)
+  status <- system2(
+    "quarto",
+    c(
+      "render",
+      shQuote(file.path(work, "report.qmd")),
+      "-P",
+      shQuote(paste0("rows:", normalizePath(rows_csv))),
+      "-P",
+      shQuote(paste0("baseline:", baseline)),
+      "-P",
+      shQuote(paste0("root:", root))
+    )
+  )
+  if (status != 0L) {
+    stop("Quarto failed to render the report (exit status ", status, "), see its output above.", call. = FALSE)
+  }
+  path <- file.path(dir, out)
+  file.copy(file.path(work, "report.html"), path, overwrite = TRUE)
+  normalizePath(path)
+}

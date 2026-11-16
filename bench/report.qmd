@@ -1,0 +1,101 @@
+---
+title: "randomPlantedForest benchmark"
+format:
+  html:
+    embed-resources: true
+    page-layout: full
+    toc: true
+execute:
+  echo: false
+  warning: false
+params:
+  rows: ""
+  baseline: "dev"
+  root: ".."
+---
+
+```{r setup}
+# the bench files expect the repository root as working directory
+setwd(params$root)
+for (f in setdiff(Sys.glob("bench/*.R"), c("bench/cli.R", "bench/tests.R"))) {
+  source(f)
+}
+rows <- utils::read.csv(params$rows, stringsAsFactors = FALSE)
+measured <- rows[is.na(rows$skipped) & is.na(rows$error), ]
+ops <- intersect(names(bench_ops()), unique(measured$op))
+# one panel row per three cells
+height <- function(op) 2 + 4 * ceiling(length(unique(.bench_cell_label(measured[measured$op == op, ]))) / 3)
+```
+
+Results from ``r basename(params$rows)``, compared against **`r params$baseline`**.
+
+## Summary
+
+```{r summary}
+#| output: asis
+# the text report without its title, its headings one level down
+md <- bench_report(rows, params$baseline)
+md <- md[!grepl("^# ", md)]
+cat(sub("^(#+) ", "\\1## ", md), sep = "\n")
+```
+
+## Time per cell
+
+Every timed call, one box per ref.
+A cross marks results that kept only median, minimum and maximum.
+
+::: {.panel-tabset}
+
+```{r time}
+#| output: asis
+for (op in ops) {
+  cat("\n### ", op, "\n\n", sep = "")
+  cat(knitr::knit_child(text = c(
+    sprintf("```{r time-%s, fig.width = 14, fig.height = %g}", op, height(op)),
+    sprintf("bench_plot_cells(measured[measured$op == '%s', ], 'time')", op),
+    "```"
+  ), envir = environment(), quiet = TRUE))
+}
+```
+
+:::
+
+## Memory per cell
+
+Peak memory above the level after setup, one value per round.
+
+::: {.panel-tabset}
+
+```{r memory}
+#| output: asis
+for (op in ops) {
+  cat("\n### ", op, "\n\n", sep = "")
+  cat(knitr::knit_child(text = c(
+    sprintf("```{r memory-%s, fig.width = 14, fig.height = %g}", op, height(op)),
+    sprintf("bench_plot_cells(measured[measured$op == '%s', ], 'memory')", op),
+    "```"
+  ), envir = environment(), quiet = TRUE))
+}
+```
+
+:::
+
+## Scaling
+
+Median over n, both axes logarithmic, for cells measured at more than one size.
+
+::: {.panel-tabset}
+
+### Time
+
+```{r scaling-time, fig.width = 14, fig.height = 10}
+bench_plot_scaling(measured, "time")
+```
+
+### Memory
+
+```{r scaling-memory, fig.width = 14, fig.height = 10}
+bench_plot_scaling(measured, "memory")
+```
+
+:::

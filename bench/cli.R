@@ -164,16 +164,32 @@ switch(
     quit(save = "no", status = as.integer(any(res$failed > 0 | res$error)))
   },
 
-  #| title: Render the report from the newest results
+  #| title: Print or render the report for a rows file
+  #| description: |
+  #|   md prints the text report. html renders bench/report.qmd with Quarto
+  #|   (on the BIPS cluster: `module load quarto` first) into a single page
+  #|   with boxplots and scaling plots under bench/results.
   report = {
+    #| description: "Rows file from `run` or `collect`. Default: the newest bench/results/rows-*.csv."
+    rows <- ""
+
     #| description: "Ref the others are compared against."
     baseline <- "dev"
 
-    csvs <- sort(Sys.glob("bench/results/rows-*.csv"), decreasing = TRUE)
-    if (!length(csvs)) {
-      stop("No results under bench/results.", call. = FALSE)
+    #| description: "Output: md (text, to stdout) or html (a page under bench/results)."
+    format <- "md"
+
+    if (!nzchar(rows)) {
+      csvs <- sort(Sys.glob("bench/results/rows-*.csv"), decreasing = TRUE)
+      if (!length(csvs)) {
+        stop("No results under bench/results. Run `run` or `collect` first.", call. = FALSE)
+      }
+      rows <- csvs[1]
+      message("Rows: ", rows)
     }
-    rows <- utils::read.csv(csvs[1], stringsAsFactors = FALSE)
-    cat(bench_report(rows, baseline), "\n")
+    path <- bench_render_report(rows, baseline = baseline, format = format)
+    if (!is.null(path)) {
+      message("Report: ", path)
+    }
   }
 )
