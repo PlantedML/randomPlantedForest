@@ -721,6 +721,18 @@ test_that("resubmit scales walltime on its own, and refuses to change nothing", 
   expect_error(bench_resubmit(reg, ids = 1L), "--mem-factor or --walltime-factor", fixed = TRUE)
 })
 
+test_that("the QoS follows the walltime, not the site's default QoS", {
+  refs <- two_refs()
+  reg <- bench_make_registry(tempfile("reg"), "local")
+  # as in the BIPS site configuration
+  reg$default.resources$qos <- "medium"
+  suppressMessages(bench_submit(reg, fake_cell("missing_op"), refs, ops = fake_ops, metric = "none"))
+  qos <- function() batchtools::getJobResources(1L, reg = reg)$resources[[1]]$qos
+  expect_null(qos())
+  suppressMessages(bench_resubmit(reg, ids = 1L, walltime_factor = 4, yes = TRUE))
+  expect_null(qos())
+})
+
 test_that("I6: an unusable systemd-run is detected, not trusted", {
   bin <- tempfile("bin")
   dir.create(bin)

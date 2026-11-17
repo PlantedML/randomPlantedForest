@@ -57,6 +57,14 @@ bench_cell_resources <- function(cells) {
   )
 }
 
+# A NULL qos, not a missing one: batchtools fills missing entries from the site
+# defaults (BIPS: qos = "medium", at most 24 h), and the BIPS template picks the
+# smallest QoS that fits the walltime only when qos is NULL.
+.bench_no_qos <- function(resources) {
+  resources["qos"] <- list(NULL)
+  resources
+}
+
 bench_submit <- function(reg, cells, refs, resources = list(), ops = NULL, metric = NULL) {
   data_dir <- file.path(reg$file.dir, "data")
   bench_prepare_data(cells, data_dir)
@@ -76,7 +84,11 @@ bench_submit <- function(reg, cells, refs, resources = list(), ops = NULL, metri
     i <- which(grp == g)
     batchtools::submitJobs(
       ids = data.frame(job.id = i),
-      resources = list(ncpus = req$ncpus[i[1]], memory = req$memory[i[1]], walltime = req$walltime[i[1]]),
+      resources = .bench_no_qos(list(
+        ncpus = req$ncpus[i[1]],
+        memory = req$memory[i[1]],
+        walltime = req$walltime[i[1]]
+      )),
       reg = reg
     )
   }
@@ -145,7 +157,7 @@ bench_resubmit <- function(reg, mem_factor = 1, walltime_factor = 1, ids = NULL,
   scaled <- lapply(res$resources, function(r) {
     r$memory <- as.integer(r$memory * mem_factor)
     r$walltime <- as.integer(r$walltime * walltime_factor)
-    r
+    .bench_no_qos(r)
   })
   if (!yes) {
     old <- function(what) vapply(res$resources, `[[`, numeric(1), what)
