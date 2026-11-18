@@ -64,6 +64,8 @@ Results collected before the raw values were kept show only median, minimum and 
 - Time verdicts: `faster` or `slower` from a change of 10% in the median time, `inconclusive` below that.
 - Memory verdicts: `more` or `less` from a change of 3% in peak memory above the level after setup, `same` below that.
 - Memory `below resolution`: the operation used less than 1 MB beyond the level after setup. This is common for `predict`, `purify` and `predict_components`: their setup fits a forest, and they reuse memory the allocator kept from that fit. Very short operations can also fall between two samples (every 5 ms). Their memory is not measurable this way.
+- For the same reason, the memory above setup can even fall as `n` grows. The HTML report therefore plots the whole peak of the R process, with the level after setup marked, and the report itself explains how to read each number.
+- `n` is the number of training rows. `predict` and `predict_components` predict `predicted` rows (1000 unless the cell says otherwise), and the full tier varies that number for them separately.
 - `OUTPUT DIFFERS`: the predictions or components differ from the baseline's. That is expected for changes that alter fits on purpose, and a red flag for changes that claim identical fits.
 - Memory bound exceeded: the ref's own estimate (`rpf_resources()`, once rpf has one) was lower than the measured memory.
 - Skipped: the ref's `rpf()` lacks an argument the operation needs, for example `fit_oob` needs `oob_path`, which came with `n_splits = NULL`.

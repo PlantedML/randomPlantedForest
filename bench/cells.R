@@ -5,6 +5,7 @@ BENCH_CELL_COLS <- c(
   "task",
   "loss",
   "n",
+  "n_new",
   "p",
   "max_interaction",
   "n_families",
@@ -19,6 +20,7 @@ BENCH_CELL_COLS <- c(
   g <- expand.grid(..., stringsAsFactors = FALSE, KEEP.OUT.ATTRS = FALSE)
   defaults <- list(
     loss = NA_character_,
+    n_new = 1000L,
     p = 10L,
     max_interaction = 2L,
     n_families = 50L,
@@ -36,15 +38,17 @@ BENCH_CELL_COLS <- c(
 
 # A few minutes on a laptop for three refs.
 .bench_cells_quick <- function() {
-  .bench_grid(
-    op = c("fit_fixed", "fit_oob", "predict", "purify"),
-    task = c("regr", "binary"),
-    n = c(1000L, 5000L),
-    p = 5L,
-    n_families = 20L,
-    n_splits = 30L,
-    iters = 3L,
-    mem_reps = 3L
+  small <- list(p = 5L, n_families = 20L, n_splits = 30L, iters = 3L, mem_reps = 3L)
+  rbind(
+    do.call(
+      .bench_grid,
+      c(
+        list(op = c("fit_fixed", "fit_oob", "predict", "purify"), task = c("regr", "binary"), n = c(1000L, 5000L)),
+        small
+      )
+    ),
+    # predicted rows; the 1000-row cell is already above
+    do.call(.bench_grid, c(list(op = "predict", task = "regr", n = 1000L, n_new = 10000L), small))
   )
 }
 
@@ -78,6 +82,14 @@ BENCH_CELL_COLS <- c(
           n = 10000L
         )
       })
+    ),
+    # predicted rows
+    .bench_grid(
+      op = c("predict", "predict_components"),
+      task = "regr",
+      n = 10000L,
+      n_new = c(1000L, 10000L, 100000L),
+      max_interaction = 3L
     ),
     # threads
     .bench_grid(

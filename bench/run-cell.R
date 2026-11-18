@@ -18,6 +18,7 @@ bench_schema <- function() {
     "time_max",
     "times",
     "peak_deltas_mb",
+    "peaks_mb",
     "digest",
     "skipped",
     "error",
@@ -56,11 +57,11 @@ bench_schema <- function() {
 
 .bench_cell_data <- function(cell, data_dir) {
   dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
-  path <- file.path(data_dir, sprintf("%s-n%d-p%d.rds", cell$task, cell$n, cell$p))
+  path <- file.path(data_dir, sprintf("%s-n%d-p%d-new%d.rds", cell$task, cell$n, cell$p, cell$n_new))
   if (!file.exists(path)) {
     # rename is atomic: a reader sees no file or a whole one
     tmp <- tempfile("data-", tmpdir = data_dir, fileext = ".tmp")
-    saveRDS(bench_make_data(cell$task, cell$n, cell$p), tmp)
+    saveRDS(bench_make_data(cell$task, cell$n, cell$p, n_new = cell$n_new), tmp)
     file.rename(tmp, path)
   }
   path
@@ -121,6 +122,11 @@ bench_run_cell <- function(cell, refs, data_dir, ops = bench_ops(), metric = ben
         times = if (length(times)) paste(signif(times, 6), collapse = ";") else NA_character_,
         peak_deltas_mb = if (length(ms)) {
           paste(signif(vapply(ms, function(m) m$peak_mb - m$floor_mb, numeric(1)), 6), collapse = ";")
+        } else {
+          NA_character_
+        },
+        peaks_mb = if (length(ms)) {
+          paste(signif(vapply(ms, function(m) m$peak_mb, numeric(1)), 6), collapse = ";")
         } else {
           NA_character_
         },

@@ -2,11 +2,16 @@
 # in the measurement child, so they call the package by namespace and use only
 # their arguments and the helpers sourced there (refs.R, measure.R, ops.R).
 
-bench_make_data <- function(task = c("regr", "binary", "multiclass"), n, p, seed = 1L) {
+# Training and predicted rows come from separate seeds, so the training data,
+# and with it the forest, is the same whatever the number of predicted rows.
+bench_make_data <- function(task = c("regr", "binary", "multiclass"), n, p, seed = 1L, n_new = 1000L) {
   task <- match.arg(task)
   stopifnot(p >= 3)
+  list(train = .bench_draw(task, n, p, seed), test = .bench_draw(task, n_new, p, seed + 1L))
+}
+
+.bench_draw <- function(task, m, p, seed) {
   set.seed(seed)
-  m <- n + 1000L
   X <- as.data.frame(matrix(stats::runif(m * p), m, p))
   X$f <- factor(sample(letters[1:5], m, replace = TRUE))
   # main effects, a two-way and a three-way interaction, and the factor
@@ -18,7 +23,7 @@ bench_make_data <- function(task = c("regr", "binary", "multiclass"), n, p, seed
     binary = factor(ifelse(noisy > stats::median(noisy), "b", "a")),
     multiclass = cut(noisy, stats::quantile(noisy, 0:3 / 3), labels = c("a", "b", "c"), include.lowest = TRUE)
   )
-  list(train = X[seq_len(n), ], test = X[n + seq_len(1000L), ])
+  X
 }
 
 # Names and values of rpf's arguments before the renaming in 0.5.0.9000.
@@ -151,6 +156,16 @@ bench_ops <- function() {
     )
   )
 }
+
+# What each op times, for readers of the report. Keep in step with bench_ops().
+BENCH_OP_DESCRIPTIONS <- c(
+  fit_fixed = "Fits a forest with fixed settings (`n_splits` as in the cell, no pruning). The timed call includes predicting 100 rows, whose output is compared across refs.",
+  fit_oob = "Fits a forest and chooses `n_splits` out of bag (`n_splits = NULL`). Refs without `oob_path` cannot do this and are skipped. Includes predicting 100 rows.",
+  fit_default = "Calls `rpf()` with its defaults, pruning included. Refs without `prune` are skipped. Includes predicting 100 rows.",
+  purify = "Purifies a fitted forest. Setup (not timed): fitting the forest. Measured once per round, since `purify()` works in place. The timed call includes predicting components for 100 rows.",
+  predict = "Predicts the `predicted` rows with a fitted forest. Setup (not timed): fitting the forest.",
+  predict_components = "Predicts the components of the `predicted` rows with a purified forest. Setup (not timed): fitting and purifying the forest."
+)
 
 bench_ref_supports <- function(op, args) {
   all(bench_ops()[[op]]$requires %in% args)

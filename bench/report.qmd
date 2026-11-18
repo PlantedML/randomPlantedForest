@@ -20,11 +20,22 @@ setwd(params$root)
 for (f in setdiff(Sys.glob("bench/*.R"), c("bench/cli.R", "bench/tests.R"))) {
   source(f)
 }
-rows <- utils::read.csv(params$rows, stringsAsFactors = FALSE)
+rows <- bench_read_rows(params$rows)
 measured <- rows[is.na(rows$skipped) & is.na(rows$error), ]
 ops <- intersect(names(bench_ops()), unique(measured$op))
 # one panel row per three cells
 height <- function(op) 2 + 4 * ceiling(length(unique(.bench_cell_label(measured[measured$op == op, ]))) / 3)
+# one tab per op: what it times, then its plot
+op_tabs <- function(what) {
+  for (op in ops) {
+    cat("\n### ", op, "\n\n", BENCH_OP_DESCRIPTIONS[[op]], "\n\n", sep = "")
+    cat(knitr::knit_child(text = c(
+      sprintf("```{r %s-%s, fig.width = 14, fig.height = %g}", what, op, height(op)),
+      sprintf("bench_plot_cells(measured[measured$op == '%s', ], '%s')", op, what),
+      "```"
+    ), envir = environment(), quiet = TRUE))
+  }
+}
 ```
 
 Results from ``r basename(params$rows)``, compared against **`r params$baseline`**.
@@ -41,61 +52,72 @@ cat(sub("^(#+) ", "\\1## ", md), sep = "\n")
 
 ## Time per cell
 
-Every timed call, one box per ref.
-A cross marks results that kept only median, minimum and maximum.
+Seconds per call of the operation, one box per ref with every timed call as a point.
+Setup, such as fitting the forest before `predict`, is not timed.
+A cross marks results that kept only the median, minimum and maximum of their calls.
 
 ::: {.panel-tabset}
 
 ```{r time}
 #| output: asis
-for (op in ops) {
-  cat("\n### ", op, "\n\n", sep = "")
-  cat(knitr::knit_child(text = c(
-    sprintf("```{r time-%s, fig.width = 14, fig.height = %g}", op, height(op)),
-    sprintf("bench_plot_cells(measured[measured$op == '%s', ], 'time')", op),
-    "```"
-  ), envir = environment(), quiet = TRUE))
-}
+op_tabs("time")
 ```
 
 :::
 
 ## Memory per cell
 
-Peak memory above the level after setup, one value per round.
+The highest memory the measuring R process used while the operation ran, one point per round.
+This includes everything already in memory: the data, and for `predict`, `purify` and `predict_components` the forest their setup fitted.
+The dashed line is the level after setup, so the distance from the line to the box is what the operation itself added.
+That distance can look smaller than the operation's real need, because it reuses memory the setup freed.
+The text report's memory verdicts compare this distance, the plots show the whole peak.
 
 ::: {.panel-tabset}
 
 ```{r memory}
 #| output: asis
-for (op in ops) {
-  cat("\n### ", op, "\n\n", sep = "")
-  cat(knitr::knit_child(text = c(
-    sprintf("```{r memory-%s, fig.width = 14, fig.height = %g}", op, height(op)),
-    sprintf("bench_plot_cells(measured[measured$op == '%s', ], 'memory')", op),
-    "```"
-  ), envir = environment(), quiet = TRUE))
-}
+op_tabs("memory")
 ```
 
 :::
 
 ## Scaling
 
-Median over n, both axes logarithmic, for cells measured at more than one size.
+Medians per ref and setting, both axes logarithmic.
+Only settings measured at more than one size are shown.
 
 ::: {.panel-tabset}
 
-### Time
+### Time over training rows
 
-```{r scaling-time, fig.width = 14, fig.height = 10}
-bench_plot_scaling(measured, "time")
+The prediction ops predict the same number of rows at every training size, and the forest's size is set by `n_splits`, not by the training rows.
+Their time should therefore stay roughly flat here: see the predicted rows tabs for how prediction scales.
+
+```{r scaling-time-n, fig.width = 14, fig.height = 10}
+bench_plot_scaling(measured, "time", over = "n")
 ```
 
-### Memory
+### Memory over training rows
 
-```{r scaling-memory, fig.width = 14, fig.height = 10}
-bench_plot_scaling(measured, "memory")
+Whole peak of the R process, as in the memory plots above.
+
+```{r scaling-memory-n, fig.width = 14, fig.height = 10}
+bench_plot_scaling(measured, "memory", over = "n")
+```
+
+### Time over predicted rows
+
+`predict` and `predict_components` on one fitted forest, with an increasing number of rows to predict.
+
+```{r scaling-time-new, fig.width = 14, fig.height = 6}
+bench_plot_scaling(measured, "time", over = "n_new")
+```
+
+### Memory over predicted rows
+
+```{r scaling-memory-new, fig.width = 14, fig.height = 6}
+bench_plot_scaling(measured, "memory", over = "n_new")
 ```
 
 :::

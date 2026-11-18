@@ -49,19 +49,36 @@ bench_deltas <- function(rows, baseline = "dev") {
 }
 
 .bench_cell_label <- function(rows) {
-  sprintf(
-    "%s %s%s n=%s p=%s order=%s families=%s splits=%s %s threads=%s",
-    rows$op,
-    rows$task,
-    ifelse(is.na(rows$loss), "", paste0("/", rows$loss)),
-    rows$n,
-    rows$p,
-    rows$max_interaction,
-    rows$n_families,
-    rows$n_splits,
-    rows$split_structure,
-    rows$nthreads
+  predicted <- ifelse(rows$op %in% c("predict", "predict_components"), paste0(" predicted=", rows$n_new), "")
+  paste0(
+    sprintf(
+      "%s %s%s n=%s p=%s order=%s families=%s splits=%s %s threads=%s",
+      rows$op,
+      rows$task,
+      ifelse(is.na(rows$loss), "", paste0("/", rows$loss)),
+      rows$n,
+      rows$p,
+      rows$max_interaction,
+      rows$n_families,
+      rows$n_splits,
+      rows$split_structure,
+      rows$nthreads
+    ),
+    predicted
   )
+}
+
+# A rows file, with columns added since it was written filled in: n_new was
+# 1000 before it was a setting, raw values were not kept.
+bench_read_rows <- function(path) {
+  rows <- utils::read.csv(path, stringsAsFactors = FALSE)
+  if (!"n_new" %in% names(rows)) {
+    rows$n_new <- rep(1000L, nrow(rows))
+  }
+  for (col in setdiff(bench_schema(), names(rows))) {
+    rows[[col]] <- rep(NA, nrow(rows))
+  }
+  rows[bench_schema()]
 }
 
 .bench_fmt_pct <- function(x) ifelse(is.na(x), "n/a", sprintf("%+.1f%%", x))
@@ -77,6 +94,19 @@ bench_report <- function(rows, baseline = "dev") {
     paste0("- Tier: ", paste(unique(rows$tier), collapse = ", ")),
     paste0("- Memory metric: ", paste(metric, collapse = ", ")),
     paste0("- Host: ", paste(unique(rows$host), collapse = ", ")),
+    "",
+    "## How to read this",
+    "",
+    "- A cell is one operation on simulated data. Every ref runs it in the same job, in alternating order, so refs are compared on the same machine.",
+    "- `n` is the number of training rows. Prediction ops (`predict`, `predict_components`) predict `predicted` rows, a separate set of rows.",
+    "- Time is the median of seconds per call of the operation alone. Its setup, such as fitting the forest before `predict`, is not timed.",
+    "- Memory in this table is what the operation adds to the peak of the R process above the level after setup. An operation can reuse memory its setup freed, which this misses, so for ops with a setup (`predict`, `purify`, `predict_components`) the number is a lower bound and can even fall as `n` grows. `below resolution` means less than 1 MB was seen. The HTML report plots the absolute peak instead.",
+    sprintf(
+      "- Verdicts: time changes below %d%% and memory changes below %d%% count as noise.",
+      BENCH_TIME_THRESHOLD,
+      BENCH_MEM_THRESHOLD
+    ),
+    "- `OUTPUT DIFFERS`: predictions or components are not identical to the baseline's.",
     ""
   )
   minor <- unique(stats::na.omit(sub("^(\\d+\\.\\d+).*$", "\\1", rows$r_version)))
@@ -188,7 +218,7 @@ bench_history_append <- function(rows, anchors, path = "bench/history.csv") {
   if (!nrow(new)) {
     return(invisible(path))
   }
-  all <- if (file.exists(path)) rbind(utils::read.csv(path, stringsAsFactors = FALSE)[names(new)], new) else new
+  all <- if (file.exists(path)) rbind(bench_read_rows(path)[names(new)], new) else new
   all <- all[order(all$timestamp, decreasing = TRUE), ]
   all <- all[!duplicated(paste(.bench_cell_key(all), all$ref)), ]
   utils::write.csv(all, path, row.names = FALSE)
@@ -203,7 +233,7 @@ bench_render_report <- function(rows_csv, baseline = "dev", format = "md", dir =
     stop("Rows file ", rows_csv, " does not exist.", call. = FALSE)
   }
   if (format == "md") {
-    cat(bench_report(utils::read.csv(rows_csv, stringsAsFactors = FALSE), baseline), sep = "\n")
+    cat(bench_report(bench_read_rows(rows_csv), baseline), sep = "\n")
     return(invisible(NULL))
   }
   if (!nzchar(Sys.which("quarto"))) {

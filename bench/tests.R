@@ -356,6 +356,25 @@ test_that("every cell names a known op", {
   expect_equal(unique(bench_select_cells(quick, sizes = 1000)$n), 1000)
 })
 
+test_that("prediction ops scale over the number of predicted rows", {
+  expect_true("n_new" %in% BENCH_CELL_COLS)
+  for (tier in c("quick", "full")) {
+    cells <- bench_cells(tier)
+    expect_true(all(cells$n_new[!cells$op %in% c("predict", "predict_components")] == 1000L), label = tier)
+    expect_gt(length(unique(cells$n_new[cells$op == "predict"])), 1L)
+  }
+  full <- bench_cells("full")
+  expect_setequal(unique(full$n_new[full$op == "predict_components"]), c(1000L, 10000L, 100000L))
+})
+
+test_that("predicted rows are drawn apart from the training rows", {
+  a <- bench_make_data("regr", 50, 3, n_new = 10L)
+  b <- bench_make_data("regr", 50, 3, n_new = 20L)
+  expect_equal(a$train, b$train)
+  expect_equal(nrow(a$test), 10L)
+  expect_equal(nrow(b$test), 20L)
+})
+
 test_that("logit cells are sized to fit the default walltime", {
   full <- bench_cells("full")
   logit <- !is.na(full$loss) & full$loss == "logit"
@@ -821,7 +840,9 @@ test_that("ref libraries are kept per R minor version", {
 test_that("raw values become one row each, summaries stand in for old results", {
   rows <- fake_rows()
   rows$times <- c("1;1.1;0.9", NA)
-  rows$peak_deltas_mb <- c("100;101", NA)
+  rows$peaks_mb <- c("300;301", NA)
+  rows$peak_mb <- c(300.5, 250)
+  rows$floor_mb <- c(200, 150)
   rows$time_min <- c(0.9, 1.1)
   rows$time_max <- c(1.1, 1.3)
   long <- bench_long(rows, "time")
@@ -830,9 +851,11 @@ test_that("raw values become one row each, summaries stand in for old results", 
   # no raw times: median, min and max, marked as such
   expect_equal(sort(long$value[long$ref == "pr"]), c(1.1, 1.2, 1.3))
   expect_false(any(long$raw[long$ref == "pr"]))
+  # memory is the absolute peak, with the level after setup alongside
   mem <- bench_long(rows, "memory")
-  expect_equal(mem$value[mem$ref == "dev"], c(100, 101))
-  expect_equal(mem$value[mem$ref == "pr"], 100)
+  expect_equal(mem$value[mem$ref == "dev"], c(300, 301))
+  expect_equal(mem$value[mem$ref == "pr"], 250)
+  expect_equal(unique(mem$floor[mem$ref == "pr"]), 150)
   # results written before the raw columns existed
   old <- fake_rows()
   expect_equal(nrow(bench_long(old, "time")), 2L)
@@ -857,6 +880,37 @@ test_that("plots build for every op and for scaling", {
   expect_equal(nrow(boxes), 2L)
 })
 
+test_that("scaling can run over the predicted rows", {
+  rows <- rbind(fake_rows(), fake_rows())
+  rows$op <- "predict"
+  rows$n_new[3:4] <- 10000L
+  rows$times <- c("1;1.1", "1.2;1.3", "4;4.2", "5;5.1")
+  p <- bench_plot_scaling(rows, "time", over = "n_new")
+  expect_setequal(p$data$n_new, c(1000L, 10000L))
+  expect_s3_class(ggplot2::ggplot_build(p), "ggplot_built")
+})
+
+test_that("memory scaling shows the absolute peak, which a reused setup cannot hide", {
+  rows <- rbind(fake_rows(mem = c(0, 0)), fake_rows(mem = c(0, 0)))
+  rows$n[3:4] <- 5000L
+  rows$peaks_mb <- c("300;302", "310;312", "400;402", "410;412")
+  p <- bench_plot_scaling(rows, "memory")
+  expect_equal(nrow(p$data), 4L)
+  expect_true(all(p$data$value >= 300))
+})
+
+test_that("a cell records the absolute peak of every round", {
+  rows <- bench_run_cell(fake_cell("any"), two_refs(), tempfile("data"), ops = fake_ops, metric = "none")
+  expect_equal(lengths(strsplit(rows$peaks_mb, ";")), c(2L, 2L))
+})
+
+test_that("the report says how to read its numbers", {
+  rep <- bench_report(fake_rows(), baseline = "dev")
+  expect_match(rep, "## How to read this", all = FALSE, fixed = TRUE)
+  expect_match(rep, "level after setup", all = FALSE, fixed = TRUE)
+  expect_match(rep, "training rows", all = FALSE, fixed = TRUE)
+})
+
 test_that("the report format is checked before anything is rendered", {
   expect_error(bench_render_report("x.csv", format = "pdf"), "Unknown format 'pdf'. Use one of md, html.", fixed = TRUE)
 })
@@ -871,4 +925,22 @@ test_that("the HTML report renders from a rows file", {
   out <- suppressMessages(bench_render_report(csv, baseline = "dev", format = "html", dir = tempfile("html")))
   expect_true(file.exists(out))
   expect_match(paste(readLines(out, warn = FALSE), collapse = "\n"), "fit_fixed", fixed = TRUE)
+})
+
+test_that("rows from before n_new read as 1000 predicted rows", {
+  old <- fake_rows()
+  old$n_new <- NULL
+  csv <- tempfile(fileext = ".csv")
+  utils::write.csv(old, csv, row.names = FALSE)
+  rows <- bench_read_rows(csv)
+  expect_equal(rows$n_new, c(1000L, 1000L))
+  expect_named(rows, bench_schema())
+})
+
+test_that("cell labels name the predicted rows for prediction ops only", {
+  rows <- rbind(fake_rows(), fake_rows())
+  rows$op[3:4] <- "predict"
+  label <- .bench_cell_label(rows)
+  expect_false(any(grepl("predicted=", label[1:2])))
+  expect_true(all(grepl("predicted=1000", label[3:4], fixed = TRUE)))
 })
