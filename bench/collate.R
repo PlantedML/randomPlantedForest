@@ -35,15 +35,21 @@ bench_deltas <- function(rows, baseline = "dev") {
   b <- base[match(other$key, base$key), ]
   out <- other[c("ref", BENCH_CELL_COLS)]
   out$baseline <- rep(baseline, nrow(out))
+  out$time_base <- b$time_median
+  out$time_ref <- other$time_median
+  out$mem_base <- b$peak_delta_mb
+  out$mem_ref <- other$peak_delta_mb
   out$time_pct <- .bench_pct(other$time_median, b$time_median)
   out$mem_pct <- .bench_pct(other$peak_delta_mb, b$peak_delta_mb)
   # peaks within the allocator's reuse of setup memory or the sampling interval
   out$mem_below <- !is.na(other$peak_delta_mb) & !is.na(b$peak_delta_mb) & other$peak_delta_mb < 1 & b$peak_delta_mb < 1
   out$time_verdict <- .bench_verdict(out$time_pct, BENCH_TIME_THRESHOLD, c("slower", "faster", "inconclusive"))
   out$mem_verdict <- .bench_verdict(out$mem_pct, BENCH_MEM_THRESHOLD, c("more", "less", "same"))
+  out$mem_verdict[out$mem_below] <- NA_character_
   # NA when either side has no output: unknown, not unchanged
   out$output_differs <- ifelse(is.na(other$digest) | is.na(b$digest), NA, other$digest != b$digest)
-  out$skipped <- other$skipped
+  # either side could not run the op
+  out$skipped <- ifelse(is.na(other$skipped), b$skipped, other$skipped)
   rownames(out) <- NULL
   out
 }
@@ -82,6 +88,29 @@ bench_read_rows <- function(path) {
 }
 
 .bench_fmt_pct <- function(x) ifelse(is.na(x), "n/a", sprintf("%+.1f%%", x))
+
+# "baseline → ref (change)", with the unit, so a percentage never stands alone
+.bench_fmt_change <- function(base, ref, pct, unit) {
+  ifelse(
+    is.na(pct),
+    "n/a",
+    sprintf("%s %s → %s %s (%s)", format(signif(base, 3)), unit, format(signif(ref, 3)), unit, .bench_fmt_pct(pct))
+  )
+}
+
+# One line per ref, op and reason, with the number of cells.
+.bench_skipped_lines <- function(skipped) {
+  groups <- unique(skipped[c("ref", "op", "skipped")])
+  vapply(
+    seq_len(nrow(groups)),
+    function(i) {
+      g <- groups[i, ]
+      k <- sum(skipped$ref == g$ref & skipped$op == g$op & skipped$skipped == g$skipped)
+      sprintf("- %s cannot run %s (%d cell%s): %s", g$ref, g$op, k, if (k == 1L) "" else "s", g$skipped)
+    },
+    character(1)
+  )
+}
 
 bench_report <- function(rows, baseline = "dev") {
   baseline <- .bench_baseline(rows, baseline)
@@ -126,30 +155,44 @@ bench_report <- function(rows, baseline = "dev") {
     out <- c(out, "Only one distinct ref was measured, so there is nothing to compare.", "")
   } else {
     d <- bench_deltas(rows, baseline)
+    # cells a ref could not run are listed under Skipped
+    d <- d[is.na(d$skipped), ]
     out <- c(
       out,
       "## Deltas",
       "",
-      "| cell | ref | time | verdict | memory | verdict | output |",
+      paste0("Each change is ", baseline, " → ref. Cells a ref could not run are listed under Skipped."),
+      "",
+      "| cell | ref | time | verdict | memory above setup | verdict | output |",
       "|---|---|---|---|---|---|---|",
       sprintf(
         "| %s | %s | %s | %s | %s | %s | %s |",
         .bench_cell_label(d),
         d$ref,
-        .bench_fmt_pct(d$time_pct),
+        mapply(.bench_fmt_change, d$time_base, d$time_ref, d$time_pct, MoreArgs = list(unit = "s")),
         ifelse(is.na(d$time_verdict), "", d$time_verdict),
-        ifelse(d$mem_below, "below resolution", .bench_fmt_pct(d$mem_pct)),
-        ifelse(is.na(d$mem_verdict), "", d$mem_verdict),
         ifelse(
-          !is.na(d$skipped),
-          "skipped",
-          ifelse(is.na(d$output_differs), "n/a", ifelse(d$output_differs, "OUTPUT DIFFERS", "same"))
-        )
+          d$mem_below,
+          "below resolution",
+          mapply(.bench_fmt_change, d$mem_base, d$mem_ref, d$mem_pct, MoreArgs = list(unit = "MB"))
+        ),
+        ifelse(is.na(d$mem_verdict), "", d$mem_verdict),
+        ifelse(is.na(d$output_differs), "n/a", ifelse(d$output_differs, "OUTPUT DIFFERS", "same"))
       ),
       ""
     )
-    diff <- d[!is.na(d$output_differs) & d$output_differs, ]
-    if (nrow(diff)) {
+    compared <- d[!is.na(d$output_differs), ]
+    diff <- compared[compared$output_differs, ]
+    if (nrow(diff) && nrow(diff) == nrow(compared)) {
+      out <- c(
+        out,
+        "## OUTPUT DIFFERS",
+        "",
+        sprintf("Every compared cell (%d) gives output that differs from %s's.", nrow(diff), baseline),
+        "That is expected when fits changed on purpose since the baseline, and a red flag for a change that claims identical fits.",
+        ""
+      )
+    } else if (nrow(diff)) {
       out <- c(out, "## OUTPUT DIFFERS", "", sprintf("- %s: %s vs %s", .bench_cell_label(diff), diff$ref, baseline), "")
     }
   }
@@ -175,7 +218,7 @@ bench_report <- function(rows, baseline = "dev") {
       out,
       "## Skipped",
       "",
-      sprintf("- %s, %s: %s", .bench_cell_label(skipped), skipped$ref, skipped$skipped),
+      .bench_skipped_lines(skipped),
       ""
     )
   }

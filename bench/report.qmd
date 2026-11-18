@@ -69,7 +69,7 @@ op_tabs("time")
 
 The highest memory the measuring R process used while the operation ran, one point per round.
 This includes everything already in memory: the data, and for `predict`, `purify` and `predict_components` the forest their setup fitted.
-The dashed line is the level after setup, so the distance from the line to the box is what the operation itself added.
+The dashed line is the level after setup (of the round where it was lowest), so the distance from the line to the box is roughly what the operation itself added.
 That distance can look smaller than the operation's real need, because it reuses memory the setup freed.
 The text report's memory verdicts compare this distance, the plots show the whole peak.
 

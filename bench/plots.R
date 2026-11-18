@@ -24,6 +24,19 @@ bench_long <- function(rows, what = "time", over = "n") {
     data.frame(value = v, raw = rep(FALSE, length(v)))
   })
   keep <- rep(seq_len(nrow(rows)), vapply(parts, nrow, integer(1)))
+  # the lowest level after setup over the rounds: every round's peak is above
+  # its own level, so none falls below this line, as it could below the median
+  floors <- if ("floors_mb" %in% names(rows)) rows$floors_mb else rep(NA_character_, nrow(rows))
+  floor <- vapply(
+    seq_len(nrow(rows)),
+    function(i) {
+      if (is.na(floors[i]) || !nzchar(floors[i])) {
+        return(as.numeric(rows$floor_mb[i]))
+      }
+      min(as.numeric(strsplit(floors[i], ";", fixed = TRUE)[[1]]))
+    },
+    numeric(1)
+  )
   without <- rows
   without[[over]] <- "*"
   out <- data.frame(
@@ -32,7 +45,7 @@ bench_long <- function(rows, what = "time", over = "n") {
     task = rows$task[keep],
     n = rows$n[keep],
     n_new = rows$n_new[keep],
-    floor = rows$floor_mb[keep],
+    floor = floor[keep],
     cell = .bench_cell_label(rows)[keep],
     setting = .bench_cell_label(without)[keep],
     do.call(rbind, parts),
@@ -84,12 +97,12 @@ bench_plot_cells <- function(rows, what = "time") {
     p <- p +
       ggplot2::geom_errorbar(
         data = floors,
-        ggplot2::aes(ref, ymin = floor, ymax = floor, linetype = "level after setup"),
+        ggplot2::aes(ref, ymin = floor, ymax = floor, linetype = "level after setup (lowest round)"),
         inherit.aes = FALSE,
         width = 0.7,
         linewidth = 0.9
       ) +
-      ggplot2::scale_linetype_manual(values = c(`level after setup` = "dashed"))
+      ggplot2::scale_linetype_manual(values = c(`level after setup (lowest round)` = "dashed"))
   }
   p +
     ggplot2::geom_point(
@@ -133,7 +146,7 @@ bench_plot_scaling <- function(rows, what = "time", over = "n") {
     ggplot2::geom_line(linewidth = 1.1) +
     ggplot2::geom_point(size = 3.5) +
     ggplot2::scale_colour_manual(values = .bench_ref_colours(levels(long$ref))) +
-    ggplot2::scale_x_log10() +
+    ggplot2::scale_x_log10(labels = function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)) +
     ggplot2::scale_y_log10() +
     ggplot2::facet_wrap(~ op + task, scales = "free_y") +
     ggplot2::labs(

@@ -609,7 +609,27 @@ test_that("skipped refs are marked in the delta table, not reported as same outp
   d <- bench_deltas(rows)
   expect_equal(d$skipped, "needs rpf >= 0.5.0.9000")
   rep <- bench_report(rows)
-  expect_match(rep, "| skipped |", all = FALSE, fixed = TRUE)
+  # not a row of n/a in the table, but one line per ref, op and reason
+  expect_false(any(grepl("| pr |", rep, fixed = TRUE)))
+  expect_match(rep, "- pr cannot run fit_fixed (1 cell): needs rpf >= 0.5.0.9000", all = FALSE, fixed = TRUE)
+})
+
+test_that("the deltas table shows the values behind each percentage", {
+  rep <- bench_report(fake_rows(time = c(1, 1.2), mem = c(100, 120)))
+  expect_match(rep, "1 s → 1.2 s (+20.0%)", all = FALSE, fixed = TRUE)
+  expect_match(rep, "100 MB → 120 MB (+20.0%)", all = FALSE, fixed = TRUE)
+})
+
+test_that("memory below resolution on both sides gets no verdict", {
+  d <- bench_deltas(fake_rows(mem = c(0.03, 0)))
+  expect_true(d$mem_below)
+  expect_true(is.na(d$mem_verdict))
+})
+
+test_that("output that differs everywhere is one sentence, not a list", {
+  rep <- bench_report(fake_rows(digest = c("x", "y")))
+  expect_match(rep, "Every compared cell (1) gives output that differs from dev's.", all = FALSE, fixed = TRUE)
+  expect_false(any(grepl(": pr vs dev", rep, fixed = TRUE)))
 })
 
 ## ---- review fixes: measurement ------------------------------------------------------------
@@ -899,9 +919,20 @@ test_that("memory scaling shows the absolute peak, which a reused setup cannot h
   expect_true(all(p$data$value >= 300))
 })
 
-test_that("a cell records the absolute peak of every round", {
+test_that("a cell records the absolute peak and the level after setup of every round", {
   rows <- bench_run_cell(fake_cell("any"), two_refs(), tempfile("data"), ops = fake_ops, metric = "none")
   expect_equal(lengths(strsplit(rows$peaks_mb, ";")), c(2L, 2L))
+  expect_equal(lengths(strsplit(rows$floors_mb, ";")), c(2L, 2L))
+})
+
+test_that("the setup line sits at the lowest round, so no peak falls below it", {
+  rows <- fake_rows()
+  rows$peaks_mb <- c("250;310", "300;301")
+  rows$floors_mb <- c("240;300", "290;295")
+  rows$floor_mb <- c(270, 292.5)
+  mem <- bench_long(rows, "memory")
+  expect_equal(unique(mem$floor[mem$ref == "dev"]), 240)
+  expect_true(all(mem$value >= mem$floor))
 })
 
 test_that("the report says how to read its numbers", {

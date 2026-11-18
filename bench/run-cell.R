@@ -19,6 +19,7 @@ bench_schema <- function() {
     "times",
     "peak_deltas_mb",
     "peaks_mb",
+    "floors_mb",
     "digest",
     "skipped",
     "error",
@@ -127,6 +128,11 @@ bench_run_cell <- function(cell, refs, data_dir, ops = bench_ops(), metric = ben
         },
         peaks_mb = if (length(ms)) {
           paste(signif(vapply(ms, function(m) m$peak_mb, numeric(1)), 6), collapse = ";")
+        } else {
+          NA_character_
+        },
+        floors_mb = if (length(ms)) {
+          paste(signif(vapply(ms, function(m) m$floor_mb, numeric(1)), 6), collapse = ";")
         } else {
           NA_character_
         },
