@@ -356,6 +356,15 @@ test_that("every cell names a known op", {
   expect_equal(unique(bench_select_cells(quick, sizes = 1000)$n), 1000)
 })
 
+test_that("logit cells are sized to fit the default walltime", {
+  full <- bench_cells("full")
+  logit <- !is.na(full$loss) & full$loss == "logit"
+  expect_true(any(logit))
+  expect_true(all(full$mem_reps[logit] == 3L))
+  expect_true(all(full$iters[logit & full$op %in% c("fit_fixed", "fit_oob")] == 1L))
+  expect_true(all(full$iters[!logit & full$op == "fit_fixed"] == 5L))
+})
+
 test_that("choices are matched exactly, never partially", {
   expect_error(bench_cells("ful"), "Unknown tier 'ful'. Use one of quick, full.", fixed = TRUE)
   expect_error(bench_make_registry(tempfile("reg"), "slrum"), "Unknown backend 'slrum'", fixed = TRUE)

@@ -117,6 +117,11 @@ bench_cells <- function(tier = "quick") {
   cells <- switch(tier, quick = .bench_cells_quick(), full = .bench_cells_full())
   # purify() works in place, see bench_ops()
   cells$iters[cells$op == "purify"] <- 1L
+  # v0.5.0 takes about 30 min per logit fit at n = 10000: 3 rounds of one
+  # call keep these cells within the default walltime
+  logit <- !is.na(cells$loss) & cells$loss == "logit"
+  cells$mem_reps[logit] <- 3L
+  cells$iters[logit & cells$op %in% c("fit_fixed", "fit_oob")] <- 1L
   cells$tier <- tier
   cells <- unique(cells)
   rownames(cells) <- NULL
