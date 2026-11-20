@@ -69,8 +69,8 @@ port_purified_numbers <- function(fit, newdata, type = NULL) {
   )
 }
 
-# all numbers, by digest name
-port_fit_numbers_all <- function() {
+# all numbers, by digest name (`level`: rpf()'s argument, given to every fit; regression and L1 / L2 ignore it)
+port_fit_numbers_all <- function(level = TRUE) {
   # the exact draw of "leaf" candidates, as master (its default may change)
   old <- options(randomPlantedForest.exact_draw = TRUE)
   on.exit(options(old), add = TRUE)
@@ -103,6 +103,7 @@ port_fit_numbers_all <- function() {
         n_try_split_points = 5,
         share_candidates = 0.5,
         prune = FALSE,
+        level = level,
         nthreads = cfg[["nt"]],
         deterministic = cfg[["det"]] == 1
       )
@@ -119,6 +120,7 @@ port_fit_numbers_all <- function() {
       n_try_split_points = 5,
       share_candidates = 0.5,
       prune = FALSE,
+      level = level,
       loss = "exponential"
     )
     out[[sprintf("cls_%s", lab)]] <- port_fit_numbers(f, nd, type = "prob")
@@ -137,6 +139,7 @@ port_fit_numbers_all <- function() {
         n_try_split_points = 5,
         share_candidates = 0.5,
         prune = FALSE,
+        level = level,
         loss = l
       )
       out[[sprintf("loss%d_%s", k, l)]] <- port_fit_numbers(f, nd, type = "prob")
@@ -155,6 +158,7 @@ port_fit_numbers_all <- function() {
       n_try_split_points = 5,
       share_candidates = 0.5,
       prune = FALSE,
+      level = level,
       loss = if (is.null(type)) NULL else "exponential",
       nthreads = nthreads
     )

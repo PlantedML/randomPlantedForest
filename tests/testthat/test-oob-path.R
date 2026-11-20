@@ -60,16 +60,15 @@ leaf_list <- function(fit) {
 
 test_that("the prefix property: the k-split forest is the first k splits of a longer fit", {
   # the growth, before the level a classification fit adds after its last split
-  rlang::local_options(randomPlantedForest.level = FALSE)
   # With delete_leaves = FALSE a split only appends leaves, so every tree of the k-split forest must be the first
   # leaves of that tree in the longer fit: every structure, regression and classification.
   d <- path_sim()
   yc <- factor(d$y > stats::median(d$y), labels = c("a", "b"))
   for (s in structures) {
     for (y in list(d$y, yc)) {
-      big <- leaf_list(path_fit(d, 60, y = y, split_structure = s, delete_leaves = FALSE))
+      big <- leaf_list(path_fit(d, 60, y = y, split_structure = s, delete_leaves = FALSE, level = FALSE))
       for (k in c(1, 7, 30)) {
-        small <- leaf_list(path_fit(d, k, y = y, split_structure = s, delete_leaves = FALSE))
+        small <- leaf_list(path_fit(d, k, y = y, split_structure = s, delete_leaves = FALSE, level = FALSE))
         is_prefix <- vapply(
           names(small),
           function(t) {

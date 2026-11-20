@@ -31,7 +31,6 @@ test_that("a family without a split predicts the mean of its rows", {
 
 test_that("a classification family without a split predicts its rows' fit", {
   # the null leaf's own fit, before the level (test-classif-level.R)
-  rlang::local_options(randomPlantedForest.level = FALSE)
   dat <- no_split_data()
   dat[c("x1", "x2")] <- 1
   shares <- function(y) as.numeric(prop.table(table(y)))
@@ -58,7 +57,8 @@ test_that("a classification family without a split predicts its rows' fit", {
       n_families = 1,
       n_splits = 5,
       deterministic = TRUE,
-      ...
+      ...,
+      level = FALSE
     )
   }
   p1 <- function(f) unlist(predict(f, dat[1, ]), use.names = FALSE)
@@ -131,7 +131,6 @@ test_that("min_leaf_rows above half the rows leaves every family without a split
 
 test_that("rpf()'s default call (splits chosen out of bag): a family without a split predicts its rows' fit", {
   # the null leaf's own fit, before the level (test-classif-level.R)
-  rlang::local_options(randomPlantedForest.level = FALSE)
   # The adaptive fit rebuilds the forest from the families' records at the chosen number of splits; a family without
   # a split there gets its rows' fit, as a fit with that number of splits gives it. Checked on the forest itself
   # (`$fit`, kept with keep_forest = TRUE) and on the pruned model.
@@ -158,7 +157,13 @@ test_that("rpf()'s default call (splits chosen out of bag): a family without a s
   for (outcome in c("cl", "cl3")) {
     for (loss in c("exponential", "logit")) {
       set.seed(1)
-      fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = constant, loss = loss, keep_forest = TRUE)
+      fit <- rpf(
+        stats::as.formula(paste(outcome, "~ x1 + x2")),
+        data = constant,
+        loss = loss,
+        keep_forest = TRUE,
+        level = FALSE
+      )
       check_cls(fit, constant[[outcome]], paste(outcome, loss))
     }
   }
@@ -168,7 +173,13 @@ test_that("rpf()'s default call (splits chosen out of bag): a family without a s
   check_reg(rpf(y ~ x1 + x2, data = dat, min_leaf_rows = 51, keep_forest = TRUE), "min_leaf_rows")
   for (outcome in c("cl", "cl3")) {
     set.seed(1)
-    fit <- rpf(stats::as.formula(paste(outcome, "~ x1 + x2")), data = dat, min_leaf_rows = 51, keep_forest = TRUE)
+    fit <- rpf(
+      stats::as.formula(paste(outcome, "~ x1 + x2")),
+      data = dat,
+      min_leaf_rows = 51,
+      keep_forest = TRUE,
+      level = FALSE
+    )
     check_cls(fit, dat[[outcome]], paste(outcome, "min_leaf_rows"))
   }
 })
@@ -189,7 +200,6 @@ test_that("the pruned model's intercept includes the families that made no split
 
 test_that("the OOB path tracks a family without a split at its rows' fit, not at 0", {
   # the path itself: the families' null leaves without the level (test-classif-level.R)
-  rlang::local_options(randomPlantedForest.level = FALSE)
   dat <- no_split_data()
   # 100 rows: no threshold keeps 51 rows on each side, so no family splits
   path_fit <- function(y, n_families, ...) {
@@ -202,7 +212,8 @@ test_that("the OOB path tracks a family without a split at its rows' fit, not at
       min_leaf_rows = 51,
       prune = FALSE,
       oob_path = c(1, 5),
-      ...
+      ...,
+      level = FALSE
     )
   }
   cases <- list(
@@ -237,7 +248,7 @@ test_that("the OOB path tracks a family without a split at its rows' fit, not at
   # the adaptive fit tracks them the same way: its first checkpoint's raw criterion is that of the families' fits
   # (at the score 0 it was log(2))
   set.seed(2)
-  ad <- rpf(cl ~ x1 + x2, data = dat, loss = "logit", n_families = 10, min_leaf_rows = 51, prune = FALSE)
+  ad <- rpf(cl ~ x1 + x2, data = dat, loss = "logit", n_families = 10, min_leaf_rows = 51, prune = FALSE, level = FALSE)
   p <- mean(dat$cl == "b")
   expect_lt(ad$oob_path$oob_loss_raw[1], -(p * log(p) + (1 - p) * log(1 - p)) + 0.05)
 })

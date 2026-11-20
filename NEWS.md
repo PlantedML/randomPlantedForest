@@ -74,7 +74,8 @@
   The families are averaged on the score scale, and where they disagree the probability of their mean score is below the mean of their probabilities for a class rarer than 1/2, so the forest predicted a rare class too rarely, the more so the more splits it made.
   With the level the forest predicts each class about as often as it occurs, at any number of splits.
   The out-of-bag choice of `n_splits` scores every number of splits at its own level, and the pruning starts from the forest with its level.
-  This changes every fit with these losses, binary and multiclass; `options(randomPlantedForest.level = FALSE)` fits without the level.
+  This changes every fit with these losses, binary and multiclass; `rpf(level = FALSE)` fits without the level, as before.
+  The setting is stored in `$params$level`, and the refits of the pruning's cross-validation and of `tune` follow it.
 
 * `rpf()` gains `keep_level_order`, to keep the level order of factor predictors instead of ordering their levels by the outcome.
   `TRUE` keeps it for every factor, ordered or not, and a character vector for the named factors only; splits then separate neighbouring levels in the order of `levels()`.

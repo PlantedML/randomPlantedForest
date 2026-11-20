@@ -104,6 +104,11 @@
 #'   search is the same either way. The exponential loss's step is exact by
 #'   itself, so `exact_step` does not change `"exponential"` fits. See
 #'   "Classification losses" in Details.
+#' @param level `[logical(1): TRUE]`: Only used with `loss = "logit"` and
+#'   `"exponential"`: whether the forest's score gets its level after the fit
+#'   (`FALSE` fits without it). Regression and the classification losses
+#'   `"L1"` and `"L2"` have no level and ignore it. See "The level of the
+#'   classification losses" in Details.
 #' @param prune `[logical(1) | NULL: NULL]`: Whether to return the pruned model
 #'   instead of the forest: the forest is pruned by [prune_components()] with
 #'   its defaults on the training rows, and the result is its `rpf_pruned`
@@ -305,10 +310,9 @@
 #' of `n_splits` scores every number of splits at its own level, and the
 #' pruning starts from the forest with its level. `$level` holds it (one value
 #' per score column) and `print()` shows it.
-#' `options(randomPlantedForest.level = FALSE)` fits without it. The setting
-#' is stored in the fit's `$params$level`, and refits (the pruning's
-#' cross-validation) follow it; a fit without the setting is refitted without
-#' a level.
+#' `level = FALSE` fits without it. The setting is stored in the fit's
+#' `$params$level`, and refits (the pruning's cross-validation and the search
+#' of `tune`) follow it; a fit without the setting is refitted without a level.
 #'
 #' ## Factor predictors
 #'
@@ -691,6 +695,7 @@ rpf.formula <- function(
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -735,6 +740,7 @@ rpf.formula <- function(
     interaction_constraints = interaction_constraints,
     loss = loss,
     exact_step = exact_step,
+    level = level,
     prune = prune,
     max_panels = max_panels,
     keep_forest = keep_forest,
@@ -768,6 +774,7 @@ rpf.data.frame <- function(
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -799,6 +806,7 @@ rpf.data.frame <- function(
     interaction_constraints = interaction_constraints,
     loss = loss,
     exact_step = exact_step,
+    level = level,
     prune = prune,
     max_panels = max_panels,
     keep_forest = keep_forest,
@@ -832,6 +840,7 @@ rpf.matrix <- function(
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -863,6 +872,7 @@ rpf.matrix <- function(
     interaction_constraints = interaction_constraints,
     loss = loss,
     exact_step = exact_step,
+    level = level,
     prune = prune,
     max_panels = max_panels,
     keep_forest = keep_forest,
@@ -896,6 +906,7 @@ rpf.recipe <- function(
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -930,6 +941,7 @@ rpf.recipe <- function(
     interaction_constraints = interaction_constraints,
     loss = loss,
     exact_step = exact_step,
+    level = level,
     prune = prune,
     max_panels = max_panels,
     keep_forest = keep_forest,
@@ -963,6 +975,7 @@ rpf_bridge <- function(
   interaction_constraints,
   loss,
   exact_step,
+  level,
   prune,
   max_panels,
   keep_forest,
@@ -1020,6 +1033,7 @@ rpf_bridge <- function(
   loss_functions <- switch(outcomes$mode, "regression" = "L2", "classification" = c("L1", "L2", "logit", "exponential"))
   checkmate::assert_choice(loss, choices = loss_functions)
   checkmate::assert_flag(exact_step)
+  checkmate::assert_flag(level)
 
   checkmate::assert_flag(prune, null.ok = TRUE)
   checkmate::assert_flag(deterministic)
@@ -1105,9 +1119,9 @@ rpf_bridge <- function(
     # logit's steps (exponential's are exact anyway), and the losses' pseudo-rows, by an option for studies only
     params$exact_step <- exact_step
     params$prior_rows <- rpf_prior_rows(call = call)
-    # the level of loss = "logit" and "exponential" (classif_level()), by the option randomPlantedForest.level
+    # the level of loss = "logit" and "exponential" (classif_level()); the other losses have none
     if (loss %in% c("logit", "exponential")) {
-      params$level <- rpf_level(call = call)
+      params$level <- level
     }
   }
 
@@ -1249,20 +1263,6 @@ rpf_exact_draw <- function(call = rlang::caller_env()) {
     )
   }
   exact_draw
-}
-
-# The level of loss = "logit" and "exponential" (classif_level()): the option randomPlantedForest.level (TRUE, the
-# default: on; FALSE: off). Stored in the fit's params, so that a refit (the pruning's cross-validation) and a saved
-# fit keep it; a fit without params$level gets no level (level_on()).
-rpf_level <- function(call = rlang::caller_env()) {
-  level <- getOption("randomPlantedForest.level", TRUE)
-  if (!rlang::is_bool(level)) {
-    cli::cli_abort(
-      "The option {.code randomPlantedForest.level} must be {.code TRUE} or {.code FALSE}.",
-      call = call
-    )
-  }
-  level
 }
 
 # The pseudo-rows a of the logit and exponential losses (1): the undocumented

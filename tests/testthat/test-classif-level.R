@@ -1,6 +1,6 @@
 # The classification level (classif_level()): one constant per score column, the maximum-likelihood intercept of the
-# log-loss given the forest's out-of-bag scores (the balance property), in every family's null leaf. The option
-# randomPlantedForest.level (TRUE by default) switches it; off, a fit is the fit of earlier versions.
+# log-loss given the forest's out-of-bag scores (the balance property), in every family's null leaf. rpf()'s argument
+# `level` (TRUE by default) switches it; off, a fit is the fit of earlier versions.
 
 level_data <- function(n = 400, seed = 3, K = 2) {
   set.seed(seed)
@@ -19,12 +19,6 @@ level_data <- function(n = 400, seed = 3, K = 2) {
 level_raw <- function(fit, d) {
   X <- preprocess_predictors_predict(fit, hardhat::forge(d, fit$blueprint)$predictors)
   matrix(fit$fit$predict_matrix(X, 0, 0L), nrow = nrow(d))
-}
-
-with_level <- function(on, code) {
-  old <- options(randomPlantedForest.level = on)
-  on.exit(options(old))
-  code
 }
 
 test_that("classif_level() solves the balance equations (binary, multiclass logit, SAMME)", {
@@ -69,10 +63,8 @@ test_that("classif_level() solves the balance equations (binary, multiclass logi
 test_that("the level moves the forest's score by a constant; off, no level and the same splits", {
   d <- level_data()
   fits <- lapply(c(FALSE, TRUE), function(on) {
-    with_level(on, {
-      set.seed(4)
-      rpf(y ~ ., data = d, loss = "logit", max_interaction = 2, n_families = 20, n_splits = 30, prune = FALSE)
-    })
+    set.seed(4)
+    rpf(y ~ ., data = d, loss = "logit", max_interaction = 2, n_families = 20, n_splits = 30, prune = FALSE, level = on)
   })
   expect_null(fits[[1]]$level)
   expect_false(fits[[1]]$params$level)
@@ -123,10 +115,17 @@ test_that("multiclass logit and exponential get one level per score column", {
     if (loss == "exponential") {
       expect_equal(sum(fit$level), 0, tolerance = 1e-12)
     }
-    with_level(FALSE, {
-      set.seed(5)
-      fit0 <- rpf(y ~ ., data = d, loss = loss, max_interaction = 2, n_families = 20, n_splits = 25, prune = FALSE)
-    })
+    set.seed(5)
+    fit0 <- rpf(
+      y ~ .,
+      data = d,
+      loss = loss,
+      max_interaction = 2,
+      n_families = 20,
+      n_splits = 25,
+      prune = FALSE,
+      level = FALSE
+    )
     expect_equal(
       level_raw(fit, d) - level_raw(fit0, d),
       matrix(fit$level, nrow(d), length(fit$level), byrow = TRUE),
@@ -135,16 +134,28 @@ test_that("multiclass logit and exponential get one level per score column", {
   }
 })
 
-test_that("L1 / L2 classification and regression get no level", {
+test_that("L1 / L2 classification and regression get no level, and ignore the argument", {
   d <- level_data()
-  set.seed(6)
-  fit <- rpf(y ~ ., data = d, loss = "L2", n_families = 10, n_splits = 10, prune = FALSE)
-  expect_null(fit$level)
-  expect_null(fit$params$level)
   d$z <- as.numeric(d$y == "yes") + d$x1
-  set.seed(6)
-  fit <- rpf(z ~ x1 + x2 + x3, data = d, n_families = 10, n_splits = 10, prune = FALSE)
-  expect_null(fit$level)
+  for (f in list(y ~ ., z ~ x1 + x2 + x3)) {
+    fits <- lapply(c(TRUE, FALSE), function(on) {
+      set.seed(6)
+      loss <- if (identical(f[[2]], quote(y))) "L2" else NULL
+      expect_no_warning(fit <- rpf(f, data = d, loss = loss, n_families = 10, n_splits = 10, prune = FALSE, level = on))
+      fit
+    })
+    expect_null(fits[[1]]$level)
+    expect_null(fits[[1]]$params$level)
+    expect_identical(predict(fits[[1]], d), predict(fits[[2]], d))
+  }
+  for (loss in c("L1", "L2")) {
+    set.seed(6)
+    a <- rpf(y ~ ., data = d[1:4], loss = loss, n_families = 10, n_splits = 10, prune = FALSE)
+    set.seed(6)
+    b <- rpf(y ~ ., data = d[1:4], loss = loss, n_families = 10, n_splits = 10, prune = FALSE, level = FALSE)
+    expect_identical(predict(a, d, type = "prob"), predict(b, d, type = "prob"))
+    expect_identical(a$params, b$params)
+  }
 })
 
 test_that("the adaptive fit scores every checkpoint at its level and returns the forest at the chosen one's", {
@@ -250,48 +261,46 @@ test_that("the pruning's cross-validation refits each fold with its level; a fit
   old$params$level <- NULL
   expect_false(level_on(old$params, "classification"))
   refit_old <- prune_refit(old, d[c("x1", "x2", "x3")], d$y, seq_len(200), seed = 1, nthreads = 1L)
-  with_level(FALSE, {
-    set.seed(1)
-    direct0 <- rpf(
-      y ~ .,
-      data = d[seq_len(200), ],
-      loss = "logit",
-      max_interaction = 2,
-      n_families = 10,
-      n_splits = 20,
-      prune = FALSE
-    )
-  })
+  set.seed(1)
+  direct0 <- rpf(
+    y ~ .,
+    data = d[seq_len(200), ],
+    loss = "logit",
+    max_interaction = 2,
+    n_families = 10,
+    n_splits = 20,
+    prune = FALSE,
+    level = FALSE
+  )
   expect_identical(level_raw(refit_old, d), level_raw(direct0, d))
 })
 
-test_that("the option must be TRUE or FALSE", {
+test_that("level must be TRUE or FALSE", {
   d <- level_data(n = 100)
-  with_level("yes", {
+  for (bad in list("yes", NA, c(TRUE, FALSE), NULL)) {
     expect_error(
-      rpf(y ~ ., data = d, loss = "logit", n_families = 2, n_splits = 2, prune = FALSE),
-      "randomPlantedForest.level"
+      rpf(y ~ ., data = d, loss = "logit", n_families = 2, n_splits = 2, prune = FALSE, level = bad),
+      "level"
     )
-  })
+  }
 })
 
 test_that("families without a split: the level is computed from their fits, and is small", {
   d <- level_data(n = 100)
   # 100 rows: no threshold keeps 51 rows on each side, so no family splits
   fit_path <- function(level) {
-    with_level(level, {
-      set.seed(2)
-      rpf(
-        y ~ .,
-        data = d,
-        loss = "logit",
-        n_families = 10,
-        n_splits = 5,
-        min_leaf_rows = 51,
-        prune = FALSE,
-        oob_path = TRUE
-      )
-    })
+    set.seed(2)
+    rpf(
+      y ~ .,
+      data = d,
+      loss = "logit",
+      n_families = 10,
+      n_splits = 5,
+      min_leaf_rows = 51,
+      prune = FALSE,
+      oob_path = TRUE,
+      level = level
+    )
   }
   on <- fit_path(TRUE)
   expect_true(all(vapply(on$fit$get_model(), function(f) length(f$variables) == 1, TRUE)))
@@ -310,4 +319,127 @@ test_that("families without a split: the level is computed from their fits, and 
   expect_identical(off$fit$oob_path(), path)
   nulls_off <- vapply(off$fit$get_model(), function(f) f$values[[1]][[1]][1], 0)
   expect_equal(nulls_off, nulls, tolerance = 1e-12)
+})
+
+test_that("level = FALSE is kept by rpf_marshal(), saveRDS() and the refits of the restored forest", {
+  d <- level_data(n = 300)
+  x <- d[c("x1", "x2", "x3")]
+  roundtrip <- function(m) {
+    f <- tempfile(fileext = ".rds")
+    on.exit(unlink(f))
+    saveRDS(rpf_marshal(m), f)
+    rpf_unmarshal(readRDS(f))
+  }
+  for (loss in c("logit", "exponential")) {
+    set.seed(12)
+    fit <- rpf(
+      y ~ .,
+      data = d,
+      loss = loss,
+      max_interaction = 2,
+      n_families = 10,
+      n_splits = 20,
+      prune = FALSE,
+      level = FALSE
+    )
+    back <- roundtrip(fit)
+    expect_false(back$params$level)
+    expect_null(back$level)
+    expect_identical(predict(back, d, type = "prob"), predict(fit, d, type = "prob"))
+    # a refit of the restored forest (the pruning's cross-validation) is the fit without the level on those rows
+    refit <- prune_refit(back, x, d$y, seq_len(200), seed = 1, nthreads = 1L)
+    set.seed(1)
+    direct <- rpf(
+      y ~ .,
+      data = d[seq_len(200), ],
+      loss = loss,
+      max_interaction = 2,
+      n_families = 10,
+      n_splits = 20,
+      prune = FALSE,
+      level = FALSE
+    )
+    expect_null(refit$level)
+    expect_identical(level_raw(refit, d), level_raw(direct, d))
+    refit_fit <- prune_refit(fit, x, d$y, seq_len(200), seed = 1, nthreads = 1L)
+    expect_identical(level_raw(refit, d), level_raw(refit_fit, d))
+    # the default pruned model, with its forest
+    set.seed(13)
+    pm <- rpf(y ~ ., data = d, loss = loss, max_interaction = 2, n_families = 10, keep_forest = TRUE, level = FALSE)
+    pb <- roundtrip(pm)
+    expect_false(pb$fit$params$level)
+    expect_null(pb$fit$level)
+    expect_identical(predict(pb, d, type = "prob"), predict(pm, d, type = "prob"))
+  }
+})
+
+test_that("the pruning's cross-validation refits each fold without the level when level = FALSE", {
+  d <- level_data(n = 300)
+  x <- d[c("x1", "x2", "x3")]
+  fits <- lapply(c(TRUE, FALSE), function(on) {
+    set.seed(14)
+    rpf(y ~ ., data = d, loss = "logit", max_interaction = 2, n_families = 10, n_splits = 20, prune = FALSE, level = on)
+  })
+  # the folds' refits: the fit on those rows with the forest's setting
+  for (k in 1:2) {
+    refit <- prune_refit(fits[[k]], x, d$y, seq_len(200), seed = 2, nthreads = 1L)
+    expect_identical(refit$params$level, k == 1)
+    set.seed(2)
+    direct <- rpf(
+      y ~ .,
+      data = d[seq_len(200), ],
+      loss = "logit",
+      max_interaction = 2,
+      n_families = 10,
+      n_splits = 20,
+      prune = FALSE,
+      level = k == 1
+    )
+    expect_equal(level_raw(refit, d), level_raw(direct, d), tolerance = 1e-12)
+  }
+  # the choice by cross-validation scores the folds' refits: the same forest with the setting switched on in its
+  # params (so its folds are refitted with the level) scores otherwise
+  off <- fits[[2]]
+  cv_off <- prune_components(off, x, d$y, select_by = "cv", seed = 1, max_panels = Inf)$cv
+  switched <- off
+  switched$params$level <- TRUE
+  cv_switched <- prune_components(switched, x, d$y, select_by = "cv", seed = 1, max_panels = Inf)$cv
+  expect_false(isTRUE(all.equal(cv_off$cv_loss, cv_switched$cv_loss)))
+  # and the restored forest (with its training rows) scores as the forest did
+  f <- tempfile(fileext = ".rds")
+  on.exit(unlink(f))
+  saveRDS(rpf_marshal(off, include_data = TRUE), f)
+  back <- rpf_unmarshal(readRDS(f))
+  expect_identical(prune_components(back, x, d$y, select_by = "cv", seed = 1, max_panels = Inf)$cv, cv_off)
+})
+
+test_that("rpf(tune = ) with level = FALSE grows and refits every forest without the level", {
+  d <- level_data(n = 300)
+  x <- d[c("x1", "x2", "x3")]
+  one <- data.frame(n_try_split_points = 5L, share_candidates = 0.2)
+  ctl <- tune_control(ladder = one, search = 1, min_leaf_rows = 1L, neighbours = FALSE)
+  set.seed(15)
+  tu <- rpf(x, d$y, loss = "logit", max_interaction = 2, n_families = 10, tune = ctl, keep_forest = TRUE, level = FALSE)
+  expect_false(tu$fit$params$level)
+  expect_null(tu$fit$level)
+  # a one-point search is the default fit at that point, here without the level
+  set.seed(15)
+  p <- rpf(
+    x,
+    d$y,
+    loss = "logit",
+    max_interaction = 2,
+    n_families = 10,
+    n_try_split_points = 5,
+    share_candidates = 0.2,
+    keep_forest = TRUE,
+    level = FALSE
+  )
+  expect_identical(tu$fit$fit$get_model(), p$fit$fit$get_model())
+  expect_identical(tu$oob, p$oob)
+  expect_identical(predict(tu, x, type = "prob"), predict(p, x, type = "prob"))
+  set.seed(15)
+  on <- rpf(x, d$y, loss = "logit", max_interaction = 2, n_families = 10, tune = ctl, keep_forest = TRUE)
+  expect_true(on$fit$params$level)
+  expect_false(is.null(on$fit$level))
 })

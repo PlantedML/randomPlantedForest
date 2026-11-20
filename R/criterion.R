@@ -305,9 +305,9 @@ level_solve <- function(J, r) {
   x
 }
 
-# Whether a fit with these params gets the classification level (classif_level()): rpf()'s option
-# randomPlantedForest.level (TRUE by default) is stored in params$level; a forest fitted before the level existed has
-# no params$level and none. Classification with loss = "logit" or "exponential".
+# Whether a fit with these params gets the classification level (classif_level()): rpf()'s argument `level` (TRUE
+# by default) is stored in params$level; a forest fitted before the level existed has no params$level and none.
+# Classification with loss = "logit" or "exponential".
 level_on <- function(params, mode) {
   mode == "classification" && isTRUE(params$level) && isTRUE(params$loss %in% c("logit", "exponential"))
 }

@@ -26,6 +26,7 @@ rpf(x, ...)
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -55,6 +56,7 @@ rpf(x, ...)
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -84,6 +86,7 @@ rpf(x, ...)
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -113,6 +116,7 @@ rpf(x, ...)
   interaction_constraints = NULL,
   loss = NULL,
   exact_step = TRUE,
+  level = TRUE,
   prune = NULL,
   max_panels = 10,
   keep_forest = FALSE,
@@ -228,6 +232,12 @@ them by (\code{FALSE}, faster). The split
 search is the same either way. The exponential loss's step is exact by
 itself, so \code{exact_step} does not change \code{"exponential"} fits. See
 "Classification losses" in Details.}
+
+\item{level}{\verb{[logical(1): TRUE]}: Only used with \code{loss = "logit"} and
+\code{"exponential"}: whether the forest's score gets its level after the fit
+(\code{FALSE} fits without it). Regression and the classification losses
+\code{"L1"} and \code{"L2"} have no level and ignore it. See "The level of the
+classification losses" in Details.}
 
 \item{prune}{\verb{[logical(1) | NULL: NULL]}: Whether to return the pruned model
 instead of the forest: the forest is pruned by \code{\link[=prune_components]{prune_components()}} with
@@ -457,10 +467,9 @@ predictions of the training rows are balanced instead. The out-of-bag choice
 of \code{n_splits} scores every number of splits at its own level, and the
 pruning starts from the forest with its level. \verb{$level} holds it (one value
 per score column) and \code{print()} shows it.
-\code{options(randomPlantedForest.level = FALSE)} fits without it. The setting
-is stored in the fit's \verb{$params$level}, and refits (the pruning's
-cross-validation) follow it; a fit without the setting is refitted without
-a level.
+\code{level = FALSE} fits without it. The setting is stored in the fit's
+\verb{$params$level}, and refits (the pruning's cross-validation and the search
+of \code{tune}) follow it; a fit without the setting is refitted without a level.
 }
 
 \subsection{Factor predictors}{
