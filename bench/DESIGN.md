@@ -1,7 +1,8 @@
 # Performance benchmark (`bench/`): design
 
-Status: design, not yet built.
-Written 2026-11-13.
+Status: built.
+Written 2026-11-13 as the design, updated 2026-11-20 to match what was built.
+How to use it is in [README.md](README.md).
 
 ## Why
 
@@ -61,7 +62,7 @@ rpf is not on CRAN, so anchors are git tags.
 Each ref is installed into its own library containing only rpf, from a `git worktree`.
 All dependencies come from one shared library, so refs differ only in rpf.
 Refs with identical package content are measured once.
-A run refuses to start on a dirty tracked tree, unless the working tree itself is the ref under test (builder's choice how to mark that).
+A run refuses to start on a dirty tracked tree, unless the working tree itself is one of the refs (`WORKTREE`).
 
 **Runner environment.**
 The runner is a command-line tool built with Rapp, as in arf.
@@ -73,9 +74,12 @@ rig is available on the BIPS cluster, so local and cluster runs use the same mec
 Every measurement runs in a fresh R process (`callr`).
 Rounds are interleaved across refs within a cell, and setup (data generation, loading) is not timed.
 Runtime is the median of several timed calls.
-Memory is sampled from the cgroup v2 memory accounting of the job, as in arf, and reported as peak minus a baseline taken in the same round.
-On macOS, peak RSS of the measurement process is the fallback if it is simple to obtain.
-Otherwise the runner warns that accurate memory measurement needs cgroup v2 on Linux and measures time only.
+Memory is sampled every 5 ms from the cgroup v2 memory accounting of the job, as in arf.
+Each round records the peak and the level after setup.
+The text report compares the peak above that level, which misses memory an operation reuses from its setup, so for operations with a setup it is a lower bound and can even fall as `n` grows.
+The HTML report therefore plots the whole peak, with the level after setup marked.
+On macOS, peak RSS of the measurement process is used instead.
+Without either, the runner warns that accurate memory measurement needs cgroup v2 on Linux and measures time only.
 Each cell hashes its output (predictions, components) per ref.
 
 **Threads.**
@@ -86,12 +90,15 @@ rpf's own `nthreads` is a cell dimension, not ambient state.
 `quick` runs cells one after another on the local machine.
 `full` submits one batchtools job per cell to Slurm, using the site configuration.
 Cells on one machine are not run concurrently, since they would disturb each other's timing and memory.
-On the cluster, jobs may share nodes with other jobs, as in arf: every ref of a cell is measured in the same job with interleaved rounds, so shared-node noise affects all refs alike, and the cgroup memory accounting is per job (Claude's call).
-The `full` tier is validated on the cluster by the maintainers, since the builder has no cluster access (Claude's call).
+On the cluster, jobs may share nodes with other jobs, as in arf: every ref of a cell is measured in the same job with interleaved rounds, so shared-node noise affects all refs alike, and the cgroup memory accounting is per job.
+Jobs leave the QoS unset, so the site template picks it from the walltime.
 
 **Results.**
-Raw results are plain tables (CSV or similar), gitignored.
-Results for anchor refs can be appended to a committed history file for a trend across releases, as in arf.
+Raw results are CSV files with one row per ref and cell, gitignored.
+Each row keeps every timed call and every round's memory, for the plots.
+`collect` appends the rows of anchor refs to the committed `history.csv`, for a trend across releases, as in arf.
+It skips incomplete runs.
+The text report (`report.md`) and a self-contained HTML page rendered with Quarto (`report.qmd`) are built from those rows, and both explain how to read their numbers.
 
 ## What is measured
 
@@ -101,11 +108,12 @@ The operations, on simulated data:
 - growing with `n_splits = NULL` (out-of-bag choice), `prune = FALSE`
 - the default call (out-of-bag `n_splits`, pruning, display)
 - `purify()`
-- `predict()` on an unpurified forest, including row counts above the leaf-index threshold
+- `predict()` on an unpurified forest, for 1,000 to 100,000 predicted rows
 - `predict_components()`
 - classification with `loss = "logit"` and `"exponential"`, binary and multiclass
 
-Cell dimensions include n, p, `max_interaction`, `n_families`, `n_splits` and `nthreads`.
+Cell dimensions include n (training rows), the number of predicted rows, p, `max_interaction`, `n_families`, `n_splits` and `nthreads`.
+Training and predicted rows are drawn with separate seeds, so the forest is the same whatever the number of predicted rows.
 `quick` uses a small grid, `full` the whole one.
 
 ## The memory estimator (separate pull request)
@@ -135,18 +143,19 @@ The contract `bench/` relies on (Claude's calls, to be confirmed in the estimato
 ## Open points
 
 - **Anchor compatibility.**
-  0.5.0 has the old argument names and lacks `prune`, `n_splits = NULL` and other features, so cells written for the current API cannot all run on it.
-  Proposal (builder's call to refine): each cell declares the minimum version it needs, refs below it skip the cell, and the first release with the current API (0.6.0) becomes the main anchor.
-  Until it is tagged, the `dev` branch serves as the base: development now goes through `dev`, and `master` gets fewer direct merges.
+  0.5.0 has the old argument names and lacks `prune`, `n_splits = NULL` and other features.
+  Arguments are translated by what each ref's `rpf()` accepts, and each operation names the arguments it needs, so a ref without them skips the cell and the report lists it under Skipped.
+  The first release with the current API (0.6.0) should become the main anchor once it is tagged.
+  Until then, `dev` and 0.5.0 are the usual refs.
 - **Expected output differences.**
   Some changes alter fits on purpose (e.g. the fast candidate draw).
   The report flags output differences, and whether a difference is expected is noted by the person reading it, not encoded in the suite.
 
-## Left to the builder
+## Decided while building
 
-- File layout under `bench/`, CLI subcommands and their names (arf has run, plan, collect, resubmit, viz, diag).
-- The exact grids for both tiers, within the `quick` time budget.
-- Data generators for regression and classification.
-- Number of timing iterations and memory rounds, the sampling interval, verdict thresholds (arf starts from 3% for memory and 10% for time).
-- Report format (Markdown table, Quarto page, or both).
-- Walltime and memory requests per cell on the cluster.
+- Layout: one launcher (`rpf-bench`) with the subcommands `run`, `collect`, `resubmit`, `report` and `test`, and plain R files per concern (refs, measurement, operations, cells, collation, plots).
+- Grids: in `cells.R`. The `full` tier's logit cells run 3 rounds of 1 call, since 0.5.0 takes about 30 minutes per logit fit at n = 10,000.
+- Data: one generator for regression, binary and multiclass tasks with main effects, a two-way and a three-way interaction and a factor, in `ops.R`.
+- Timing: 5 calls in 5 rounds on the `full` tier, 3 in 3 on `quick`. Verdicts treat changes below 10% in time and 3% in memory as noise, as in arf.
+- Report: both a Markdown table and a Quarto page.
+- Cluster resources: 4 GB of memory per unit of rows times families (10,000 × 50), `nthreads + 1` CPUs and 8 hours per cell. `resubmit` scales memory and walltime by factors and previews before it submits.
